@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ titulo_pagina }}{% endblock %}
+{% block page_title %}{{ titulo_pagina }}{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a>
+  </li>
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:cliente_list' %}" class="text-decoration-none">Clientes</a>
+  </li>
+  <li class="breadcrumb-item active">{{ titulo_pagina }}</li>
+{% endblock %}
+
+{% block content %}
+
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center gap-2">
+        <i class="bi bi-building text-primary fs-5"></i>
+        <h6 class="mb-0 fw-semibold">{{ titulo_pagina }}</h6>
+      </div>
+      <div class="card-body py-4 px-4">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <!-- Nome -->
+          <div class="mb-3">
+            <label class="form-label fw-medium small">{{ form.nome.label }}</label>
+            {{ form.nome }}
+            {% if form.nome.errors %}
+              <div class="invalid-feedback d-block">{{ form.nome.errors.0 }}</div>
+            {% endif %}
+          </div>
+
+          <!-- CNPJ/CPF -->
+          <div class="mb-3">
+            <label class="form-label fw-medium small">
+              {{ form.cnpj_cpf.label }}
+              <span class="text-muted">(opcional)</span>
+            </label>
+            {{ form.cnpj_cpf }}
+            {% if form.cnpj_cpf.errors %}
+              <div class="invalid-feedback d-block">{{ form.cnpj_cpf.errors.0 }}</div>
+            {% endif %}
+          </div>
+
+          <!-- Cidade e UF -->
+          <div class="row g-3 mb-3">
+            <div class="col-md-8">
+              <label class="form-label fw-medium small">{{ form.cidade.label }}</label>
+              {{ form.cidade }}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-medium small">{{ form.uf.label }}</label>
+              {{ form.uf }}
+            </div>
+          </div>
+
+          <!-- Contato -->
+          <div class="mb-3">
+            <label class="form-label fw-medium small">
+              {{ form.contato.label }}
+              <span class="text-muted">(opcional)</span>
+            </label>
+            {{ form.contato }}
+          </div>
+
+          <!-- Telefone e Email -->
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-medium small">
+                {{ form.telefone.label }}
+                <span class="text-muted">(opcional)</span>
+              </label>
+              {{ form.telefone }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium small">
+                {{ form.email.label }}
+                <span class="text-muted">(opcional)</span>
+              </label>
+              {{ form.email }}
+            </div>
+          </div>
+
+          <!-- Ativo -->
+          <div class="mb-4">
+            <div class="form-check form-switch">
+              {{ form.ativo }}
+              <label class="form-check-label fw-medium small" for="{{ form.ativo.id_for_label }}">
+                {{ form.ativo.label }}
+              </label>
+            </div>
+          </div>
+
+          <hr class="my-3">
+
+          <div class="d-flex gap-2 justify-content-end">
+            <a href="{% url 'relatorios:cliente_list' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-x-lg me-1"></i>Cancelar
+            </a>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-lg me-1"></i>{{ acao }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

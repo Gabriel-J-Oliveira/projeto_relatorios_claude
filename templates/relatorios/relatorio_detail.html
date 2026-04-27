@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ relatorio.numero }}{% endblock %}
+{% block page_title %}Relatório {{ relatorio.numero }}{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'relatorios:relatorio_list' %}" class="text-decoration-none">Relatórios</a></li>
+  <li class="breadcrumb-item active">{{ relatorio.numero }}</li>
+{% endblock %}
+
+{% block page_actions %}
+  <div class="d-flex gap-2">
+    <a href="{% url 'relatorios:relatorio_update' relatorio.pk %}" class="btn btn-primary">
+      <i class="bi bi-pencil me-1"></i>Editar
+    </a>
+    <a href="{% url 'relatorios:relatorio_delete' relatorio.pk %}" class="btn btn-outline-danger">
+      <i class="bi bi-trash me-1"></i>Excluir
+    </a>
+  </div>
+{% endblock %}
+
+{% block content %}
+
+<div class="row g-3">
+
+  <!-- Coluna principal -->
+  <div class="col-12 col-xl-8">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-file-earmark-text text-primary fs-5"></i>
+          <h6 class="mb-0 fw-semibold">Dados do Atendimento</h6>
+        </div>
+        {% if relatorio.status == 'pendente' %}
+          <span class="badge bg-warning-subtle text-warning rounded-pill px-3">Pendente</span>
+        {% elif relatorio.status == 'fechado' %}
+          <span class="badge bg-success-subtle text-success rounded-pill px-3">Fechado</span>
+        {% else %}
+          <span class="badge bg-info-subtle text-info rounded-pill px-3">Faturado</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-4 text-muted small fw-medium">Número</dt>
+          <dd class="col-sm-8 fw-semibold">{{ relatorio.numero }}</dd>
+
+          <dt class="col-sm-4 text-muted small fw-medium">Cliente</dt>
+          <dd class="col-sm-8">{{ relatorio.cliente.nome }}</dd>
+
+          <dt class="col-sm-4 text-muted small fw-medium">Técnico</dt>
+          <dd class="col-sm-8">{{ relatorio.tecnico.nome }}</dd>
+
+          <dt class="col-sm-4 text-muted small fw-medium">Cidade</dt>
+          <dd class="col-sm-8">{{ relatorio.cidade_atendimento }}</dd>
+
+          <dt class="col-sm-4 text-muted small fw-medium">Data</dt>
+          <dd class="col-sm-8">{{ relatorio.data_atendimento|date:"d/m/Y" }}</dd>
+
+          <dt class="col-sm-4 text-muted small fw-medium">Horas trabalhadas</dt>
+          <dd class="col-sm-8">{{ relatorio.horas_trabalhadas }}h</dd>
+        </dl>
+
+        <hr>
+
+        <h6 class="fw-semibold small text-muted mb-2">Descrição do Atendimento</h6>
+        <p class="mb-0" style="white-space: pre-line;">{{ relatorio.descricao }}</p>
+
+        {% if relatorio.observacoes %}
+        <hr>
+        <h6 class="fw-semibold small text-muted mb-2">Observações</h6>
+        <p class="mb-0 text-muted" style="white-space: pre-line;">{{ relatorio.observacoes }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Coluna lateral -->
+  <div class="col-12 col-xl-4">
+
+    <!-- Card financeiro -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-transparent border-bottom py-3">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-currency-dollar text-success fs-5"></i>
+          <h6 class="mb-0 fw-semibold">Financeiro</h6>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="d-flex flex-column gap-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="text-muted small">Despesas</span>
+            <span class="fw-semibold">R$ {{ relatorio.valor_despesas }}</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="text-muted small">Adiantamento recebido</span>
+            <span class="fw-semibold text-success">R$ {{ relatorio.valor_adiantamento }}</span>
+          </div>
+          <hr class="my-1">
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="fw-medium small">Saldo</span>
+            <span class="fw-bold {% if relatorio.saldo >= 0 %}text-success{% else %}text-danger{% endif %}">
+              R$ {{ relatorio.saldo }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auditoria -->
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <div class="d-flex flex-column gap-2">
+          <div class="d-flex justify-content-between">
+            <span class="text-muted small">Criado em</span>
+            <span class="small">{{ relatorio.criado_em|date:"d/m/Y H:i" }}</span>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span class="text-muted small">Atualizado em</span>
+            <span class="small">{{ relatorio.atualizado_em|date:"d/m/Y H:i" }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}

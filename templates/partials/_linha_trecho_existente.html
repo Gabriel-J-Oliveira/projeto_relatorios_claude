@@ -1,0 +1,31 @@
+{# Linha de trecho EXISTENTE #}
+{{ form.id }}
+{{ form.ordem }}
+<td class="p-1">{{ form.data }}</td>
+<td class="p-1">{{ form.origem }}</td>
+<td class="p-1">{{ form.destino }}</td>
+<td class="p-1">{{ form.km }}</td>
+<td class="p-1">{{ form.valor_km }}</td>
+<td class="p-1 fw-semibold text-success">
+  R$ {{ form.instance.valor_calculado|default:"0,00" }}
+</td>
+<td class="p-1">{{ form.observacao }}</td>
+<td class="p-1 text-center">
+  {{ form.DELETE }}
+  {% if form.instance.pk %}
+    <button type="button"
+            class="btn btn-sm btn-outline-danger px-2"
+            hx-post="{% url 'relatorios:htmx_remove_trecho' form.instance.pk %}"
+            hx-target="closest tr"
+            hx-swap="outerHTML"
+            hx-confirm="Remover este trecho?">
+      <i class="bi bi-trash"></i>
+    </button>
+  {% else %}
+    <button type="button"
+            class="btn btn-sm btn-outline-danger px-2"
+            onclick="this.closest('tr').remove()">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  {% endif %}
+</td>

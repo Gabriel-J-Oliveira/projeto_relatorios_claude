@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block titulo %}Campo Manager{% endblock %} | Campo Manager</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/custom.css' %}"/>
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js"></script>
+  {% block extra_css %}{% endblock %}
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+
+<div class="d-flex" id="app-wrapper">
+  {% include "partials/_sidebar.html" %}
+
+  <div class="flex-grow-1 d-flex flex-column" id="main-content">
+    {% include "partials/_navbar.html" %}
+
+    <main class="flex-grow-1 p-4 bg-body-secondary">
+
+      {% if messages %}
+        <div class="mb-3">
+          {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
+              <i class="bi bi-info-circle me-2"></i>{{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+          <h4 class="fw-semibold mb-0 text-body-emphasis">
+            {% block page_title %}{% endblock %}
+          </h4>
+          <nav aria-label="breadcrumb" class="mt-1">
+            <ol class="breadcrumb mb-0 small">
+              {% block breadcrumb %}
+                <li class="breadcrumb-item">
+                  <a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a>
+                </li>
+              {% endblock %}
+            </ol>
+          </nav>
+        </div>
+        <div>{% block page_actions %}{% endblock %}</div>
+      </div>
+
+      {% block content %}{% endblock %}
+
+    </main>
+
+    <footer class="py-3 px-4 border-top bg-body text-muted small">
+      <div class="d-flex justify-content-between">
+        <span>© 2024 Campo Manager</span>
+        <span>v2.0</span>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% load static %}
+<script src="{% static 'js/custom.js' %}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

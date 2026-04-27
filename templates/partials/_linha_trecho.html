@@ -1,0 +1,34 @@
+{# Linha de trecho KM NOVA — retornada pelo HTMX #}
+<tr class="linha-trecho" id="linha-trecho-nova-{{ idx }}">
+  <td class="p-1">{{ form.data }}</td>
+  <td class="p-1">{{ form.origem }}</td>
+  <td class="p-1">{{ form.destino }}</td>
+  <td class="p-1">{{ form.km }}</td>
+  <td class="p-1">{{ form.valor_km }}</td>
+  <td class="p-1 fw-semibold text-success" id="total-trecho-{{ idx }}">
+    R$ 0,00
+  </td>
+  <td class="p-1">{{ form.observacao }}</td>
+  <td class="p-1 text-center">
+    <button type="button"
+            class="btn btn-sm btn-outline-danger px-2"
+            onclick="this.closest('tr').remove()">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  </td>
+</tr>
+<script>
+  // Cálculo automático do total do trecho recém adicionado
+  (function() {
+    const tr  = document.getElementById("linha-trecho-nova-{{ idx }}");
+    const inp = (sel) => tr.querySelector(sel);
+    const calcular = () => {
+      const km  = parseFloat(inp("[name*='-km']")?.value) || 0;
+      const vkm = parseFloat(inp("[name*='valor_km']")?.value) || 0;
+      const tot = document.getElementById("total-trecho-{{ idx }}");
+      if (tot) tot.textContent = "R$ " + (km * vkm).toFixed(2).replace(".", ",");
+    };
+    inp("[name*='-km']")?.addEventListener("input", calcular);
+    inp("[name*='valor_km']")?.addEventListener("input", calcular);
+  })();
+</script>

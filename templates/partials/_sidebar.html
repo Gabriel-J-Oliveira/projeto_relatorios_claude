@@ -1,0 +1,107 @@
+{% load static %}
+
+<nav id="sidebar" class="d-flex flex-column flex-shrink-0 bg-body-tertiary border-end" style="width: 260px; min-height: 100vh;">
+
+  <!-- Logo -->
+  <a href="{% url 'relatorios:dashboard' %}"
+     class="d-flex align-items-center gap-2 px-4 py-3 text-decoration-none border-bottom">
+    <div class="d-flex align-items-center justify-content-center rounded-3 bg-primary text-white"
+         style="width:36px;height:36px;font-size:1.1rem;">
+      <i class="bi bi-tools"></i>
+    </div>
+    <span class="fw-bold fs-6 text-body-emphasis">Campo Manager</span>
+  </a>
+
+  <!-- Menu -->
+  <ul class="nav nav-pills flex-column px-3 py-3 gap-1 flex-grow-1">
+
+    <!-- Dashboard -->
+    <li class="nav-item">
+      <a href="{% url 'relatorios:dashboard' %}"
+         class="nav-link d-flex align-items-center gap-2
+                {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+        <i class="bi bi-speedometer2 fs-5"></i>
+        <span>Dashboard</span>
+      </a>
+    </li>
+
+    <!-- Separador Operações -->
+    <li class="mt-2 mb-1 px-2">
+      <small class="text-uppercase text-muted fw-semibold" style="font-size:.7rem;letter-spacing:.05em;">
+        Operações
+      </small>
+    </li>
+
+    <!-- Relatórios -->
+    <li class="nav-item">
+      <a href="{% url 'relatorios:relatorio_list' %}"
+         class="nav-link d-flex align-items-center gap-2
+                {% if 'relatorio' in request.resolver_match.url_name %}active{% endif %}">
+        <i class="bi bi-file-earmark-text fs-5"></i>
+        <span>Relatórios</span>
+      </a>
+    </li>
+
+    <!-- Adiantamentos -->
+    <li class="nav-item">
+      <a href="{% url 'relatorios:adiantamento_list' %}"
+         class="nav-link d-flex align-items-center gap-2
+                {% if 'adiantamento' in request.resolver_match.url_name %}active{% endif %}">
+        <i class="bi bi-cash-coin fs-5"></i>
+        <span>Adiantamentos</span>
+      </a>
+    </li>
+
+    <!-- Separador Cadastros -->
+    <li class="mt-2 mb-1 px-2">
+      <small class="text-uppercase text-muted fw-semibold" style="font-size:.7rem;letter-spacing:.05em;">
+        Cadastros
+      </small>
+    </li>
+
+    <!-- Técnicos -->
+    <li class="nav-item">
+      <a href="{% url 'relatorios:tecnico_list' %}"
+         class="nav-link d-flex align-items-center gap-2
+                {% if 'tecnico' in request.resolver_match.url_name %}active{% endif %}">
+        <i class="bi bi-person-badge fs-5"></i>
+        <span>Técnicos</span>
+      </a>
+    </li>
+
+    <!-- Clientes -->
+    <li class="nav-item">
+      <a href="{% url 'relatorios:cliente_list' %}"
+         class="nav-link d-flex align-items-center gap-2
+                {% if 'cliente' in request.resolver_match.url_name %}active{% endif %}">
+        <i class="bi bi-building fs-5"></i>
+        <span>Clientes</span>
+      </a>
+    </li>
+
+    <li class="flex-grow-1"></li>
+
+    <!-- Separador Sistema -->
+    <li class="mb-1 px-2">
+      <small class="text-uppercase text-muted fw-semibold" style="font-size:.7rem;letter-spacing:.05em;">
+        Sistema
+      </small>
+    </li>
+
+    <!-- Admin -->
+    <li class="nav-item">
+      <a href="/admin/" target="_blank"
+         class="nav-link d-flex align-items-center gap-2 text-body-secondary">
+        <i class="bi bi-gear fs-5"></i>
+        <span>Admin Django</span>
+        <i class="bi bi-box-arrow-up-right ms-auto small"></i>
+      </a>
+    </li>
+
+  </ul>
+
+  <div class="px-4 py-3 border-top">
+    <small class="text-muted">v1.0.0 — Ambiente Dev</small>
+  </div>
+
+</nav>

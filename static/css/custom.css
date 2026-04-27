@@ -1,0 +1,76 @@
+/* ── BASE ── */
+body {
+  font-family: 'Inter', sans-serif;
+  font-size: .9rem;
+}
+
+/* ── SIDEBAR ── */
+#sidebar {
+  transition: width 0.25s ease;
+}
+
+#sidebar .nav-link {
+  border-radius: .5rem;
+  padding: .5rem .75rem;
+  font-size: .875rem;
+  font-weight: 500;
+  color: var(--bs-body-color);
+  transition: background-color .15s ease, color .15s ease;
+}
+
+#sidebar .nav-link:hover {
+  background-color: var(--bs-primary-bg-subtle);
+  color: var(--bs-primary);
+}
+
+#sidebar .nav-link.active {
+  background-color: var(--bs-primary);
+  color: #fff !important;
+}
+
+#sidebar .nav-link.active i {
+  color: #fff !important;
+}
+
+/* ── CARDS ── */
+.card {
+  border-radius: .75rem;
+  transition: box-shadow .2s ease, transform .15s ease;
+}
+
+.card:hover {
+  box-shadow: 0 .5rem 1.5rem rgba(0, 0, 0, .08) !important;
+}
+
+/* ── TABELA ── */
+.table th {
+  font-size: .78rem;
+  letter-spacing: .03em;
+}
+
+.table-hover tbody tr:hover {
+  background-color: var(--bs-primary-bg-subtle);
+}
+
+/* ── NAVBAR ── */
+header.navbar {
+  min-height: 58px;
+}
+
+/* ── UTILITÁRIOS ── */
+.bg-body-secondary {
+  min-height: calc(100vh - 58px);
+}
+
+/* ── SCROLLBAR FINA ── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,.2);
+  border-radius: 10px;
+}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block titulo %}Excluir Técnico{% endblock %}
+{% block page_title %}Excluir Técnico{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a>
+  </li>
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:tecnico_list' %}" class="text-decoration-none">Técnicos</a>
+  </li>
+  <li class="breadcrumb-item active">Excluir</li>
+{% endblock %}
+
+{% block content %}
+
+<div class="row justify-content-center">
+  <div class="col-12 col-md-6">
+    <div class="card border-0 shadow-sm" style="border-top: 3px solid #dc3545 !important;">
+      <div class="card-body text-center py-5">
+        <div class="text-danger mb-3" style="font-size:3rem;">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+        </div>
+        <h5 class="fw-bold">Confirmar exclusão</h5>
+        <p class="text-muted mb-1">Você está prestes a excluir o técnico:</p>
+        <p class="fw-semibold fs-5 mb-1">{{ object.nome }}</p>
+        <p class="text-muted small mb-4">{{ object.email }}</p>
+
+        {% if object.relatorios.count > 0 %}
+        <div class="alert alert-danger text-start small">
+          <i class="bi bi-exclamation-circle me-1"></i>
+          Este técnico possui <strong>{{ object.relatorios.count }} relatório{{ object.relatorios.count|pluralize }}</strong> vinculado{{ object.relatorios.count|pluralize }}.
+          A exclusão pode falhar por causa dessas dependências.
+        </div>
+        {% else %}
+        <div class="alert alert-warning text-start small">
+          <i class="bi bi-info-circle me-1"></i>
+          Esta ação <strong>não pode ser desfeita</strong>.
+        </div>
+        {% endif %}
+
+        <form method="post" class="d-flex gap-2 justify-content-center mt-4">
+          {% csrf_token %}
+          <a href="{% url 'relatorios:tecnico_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Cancelar
+          </a>
+          <button type="submit" class="btn btn-danger">
+            <i class="bi bi-trash me-1"></i>Excluir definitivamente
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

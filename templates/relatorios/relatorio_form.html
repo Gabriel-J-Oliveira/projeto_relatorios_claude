@@ -1,0 +1,578 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block titulo %}{{ titulo_pagina }}{% endblock %}
+{% block page_title %}{{ titulo_pagina }}{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a>
+  </li>
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:relatorio_list' %}" class="text-decoration-none">Relatórios</a>
+  </li>
+  <li class="breadcrumb-item active">{{ titulo_pagina }}</li>
+{% endblock %}
+
+{% block content %}
+<form method="post" enctype="multipart/form-data" id="form-relatorio" novalidate
+      x-data="resumoFinanceiro()" x-init="init()">
+  {% csrf_token %}
+
+  <!-- Formset management forms (obrigatório para Django formsets) -->
+  {{ fs_desp.management_form }}
+  {{ fs_km.management_form }}
+
+  <!-- ── ABAS ── -->
+  <ul class="nav nav-tabs mb-0" id="abas" role="tablist">
+    <li class="nav-item">
+      <button class="nav-link active d-flex align-items-center gap-1"
+              data-bs-toggle="tab" data-bs-target="#tab-dados" type="button">
+        <i class="bi bi-clipboard-data"></i> Dados Gerais
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link d-flex align-items-center gap-1"
+              data-bs-toggle="tab" data-bs-target="#tab-despesas" type="button">
+        <i class="bi bi-receipt"></i> Despesas
+        <span class="badge bg-primary rounded-pill ms-1" id="badge-despesas">0</span>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link d-flex align-items-center gap-1"
+              data-bs-toggle="tab" data-bs-target="#tab-km" type="button">
+        <i class="bi bi-geo-alt"></i> Deslocamento / KM
+        <span class="badge bg-secondary rounded-pill ms-1" id="badge-km">0</span>
+      </button>
+    </li>
+    <li class="nav-item ms-auto">
+      <button class="nav-link d-flex align-items-center gap-1"
+              data-bs-toggle="tab" data-bs-target="#tab-resumo" type="button">
+        <i class="bi bi-calculator"></i> Resumo Financeiro
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content bg-white border border-top-0 rounded-bottom shadow-sm">
+
+    <!-- ── ABA 1: DADOS GERAIS ── -->
+    <div class="tab-pane fade show active p-4" id="tab-dados">
+
+      {% if form.errors %}
+        <div class="alert alert-danger small mb-3">
+          <i class="bi bi-exclamation-circle me-1"></i>
+          Corrija os campos destacados antes de salvar.
+        </div>
+      {% endif %}
+
+      <div class="row g-3">
+
+        <!-- Número e Status -->
+        <div class="col-md-4">
+          <label class="form-label fw-medium small">Número do Relatório *</label>
+          {{ form.numero }}
+          {% if form.numero.errors %}
+            <div class="text-danger small mt-1">{{ form.numero.errors.0 }}</div>
+          {% endif %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-medium small">Status</label>
+          {{ form.status }}
+        </div>
+        <div class="col-md-5">
+          <label class="form-label fw-medium small">Área / Centro de Custo</label>
+          {{ form.area_gasto }}
+        </div>
+
+        <!-- Cliente e Técnico -->
+        <div class="col-md-6">
+          <label class="form-label fw-medium small">Cliente *</label>
+          {{ form.cliente }}
+          {% if form.cliente.errors %}
+            <div class="text-danger small mt-1">{{ form.cliente.errors.0 }}</div>
+          {% endif %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-medium small">Técnico Responsável *</label>
+          {{ form.tecnico_responsavel }}
+        </div>
+
+        <!-- Local e tipo -->
+        <div class="col-md-5">
+          <label class="form-label fw-medium small">Cidade de Atendimento *</label>
+          {{ form.cidade_atendimento }}
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-medium small">UF</label>
+          {{ form.uf_atendimento }}
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-medium small">Localidade</label>
+          {{ form.tipo_localidade }}
+        </div>
+        <div class="col-md-3">
+          <!-- espaço intencional -->
+        </div>
+
+        <!-- Datas -->
+        <div class="col-md-3">
+          <label class="form-label fw-medium small">Data Início *</label>
+          {{ form.data_inicio }}
+          {% if form.data_inicio.errors %}
+            <div class="text-danger small mt-1">{{ form.data_inicio.errors.0 }}</div>
+          {% endif %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-medium small">Data Fim *</label>
+          {{ form.data_fim }}
+          {% if form.data_fim.errors %}
+            <div class="text-danger small mt-1">{{ form.data_fim.errors.0 }}</div>
+          {% endif %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-medium small">
+            Adiantamento Recebido (R$)
+          </label>
+          {{ form.valor_adiantamento }}
+        </div>
+
+        <!-- Motivo -->
+        <div class="col-12">
+          <label class="form-label fw-medium small">Motivo / Descrição do Serviço *</label>
+          {{ form.motivo }}
+          {% if form.motivo.errors %}
+            <div class="text-danger small mt-1">{{ form.motivo.errors.0 }}</div>
+          {% endif %}
+        </div>
+
+        <!-- Observações -->
+        <div class="col-12">
+          <label class="form-label fw-medium small">
+            Observações Gerais
+            <span class="text-muted">(opcional)</span>
+          </label>
+          {{ form.observacoes }}
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── ABA 2: DESPESAS ITEMIZADAS ── -->
+    <div class="tab-pane fade" id="tab-despesas">
+
+      <!-- Cabeçalho da grade -->
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0" id="tabela-despesas">
+          <thead class="table-light">
+            <tr>
+              <th style="width:100px">Data</th>
+              <th style="width:140px">Tipo</th>
+              <th>Descrição / Fornecedor</th>
+              <th style="width:110px">Valor R$</th>
+              <th style="width:120px">Quem Pagou</th>
+              <th style="width:80px" class="text-center">Reemb.</th>
+              <th style="width:130px">Centro Custo</th>
+              <th style="width:50px" class="text-center">Comp.</th>
+              <th style="width:40px"></th>
+            </tr>
+          </thead>
+          <tbody id="corpo-despesas">
+
+            <!-- Linhas existentes (edição) -->
+            {% for f in fs_desp %}
+              <tr class="linha-despesa" id="linha-despesa-{{ forloop.counter0 }}">
+                {% include "relatorios/partials/_linha_despesa_existente.html" with form=f %}
+              </tr>
+            {% endfor %}
+
+          </tbody>
+
+          <tfoot class="table-light fw-semibold">
+            <tr>
+              <td colspan="3" class="text-end small text-muted pe-3">Totais</td>
+              <td class="text-success fw-bold">
+                R$ <span x-text="totalDespesas()">0,00</span>
+              </td>
+              <td colspan="5"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Botão adicionar linha -->
+      <div class="p-3 border-top">
+        {% if instance %}
+          <button type="button"
+                  class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
+                  hx-get="{% url 'relatorios:htmx_add_despesa' instance.pk %}"
+                  hx-target="#corpo-despesas"
+                  hx-swap="beforeend"
+                  @click="atualizarBadge('badge-despesas', 'linha-despesa')">
+            <i class="bi bi-plus-lg"></i> Adicionar Despesa
+          </button>
+        {% else %}
+          <p class="text-muted small mb-0">
+            <i class="bi bi-info-circle me-1"></i>
+            Salve os dados gerais primeiro para adicionar despesas.
+          </p>
+        {% endif %}
+      </div>
+
+    </div>
+
+    <!-- ── ABA 3: DESLOCAMENTO / KM ── -->
+    <div class="tab-pane fade" id="tab-km">
+
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0" id="tabela-km">
+          <thead class="table-light">
+            <tr>
+              <th style="width:100px">Data</th>
+              <th>Origem</th>
+              <th>Destino</th>
+              <th style="width:80px">KM</th>
+              <th style="width:100px">Valor/KM</th>
+              <th style="width:110px">Total R$</th>
+              <th>Obs.</th>
+              <th style="width:40px"></th>
+            </tr>
+          </thead>
+          <tbody id="corpo-trechos">
+
+            {% for f in fs_km %}
+              <tr class="linha-trecho" id="linha-trecho-{{ forloop.counter0 }}">
+                {% include "relatorios/partials/_linha_trecho_existente.html" with form=f %}
+              </tr>
+            {% endfor %}
+
+          </tbody>
+          <tfoot class="table-light fw-semibold">
+            <tr>
+              <td colspan="3" class="text-end small text-muted pe-3">Totais</td>
+              <td class="small">
+                <span x-text="totalKmPercorrido()">0</span> km
+              </td>
+              <td></td>
+              <td class="text-success fw-bold">
+                R$ <span x-text="totalKmValor()">0,00</span>
+              </td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="p-3 border-top">
+        {% if instance %}
+          <button type="button"
+                  class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1"
+                  hx-get="{% url 'relatorios:htmx_add_trecho' instance.pk %}"
+                  hx-target="#corpo-trechos"
+                  hx-swap="beforeend"
+                  @click="atualizarBadge('badge-km', 'linha-trecho')">
+            <i class="bi bi-plus-lg"></i> Adicionar Trecho
+          </button>
+        {% else %}
+          <p class="text-muted small mb-0">
+            <i class="bi bi-info-circle me-1"></i>
+            Salve os dados gerais primeiro para adicionar trechos.
+          </p>
+        {% endif %}
+      </div>
+
+    </div>
+
+    <!-- ── ABA 4: RESUMO FINANCEIRO ── -->
+    <div class="tab-pane fade p-4" id="tab-resumo">
+
+      <div class="row g-3">
+
+        <!-- Bloco técnico -->
+        <div class="col-md-4">
+          <div class="card border-0 bg-body-tertiary h-100">
+            <div class="card-header bg-transparent border-bottom py-2">
+              <small class="fw-semibold text-muted">
+                <i class="bi bi-person me-1"></i>Pago pelo Técnico
+              </small>
+            </div>
+            <div class="card-body">
+              <div class="d-flex justify-content-between py-1 border-bottom small">
+                <span class="text-muted">Despesas reembolsáveis</span>
+                <span class="fw-semibold">
+                  R$ <span x-text="totalTecnico()">0,00</span>
+                </span>
+              </div>
+              <div class="d-flex justify-content-between py-1 border-bottom small">
+                <span class="text-muted">Deslocamento (KM)</span>
+                <span class="fw-semibold">
+                  R$ <span x-text="totalKmValor()">0,00</span>
+                </span>
+              </div>
+              <div class="d-flex justify-content-between py-2 small fw-bold">
+                <span>Subtotal técnico</span>
+                <span class="text-primary">
+                  R$ <span x-text="subtotalTecnico()">0,00</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bloco empresa -->
+        <div class="col-md-4">
+          <div class="card border-0 bg-body-tertiary h-100">
+            <div class="card-header bg-transparent border-bottom py-2">
+              <small class="fw-semibold text-muted">
+                <i class="bi bi-building me-1"></i>Pago pela Empresa
+              </small>
+            </div>
+            <div class="card-body">
+              <div class="d-flex justify-content-between py-1 border-bottom small">
+                <span class="text-muted">Despesas diretas</span>
+                <span class="fw-semibold">
+                  R$ <span x-text="totalEmpresa()">0,00</span>
+                </span>
+              </div>
+              <div class="d-flex justify-content-between py-2 small fw-bold">
+                <span>Subtotal empresa</span>
+                <span class="text-secondary">
+                  R$ <span x-text="totalEmpresa()">0,00</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bloco saldo -->
+        <div class="col-md-4">
+          <div class="card border-0 h-100"
+               :class="saldo() >= 0 ? 'bg-success-subtle' : 'bg-danger-subtle'">
+            <div class="card-header bg-transparent border-bottom py-2">
+              <small class="fw-semibold text-muted">
+                <i class="bi bi-calculator me-1"></i>Acerto Financeiro
+              </small>
+            </div>
+            <div class="card-body">
+              <div class="d-flex justify-content-between py-1 border-bottom small">
+                <span class="text-muted">Total despesas</span>
+                <span class="fw-semibold">R$ <span x-text="totalGeral()">0,00</span></span>
+              </div>
+              <div class="d-flex justify-content-between py-1 border-bottom small">
+                <span class="text-muted">(-) Adiantamento</span>
+                <span class="fw-semibold text-danger">
+                  R$ <span x-text="adiantamento">0,00</span>
+                </span>
+              </div>
+              <div class="d-flex justify-content-between py-2 small">
+                <span class="fw-bold fs-6">Saldo a reembolsar</span>
+                <span class="fw-bold fs-5"
+                      :class="saldo() >= 0 ? 'text-success' : 'text-danger'">
+                  R$ <span x-text="saldo()">0,00</span>
+                </span>
+              </div>
+              <div class="mt-2 small text-muted">
+                <span x-show="saldo() > 0">
+                  <i class="bi bi-arrow-left-circle text-success"></i>
+                  Empresa deve reembolsar o técnico.
+                </span>
+                <span x-show="saldo() < 0">
+                  <i class="bi bi-arrow-right-circle text-danger"></i>
+                  Técnico deve devolver à empresa.
+                </span>
+                <span x-show="saldo() == 0">
+                  <i class="bi bi-check-circle text-success"></i>
+                  Contas zeradas.
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Tabela de despesas por tipo -->
+      <div class="card border-0 bg-body-tertiary mt-3">
+        <div class="card-header bg-transparent border-bottom py-2">
+          <small class="fw-semibold text-muted">Despesas por Tipo</small>
+        </div>
+        <div class="card-body p-0">
+          {% if instance %}
+            <div class="table-responsive">
+              <table class="table table-sm mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th class="ps-3 small fw-semibold text-muted">Tipo</th>
+                    <th class="small fw-semibold text-muted">Qtd</th>
+                    <th class="small fw-semibold text-muted">Total</th>
+                    <th class="small fw-semibold text-muted">Quem Pagou</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% regroup instance.despesas.all by get_tipo_display as por_tipo %}
+                  {% for grupo in por_tipo %}
+                    <tr>
+                      <td class="ps-3 small">{{ grupo.grouper }}</td>
+                      <td class="small">{{ grupo.list|length }}</td>
+                      <td class="small fw-semibold">
+                        R$
+                        {% with total=0 %}
+                          {% for item in grupo.list %}
+                            {% comment %}somamos via template filter não é ideal,
+                            mas mantemos simples aqui{% endcomment %}
+                          {% endfor %}
+                        {% endwith %}
+                        {{ grupo.list|length }}x
+                      </td>
+                      <td class="small text-muted">—</td>
+                    </tr>
+                  {% empty %}
+                    <tr>
+                      <td colspan="4" class="text-center text-muted small py-3">
+                        Nenhuma despesa lançada ainda.
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="text-center text-muted small py-3">
+              Salve o relatório para visualizar o resumo.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+    </div><!-- /tab-resumo -->
+
+  </div><!-- /tab-content -->
+
+  <!-- ── RODAPÉ DE AÇÕES ── -->
+  <div class="d-flex justify-content-between align-items-center mt-3 py-3 px-4
+              bg-white rounded shadow-sm border">
+    <a href="{% url 'relatorios:relatorio_list' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Voltar
+    </a>
+    <div class="d-flex gap-2">
+      {% if instance %}
+        {% if instance.status == 'rascunho' %}
+          <button type="submit" name="acao_submit" value="rascunho"
+                  class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-floppy me-1"></i>Salvar rascunho
+          </button>
+          <button type="submit" name="acao_submit" value="pendente"
+                  class="btn btn-warning btn-sm">
+            <i class="bi bi-send me-1"></i>Enviar para aprovação
+          </button>
+        {% endif %}
+        {% if instance.status == 'aprovado' %}
+          <a href="{% url 'relatorios:relatorio_status' instance.pk 'faturado' %}"
+             class="btn btn-info btn-sm"
+             onclick="return confirm('Marcar como Faturado?')">
+            <i class="bi bi-check2-all me-1"></i>Marcar Faturado
+          </a>
+        {% endif %}
+      {% endif %}
+      <button type="submit" class="btn btn-primary btn-sm">
+        <i class="bi bi-check-lg me-1"></i>{{ acao }} Relatório
+      </button>
+    </div>
+  </div>
+
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function resumoFinanceiro() {
+  return {
+    adiantamento: parseFloat("{{ instance.valor_adiantamento|default:'0'|stringformat:'f' }}") || 0,
+
+    lerValores(seletor, campo) {
+      return [...document.querySelectorAll(seletor)]
+        .map(el => parseFloat(el.value) || 0);
+    },
+
+    totalTecnico() {
+      let total = 0;
+      document.querySelectorAll(".linha-despesa").forEach(linha => {
+        const quem  = linha.querySelector("[name*='quem_pagou']")?.value;
+        const reemb = linha.querySelector("[name*='reembolsavel']")?.checked;
+        const val   = parseFloat(linha.querySelector("[name*='valor']")?.value) || 0;
+        if (quem === "tecnico") total += val;
+      });
+      return total.toFixed(2).replace(".", ",");
+    },
+
+    totalEmpresa() {
+      let total = 0;
+      document.querySelectorAll(".linha-despesa").forEach(linha => {
+        const quem = linha.querySelector("[name*='quem_pagou']")?.value;
+        const val  = parseFloat(linha.querySelector("[name*='valor']")?.value) || 0;
+        if (quem === "empresa") total += val;
+      });
+      return total.toFixed(2).replace(".", ",");
+    },
+
+    totalDespesas() {
+      let total = 0;
+      document.querySelectorAll(".linha-despesa [name*='valor']")
+        .forEach(el => { total += parseFloat(el.value) || 0; });
+      return total.toFixed(2).replace(".", ",");
+    },
+
+    totalKmPercorrido() {
+      let total = 0;
+      document.querySelectorAll(".linha-trecho [name*='-km']")
+        .forEach(el => { total += parseFloat(el.value) || 0; });
+      return total.toFixed(1);
+    },
+
+    totalKmValor() {
+      let total = 0;
+      document.querySelectorAll(".linha-trecho").forEach(linha => {
+        const km  = parseFloat(linha.querySelector("[name*='-km']")?.value) || 0;
+        const vkm = parseFloat(linha.querySelector("[name*='valor_km']")?.value) || 0;
+        total += km * vkm;
+      });
+      return total.toFixed(2).replace(".", ",");
+    },
+
+    subtotalTecnico() {
+      const t = parseFloat(this.totalTecnico().replace(",", ".")) || 0;
+      const k = parseFloat(this.totalKmValor().replace(",", ".")) || 0;
+      return (t + k).toFixed(2).replace(".", ",");
+    },
+
+    totalGeral() {
+      const t = parseFloat(this.totalDespesas().replace(",", ".")) || 0;
+      const k = parseFloat(this.totalKmValor().replace(",", ".")) || 0;
+      return (t + k).toFixed(2).replace(".", ",");
+    },
+
+    saldo() {
+      const tec  = parseFloat(this.totalTecnico().replace(",", ".")) || 0;
+      const km   = parseFloat(this.totalKmValor().replace(",", ".")) || 0;
+      const adi  = parseFloat(
+        document.querySelector("[name='valor_adiantamento']")?.value
+      ) || 0;
+      return (tec + km - adi).toFixed(2).replace(".", ",");
+    },
+
+    atualizarBadge(badgeId, classeLinhas) {
+      setTimeout(() => {
+        const count = document.querySelectorAll("." + classeLinhas).length;
+        const el    = document.getElementById(badgeId);
+        if (el) el.textContent = count;
+      }, 300);
+    },
+
+    init() {
+      // Atualiza badges iniciais
+      this.atualizarBadge("badge-despesas", "linha-despesa");
+      this.atualizarBadge("badge-km", "linha-trecho");
+    },
+  };
+}
+</script>
+{% endblock %}

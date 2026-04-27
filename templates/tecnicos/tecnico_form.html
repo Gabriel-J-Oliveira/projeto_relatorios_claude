@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block titulo %}{{ titulo_pagina }}{% endblock %}
+{% block page_title %}{{ titulo_pagina }}{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a>
+  </li>
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:tecnico_list' %}" class="text-decoration-none">Técnicos</a>
+  </li>
+  <li class="breadcrumb-item active">{{ titulo_pagina }}</li>
+{% endblock %}
+
+{% block content %}
+
+<div class="row justify-content-center">
+  <div class="col-12 col-md-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center gap-2">
+        <i class="bi bi-person-badge text-primary fs-5"></i>
+        <h6 class="mb-0 fw-semibold">{{ titulo_pagina }}</h6>
+      </div>
+      <div class="card-body py-4 px-4">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label class="form-label fw-medium small">{{ form.nome.label }}</label>
+            {{ form.nome }}
+            {% if form.nome.errors %}
+              <div class="invalid-feedback d-block">{{ form.nome.errors.0 }}</div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-medium small">{{ form.email.label }}</label>
+            {{ form.email }}
+            {% if form.email.errors %}
+              <div class="invalid-feedback d-block">{{ form.email.errors.0 }}</div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-medium small">{{ form.telefone.label }}</label>
+            {{ form.telefone }}
+          </div>
+
+          <div class="mb-4">
+            <div class="form-check form-switch">
+              {{ form.ativo }}
+              <label class="form-check-label fw-medium small" for="{{ form.ativo.id_for_label }}">
+                {{ form.ativo.label }}
+              </label>
+            </div>
+          </div>
+
+          <hr class="my-3">
+
+          <div class="d-flex gap-2 justify-content-end">
+            <a href="{% url 'relatorios:tecnico_list' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-x-lg me-1"></i>Cancelar
+            </a>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-lg me-1"></i>{{ acao }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

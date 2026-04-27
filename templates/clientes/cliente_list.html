@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block titulo %}Clientes{% endblock %}
+{% block page_title %}Clientes{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a>
+  </li>
+  <li class="breadcrumb-item active">Clientes</li>
+{% endblock %}
+
+{% block page_actions %}
+  <a href="{% url 'relatorios:cliente_create' %}" class="btn btn-primary d-flex align-items-center gap-1">
+    <i class="bi bi-plus-lg"></i> Novo Cliente
+  </a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Busca -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-3">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-md-5">
+        <label class="form-label fw-medium small">Buscar cliente</label>
+        <input type="text"
+               name="busca"
+               value="{{ busca }}"
+               placeholder="Nome, CNPJ ou cidade..."
+               class="form-control">
+      </div>
+      <div class="col-auto d-flex gap-1">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-search me-1"></i>Buscar
+        </button>
+        {% if busca %}
+          <a href="{% url 'relatorios:cliente_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-x"></i>
+          </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Tabela -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center gap-2">
+    <i class="bi bi-building text-primary"></i>
+    <h6 class="mb-0 fw-semibold">{{ clientes.count }} cliente{{ clientes.count|pluralize }} cadastrado{{ clientes.count|pluralize }}</h6>
+  </div>
+  <div class="card-body p-0">
+    {% if clientes %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4 py-3 fw-semibold text-muted small">Nome / Razão Social</th>
+            <th class="py-3 fw-semibold text-muted small">CNPJ / CPF</th>
+            <th class="py-3 fw-semibold text-muted small">Localização</th>
+            <th class="py-3 fw-semibold text-muted small">Contato</th>
+            <th class="py-3 fw-semibold text-muted small">Relatórios</th>
+            <th class="py-3 fw-semibold text-muted small">Status</th>
+            <th class="py-3 fw-semibold text-muted small text-end pe-4">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in clientes %}
+          <tr>
+            <td class="ps-4">
+              <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center justify-content-center rounded-circle bg-success-subtle text-success fw-bold"
+                     style="width:36px;height:36px;font-size:.85rem;flex-shrink:0;">
+                  {{ c.nome|first|upper }}
+                </div>
+                <span class="fw-semibold small">{{ c.nome }}</span>
+              </div>
+            </td>
+            <td class="small text-muted">{{ c.cnpj_cpf|default:"—" }}</td>
+            <td class="small">
+              {{ c.cidade }}<span class="text-muted">/{{ c.uf }}</span>
+            </td>
+            <td class="small text-muted">{{ c.contato|default:"—" }}</td>
+            <td>
+              <span class="badge bg-primary-subtle text-primary rounded-pill px-2">
+                {{ c.relatorios.count }}
+              </span>
+            </td>
+            <td>
+              {% if c.ativo %}
+                <span class="badge bg-success-subtle text-success rounded-pill px-2">Ativo</span>
+              {% else %}
+                <span class="badge bg-secondary-subtle text-secondary rounded-pill px-2">Inativo</span>
+              {% endif %}
+            </td>
+            <td class="text-end pe-4">
+              <div class="d-flex gap-1 justify-content-end">
+                <a href="{% url 'relatorios:cliente_update' c.pk %}"
+                   class="btn btn-sm btn-outline-primary" title="Editar">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{% url 'relatorios:cliente_delete' c.pk %}"
+                   class="btn btn-sm btn-outline-danger" title="Excluir">
+                  <i class="bi bi-trash"></i>
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if is_paginated %}
+    <div class="card-footer bg-transparent border-top py-3 d-flex justify-content-center">
+      <nav>
+        <ul class="pagination pagination-sm mb-0 gap-1">
+          {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link rounded" href="?page={{ page_obj.previous_page_number }}">
+                <i class="bi bi-chevron-left"></i>
+              </a>
+            </li>
+          {% endif %}
+          {% for num in paginator.page_range %}
+            <li class="page-item {% if num == page_obj.number %}active{% endif %}">
+              <a class="page-link rounded" href="?page={{ num }}">{{ num }}</a>
+            </li>
+          {% endfor %}
+          {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link rounded" href="?page={{ page_obj.next_page_number }}">
+                <i class="bi bi-chevron-right"></i>
+              </a>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center py-5">
+      <div class="text-muted mb-3" style="font-size:3rem;"><i class="bi bi-building-x"></i></div>
+      <h6 class="text-body-secondary fw-semibold">Nenhum cliente encontrado</h6>
+      <p class="text-muted small mb-4">
+        {% if busca %}Tente outro termo de busca.{% else %}Comece cadastrando o primeiro cliente.{% endif %}
+      </p>
+      <a href="{% url 'relatorios:cliente_create' %}" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg me-1"></i>Novo Cliente
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

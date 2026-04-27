@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block titulo %}Relatórios{% endblock %}
+{% block page_title %}Relatórios Técnicos{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a></li>
+  <li class="breadcrumb-item active">Relatórios</li>
+{% endblock %}
+
+{% block page_actions %}
+  <a href="{% url 'relatorios:relatorio_create' %}" class="btn btn-primary d-flex align-items-center gap-1">
+    <i class="bi bi-plus-lg"></i> Novo Relatório
+  </a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Filtros -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-3">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-md-3">
+        {{ form_filtro.busca.label_tag }}
+        {{ form_filtro.busca }}
+      </div>
+      <div class="col-6 col-md-2">
+        {{ form_filtro.tecnico.label_tag }}
+        {{ form_filtro.tecnico }}
+      </div>
+      <div class="col-6 col-md-2">
+        {{ form_filtro.cliente.label_tag }}
+        {{ form_filtro.cliente }}
+      </div>
+      <div class="col-6 col-md-2">
+        {{ form_filtro.status.label_tag }}
+        {{ form_filtro.status }}
+      </div>
+      <div class="col-6 col-md-1">
+        {{ form_filtro.data_inicio.label_tag }}
+        {{ form_filtro.data_inicio }}
+      </div>
+      <div class="col-6 col-md-1">
+        {{ form_filtro.data_fim.label_tag }}
+        {{ form_filtro.data_fim }}
+      </div>
+      <div class="col-6 col-md-1 d-flex gap-1">
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-search"></i>
+        </button>
+        <a href="{% url 'relatorios:relatorio_list' %}" class="btn btn-outline-secondary w-100">
+          <i class="bi bi-x"></i>
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Tabela -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center justify-content-between">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-table text-primary"></i>
+      <h6 class="mb-0 fw-semibold">
+        {{ total }} relatório{{ total|pluralize }} encontrado{{ total|pluralize }}
+      </h6>
+    </div>
+  </div>
+
+  <div class="card-body p-0">
+    {% if relatorios %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4 py-3 fw-semibold text-muted small">Número</th>
+            <th class="py-3 fw-semibold text-muted small">Cliente</th>
+            <th class="py-3 fw-semibold text-muted small">Técnico</th>
+            <th class="py-3 fw-semibold text-muted small">Data</th>
+            <th class="py-3 fw-semibold text-muted small">Horas</th>
+            <th class="py-3 fw-semibold text-muted small">Despesas</th>
+            <th class="py-3 fw-semibold text-muted small">Status</th>
+            <th class="py-3 fw-semibold text-muted small text-end pe-4">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in relatorios %}
+          <tr>
+            <td class="ps-4">
+              <a href="{% url 'relatorios:relatorio_detail' r.pk %}"
+                 class="fw-semibold text-primary text-decoration-none">
+                {{ r.numero }}
+              </a>
+            </td>
+            <td>
+              <div class="small fw-medium">{{ r.cliente.nome }}</div>
+              <div class="text-muted" style="font-size:.78rem;">{{ r.cidade_atendimento }}</div>
+            </td>
+            <td class="small">{{ r.tecnico.nome }}</td>
+            <td class="small text-muted">{{ r.data_atendimento|date:"d/m/Y" }}</td>
+            <td class="small">{{ r.horas_trabalhadas }}h</td>
+            <td class="small">R$ {{ r.valor_despesas }}</td>
+            <td>
+              {% if r.status == 'pendente' %}
+                <span class="badge bg-warning-subtle text-warning rounded-pill px-3">Pendente</span>
+              {% elif r.status == 'fechado' %}
+                <span class="badge bg-success-subtle text-success rounded-pill px-3">Fechado</span>
+              {% else %}
+                <span class="badge bg-info-subtle text-info rounded-pill px-3">Faturado</span>
+              {% endif %}
+            </td>
+            <td class="text-end pe-4">
+              <div class="d-flex gap-1 justify-content-end">
+                <a href="{% url 'relatorios:relatorio_detail' r.pk %}"
+                   class="btn btn-sm btn-outline-secondary" title="Ver">
+                  <i class="bi bi-eye"></i>
+                </a>
+                <a href="{% url 'relatorios:relatorio_update' r.pk %}"
+                   class="btn btn-sm btn-outline-primary" title="Editar">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{% url 'relatorios:relatorio_delete' r.pk %}"
+                   class="btn btn-sm btn-outline-danger" title="Excluir">
+                  <i class="bi bi-trash"></i>
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Paginação -->
+    {% if is_paginated %}
+    <div class="card-footer bg-transparent border-top py-3 d-flex justify-content-center">
+      <nav>
+        <ul class="pagination pagination-sm mb-0 gap-1">
+          {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link rounded" href="?page={{ page_obj.previous_page_number }}">
+                <i class="bi bi-chevron-left"></i>
+              </a>
+            </li>
+          {% endif %}
+          {% for num in paginator.page_range %}
+            <li class="page-item {% if num == page_obj.number %}active{% endif %}">
+              <a class="page-link rounded" href="?page={{ num }}">{{ num }}</a>
+            </li>
+          {% endfor %}
+          {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link rounded" href="?page={{ page_obj.next_page_number }}">
+                <i class="bi bi-chevron-right"></i>
+              </a>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center py-5">
+      <div class="text-muted mb-3" style="font-size:3rem;"><i class="bi bi-inbox"></i></div>
+      <h6 class="text-body-secondary fw-semibold">Nenhum relatório encontrado</h6>
+      <p class="text-muted small mb-4">Tente ajustar os filtros ou crie um novo relatório.</p>
+      <a href="{% url 'relatorios:relatorio_create' %}" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg me-1"></i>Novo Relatório
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

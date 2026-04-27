@@ -1,0 +1,77 @@
+<header class="navbar bg-body border-bottom px-4 py-2 sticky-top shadow-sm" style="z-index: 1020;">
+  <div class="d-flex align-items-center gap-3 w-100">
+
+    <!-- Botão colapsar sidebar (mobile) -->
+    <button class="btn btn-sm btn-outline-secondary d-md-none" id="sidebar-toggle" type="button">
+      <i class="bi bi-list fs-5"></i>
+    </button>
+
+    <!-- Título dinâmico da página -->
+    <span class="fw-semibold text-body-emphasis d-none d-md-inline">
+      {% block navbar_title %}{% endblock %}
+    </span>
+
+    <!-- Espaço flex -->
+    <div class="ms-auto d-flex align-items-center gap-2">
+
+      <!-- Data atual -->
+      <span class="text-muted small d-none d-lg-inline" id="current-date"></span>
+
+      <!-- Separador -->
+      <div class="vr d-none d-lg-inline mx-1"></div>
+
+      <!-- Toggle tema claro/escuro -->
+      <button class="btn btn-sm btn-outline-secondary rounded-circle"
+              id="theme-toggle"
+              title="Alternar tema"
+              style="width: 34px; height: 34px;">
+        <i class="bi bi-moon-stars-fill" id="theme-icon"></i>
+      </button>
+
+      <!-- Avatar / usuário -->
+      <div class="dropdown">
+        <button class="btn btn-sm d-flex align-items-center gap-2 rounded-pill border"
+                type="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+                style="padding: 4px 12px 4px 4px;">
+          <div class="d-flex align-items-center justify-content-center rounded-circle bg-primary text-white fw-bold"
+               style="width: 28px; height: 28px; font-size: .75rem;">
+            {% if request.user.is_authenticated %}
+              {{ request.user.get_short_name|default:request.user.username|first|upper }}
+            {% else %}
+              A
+            {% endif %}
+          </div>
+          <span class="small fw-medium d-none d-md-inline">
+            {% if request.user.is_authenticated %}
+              {{ request.user.get_short_name|default:request.user.username }}
+            {% else %}
+              Admin
+            {% endif %}
+          </span>
+          <i class="bi bi-chevron-down small text-muted"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-1">
+          <li>
+            <a class="dropdown-item d-flex align-items-center gap-2" href="/admin/">
+              <i class="bi bi-person-circle text-muted"></i> Perfil
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item d-flex align-items-center gap-2" href="/admin/">
+              <i class="bi bi-shield-lock text-muted"></i> Configurações
+            </a>
+          </li>
+          <li><hr class="dropdown-divider" /></li>
+          <li>
+            <a class="dropdown-item d-flex align-items-center gap-2 text-danger" href="/admin/logout/">
+              <i class="bi bi-box-arrow-right"></i> Sair
+            </a>
+          </li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</header>

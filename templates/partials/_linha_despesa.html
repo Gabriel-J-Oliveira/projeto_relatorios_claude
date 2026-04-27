@@ -1,0 +1,23 @@
+{# Linha de despesa NOVA — retornada pelo HTMX #}
+<tr class="linha-despesa" id="linha-despesa-nova-{{ idx }}">
+  <td class="p-1">{{ form.data }}</td>
+  <td class="p-1">{{ form.tipo }}</td>
+  <td class="p-1">{{ form.descricao }}</td>
+  <td class="p-1">{{ form.valor }}</td>
+  <td class="p-1">{{ form.quem_pagou }}</td>
+  <td class="p-1 text-center">{{ form.reembolsavel }}</td>
+  <td class="p-1">{{ form.centro_custo }}</td>
+  <td class="p-1 text-center">
+    <label class="btn btn-sm btn-outline-secondary px-2">
+      <i class="bi bi-paperclip"></i>
+      {{ form.comprovante }}
+    </label>
+  </td>
+  <td class="p-1 text-center">
+    <button type="button"
+            class="btn btn-sm btn-outline-danger px-2"
+            onclick="this.closest('tr').remove(); resumoFinanceiro().atualizarBadge('badge-despesas','linha-despesa')">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  </td>
+</tr>

@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block titulo %}Técnicos{% endblock %}
+{% block page_title %}Técnicos{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a>
+  </li>
+  <li class="breadcrumb-item active">Técnicos</li>
+{% endblock %}
+
+{% block page_actions %}
+  <a href="{% url 'relatorios:tecnico_create' %}" class="btn btn-primary d-flex align-items-center gap-1">
+    <i class="bi bi-plus-lg"></i> Novo Técnico
+  </a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Busca rápida -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-3">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-md-5">
+        <label class="form-label fw-medium small">Buscar técnico</label>
+        <input type="text"
+               name="busca"
+               value="{{ busca }}"
+               placeholder="Nome ou e-mail..."
+               class="form-control">
+      </div>
+      <div class="col-auto d-flex gap-1">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-search me-1"></i>Buscar
+        </button>
+        {% if busca %}
+          <a href="{% url 'relatorios:tecnico_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-x"></i>
+          </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Tabela -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center gap-2">
+    <i class="bi bi-person-badge text-primary"></i>
+    <h6 class="mb-0 fw-semibold">{{ tecnicos.count }} técnico{{ tecnicos.count|pluralize }} cadastrado{{ tecnicos.count|pluralize }}</h6>
+  </div>
+  <div class="card-body p-0">
+    {% if tecnicos %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4 py-3 fw-semibold text-muted small">Nome</th>
+            <th class="py-3 fw-semibold text-muted small">E-mail</th>
+            <th class="py-3 fw-semibold text-muted small">Telefone</th>
+            <th class="py-3 fw-semibold text-muted small">Relatórios</th>
+            <th class="py-3 fw-semibold text-muted small">Status</th>
+            <th class="py-3 fw-semibold text-muted small text-end pe-4">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tecnicos %}
+          <tr>
+            <td class="ps-4">
+              <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center justify-content-center rounded-circle bg-primary-subtle text-primary fw-bold"
+                     style="width:36px;height:36px;font-size:.85rem;flex-shrink:0;">
+                  {{ t.nome|first|upper }}
+                </div>
+                <span class="fw-semibold small">{{ t.nome }}</span>
+              </div>
+            </td>
+            <td class="small text-muted">{{ t.email }}</td>
+            <td class="small text-muted">{{ t.telefone|default:"—" }}</td>
+            <td>
+              <span class="badge bg-primary-subtle text-primary rounded-pill px-2">
+                {{ t.relatorios.count }}
+              </span>
+            </td>
+            <td>
+              {% if t.ativo %}
+                <span class="badge bg-success-subtle text-success rounded-pill px-2">Ativo</span>
+              {% else %}
+                <span class="badge bg-secondary-subtle text-secondary rounded-pill px-2">Inativo</span>
+              {% endif %}
+            </td>
+            <td class="text-end pe-4">
+              <div class="d-flex gap-1 justify-content-end">
+                <a href="{% url 'relatorios:tecnico_update' t.pk %}"
+                   class="btn btn-sm btn-outline-primary" title="Editar">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{% url 'relatorios:tecnico_delete' t.pk %}"
+                   class="btn btn-sm btn-outline-danger" title="Excluir">
+                  <i class="bi bi-trash"></i>
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if is_paginated %}
+    <div class="card-footer bg-transparent border-top py-3 d-flex justify-content-center">
+      <nav>
+        <ul class="pagination pagination-sm mb-0 gap-1">
+          {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link rounded" href="?page={{ page_obj.previous_page_number }}">
+                <i class="bi bi-chevron-left"></i>
+              </a>
+            </li>
+          {% endif %}
+          {% for num in paginator.page_range %}
+            <li class="page-item {% if num == page_obj.number %}active{% endif %}">
+              <a class="page-link rounded" href="?page={{ num }}">{{ num }}</a>
+            </li>
+          {% endfor %}
+          {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link rounded" href="?page={{ page_obj.next_page_number }}">
+                <i class="bi bi-chevron-right"></i>
+              </a>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center py-5">
+      <div class="text-muted mb-3" style="font-size:3rem;"><i class="bi bi-person-x"></i></div>
+      <h6 class="text-body-secondary fw-semibold">Nenhum técnico encontrado</h6>
+      <p class="text-muted small mb-4">
+        {% if busca %}Tente outro termo de busca.{% else %}Comece cadastrando o primeiro técnico.{% endif %}
+      </p>
+      <a href="{% url 'relatorios:tecnico_create' %}" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg me-1"></i>Novo Técnico
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,362 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ relatorio.numero }}{% endblock %}
+{% block page_title %}Relatório {{ relatorio.numero }}{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a>
+  </li>
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:relatorio_list' %}" class="text-decoration-none">Relatórios</a>
+  </li>
+  <li class="breadcrumb-item active">{{ relatorio.numero }}</li>
+{% endblock %}
+
+{% block page_actions %}
+  <div class="d-flex gap-2">
+    <a href="{% url 'relatorios:relatorio_update' relatorio.pk %}"
+       class="btn btn-primary btn-sm">
+      <i class="bi bi-pencil me-1"></i>Editar
+    </a>
+    {% if relatorio.status == 'rascunho' %}
+      <form method="post"
+            action="{% url 'relatorios:relatorio_status' relatorio.pk 'pendente' %}">
+        {% csrf_token %}
+        <button class="btn btn-warning btn-sm">
+          <i class="bi bi-send me-1"></i>Enviar p/ Aprovação
+        </button>
+      </form>
+    {% elif relatorio.status == 'pendente' %}
+      <form method="post"
+            action="{% url 'relatorios:relatorio_status' relatorio.pk 'aprovado' %}">
+        {% csrf_token %}
+        <button class="btn btn-success btn-sm">
+          <i class="bi bi-check-lg me-1"></i>Aprovar
+        </button>
+      </form>
+      <form method="post"
+            action="{% url 'relatorios:relatorio_status' relatorio.pk 'rejeitado' %}">
+        {% csrf_token %}
+        <button class="btn btn-danger btn-sm">
+          <i class="bi bi-x-lg me-1"></i>Rejeitar
+        </button>
+      </form>
+    {% elif relatorio.status == 'aprovado' %}
+      <form method="post"
+            action="{% url 'relatorios:relatorio_status' relatorio.pk 'faturado' %}">
+        {% csrf_token %}
+        <button class="btn btn-info btn-sm">
+          <i class="bi bi-check2-all me-1"></i>Faturar
+        </button>
+      </form>
+    {% endif %}
+    <a href="{% url 'relatorios:relatorio_delete' relatorio.pk %}"
+       class="btn btn-outline-danger btn-sm">
+      <i class="bi bi-trash me-1"></i>Excluir
+    </a>
+  </div>
+{% endblock %}
+
+{% block content %}
+
+<!-- STATUS BANNER -->
+<div class="alert alert-{{ relatorio.status_badge_cor }} d-flex align-items-center gap-2 mb-4 py-2">
+  <i class="bi bi-info-circle-fill"></i>
+  <strong>Status:</strong> {{ relatorio.get_status_display }}
+  <span class="ms-auto small text-muted">
+    Atualizado em {{ relatorio.atualizado_em|date:"d/m/Y H:i" }}
+  </span>
+</div>
+
+<div class="row g-3">
+
+  <!-- COLUNA PRINCIPAL -->
+  <div class="col-12 col-xl-8">
+
+    <!-- Cabeçalho -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center gap-2">
+        <i class="bi bi-clipboard-data text-primary"></i>
+        <h6 class="mb-0 fw-semibold">Dados do Atendimento</h6>
+      </div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-sm-4 text-muted fw-medium">Número</dt>
+          <dd class="col-sm-8 fw-semibold">{{ relatorio.numero }}</dd>
+
+          <dt class="col-sm-4 text-muted fw-medium">Cliente</dt>
+          <dd class="col-sm-8">{{ relatorio.cliente.nome }}</dd>
+
+          <dt class="col-sm-4 text-muted fw-medium">Técnico Responsável</dt>
+          <dd class="col-sm-8">{{ relatorio.tecnico_responsavel.nome }}</dd>
+
+          {% if relatorio.equipe.exists %}
+          <dt class="col-sm-4 text-muted fw-medium">Equipe</dt>
+          <dd class="col-sm-8">
+            {% for membro in relatorio.equipe.all %}
+              <span class="badge bg-secondary-subtle text-secondary me-1">
+                {{ membro.tecnico.nome }} ({{ membro.get_papel_display }})
+              </span>
+            {% endfor %}
+          </dd>
+          {% endif %}
+
+          <dt class="col-sm-4 text-muted fw-medium">Local</dt>
+          <dd class="col-sm-8">
+            {{ relatorio.cidade_atendimento }}/{{ relatorio.uf_atendimento }}
+            <span class="badge bg-body-tertiary text-muted ms-1">
+              {{ relatorio.get_tipo_localidade_display }}
+            </span>
+          </dd>
+
+          <dt class="col-sm-4 text-muted fw-medium">Período</dt>
+          <dd class="col-sm-8">
+            {{ relatorio.data_inicio|date:"d/m/Y" }}
+            {% if relatorio.data_inicio != relatorio.data_fim %}
+              até {{ relatorio.data_fim|date:"d/m/Y" }}
+            {% endif %}
+          </dd>
+
+          {% if relatorio.area_gasto %}
+          <dt class="col-sm-4 text-muted fw-medium">Área / C. Custo</dt>
+          <dd class="col-sm-8">{{ relatorio.area_gasto }}</dd>
+          {% endif %}
+        </dl>
+        <hr class="my-3">
+        <h6 class="fw-semibold small text-muted mb-2">Motivo / Descrição</h6>
+        <p class="mb-0 small" style="white-space:pre-line">{{ relatorio.motivo }}</p>
+      </div>
+    </div>
+
+    <!-- Tabela de despesas -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center gap-2">
+        <i class="bi bi-receipt text-primary"></i>
+        <h6 class="mb-0 fw-semibold">
+          Despesas Itemizadas
+          <span class="badge bg-primary-subtle text-primary ms-1">
+            {{ relatorio.despesas.count }}
+          </span>
+        </h6>
+      </div>
+      <div class="card-body p-0">
+        {% if relatorio.despesas.exists %}
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-3 small fw-semibold text-muted">Data</th>
+                  <th class="small fw-semibold text-muted">Tipo</th>
+                  <th class="small fw-semibold text-muted">Descrição</th>
+                  <th class="small fw-semibold text-muted">Valor</th>
+                  <th class="small fw-semibold text-muted">Pago por</th>
+                  <th class="small fw-semibold text-muted text-center">Reemb.</th>
+                  <th class="small fw-semibold text-muted">C. Custo</th>
+                  <th class="small fw-semibold text-muted text-center">Doc.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for d in relatorio.despesas.all %}
+                <tr>
+                  <td class="ps-3 small text-muted">{{ d.data|date:"d/m/Y" }}</td>
+                  <td>
+                    <span class="badge bg-body-tertiary text-body-secondary small">
+                      {{ d.get_tipo_display }}
+                    </span>
+                  </td>
+                  <td class="small">{{ d.descricao }}</td>
+                  <td class="small fw-semibold">R$ {{ d.valor }}</td>
+                  <td class="small">
+                    {% if d.quem_pagou == 'tecnico' %}
+                      <span class="badge bg-primary-subtle text-primary">Técnico</span>
+                    {% else %}
+                      <span class="badge bg-secondary-subtle text-secondary">Empresa</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    {% if d.reembolsavel %}
+                      <i class="bi bi-check-circle-fill text-success"></i>
+                    {% else %}
+                      <i class="bi bi-x-circle text-muted"></i>
+                    {% endif %}
+                  </td>
+                  <td class="small text-muted">{{ d.centro_custo|default:"—" }}</td>
+                  <td class="text-center">
+                    {% if d.comprovante %}
+                      <a href="{{ d.comprovante.url }}" target="_blank"
+                         class="btn btn-sm btn-outline-success px-1 py-0">
+                        <i class="bi bi-file-earmark-check small"></i>
+                      </a>
+                    {% else %}
+                      <span class="text-muted small">—</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot class="table-light fw-semibold">
+                <tr>
+                  <td colspan="3" class="ps-3 small text-end text-muted">Total despesas</td>
+                  <td class="small fw-bold text-success">
+                    R$ {{ relatorio.total_despesas_tecnico|add:relatorio.total_despesas_empresa }}
+                  </td>
+                  <td colspan="4"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-center py-4 text-muted small">
+            <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+            Nenhuma despesa lançada.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Tabela de KM -->
+    {% if relatorio.trechos.exists %}
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center gap-2">
+        <i class="bi bi-geo-alt text-primary"></i>
+        <h6 class="mb-0 fw-semibold">Deslocamento / KM</h6>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3 small fw-semibold text-muted">Data</th>
+                <th class="small fw-semibold text-muted">Origem</th>
+                <th class="small fw-semibold text-muted">Destino</th>
+                <th class="small fw-semibold text-muted">KM</th>
+                <th class="small fw-semibold text-muted">R$/KM</th>
+                <th class="small fw-semibold text-muted">Total</th>
+                <th class="small fw-semibold text-muted">Obs.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in relatorio.trechos.all %}
+              <tr>
+                <td class="ps-3 small text-muted">{{ t.data|date:"d/m/Y" }}</td>
+                <td class="small">{{ t.origem }}</td>
+                <td class="small">{{ t.destino }}</td>
+                <td class="small">{{ t.km }} km</td>
+                <td class="small text-muted">R$ {{ t.valor_km }}</td>
+                <td class="small fw-semibold text-success">R$ {{ t.valor_calculado }}</td>
+                <td class="small text-muted">{{ t.observacao|default:"—" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot class="table-light fw-semibold">
+              <tr>
+                <td colspan="3" class="ps-3 small text-end text-muted">Total KM</td>
+                <td class="small">{{ relatorio.total_km_percorrido }} km</td>
+                <td></td>
+                <td class="small fw-bold text-success">R$ {{ relatorio.total_km }}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div><!-- /col principal -->
+
+  <!-- COLUNA LATERAL — RESUMO FINANCEIRO -->
+  <div class="col-12 col-xl-4">
+
+    <!-- Card financeiro -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-transparent border-bottom py-3">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-calculator text-success"></i>
+          <h6 class="mb-0 fw-semibold">Resumo Financeiro</h6>
+        </div>
+      </div>
+      <div class="card-body">
+
+        <div class="d-flex flex-column gap-2 small">
+          <div class="d-flex justify-content-between py-1 border-bottom">
+            <span class="text-muted">Despesas (técnico)</span>
+            <span class="fw-semibold">R$ {{ relatorio.total_despesas_tecnico }}</span>
+          </div>
+          <div class="d-flex justify-content-between py-1 border-bottom">
+            <span class="text-muted">Despesas (empresa)</span>
+            <span class="fw-semibold">R$ {{ relatorio.total_despesas_empresa }}</span>
+          </div>
+          <div class="d-flex justify-content-between py-1 border-bottom">
+            <span class="text-muted">Deslocamento (KM)</span>
+            <span class="fw-semibold">R$ {{ relatorio.total_km }}</span>
+          </div>
+          <div class="d-flex justify-content-between py-1 border-bottom">
+            <span class="fw-medium">Total de despesas</span>
+            <span class="fw-bold">R$ {{ relatorio.total_despesas }}</span>
+          </div>
+          <div class="d-flex justify-content-between py-1 border-bottom">
+            <span class="text-muted">(-) Adiantamento</span>
+            <span class="fw-semibold text-danger">
+              R$ {{ relatorio.valor_adiantamento }}
+            </span>
+          </div>
+        </div>
+
+        <div class="mt-3 p-3 rounded-3
+             {% if relatorio.saldo >= 0 %}bg-success-subtle{% else %}bg-danger-subtle{% endif %}">
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="fw-bold">Saldo a reembolsar</span>
+            <span class="fw-bold fs-5
+                  {% if relatorio.saldo >= 0 %}text-success{% else %}text-danger{% endif %}">
+              R$ {{ relatorio.saldo }}
+            </span>
+          </div>
+          <div class="small mt-1
+               {% if relatorio.saldo >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {% if relatorio.saldo > 0 %}
+              <i class="bi bi-arrow-left-circle me-1"></i>
+              Empresa deve reembolsar o técnico.
+            {% elif relatorio.saldo < 0 %}
+              <i class="bi bi-arrow-right-circle me-1"></i>
+              Técnico deve devolver à empresa.
+            {% else %}
+              <i class="bi bi-check-circle me-1"></i>
+              Contas zeradas.
+            {% endif %}
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Auditoria -->
+    <div class="card border-0 shadow-sm">
+      <div class="card-body small">
+        <div class="d-flex flex-column gap-2">
+          <div class="d-flex justify-content-between">
+            <span class="text-muted">Criado em</span>
+            <span>{{ relatorio.criado_em|date:"d/m/Y H:i" }}</span>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span class="text-muted">Atualizado em</span>
+            <span>{{ relatorio.atualizado_em|date:"d/m/Y H:i" }}</span>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span class="text-muted">Total de despesas</span>
+            <span>{{ relatorio.despesas.count }} item(s)</span>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span class="text-muted">Total de trechos KM</span>
+            <span>{{ relatorio.trechos.count }} trecho(s)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+{% endblock %}
