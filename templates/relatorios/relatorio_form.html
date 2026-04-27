@@ -1,578 +1,684 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block titulo %}{{ titulo_pagina }}{% endblock %}
 {% block page_title %}{{ titulo_pagina }}{% endblock %}
-
 {% block breadcrumb %}
   <li class="breadcrumb-item">
     <a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a>
   </li>
   <li class="breadcrumb-item">
-    <a href="{% url 'relatorios:relatorio_list' %}" class="text-decoration-none">Relatórios</a>
+    <a href="{% url 'relatorios:relatorio_list' %}"
+       class="text-decoration-none">Relatórios</a>
   </li>
   <li class="breadcrumb-item active">{{ titulo_pagina }}</li>
 {% endblock %}
-
 {% block content %}
-<form method="post" enctype="multipart/form-data" id="form-relatorio" novalidate
-      x-data="resumoFinanceiro()" x-init="init()">
-  {% csrf_token %}
-
-  <!-- Formset management forms (obrigatório para Django formsets) -->
-  {{ fs_desp.management_form }}
-  {{ fs_km.management_form }}
-
-  <!-- ── ABAS ── -->
-  <ul class="nav nav-tabs mb-0" id="abas" role="tablist">
-    <li class="nav-item">
-      <button class="nav-link active d-flex align-items-center gap-1"
-              data-bs-toggle="tab" data-bs-target="#tab-dados" type="button">
-        <i class="bi bi-clipboard-data"></i> Dados Gerais
-      </button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link d-flex align-items-center gap-1"
-              data-bs-toggle="tab" data-bs-target="#tab-despesas" type="button">
-        <i class="bi bi-receipt"></i> Despesas
-        <span class="badge bg-primary rounded-pill ms-1" id="badge-despesas">0</span>
-      </button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link d-flex align-items-center gap-1"
-              data-bs-toggle="tab" data-bs-target="#tab-km" type="button">
-        <i class="bi bi-geo-alt"></i> Deslocamento / KM
-        <span class="badge bg-secondary rounded-pill ms-1" id="badge-km">0</span>
-      </button>
-    </li>
-    <li class="nav-item ms-auto">
-      <button class="nav-link d-flex align-items-center gap-1"
-              data-bs-toggle="tab" data-bs-target="#tab-resumo" type="button">
-        <i class="bi bi-calculator"></i> Resumo Financeiro
-      </button>
-    </li>
-  </ul>
-
-  <div class="tab-content bg-white border border-top-0 rounded-bottom shadow-sm">
-
-    <!-- ── ABA 1: DADOS GERAIS ── -->
-    <div class="tab-pane fade show active p-4" id="tab-dados">
-
-      {% if form.errors %}
-        <div class="alert alert-danger small mb-3">
-          <i class="bi bi-exclamation-circle me-1"></i>
-          Corrija os campos destacados antes de salvar.
-        </div>
-      {% endif %}
-
-      <div class="row g-3">
-
-        <!-- Número e Status -->
-        <div class="col-md-4">
-          <label class="form-label fw-medium small">Número do Relatório *</label>
-          {{ form.numero }}
-          {% if form.numero.errors %}
-            <div class="text-danger small mt-1">{{ form.numero.errors.0 }}</div>
-          {% endif %}
-        </div>
-        <div class="col-md-3">
-          <label class="form-label fw-medium small">Status</label>
-          {{ form.status }}
-        </div>
-        <div class="col-md-5">
-          <label class="form-label fw-medium small">Área / Centro de Custo</label>
-          {{ form.area_gasto }}
-        </div>
-
-        <!-- Cliente e Técnico -->
-        <div class="col-md-6">
-          <label class="form-label fw-medium small">Cliente *</label>
-          {{ form.cliente }}
-          {% if form.cliente.errors %}
-            <div class="text-danger small mt-1">{{ form.cliente.errors.0 }}</div>
-          {% endif %}
-        </div>
-        <div class="col-md-6">
-          <label class="form-label fw-medium small">Técnico Responsável *</label>
-          {{ form.tecnico_responsavel }}
-        </div>
-
-        <!-- Local e tipo -->
-        <div class="col-md-5">
-          <label class="form-label fw-medium small">Cidade de Atendimento *</label>
-          {{ form.cidade_atendimento }}
-        </div>
-        <div class="col-md-2">
-          <label class="form-label fw-medium small">UF</label>
-          {{ form.uf_atendimento }}
-        </div>
-        <div class="col-md-2">
-          <label class="form-label fw-medium small">Localidade</label>
-          {{ form.tipo_localidade }}
-        </div>
-        <div class="col-md-3">
-          <!-- espaço intencional -->
-        </div>
-
-        <!-- Datas -->
-        <div class="col-md-3">
-          <label class="form-label fw-medium small">Data Início *</label>
-          {{ form.data_inicio }}
-          {% if form.data_inicio.errors %}
-            <div class="text-danger small mt-1">{{ form.data_inicio.errors.0 }}</div>
-          {% endif %}
-        </div>
-        <div class="col-md-3">
-          <label class="form-label fw-medium small">Data Fim *</label>
-          {{ form.data_fim }}
-          {% if form.data_fim.errors %}
-            <div class="text-danger small mt-1">{{ form.data_fim.errors.0 }}</div>
-          {% endif %}
-        </div>
-        <div class="col-md-3">
-          <label class="form-label fw-medium small">
-            Adiantamento Recebido (R$)
-          </label>
-          {{ form.valor_adiantamento }}
-        </div>
-
-        <!-- Motivo -->
-        <div class="col-12">
-          <label class="form-label fw-medium small">Motivo / Descrição do Serviço *</label>
-          {{ form.motivo }}
-          {% if form.motivo.errors %}
-            <div class="text-danger small mt-1">{{ form.motivo.errors.0 }}</div>
-          {% endif %}
-        </div>
-
-        <!-- Observações -->
-        <div class="col-12">
-          <label class="form-label fw-medium small">
-            Observações Gerais
-            <span class="text-muted">(opcional)</span>
-          </label>
-          {{ form.observacoes }}
-        </div>
-
-      </div>
-    </div>
-
-    <!-- ── ABA 2: DESPESAS ITEMIZADAS ── -->
-    <div class="tab-pane fade" id="tab-despesas">
-
-      <!-- Cabeçalho da grade -->
-      <div class="table-responsive">
-        <table class="table table-sm align-middle mb-0" id="tabela-despesas">
-          <thead class="table-light">
-            <tr>
-              <th style="width:100px">Data</th>
-              <th style="width:140px">Tipo</th>
-              <th>Descrição / Fornecedor</th>
-              <th style="width:110px">Valor R$</th>
-              <th style="width:120px">Quem Pagou</th>
-              <th style="width:80px" class="text-center">Reemb.</th>
-              <th style="width:130px">Centro Custo</th>
-              <th style="width:50px" class="text-center">Comp.</th>
-              <th style="width:40px"></th>
-            </tr>
-          </thead>
-          <tbody id="corpo-despesas">
-
-            <!-- Linhas existentes (edição) -->
-            {% for f in fs_desp %}
-              <tr class="linha-despesa" id="linha-despesa-{{ forloop.counter0 }}">
-                {% include "relatorios/partials/_linha_despesa_existente.html" with form=f %}
-              </tr>
-            {% endfor %}
-
-          </tbody>
-
-          <tfoot class="table-light fw-semibold">
-            <tr>
-              <td colspan="3" class="text-end small text-muted pe-3">Totais</td>
-              <td class="text-success fw-bold">
-                R$ <span x-text="totalDespesas()">0,00</span>
-              </td>
-              <td colspan="5"></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      <!-- Botão adicionar linha -->
-      <div class="p-3 border-top">
-        {% if instance %}
-          <button type="button"
-                  class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
-                  hx-get="{% url 'relatorios:htmx_add_despesa' instance.pk %}"
-                  hx-target="#corpo-despesas"
-                  hx-swap="beforeend"
-                  @click="atualizarBadge('badge-despesas', 'linha-despesa')">
-            <i class="bi bi-plus-lg"></i> Adicionar Despesa
-          </button>
-        {% else %}
-          <p class="text-muted small mb-0">
-            <i class="bi bi-info-circle me-1"></i>
-            Salve os dados gerais primeiro para adicionar despesas.
-          </p>
-        {% endif %}
-      </div>
-
-    </div>
-
-    <!-- ── ABA 3: DESLOCAMENTO / KM ── -->
-    <div class="tab-pane fade" id="tab-km">
-
-      <div class="table-responsive">
-        <table class="table table-sm align-middle mb-0" id="tabela-km">
-          <thead class="table-light">
-            <tr>
-              <th style="width:100px">Data</th>
-              <th>Origem</th>
-              <th>Destino</th>
-              <th style="width:80px">KM</th>
-              <th style="width:100px">Valor/KM</th>
-              <th style="width:110px">Total R$</th>
-              <th>Obs.</th>
-              <th style="width:40px"></th>
-            </tr>
-          </thead>
-          <tbody id="corpo-trechos">
-
-            {% for f in fs_km %}
-              <tr class="linha-trecho" id="linha-trecho-{{ forloop.counter0 }}">
-                {% include "relatorios/partials/_linha_trecho_existente.html" with form=f %}
-              </tr>
-            {% endfor %}
-
-          </tbody>
-          <tfoot class="table-light fw-semibold">
-            <tr>
-              <td colspan="3" class="text-end small text-muted pe-3">Totais</td>
-              <td class="small">
-                <span x-text="totalKmPercorrido()">0</span> km
-              </td>
-              <td></td>
-              <td class="text-success fw-bold">
-                R$ <span x-text="totalKmValor()">0,00</span>
-              </td>
-              <td colspan="2"></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      <div class="p-3 border-top">
-        {% if instance %}
-          <button type="button"
-                  class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1"
-                  hx-get="{% url 'relatorios:htmx_add_trecho' instance.pk %}"
-                  hx-target="#corpo-trechos"
-                  hx-swap="beforeend"
-                  @click="atualizarBadge('badge-km', 'linha-trecho')">
-            <i class="bi bi-plus-lg"></i> Adicionar Trecho
-          </button>
-        {% else %}
-          <p class="text-muted small mb-0">
-            <i class="bi bi-info-circle me-1"></i>
-            Salve os dados gerais primeiro para adicionar trechos.
-          </p>
-        {% endif %}
-      </div>
-
-    </div>
-
-    <!-- ── ABA 4: RESUMO FINANCEIRO ── -->
-    <div class="tab-pane fade p-4" id="tab-resumo">
-
-      <div class="row g-3">
-
-        <!-- Bloco técnico -->
-        <div class="col-md-4">
-          <div class="card border-0 bg-body-tertiary h-100">
-            <div class="card-header bg-transparent border-bottom py-2">
-              <small class="fw-semibold text-muted">
-                <i class="bi bi-person me-1"></i>Pago pelo Técnico
-              </small>
+  {# ── Dados passados ao Alpine.js (Operação Real) ── #}
+  <div x-data="formRelatorio('{{ valor_km_padrao }}')" x-init="init()">
+    <div class="row justify-content-center">
+      <div class="col-12">
+        {# Card e Header com Estilo Refinado #}
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center justify-content-between gap-2">
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-file-earmark-text text-primary fs-5"></i>
+              <h6 class="mb-0 fw-semibold">{{ titulo_pagina }}</h6>
             </div>
-            <div class="card-body">
-              <div class="d-flex justify-content-between py-1 border-bottom small">
-                <span class="text-muted">Despesas reembolsáveis</span>
-                <span class="fw-semibold">
-                  R$ <span x-text="totalTecnico()">0,00</span>
-                </span>
-              </div>
-              <div class="d-flex justify-content-between py-1 border-bottom small">
-                <span class="text-muted">Deslocamento (KM)</span>
-                <span class="fw-semibold">
-                  R$ <span x-text="totalKmValor()">0,00</span>
-                </span>
-              </div>
-              <div class="d-flex justify-content-between py-2 small fw-bold">
-                <span>Subtotal técnico</span>
-                <span class="text-primary">
-                  R$ <span x-text="subtotalTecnico()">0,00</span>
-                </span>
-              </div>
-            </div>
+            <span class="badge bg-{{ form.instance.status_badge|default:'secondary' }}">
+              {{ form.instance.get_status_display|default:"Rascunho" }}
+            </span>
           </div>
-        </div>
-
-        <!-- Bloco empresa -->
-        <div class="col-md-4">
-          <div class="card border-0 bg-body-tertiary h-100">
-            <div class="card-header bg-transparent border-bottom py-2">
-              <small class="fw-semibold text-muted">
-                <i class="bi bi-building me-1"></i>Pago pela Empresa
-              </small>
-            </div>
-            <div class="card-body">
-              <div class="d-flex justify-content-between py-1 border-bottom small">
-                <span class="text-muted">Despesas diretas</span>
-                <span class="fw-semibold">
-                  R$ <span x-text="totalEmpresa()">0,00</span>
-                </span>
+          <div class="card-body py-4 px-4">
+            <form method="post"
+                  enctype="multipart/form-data"
+                  id="form-relatorio"
+                  novalidate>
+              {% csrf_token %}
+              {# Management forms — obrigatórios para Django formsets (Operação Real) #}
+              {{ fs_desp.management_form }}
+              {{ fs_km.management_form }}
+              {{ form.non_field_errors }}
+              {# ── NAVEGAÇÃO POR ABAS (Estilo Visual + Badges Funcionais) ── #}
+              <ul class="nav nav-tabs mb-4" id="abas" role="tablist">
+                <li class="nav-item">
+                  <button class="nav-link active d-flex align-items-center gap-2 px-3 py-2"
+                          id="tab-dados-btn"
+                          data-bs-toggle="tab"
+                          data-bs-target="#tab-dados"
+                          type="button">
+                    <i class="bi bi-clipboard-data"></i>
+                    <span>Dados Gerais</span>
+                    {% if form.errors %}<span class="badge bg-danger rounded-pill">!</span>{% endif %}
+                  </button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link d-flex align-items-center gap-2 px-3 py-2"
+                          id="tab-despesas-btn"
+                          data-bs-toggle="tab"
+                          data-bs-target="#tab-despesas"
+                          type="button">
+                    <i class="bi bi-receipt"></i>
+                    <span>Despesas</span>
+                    <span class="badge bg-primary rounded-pill ms-1"
+                          x-text="contarLinhas('despesas')">0</span>
+                  </button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link d-flex align-items-center gap-2 px-3 py-2"
+                          id="tab-km-btn"
+                          data-bs-toggle="tab"
+                          data-bs-target="#tab-km"
+                          type="button">
+                    <i class="bi bi-geo-alt"></i>
+                    <span>KM</span>
+                    <span class="badge bg-secondary rounded-pill ms-1"
+                          x-text="contarLinhas('trechos')">0</span>
+                  </button>
+                </li>
+                <li class="nav-item ms-auto">
+                  <button class="nav-link d-flex align-items-center gap-2 px-3 py-2"
+                          id="tab-resumo-btn"
+                          data-bs-toggle="tab"
+                          data-bs-target="#tab-resumo"
+                          type="button">
+                    <i class="bi bi-calculator"></i>
+                    <span>Resumo</span>
+                  </button>
+                </li>
+              </ul>
+              <div class="tab-content bg-body border-top-0 rounded-bottom shadow-sm">
+                {# ══════════════════════════════════════════ #}
+                {# ABA 1 — DADOS GERAIS                       #}
+                {# ══════════════════════════════════════════ #}
+                <div class="tab-pane fade show active p-4" id="tab-dados">
+                  {% if form.non_field_errors %}
+                    <div class="alert alert-danger d-flex align-items-center gap-2 py-2 small">
+                      <i class="bi bi-exclamation-triangle-fill"></i>
+                      <div>
+                        {% for e in form.non_field_errors %}{{ e }}{% endfor %}
+                      </div>
+                    </div>
+                  {% endif %}
+                  <div class="row g-3">
+                    {# Número / Status #}
+                    <div class="col-md-4">
+                      <label class="form-label fw-medium small text-muted">Número *</label>
+                      {{ form.numero }}
+                      {% if form.numero.errors %}<div class="text-danger small mt-1">{{ form.numero.errors.0 }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label fw-medium small text-muted">Status</label>
+                      {{ form.status }}
+                    </div>
+                    <div class="col-md-5">
+                      <label class="form-label fw-medium small text-muted">
+                        Centro de Custo
+                        <span class="fw-normal opacity-75">(aplica-se a todas as despesas)</span>
+                      </label>
+                      {{ form.centro_custo }}
+                    </div>
+                    {# Cliente / Responsável #}
+                    <div class="col-md-6">
+                      <label class="form-label fw-medium small text-muted">Cliente *</label>
+                      {{ form.cliente }}
+                      {% if form.cliente.errors %}<div class="text-danger small mt-1">{{ form.cliente.errors.0 }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label fw-medium small text-muted">Técnico Responsável *</label>
+                      {{ form.tecnico_responsavel }}
+                    </div>
+                    {# Equipe adicional #}
+                    <div class="col-12">
+                      <label class="form-label fw-medium small text-muted">
+                        Equipe Adicional
+                        <span class="fw-normal opacity-75">(opcional — Ctrl+clique para múltiplos)</span>
+                      </label>
+                      {{ form.tecnicos_equipe }}
+                      {% if form.tecnicos_equipe.errors %}
+                        <div class="text-danger small mt-1">{{ form.tecnicos_equipe.errors.0 }}</div>
+                      {% endif %}
+                    </div>
+                    {# Localidade #}
+                    <div class="col-md-5">
+                      <label class="form-label fw-medium small text-muted">Cidade de Atendimento *</label>
+                      {{ form.cidade_atendimento }}
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label fw-medium small text-muted">UF</label>
+                      {{ form.uf_atendimento }}
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label fw-medium small text-muted">Localidade</label>
+                      {{ form.tipo_localidade }}
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label fw-medium small text-muted">Adiantamento (R$)</label>
+                      <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light border-end-0">R$</span>
+                        {{ form.valor_adiantamento }}
+                      </div>
+                    </div>
+                    {# Período #}
+                    <div class="col-md-3">
+                      <label class="form-label fw-medium small text-muted">Data Início *</label>
+                      {{ form.data_inicio }}
+                      {% if form.data_inicio.errors %}<div class="text-danger small mt-1">{{ form.data_inicio.errors.0 }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label fw-medium small text-muted">Data Fim *</label>
+                      {{ form.data_fim }}
+                      {% if form.data_fim.errors %}<div class="text-danger small mt-1">{{ form.data_fim.errors.0 }}</div>{% endif %}
+                    </div>
+                    {# Motivo #}
+                    <div class="col-12">
+                      <label class="form-label fw-medium small text-muted">Motivo / Descrição do Serviço *</label>
+                      {{ form.motivo }}
+                      {% if form.motivo.errors %}<div class="text-danger small mt-1">{{ form.motivo.errors.0 }}</div>{% endif %}
+                    </div>
+                    {# Observações #}
+                    <div class="col-12">
+                      <label class="form-label fw-medium small text-muted">
+                        Observações
+                        <span class="fw-normal opacity-75">(opcional)</span>
+                      </label>
+                      {{ form.observacoes }}
+                    </div>
+                  </div>
+                </div>
+                {# ══════════════════════════════════════════ #}
+                {# ABA 2 — DESPESAS                           #}
+                {# ══════════════════════════════════════════ #}
+                <div class="tab-pane fade" id="tab-despesas">
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0 table-hover"
+                           id="tabela-despesas">
+                      <thead class="table-light border-bottom">
+                        <tr>
+                          <th class="px-3 py-2 fw-semibold text-muted small" style="width: 120px;">Data</th>
+                          <th class="px-3 py-2 fw-semibold text-muted small" style="width: 150px;">Tipo</th>
+                          <th class="px-3 py-2 fw-semibold text-muted small">Descrição / Fornecedor</th>
+                          <th class="px-3 py-2 fw-semibold text-muted small">Valor R$</th>
+                          <th class="px-3 py-2 fw-semibold text-muted small">Quem Pagou</th>
+                          <th class="px-3 py-2 fw-semibold text-muted small text-center">Comprovante</th>
+                          <th class="px-3 py-2" style="width: 50px;"></th>
+                        </tr>
+                      </thead>
+                      <tbody id="corpo-despesas" class="border-top-0">
+                        {% for f in fs_desp %}
+                          <tr class="linha-despesa"
+                              data-form-index="{{ forloop.counter0 }}"
+                              {% if f.instance.pk %}data-pk="{{ f.instance.pk }}"{% endif %}>
+                            <td class="p-1 px-3">
+                              {{ f.id }}{{ f.ordem }}
+                              <div class="d-none">{{ f.DELETE }}</div>
+                              {{ f.data }}
+                              {% if f.data.errors %}<div class="text-danger" style="font-size:.7rem">{{ f.data.errors.0 }}</div>{% endif %}
+                            </td>
+                            <td class="p-1">{{ f.tipo }}</td>
+                            <td class="p-1">{{ f.descricao }}</td>
+                            <td class="p-1">
+                              {{ f.valor }}
+                              {% if f.valor.errors %}<div class="text-danger" style="font-size:.7rem">{{ f.valor.errors.0 }}</div>{% endif %}
+                            </td>
+                            <td class="p-1">{{ f.quem_pagou }}</td>
+                            <td class="p-1 text-center text-nowrap">
+                              {% if f.instance.comprovante %}
+                                <a href="{{ f.instance.comprovante.url }}"
+                                   target="_blank"
+                                   class="btn btn-sm btn-light text-success border px-2 py-1"
+                                   title="Ver Comprovante">
+                                  <i class="bi bi-file-earmark-check"></i>
+                                </a>
+                              {% else %}
+                                <label class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 px-2 py-1 mb-0 cursor-pointer"
+                                       title="Anexar comprovante">
+                                  <i class="bi bi-paperclip small"></i>
+                                  {{ f.comprovante }}
+                                </label>
+                              {% endif %}
+                            </td>
+                            <td class="p-1 text-center pe-3">
+                              <button type="button"
+                                      class="btn btn-sm btn-outline-danger text-nowrap"
+                                      onclick="removerLinha(this)"
+                                      title="Remover linha">
+                                <i class="bi bi-trash3"></i>
+                                Remover
+                              </button>
+                            </td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                      <tfoot class="bg-body-tertiary border-top">
+                        <tr>
+                          <td colspan="3" class="text-end py-2 pe-3 small fw-medium text-muted">Total despesas</td>
+                          <td class="py-2 fw-bold text-dark small">
+                            R$ <span id="total-despesas">0,00</span>
+                          </td>
+                          <td colspan="3"></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                  <div class="p-3 bg-light border-top d-flex align-items-center justify-content-between">
+                    <button type="button"
+                            class="btn btn-sm btn-primary d-flex align-items-center gap-2 px-3"
+                            onclick="adicionarLinhaDespesa()">
+                      <i class="bi bi-plus-circle"></i> Adicionar Despesa
+                    </button>
+                    <span class="text-muted small italic"><i class="bi bi-info-circle me-1"></i>As linhas serão salvas junto com o relatório.</span>
+                  </div>
+                </div>
+                {# ══════════════════════════════════════════ #}
+                {# ABA 3 — KM                                 #}
+                {# ══════════════════════════════════════════ #}
+                <div class="tab-pane fade" id="tab-km">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                      <h6 class="mb-0 fw-semibold">Trechos de KM</h6>
+                      <small class="text-muted">Origem, destino e distância por trecho.</small>
+                    </div>
+                  </div>
+                  <div class="table-responsive">
+                    <table class="table table-bordered align-middle mb-0 table-hover"
+                           id="tabela-km">
+                      <thead class="table-light">
+                        <tr>
+                          <th class="px-3 py-2 fw-semibold text-muted small" style="width: 120px;">Data</th>
+                          <th class="px-3 py-2 fw-semibold text-muted small">Origem</th>
+                          <th class="px-3 py-2 fw-semibold text-muted small">Destino</th>
+                          <th class="px-3 py-2 fw-semibold text-muted small" style="width: 100px;">KM</th>
+                          <th class="px-3 py-2 fw-semibold text-muted small" style="width: 100px;">R$/KM</th>
+                          <th class="px-3 py-2 fw-semibold text-muted small" style="width: 120px;">Total R$</th>
+                          <th class="px-3 py-2 fw-semibold text-muted small">Obs.</th>
+                          <th class="px-3 py-2" style="width: 90px;">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody id="corpo-trechos">
+                        {% for f in fs_km %}
+                          <tr class="linha-trecho"
+                              data-form-index="{{ forloop.counter0 }}"
+                              {% if f.instance.pk %}data-pk="{{ f.instance.pk }}"{% endif %}>
+                            <td class="p-1 px-3">
+                              {{ f.id }}{{ f.ordem }}
+                              <div class="d-none">{{ f.DELETE }}</div>
+                              {{ f.data }}
+                            </td>
+                            <td class="p-1">{{ f.origem }}</td>
+                            <td class="p-1">{{ f.destino }}</td>
+                            <td class="p-1">{{ f.km }}</td>
+                            <td class="p-1">{{ f.valor_km }}</td>
+                            <td class="p-1 fw-bold text-dark small total-trecho">R$ {{ f.instance.valor_calculado|default:"0,00" }}</td>
+                            <td class="p-1">{{ f.observacao }}</td>
+                            <td class="p-1 text-center pe-3">
+                              <button type="button"
+                                      class="btn btn-sm btn-outline-danger"
+                                      onclick="removerLinha(this)"
+                                      title="Remover linha">
+                                <i class="bi bi-trash3"></i> Remover
+                              </button>
+                            </td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                      <tfoot class="bg-body-tertiary border-top">
+                        <tr>
+                          <td colspan="3" class="text-end py-2 pe-3 small fw-medium text-muted">Totais</td>
+                          <td class="py-2 small fw-bold">
+                            <span id="total-km-percorrido">0</span> <small class="text-muted fw-normal">km</small>
+                          </td>
+                          <td></td>
+                          <td class="py-2 fw-bold text-dark small">
+                            R$ <span id="total-km-valor">0,00</span>
+                          </td>
+                          <td colspan="2"></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                  <div class="p-3 bg-light border border-top-0 d-flex align-items-center justify-content-between">
+                    <button type="button"
+                            class="btn btn-outline-primary btn-sm d-flex align-items-center gap-2 px-3"
+                            onclick="adicionarLinhaKm()">
+                      <i class="bi bi-plus-lg"></i> Adicionar trecho
+                    </button>
+                    <span class="text-muted small">
+                      <i class="bi bi-shield-check me-1"></i>Valor/KM padrão: <strong>R$ {{ valor_km_padrao }}</strong> (política vigente).
+                    </span>
+                  </div>
+                </div>
+                {# ══════════════════════════════════════════ #}
+                {# ABA 4 — RESUMO                             #}
+                {# ══════════════════════════════════════════ #}
+                <div class="tab-pane fade p-4" id="tab-resumo">
+                  <div class="row g-4">
+                    {# Técnico #}
+                    <div class="col-md-4">
+                      <div class="card border-0 bg-body-tertiary shadow-none rounded-3 h-100">
+                        <div class="card-header bg-transparent border-bottom py-2 px-3">
+                          <small class="fw-bold text-uppercase text-muted"
+                                 style="font-size: 0.7rem;
+                                        letter-spacing: 0.5px">
+                            <i class="bi bi-person-badge me-1"></i>Pago pelo Técnico
+                          </small>
+                        </div>
+                        <div class="card-body p-3">
+                          <div class="d-flex justify-content-between py-2 border-bottom border-secondary-subtle">
+                            <span class="text-muted small">Despesas diretas</span>
+                            <span class="fw-semibold small">R$ <span id="res-tec-desp">0,00</span></span>
+                          </div>
+                          <div class="d-flex justify-content-between py-2 border-bottom border-secondary-subtle">
+                            <span class="text-muted small">Deslocamento (KM)</span>
+                            <span class="fw-semibold small">R$ <span id="res-km">0,00</span></span>
+                          </div>
+                          <div class="d-flex justify-content-between pt-3 fw-bold">
+                            <span class="text-dark small">Subtotal Técnico</span>
+                            <span class="text-primary fs-5">R$ <span id="res-subtotal-tec">0,00</span></span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {# Empresa #}
+                    <div class="col-md-4">
+                      <div class="card border-0 bg-body-tertiary shadow-none rounded-3 h-100">
+                        <div class="card-header bg-transparent border-bottom py-2 px-3">
+                          <small class="fw-bold text-uppercase text-muted"
+                                 style="font-size: 0.7rem;
+                                        letter-spacing: 0.5px">
+                            <i class="bi bi-building me-1"></i>Pago pela Empresa
+                          </small>
+                        </div>
+                        <div class="card-body p-3">
+                          <div class="d-flex justify-content-between py-2 border-bottom border-secondary-subtle">
+                            <span class="text-muted small">Faturado diretamente</span>
+                            <span class="fw-semibold small">R$ <span id="res-emp-desp">0,00</span></span>
+                          </div>
+                          <div class="d-flex justify-content-between pt-3 fw-bold">
+                            <span class="text-dark small">Subtotal Empresa</span>
+                            <span class="text-dark fs-5 opacity-75">R$ <span id="res-subtotal-emp">0,00</span></span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {# Saldo #}
+                    <div class="col-md-4">
+                      <div class="card border-primary border-opacity-25 shadow-none rounded-3 h-100"
+                           id="card-saldo">
+                        <div class="card-header bg-primary bg-opacity-10 border-bottom border-primary border-opacity-10 py-2 px-3">
+                          <small class="fw-bold text-uppercase text-primary"
+                                 style="font-size: 0.7rem;
+                                        letter-spacing: 0.5px">
+                            <i class="bi bi-calculator me-1"></i>Acerto Financeiro
+                          </small>
+                        </div>
+                        <div class="card-body p-3">
+                          <div class="d-flex justify-content-between py-2 border-bottom border-secondary-subtle">
+                            <span class="text-muted small">Custo Total do Relatório</span>
+                            <span class="fw-semibold small text-dark">R$ <span id="res-total-geral">0,00</span></span>
+                          </div>
+                          <div class="d-flex justify-content-between py-2 border-bottom border-secondary-subtle">
+                            <span class="text-muted small">(-) Adiantamento Recebido</span>
+                            <span class="fw-semibold small text-danger">R$ <span id="res-adiantamento">0,00</span></span>
+                          </div>
+                          <div class="mt-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                              <span class="fw-bold text-dark small">Saldo Final</span>
+                              <span class="fw-bold fs-4 text-success" id="res-saldo">R$ 0,00</span>
+                            </div>
+                            <div class="small mt-2 p-2 rounded bg-light text-center text-muted"
+                                 id="res-msg"
+                                 style="font-size: 0.75rem"></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div class="d-flex justify-content-between py-2 small fw-bold">
-                <span>Subtotal empresa</span>
-                <span class="text-secondary">
-                  R$ <span x-text="totalEmpresa()">0,00</span>
-                </span>
+              {# /tab-content #}
+              {# ── RODAPÉ DE AÇÕES ── #}
+              <div class="d-flex justify-content-between align-items-center mt-3 py-3 px-4 bg-border rounded shadow-sm border">
+                <a href="{% url 'relatorios:relatorio_list' %}"
+                   class="btn btn-outline-secondary btn-sm">
+                  <i class="bi bi-arrow-left me-1"></i>Voltar
+                </a>
+                <div class="d-flex gap-2">
+                  <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="bi bi-check-lg me-1"></i>{{ acao }}
+                  </button>
+                </div>
               </div>
-            </div>
+            </form>
           </div>
-        </div>
+          {# /x-data #}
+        {% endblock %}
+        {% block extra_css %}
+          <style>
+    .col-data, .col-data-input { min-width: 105px; }
+    .col-tipo { min-width: 145px; }
+    .col-valor { min-width: 110px; }
+    .col-quem { min-width: 110px; }
+    .col-comp { min-width: 55px; }
+    .col-km { min-width: 80px; }
+    .col-vkm { min-width: 100px; }
+    .col-obs { min-width: 140px; }
+    .col-action { width: 40px; }
+          </style>
+        {% endblock %}
+        {% block extra_js %}
+          <script>
+  /* ═══════════════════════════════════════════════════════════════
+     CONTROLE DO FORMULÁRIO — Single Save sem HTMX
+     ═══════════════════════════════════════════════════════════════ */
+  const URL_NOVA_LINHA_DESPESA = "{% url 'relatorios:nova_linha_despesa' %}";
 
-        <!-- Bloco saldo -->
-        <div class="col-md-4">
-          <div class="card border-0 h-100"
-               :class="saldo() >= 0 ? 'bg-success-subtle' : 'bg-danger-subtle'">
-            <div class="card-header bg-transparent border-bottom py-2">
-              <small class="fw-semibold text-muted">
-                <i class="bi bi-calculator me-1"></i>Acerto Financeiro
-              </small>
-            </div>
-            <div class="card-body">
-              <div class="d-flex justify-content-between py-1 border-bottom small">
-                <span class="text-muted">Total despesas</span>
-                <span class="fw-semibold">R$ <span x-text="totalGeral()">0,00</span></span>
-              </div>
-              <div class="d-flex justify-content-between py-1 border-bottom small">
-                <span class="text-muted">(-) Adiantamento</span>
-                <span class="fw-semibold text-danger">
-                  R$ <span x-text="adiantamento">0,00</span>
-                </span>
-              </div>
-              <div class="d-flex justify-content-between py-2 small">
-                <span class="fw-bold fs-6">Saldo a reembolsar</span>
-                <span class="fw-bold fs-5"
-                      :class="saldo() >= 0 ? 'text-success' : 'text-danger'">
-                  R$ <span x-text="saldo()">0,00</span>
-                </span>
-              </div>
-              <div class="mt-2 small text-muted">
-                <span x-show="saldo() > 0">
-                  <i class="bi bi-arrow-left-circle text-success"></i>
-                  Empresa deve reembolsar o técnico.
-                </span>
-                <span x-show="saldo() < 0">
-                  <i class="bi bi-arrow-right-circle text-danger"></i>
-                  Técnico deve devolver à empresa.
-                </span>
-                <span x-show="saldo() == 0">
-                  <i class="bi bi-check-circle text-success"></i>
-                  Contas zeradas.
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+  // ── Contadores de índice (nunca reutilizados) ──────────────────
+  let _idxDesp = {{ fs_desp.total_form_count }};
+  let _idxKm = {{ fs_km.total_form_count }};
 
-      </div>
+  // Prefixos Django
+  const PREFIX_DESP = "despesas";
+  const PREFIX_KM = "trechos";
+  const VKM_PADRAO = "{{ valor_km_padrao }}";
 
-      <!-- Tabela de despesas por tipo -->
-      <div class="card border-0 bg-body-tertiary mt-3">
-        <div class="card-header bg-transparent border-bottom py-2">
-          <small class="fw-semibold text-muted">Despesas por Tipo</small>
-        </div>
-        <div class="card-body p-0">
-          {% if instance %}
-            <div class="table-responsive">
-              <table class="table table-sm mb-0">
-                <thead class="table-light">
-                  <tr>
-                    <th class="ps-3 small fw-semibold text-muted">Tipo</th>
-                    <th class="small fw-semibold text-muted">Qtd</th>
-                    <th class="small fw-semibold text-muted">Total</th>
-                    <th class="small fw-semibold text-muted">Quem Pagou</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% regroup instance.despesas.all by get_tipo_display as por_tipo %}
-                  {% for grupo in por_tipo %}
-                    <tr>
-                      <td class="ps-3 small">{{ grupo.grouper }}</td>
-                      <td class="small">{{ grupo.list|length }}</td>
-                      <td class="small fw-semibold">
-                        R$
-                        {% with total=0 %}
-                          {% for item in grupo.list %}
-                            {% comment %}somamos via template filter não é ideal,
-                            mas mantemos simples aqui{% endcomment %}
-                          {% endfor %}
-                        {% endwith %}
-                        {{ grupo.list|length }}x
-                      </td>
-                      <td class="small text-muted">—</td>
-                    </tr>
-                  {% empty %}
-                    <tr>
-                      <td colspan="4" class="text-center text-muted small py-3">
-                        Nenhuma despesa lançada ainda.
-                      </td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          {% else %}
-            <div class="text-center text-muted small py-3">
-              Salve o relatório para visualizar o resumo.
-            </div>
-          {% endif %}
-        </div>
-      </div>
 
-    </div><!-- /tab-resumo -->
+  // ── Clonar linha de DESPESA ────────────────────────────────────
+  console.log("clicou no adicionar despesa");
+  async function adicionarLinhaDespesa() {
+  const idx = _idxDesp;
 
-  </div><!-- /tab-content -->
+  try {
+    console.log("URL:", `${URL_NOVA_LINHA_DESPESA}?idx=${idx}`);
+    const response = await fetch(`${URL_NOVA_LINHA_DESPESA}?idx=${idx}`);
 
-  <!-- ── RODAPÉ DE AÇÕES ── -->
-  <div class="d-flex justify-content-between align-items-center mt-3 py-3 px-4
-              bg-white rounded shadow-sm border">
-    <a href="{% url 'relatorios:relatorio_list' %}" class="btn btn-outline-secondary btn-sm">
-      <i class="bi bi-arrow-left me-1"></i>Voltar
-    </a>
-    <div class="d-flex gap-2">
-      {% if instance %}
-        {% if instance.status == 'rascunho' %}
-          <button type="submit" name="acao_submit" value="rascunho"
-                  class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-floppy me-1"></i>Salvar rascunho
-          </button>
-          <button type="submit" name="acao_submit" value="pendente"
-                  class="btn btn-warning btn-sm">
-            <i class="bi bi-send me-1"></i>Enviar para aprovação
-          </button>
-        {% endif %}
-        {% if instance.status == 'aprovado' %}
-          <a href="{% url 'relatorios:relatorio_status' instance.pk 'faturado' %}"
-             class="btn btn-info btn-sm"
-             onclick="return confirm('Marcar como Faturado?')">
-            <i class="bi bi-check2-all me-1"></i>Marcar Faturado
-          </a>
-        {% endif %}
-      {% endif %}
-      <button type="submit" class="btn btn-primary btn-sm">
-        <i class="bi bi-check-lg me-1"></i>{{ acao }} Relatório
-      </button>
-    </div>
-  </div>
+    if (!response.ok) {
+      throw new Error("Erro ao carregar nova linha de despesa.");
+    }
 
-</form>
-{% endblock %}
+    const html = await response.text();
 
-{% block extra_js %}
-<script>
-function resumoFinanceiro() {
-  return {
-    adiantamento: parseFloat("{{ instance.valor_adiantamento|default:'0'|stringformat:'f' }}") || 0,
+    document.getElementById("corpo-despesas")
+      .insertAdjacentHTML("beforeend", html);
 
-    lerValores(seletor, campo) {
-      return [...document.querySelectorAll(seletor)]
-        .map(el => parseFloat(el.value) || 0);
-    },
+    _idxDesp++;
+    atualizarTotalForms(PREFIX_DESP, _idxDesp);
+    recalcular();
 
-    totalTecnico() {
-      let total = 0;
-      document.querySelectorAll(".linha-despesa").forEach(linha => {
-        const quem  = linha.querySelector("[name*='quem_pagou']")?.value;
-        const reemb = linha.querySelector("[name*='reembolsavel']")?.checked;
-        const val   = parseFloat(linha.querySelector("[name*='valor']")?.value) || 0;
-        if (quem === "tecnico") total += val;
-      });
-      return total.toFixed(2).replace(".", ",");
-    },
-
-    totalEmpresa() {
-      let total = 0;
-      document.querySelectorAll(".linha-despesa").forEach(linha => {
-        const quem = linha.querySelector("[name*='quem_pagou']")?.value;
-        const val  = parseFloat(linha.querySelector("[name*='valor']")?.value) || 0;
-        if (quem === "empresa") total += val;
-      });
-      return total.toFixed(2).replace(".", ",");
-    },
-
-    totalDespesas() {
-      let total = 0;
-      document.querySelectorAll(".linha-despesa [name*='valor']")
-        .forEach(el => { total += parseFloat(el.value) || 0; });
-      return total.toFixed(2).replace(".", ",");
-    },
-
-    totalKmPercorrido() {
-      let total = 0;
-      document.querySelectorAll(".linha-trecho [name*='-km']")
-        .forEach(el => { total += parseFloat(el.value) || 0; });
-      return total.toFixed(1);
-    },
-
-    totalKmValor() {
-      let total = 0;
-      document.querySelectorAll(".linha-trecho").forEach(linha => {
-        const km  = parseFloat(linha.querySelector("[name*='-km']")?.value) || 0;
-        const vkm = parseFloat(linha.querySelector("[name*='valor_km']")?.value) || 0;
-        total += km * vkm;
-      });
-      return total.toFixed(2).replace(".", ",");
-    },
-
-    subtotalTecnico() {
-      const t = parseFloat(this.totalTecnico().replace(",", ".")) || 0;
-      const k = parseFloat(this.totalKmValor().replace(",", ".")) || 0;
-      return (t + k).toFixed(2).replace(".", ",");
-    },
-
-    totalGeral() {
-      const t = parseFloat(this.totalDespesas().replace(",", ".")) || 0;
-      const k = parseFloat(this.totalKmValor().replace(",", ".")) || 0;
-      return (t + k).toFixed(2).replace(".", ",");
-    },
-
-    saldo() {
-      const tec  = parseFloat(this.totalTecnico().replace(",", ".")) || 0;
-      const km   = parseFloat(this.totalKmValor().replace(",", ".")) || 0;
-      const adi  = parseFloat(
-        document.querySelector("[name='valor_adiantamento']")?.value
-      ) || 0;
-      return (tec + km - adi).toFixed(2).replace(".", ",");
-    },
-
-    atualizarBadge(badgeId, classeLinhas) {
-      setTimeout(() => {
-        const count = document.querySelectorAll("." + classeLinhas).length;
-        const el    = document.getElementById(badgeId);
-        if (el) el.textContent = count;
-      }, 300);
-    },
-
-    init() {
-      // Atualiza badges iniciais
-      this.atualizarBadge("badge-despesas", "linha-despesa");
-      this.atualizarBadge("badge-km", "linha-trecho");
-    },
-  };
+  } catch (error) {
+    console.error(error);
+  }
 }
-</script>
-{% endblock %}
+
+
+  // ── Clonar linha de KM ─────────────────────────────────────────
+  async function adicionarLinhaKm() {
+  const idx = _idxKm;
+
+  try {
+    const response = await fetch(`/nova-linha-km/?idx=${idx}`);
+
+    if (!response.ok) {
+      throw new Error("Erro ao carregar nova linha KM.");
+    }
+
+    const html = await response.text();
+
+    document.getElementById("corpo-trechos")
+      .insertAdjacentHTML("beforeend", html);
+
+    _idxKm++;
+    atualizarTotalForms(PREFIX_KM, _idxKm);
+    recalcular();
+
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+  // ── Remover linha ─────────────────────────────────────────────
+  function removerLinha(btn) {
+    const tr = btn.closest("tr");
+    // Se a linha já existe no banco, marca DELETE em vez de remover do DOM
+    const deleteFld = tr.querySelector("[name$='-DELETE']");
+    if (deleteFld && tr.dataset.pk) {
+      deleteFld.value = "on";
+      tr.style.opacity = "0.3";
+      tr.style.pointerEvents = "none";
+    } else {
+      tr.remove();
+    }
+    recalcular();
+  }
+
+
+  // ── Atualiza TOTAL_FORMS do management form ───────────────────
+  function atualizarTotalForms(prefix, total) {
+    const el = document.querySelector(`[name="${prefix}-TOTAL_FORMS"]`);
+    if (el) el.value = total;
+  }
+
+
+  // ── Cálculo do total de cada trecho KM ───────────────────────
+  function calcularTrechoKm(input) {
+    const tr = input.closest("tr");
+    const km = parseFloat(tr.querySelector(".campo-km")?.value) || 0;
+    const vkm = parseFloat(tr.querySelector(".campo-vkm")?.value) || 0;
+    const cel = tr.querySelector(".total-trecho");
+    if (cel) cel.textContent = "R$ " + (km * vkm).toFixed(2).replace(".", ",");
+  }
+
+
+  // ── Recalcula todos os totais e o resumo financeiro ──────────
+  function recalcular() {
+    let totalTec = 0, totalEmp = 0;
+
+    // Despesas
+    document.querySelectorAll(".linha-despesa").forEach(tr => {
+      if (tr.style.opacity === "0.3") return; // marcada para deleção
+      const val = parseFloat(tr.querySelector(".campo-valor-desp")?.value) || 0;
+      const quem = tr.querySelector(".campo-quem-pagou")?.value || "tecnico";
+      if (quem === "tecnico") totalTec += val;
+      else totalEmp += val;
+    });
+
+    let totalKmPx = 0, totalKmKm = 0;
+    document.querySelectorAll(".linha-trecho").forEach(tr => {
+      if (tr.style.opacity === "0.3") return;
+      const km = parseFloat(tr.querySelector(".campo-km")?.value) || 0;
+      const vkm = parseFloat(tr.querySelector(".campo-vkm")?.value) || 0;
+      totalKmKm += km;
+      totalKmPx += km * vkm;
+    });
+
+    const totalGeral = totalTec + totalEmp + totalKmPx;
+    const adiant = parseFloat(
+      document.querySelector("[name='valor_adiantamento']")?.value
+    ) || 0;
+    const saldo = totalTec + totalKmPx - adiant;
+
+    // Rodapés das tabelas
+    setText("total-despesas", (totalTec + totalEmp).toFixed(2).replace(".", ","));
+    setText("total-km-percorrido", totalKmKm.toFixed(1));
+    setText("total-km-valor", totalKmPx.toFixed(2).replace(".", ","));
+
+    // Resumo
+    setText("res-tec-desp", totalTec.toFixed(2).replace(".", ","));
+    setText("res-emp-desp", totalEmp.toFixed(2).replace(".", ","));
+    setText("res-km", totalKmPx.toFixed(2).replace(".", ","));
+    setText("res-subtotal-tec", (totalTec + totalKmPx).toFixed(2).replace(".", ","));
+    setText("res-subtotal-emp", totalEmp.toFixed(2).replace(".", ","));
+    setText("res-total-geral", totalGeral.toFixed(2).replace(".", ","));
+    setText("res-adiantamento", adiant.toFixed(2).replace(".", ","));
+
+    const saldoFmt = (saldo < 0 ? "-R$ " : "R$ ") + Math.abs(saldo).toFixed(2).replace(".", ",");
+    setText("res-saldo", saldoFmt);
+
+    const cardSaldo = document.getElementById("card-saldo");
+    const msgEl = document.getElementById("res-msg");
+    if (cardSaldo && msgEl) {
+      cardSaldo.className = "card border-0 h-100 "
+        + (saldo > 0 ? "bg-success-subtle"
+          : saldo < 0 ? "bg-danger-subtle"
+            : "bg-body-tertiary");
+      msgEl.innerHTML = saldo > 0
+        ? '<i class="bi bi-arrow-left-circle text-success me-1"></i>Empresa deve reembolsar o técnico.'
+        : saldo < 0
+          ? '<i class="bi bi-arrow-right-circle text-danger me-1"></i>Técnico deve devolver à empresa.'
+          : '<i class="bi bi-check-circle text-success me-1"></i>Contas zeradas.';
+    }
+
+    // Badges das abas
+    const nDesp = document.querySelectorAll(
+      ".linha-despesa:not([style*='opacity: 0.3'])"
+    ).length;
+    const nKm = document.querySelectorAll(
+      ".linha-trecho:not([style*='opacity: 0.3'])"
+    ).length;
+
+    document.querySelectorAll("[x-text]").forEach(el => {
+      if (el.getAttribute("x-text").includes("despesas")) el.textContent = nDesp;
+      if (el.getAttribute("x-text").includes("trechos")) el.textContent = nKm;
+    });
+  }
+
+
+  // ── Helpers ─────────────────────────────────────────────────
+  function setText(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  }
+
+  function contarLinhas(tipo) {
+    return document.querySelectorAll(
+      `.linha-${tipo === "despesas" ? "despesa" : "trecho"}:not([style*='opacity'])`
+    ).length;
+  }
+
+
+  // ── Alpine.js init (suporte ao x-data mínimo) ───────────────
+  function formRelatorio(vkmPadrao) {
+    return {
+      init() {
+        // Recalcula ao mudar adiantamento
+        document.querySelector("[name='valor_adiantamento']")
+          ?.addEventListener("input", recalcular);
+        // Recalcular ao carregar (edição)
+        recalcular();
+        // Recalcular totais de trechos existentes ao editar
+        document.querySelectorAll(".linha-trecho").forEach(tr => {
+          const km = parseFloat(tr.querySelector(".campo-km")?.value) || 0;
+          const vkm = parseFloat(tr.querySelector(".campo-vkm")?.value) || 0;
+          const cel = tr.querySelector(".total-trecho");
+          if (cel && km && vkm) {
+            cel.textContent = "R$ " + (km * vkm).toFixed(2).replace(".", ",");
+          }
+        });
+      },
+      contarLinhas(tipo) { return contarLinhas(tipo); },
+    };
+  }
+
+  // Inicialização imediata (sem Alpine em modo não-defer)
+  document.addEventListener("DOMContentLoaded", () => recalcular());
+          </script>
+        {% endblock %}

@@ -2,9 +2,10 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.views.generic import TemplateView, ListView
 from django.contrib import messages
 from django.http import HttpResponse
-from django.db.models import Q, Sum, Count
-from django.views.decorators.http import require_POST, require_http_methods
+from django.db.models import Q, Sum
+from django.views.decorators.http import require_POST
 from decimal import Decimal
+import datetime
 
 from .models import (
     RelatorioTecnico,
@@ -20,12 +21,12 @@ from .forms import (
     RelatorioTecnicoForm,
     ItemDespesaFormSet,
     TrechoKmFormSet,
-    ItemDespesaForm,
-    TrechoKmForm,
     TecnicoForm,
     ClienteForm,
     AdiantamentoForm,
     RelatorioFiltroForm,
+    ItemDespesaForm,
+    TrechoKmForm
 )
 
 
@@ -38,16 +39,11 @@ class DashboardView(TemplateView):
     template_name = "dashboard/dashboard.html"
 
     def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
+        ctx = super().get_context_data(**kwargs)
         total = RelatorioTecnico.objects.count()
-        total_d = total or 1
+        d = total or 1
 
-        total_despesas = sum(
-            r.total_despesas
-            for r in RelatorioTecnico.objects.prefetch_related("despesas", "trechos")
-        )
-
-        context.update(
+        ctx.update(
             {
                 "titulo_pagina": "Dashboard",
                 "total_relatorios": total,
@@ -56,39 +52,28 @@ class DashboardView(TemplateView):
                 ).count(),
                 "total_tecnicos": Tecnico.objects.filter(ativo=True).count(),
                 "total_clientes": Cliente.objects.filter(ativo=True).count(),
-                "total_despesas_fmt": f"R$ {total_despesas:,.2f}".replace(",", "X")
-                .replace(".", ",")
-                .replace("X", "."),
                 "pct_rascunho": round(
-                    RelatorioTecnico.objects.filter(status="rascunho").count()
-                    / total_d
-                    * 100
+                    RelatorioTecnico.objects.filter(status="rascunho").count() / d * 100
                 ),
                 "pct_pendente": round(
-                    RelatorioTecnico.objects.filter(status="pendente").count()
-                    / total_d
-                    * 100
+                    RelatorioTecnico.objects.filter(status="pendente").count() / d * 100
                 ),
                 "pct_aprovado": round(
-                    RelatorioTecnico.objects.filter(status="aprovado").count()
-                    / total_d
-                    * 100
+                    RelatorioTecnico.objects.filter(status="aprovado").count() / d * 100
                 ),
                 "pct_faturado": round(
-                    RelatorioTecnico.objects.filter(status="faturado").count()
-                    / total_d
-                    * 100
+                    RelatorioTecnico.objects.filter(status="faturado").count() / d * 100
                 ),
                 "relatorios_recentes": RelatorioTecnico.objects.select_related(
                     "cliente", "tecnico_responsavel"
                 ).order_by("-criado_em")[:8],
             }
         )
-        return context
+        return ctx
 
 
 # ─────────────────────────────────────────────
-# RELATÓRIO — LISTAGEM
+# LISTAGEM
 # ─────────────────────────────────────────────
 
 
@@ -132,39 +117,67 @@ class RelatorioListView(ListView):
 
 
 # ─────────────────────────────────────────────
-# RELATÓRIO — CRIAR / EDITAR (view única com abas)
+# CRIAR / EDITAR  — Single Save
 # ─────────────────────────────────────────────
 
 
 def relatorio_form_view(request, pk=None):
     """
-    View única para criação e edição do relatório.
-    Gerencia: cabeçalho + formset de despesas + formset de KM.
+    View unificada: cria ou edita relatório.
+
+    Fluxo Single-Save:
+    - Formulário principal + formsets de despesas e KM
+      são submetidos e validados juntos em um único POST.
+    - Não existe mais a obrigatoriedade de salvar o cabeçalho
+      antes de adicionar itens. Os itens são adicionados via
+      JavaScript puro (clonagem de linha) e submetidos junto
+      com o formulário principal.
     """
     instance = get_object_or_404(RelatorioTecnico, pk=pk) if pk else None
-    acao = "Editar" if instance else "Novo"
 
     if request.method == "POST":
         form = RelatorioTecnicoForm(request.POST, instance=instance)
-        fs_desp = ItemDespesaFormSet(request.POST, request.FILES, instance=instance)
-        fs_km = TrechoKmFormSet(request.POST, instance=instance)
+        fs_desp = ItemDespesaFormSet(
+            request.POST,
+            request.FILES,
+            instance=instance,
+            prefix="despesas",
+        )
+        fs_km = TrechoKmFormSet(
+            request.POST,
+            instance=instance,
+            prefix="trechos",
+        )
 
-        if form.is_valid() and fs_desp.is_valid() and fs_km.is_valid():
-            relatorio = form.save()
+        form_ok = form.is_valid()
+        fs_desp_ok = fs_desp.is_valid()
+        fs_km_ok = fs_km.is_valid()
+
+        if form_ok and fs_desp_ok and fs_km_ok:
+            relatorio = form.save()  # salva cabeçalho + equipe M2M
+
             fs_desp.instance = relatorio
             fs_km.instance = relatorio
             fs_desp.save()
             fs_km.save()
+
             messages.success(
-                request, f"Relatório {relatorio.numero} salvo com sucesso!"
+                request,
+                f"Relatório {relatorio.numero} salvo com sucesso!",
             )
             return redirect("relatorios:relatorio_detail", pk=relatorio.pk)
-        else:
-            messages.error(request, "Corrija os erros abaixo.")
+
+        messages.error(request, "Corrija os erros indicados antes de salvar.")
+
     else:
         form = RelatorioTecnicoForm(instance=instance)
-        fs_desp = ItemDespesaFormSet(instance=instance)
-        fs_km = TrechoKmFormSet(instance=instance)
+        fs_desp = ItemDespesaFormSet(instance=instance, prefix="despesas")
+        fs_km = TrechoKmFormSet(instance=instance, prefix="trechos")
+
+    # Valor/km vigente para preencher novas linhas de KM via JS
+    valor_km_padrao = PoliticaValor.valor_km_vigente(
+        instance.data_inicio if instance else datetime.date.today()
+    )
 
     return render(
         request,
@@ -174,19 +187,41 @@ def relatorio_form_view(request, pk=None):
             "fs_desp": fs_desp,
             "fs_km": fs_km,
             "instance": instance,
-            "titulo_pagina": f"{acao} Relatório",
-            "acao": acao,
-            "valor_km_atual": PoliticaValor.valor_km_vigente(
-                instance.data_inicio
-                if instance
-                else __import__("datetime").date.today()
-            ),
+            "titulo_pagina": "Editar Relatório" if instance else "Novo Relatório",
+            "acao": "Salvar alterações" if instance else "Criar Relatório",
+            "valor_km_padrao": str(valor_km_padrao),
         },
     )
 
+def nova_linha_despesa(request):
+    idx = request.GET.get("idx", 0)
+    form = ItemDespesaForm(prefix=f"despesas-{idx}")
+
+    return render(
+        request,
+        "partials/_linha_despesa.html",
+        {
+            "form": form,
+            "idx": idx,
+        },
+    )
+
+def nova_linha_km(request):
+    idx = request.GET.get("idx", 0)
+
+    form = TrechoKmForm(prefix=f"trechos-{idx}")
+
+    return render(
+        request,
+        "partials/_linha_trecho.html",
+        {
+            "form": form,
+            "idx": idx,
+        },
+    )
 
 # ─────────────────────────────────────────────
-# RELATÓRIO — DETALHE
+# DETALHE
 # ─────────────────────────────────────────────
 
 
@@ -203,14 +238,12 @@ def relatorio_detail_view(request, pk):
         {
             "relatorio": relatorio,
             "titulo_pagina": f"Relatório {relatorio.numero}",
-            "despesas_tecnico": relatorio.despesas.filter(quem_pagou="tecnico"),
-            "despesas_empresa": relatorio.despesas.filter(quem_pagou="empresa"),
         },
     )
 
 
 # ─────────────────────────────────────────────
-# RELATÓRIO — EXCLUIR
+# EXCLUIR
 # ─────────────────────────────────────────────
 
 
@@ -232,7 +265,7 @@ def relatorio_delete_view(request, pk):
 
 
 # ─────────────────────────────────────────────
-# RELATÓRIO — MUDAR STATUS
+# MUDAR STATUS
 # ─────────────────────────────────────────────
 
 
@@ -240,12 +273,13 @@ def relatorio_delete_view(request, pk):
 def relatorio_status_view(request, pk, status):
     relatorio = get_object_or_404(RelatorioTecnico, pk=pk)
     status_validos = [s[0] for s in StatusRelatorio.choices]
+
     if status not in status_validos:
         messages.error(request, "Status inválido.")
         return redirect("relatorios:relatorio_detail", pk=pk)
 
     if status == StatusRelatorio.PENDENTE:
-        erros = relatorio.pode_fechar()
+        erros = relatorio.pode_enviar()
         if erros:
             for e in erros:
                 messages.error(request, e)
@@ -253,74 +287,15 @@ def relatorio_status_view(request, pk, status):
 
     relatorio.status = status
     relatorio.save(update_fields=["status", "atualizado_em"])
-
-    # CORREÇÃO DE SINTAXE AQUI:
     messages.success(
-        request, f"Status alterado para '{relatorio.get_status_display()}'."
+        request,
+        f'Status alterado para "{relatorio.get_status_display()}".',
     )
     return redirect("relatorios:relatorio_detail", pk=pk)
 
 
 # ─────────────────────────────────────────────
-# HTMX — LINHA DE DESPESA
-# ─────────────────────────────────────────────
-
-
-def htmx_add_despesa(request, pk):
-    """Retorna HTML de uma nova linha de despesa (HTMX)."""
-    relatorio = get_object_or_404(RelatorioTecnico, pk=pk)
-    total = relatorio.despesas.count()
-    prefix = f"despesas-{total}"
-    form = ItemDespesaForm(prefix=prefix)
-    return render(
-        request,
-        "./partials/_linha_despesa.html",
-        {
-            "form": form,
-            "prefix": prefix,
-            "idx": total,
-        },
-    )
-
-
-@require_POST
-def htmx_remove_despesa(request, item_pk):
-    """Remove um item de despesa via HTMX."""
-    item = get_object_or_404(ItemDespesa, pk=item_pk)
-    item.delete()
-    return HttpResponse("")  # HTMX substitui o elemento por vazio (swap outerHTML)
-
-
-def htmx_add_trecho(request, pk):
-    """Retorna HTML de uma nova linha de trecho KM (HTMX)."""
-    relatorio = get_object_or_404(RelatorioTecnico, pk=pk)
-    total = relatorio.trechos.count()
-    prefix = f"trechos-{total}"
-    form = TrechoKmForm(
-        prefix=prefix,
-        initial={"valor_km": PoliticaValor.valor_km_vigente(relatorio.data_inicio)},
-    )
-    return render(
-        request,
-        "./partials/_linha_trecho.html",
-        {
-            "form": form,
-            "prefix": prefix,
-            "idx": total,
-        },
-    )
-
-
-@require_POST
-def htmx_remove_trecho(request, trecho_pk):
-    """Remove um trecho KM via HTMX."""
-    trecho = get_object_or_404(TrechoKm, pk=trecho_pk)
-    trecho.delete()
-    return HttpResponse("")
-
-
-# ─────────────────────────────────────────────
-# TÉCNICOS — CRUD
+# TÉCNICOS
 # ─────────────────────────────────────────────
 
 
@@ -349,7 +324,7 @@ def tecnico_form_view(request, pk=None):
     form = TecnicoForm(request.POST or None, instance=instance)
     if form.is_valid():
         t = form.save()
-        messages.success(request, f"Técnico {t.nome} salvo com sucesso!")
+        messages.success(request, f"Técnico {t.nome} salvo!")
         return redirect("relatorios:tecnico_list")
     return render(
         request,
@@ -380,7 +355,7 @@ def tecnico_delete_view(request, pk):
 
 
 # ─────────────────────────────────────────────
-# CLIENTES — CRUD
+# CLIENTES
 # ─────────────────────────────────────────────
 
 
@@ -413,7 +388,7 @@ def cliente_form_view(request, pk=None):
     form = ClienteForm(request.POST or None, instance=instance)
     if form.is_valid():
         c = form.save()
-        messages.success(request, f"Cliente {c.nome} salvo com sucesso!")
+        messages.success(request, f"Cliente {c.nome} salvo!")
         return redirect("relatorios:cliente_list")
     return render(
         request,
@@ -444,7 +419,7 @@ def cliente_delete_view(request, pk):
 
 
 # ─────────────────────────────────────────────
-# ADIANTAMENTOS — CRUD
+# ADIANTAMENTOS
 # ─────────────────────────────────────────────
 
 
@@ -466,10 +441,9 @@ class AdiantamentoListView(ListView):
         ctx["titulo_pagina"] = "Adiantamentos"
         ctx["tecnicos"] = Tecnico.objects.filter(ativo=True)
         ctx["tecnico_sel"] = self.request.GET.get("tecnico", "")
-        total = self.get_queryset().aggregate(total=Sum("valor"))["total"] or Decimal(
-            "0.00"
-        )
-        ctx["total_geral"] = total
+        ctx["total_geral"] = self.get_queryset().aggregate(t=Sum("valor"))[
+            "t"
+        ] or Decimal("0.00")
         return ctx
 
 
@@ -478,7 +452,7 @@ def adiantamento_form_view(request, pk=None):
     form = AdiantamentoForm(request.POST or None, instance=instance)
     if form.is_valid():
         form.save()
-        messages.success(request, "Adiantamento salvo com sucesso!")
+        messages.success(request, "Adiantamento salvo!")
         return redirect("relatorios:adiantamento_list")
     return render(
         request,
@@ -493,16 +467,16 @@ def adiantamento_form_view(request, pk=None):
 
 
 def adiantamento_delete_view(request, pk):
-    adiantamento = get_object_or_404(Adiantamento, pk=pk)
+    obj = get_object_or_404(Adiantamento, pk=pk)
     if request.method == "POST":
-        adiantamento.delete()
+        obj.delete()
         messages.success(request, "Adiantamento removido.")
         return redirect("relatorios:adiantamento_list")
     return render(
         request,
         "adiantamentos/adiantamento_confirm_delete.html",
         {
-            "object": adiantamento,
+            "object": obj,
             "titulo_pagina": "Excluir Adiantamento",
         },
     )

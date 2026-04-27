@@ -74,3 +74,14 @@ header.navbar {
   background: rgba(0,0,0,.2);
   border-radius: 10px;
 }
+
+[data-bs-theme="dark"] .table-light {
+    --bs-table-bg: var(--bs-body-bg);
+    --bs-table-color: var(--bs-body-color);
+    --bs-table-border-color: var(--bs-border-color);
+    --bs-table-hover-bg: var(--bs-secondary-bg);
+}
+
+[data-bs-theme="dark"] .bg-light {
+    background-color: var(--bs-body-bg) !important;
+}

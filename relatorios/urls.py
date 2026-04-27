@@ -4,7 +4,6 @@ from . import views
 app_name = "relatorios"
 
 urlpatterns = [
-    # Dashboard
     path("dashboard/", views.DashboardView.as_view(), name="dashboard"),
     # Relatórios
     path("relatorios/", views.RelatorioListView.as_view(), name="relatorio_list"),
@@ -24,28 +23,6 @@ urlpatterns = [
         "relatorios/<int:pk>/status/<str:status>/",
         views.relatorio_status_view,
         name="relatorio_status",
-    ),
-    # HTMX — despesas
-    path(
-        "relatorios/<int:pk>/htmx/despesa/add/",
-        views.htmx_add_despesa,
-        name="htmx_add_despesa",
-    ),
-    path(
-        "relatorios/htmx/despesa/<int:item_pk>/remove/",
-        views.htmx_remove_despesa,
-        name="htmx_remove_despesa",
-    ),
-    # HTMX — trechos km
-    path(
-        "relatorios/<int:pk>/htmx/trecho/add/",
-        views.htmx_add_trecho,
-        name="htmx_add_trecho",
-    ),
-    path(
-        "relatorios/htmx/trecho/<int:trecho_pk>/remove/",
-        views.htmx_remove_trecho,
-        name="htmx_remove_trecho",
     ),
     # Técnicos
     path("tecnicos/", views.TecnicoListView.as_view(), name="tecnico_list"),
@@ -78,4 +55,6 @@ urlpatterns = [
         views.adiantamento_delete_view,
         name="adiantamento_delete",
     ),
+    path("nova-linha-despesa/", views.nova_linha_despesa, name="nova_linha_despesa"),
+    path("nova-linha-km/", views.nova_linha_km, name="nova_linha_km"),
 ]

@@ -1,6 +1,9 @@
 """
-Models do sistema Campo Manager — v2.
-Módulo de prestação de contas com despesas itemizadas e deslocamento por trecho.
+Models v3 — Campo Manager
+Mudanças:
+- centro_custo movido de ItemDespesa para RelatorioTecnico
+- campo reembolsavel removido de ItemDespesa
+- RelatorioTecnicoEquipe mantido para múltiplos técnicos
 """
 
 from django.db import models
@@ -32,7 +35,7 @@ class TipoDespesa(models.TextChoices):
     HOSPEDAGEM = "hospedagem", "Hospedagem"
     COMBUSTIVEL = "combustivel", "Combustível"
     PEDAGIO = "pedagio", "Pedágio"
-    TRANSPORTE = "transporte", "Transporte (ônibus/taxi/uber)"
+    TRANSPORTE = "transporte", "Transporte"
     ESTACIONAMENTO = "estacionamento", "Estacionamento"
     MATERIAL = "material", "Material / Ferramentas"
     COMUNICACAO = "comunicacao", "Comunicação / Telefone"
@@ -40,8 +43,8 @@ class TipoDespesa(models.TextChoices):
 
 
 class QuemPagou(models.TextChoices):
-    TECNICO = "tecnico", "Técnico (reembolsável)"
-    EMPRESA = "empresa", "Empresa (cartão/direto)"
+    TECNICO = "tecnico", "Técnico"
+    EMPRESA = "empresa", "Empresa"
 
 
 class PapelTecnico(models.TextChoices):
@@ -108,7 +111,11 @@ class Tecnico(models.Model):
 class Cliente(models.Model):
     nome = models.CharField("Nome / Razão Social", max_length=200)
     cnpj_cpf = models.CharField(
-        "CNPJ / CPF", max_length=20, blank=True, null=True, unique=True
+        "CNPJ / CPF",
+        max_length=20,
+        blank=True,
+        null=True,
+        unique=True,
     )
     cidade = models.CharField("Cidade", max_length=100)
     uf = models.CharField("UF", max_length=2, choices=UF.choices, default=UF.PR)
@@ -132,17 +139,11 @@ class Cliente(models.Model):
 
 
 # ─────────────────────────────────────────────────────────────────
-# POLITICA DE VALORES (limites e tarifas configuráveis)
+# POLÍTICA DE VALORES
 # ─────────────────────────────────────────────────────────────────
 
 
 class PoliticaValor(models.Model):
-    """
-    Tabela de limites e tarifas.
-    Permite configurar: limite de refeição, diária de hotel, valor por km.
-    Uma política vigente por vez por tipo.
-    """
-
     tipo_despesa = models.CharField(
         "Tipo de despesa",
         max_length=30,
@@ -156,7 +157,6 @@ class PoliticaValor(models.Model):
         decimal_places=2,
         null=True,
         blank=True,
-        help_text="Valor máximo por ocorrência. Deixe em branco para sem limite.",
     )
     valor_km = models.DecimalField(
         "Valor por km (R$)",
@@ -164,7 +164,6 @@ class PoliticaValor(models.Model):
         decimal_places=4,
         null=True,
         blank=True,
-        help_text="Preencha apenas para política de quilometragem.",
     )
     vigencia_inicio = models.DateField("Vigência início")
     vigencia_fim = models.DateField("Vigência fim", null=True, blank=True)
@@ -176,12 +175,11 @@ class PoliticaValor(models.Model):
         ordering = ["-vigencia_inicio"]
 
     def __str__(self):
-        return f"{self.descricao} — R$ {self.limite_valor or self.valor_km}"
+        return f"{self.descricao} — {self.limite_valor or self.valor_km}"
 
     @classmethod
     def limite_para(cls, tipo_despesa, data):
-        """Retorna o limite vigente para um tipo de despesa em uma data."""
-        politica = (
+        p = (
             cls.objects.filter(
                 tipo_despesa=tipo_despesa,
                 ativo=True,
@@ -192,12 +190,11 @@ class PoliticaValor(models.Model):
             )
             .first()
         )
-        return politica.limite_valor if politica else None
+        return p.limite_valor if p else None
 
     @classmethod
     def valor_km_vigente(cls, data):
-        """Retorna o valor por km vigente em uma data."""
-        politica = (
+        p = (
             cls.objects.filter(
                 valor_km__isnull=False,
                 ativo=True,
@@ -208,11 +205,11 @@ class PoliticaValor(models.Model):
             )
             .first()
         )
-        return politica.valor_km if politica else Decimal("0.00")
+        return p.valor_km if p else Decimal("0.00")
 
 
 # ─────────────────────────────────────────────────────────────────
-# RELATORIO TECNICO (cabeçalho)
+# RELATÓRIO TÉCNICO
 # ─────────────────────────────────────────────────────────────────
 
 
@@ -226,7 +223,7 @@ class RelatorioTecnico(models.Model):
         default=StatusRelatorio.RASCUNHO,
     )
 
-    # Vinculações
+    # Vínculos
     cliente = models.ForeignKey(
         Cliente,
         on_delete=models.PROTECT,
@@ -247,10 +244,13 @@ class RelatorioTecnico(models.Model):
         verbose_name="Equipe adicional",
     )
 
-    # Dados do atendimento
+    # Atendimento
     cidade_atendimento = models.CharField("Cidade de atendimento", max_length=100)
     uf_atendimento = models.CharField(
-        "UF", max_length=2, choices=UF.choices, default=UF.PR
+        "UF",
+        max_length=2,
+        choices=UF.choices,
+        default=UF.PR,
     )
     tipo_localidade = models.CharField(
         "Tipo de localidade",
@@ -258,17 +258,19 @@ class RelatorioTecnico(models.Model):
         choices=TipoLocalidade.choices,
         default=TipoLocalidade.INTERIOR,
     )
-    data_inicio = models.DateField("Data início do atendimento")
-    data_fim = models.DateField("Data fim do atendimento")
+    data_inicio = models.DateField("Data início")
+    data_fim = models.DateField("Data fim")
     motivo = models.TextField("Motivo / Descrição do serviço")
-    area_gasto = models.CharField(
-        "Área / Centro de custo",
+
+    # Centro de custo único para todo o relatório (movido de ItemDespesa)
+    centro_custo = models.CharField(
+        "Centro de custo / Classificação",
         max_length=100,
         blank=True,
-        help_text="Ex: Manutenção, Instalação, Comercial...",
+        help_text="Aplicado a todos os itens deste relatório.",
     )
 
-    # Financeiro — cabeçalho
+    # Financeiro
     valor_adiantamento = models.DecimalField(
         "Adiantamento recebido (R$)",
         max_digits=10,
@@ -277,10 +279,7 @@ class RelatorioTecnico(models.Model):
         validators=[MinValueValidator(Decimal("0.00"))],
     )
 
-    # Observações gerais
     observacoes = models.TextField("Observações gerais", blank=True)
-
-    # Auditoria
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
@@ -292,69 +291,56 @@ class RelatorioTecnico(models.Model):
     def __str__(self):
         return f"{self.numero} — {self.cliente}"
 
-    # ── Propriedades financeiras calculadas ──────────────────────
+    # ── Financeiro ──────────────────────────────────────────────
 
     @property
     def total_despesas_tecnico(self):
-        """Soma de despesas pagas pelo técnico (reembolsáveis)."""
         return self.despesas.filter(quem_pagou=QuemPagou.TECNICO).aggregate(
-            total=models.Sum("valor")
-        )["total"] or Decimal("0.00")
+            t=models.Sum("valor")
+        )["t"] or Decimal("0.00")
 
     @property
     def total_despesas_empresa(self):
-        """Soma de despesas pagas diretamente pela empresa."""
         return self.despesas.filter(quem_pagou=QuemPagou.EMPRESA).aggregate(
-            total=models.Sum("valor")
-        )["total"] or Decimal("0.00")
+            t=models.Sum("valor")
+        )["t"] or Decimal("0.00")
 
     @property
     def total_km(self):
-        """Soma do valor calculado de todos os trechos de KM."""
-        return self.trechos.aggregate(total=models.Sum("valor_calculado"))[
-            "total"
-        ] or Decimal("0.00")
-
-    @property
-    def total_despesas(self):
-        """Total geral: despesas + km."""
-        return self.total_despesas_tecnico + self.total_despesas_empresa + self.total_km
-
-    @property
-    def saldo(self):
-        """
-        Saldo a acertar.
-        Positivo  → empresa deve reembolsar o técnico.
-        Negativo  → técnico deve devolver à empresa.
-        """
-        return self.total_despesas_tecnico + self.total_km - self.valor_adiantamento
-
-    @property
-    def total_km_percorrido(self):
-        return self.trechos.aggregate(total=models.Sum("km"))["total"] or Decimal(
+        return self.trechos.aggregate(t=models.Sum("valor_calculado"))["t"] or Decimal(
             "0.00"
         )
 
     @property
+    def total_despesas(self):
+        return self.total_despesas_tecnico + self.total_despesas_empresa + self.total_km
+
+    @property
+    def saldo(self):
+        return self.total_despesas_tecnico + self.total_km - self.valor_adiantamento
+
+    @property
+    def total_km_percorrido(self):
+        return self.trechos.aggregate(t=models.Sum("km"))["t"] or Decimal("0.00")
+
+    @property
     def status_badge_cor(self):
-        mapa = {
+        return {
             StatusRelatorio.RASCUNHO: "secondary",
             StatusRelatorio.PENDENTE: "warning",
             StatusRelatorio.APROVADO: "success",
             StatusRelatorio.REJEITADO: "danger",
             StatusRelatorio.FATURADO: "info",
-        }
-        return mapa.get(self.status, "secondary")
+        }.get(self.status, "secondary")
 
     def clean(self):
         if self.data_fim and self.data_inicio:
             if self.data_fim < self.data_inicio:
                 raise ValidationError(
-                    {"data_fim": "A data fim não pode ser anterior à data início."}
+                    {"data_fim": "Data fim não pode ser anterior à data início."}
                 )
 
-    def pode_fechar(self):
-        """Verifica se o relatório pode ser enviado para aprovação."""
+    def pode_enviar(self):
         erros = []
         if not self.despesas.exists() and not self.trechos.exists():
             erros.append("Adicione pelo menos uma despesa ou trecho de KM.")
@@ -362,7 +348,7 @@ class RelatorioTecnico(models.Model):
 
 
 # ─────────────────────────────────────────────────────────────────
-# EQUIPE DO RELATÓRIO (técnicos adicionais)
+# EQUIPE DO RELATÓRIO
 # ─────────────────────────────────────────────────────────────────
 
 
@@ -371,12 +357,10 @@ class RelatorioTecnicoEquipe(models.Model):
         RelatorioTecnico,
         on_delete=models.CASCADE,
         related_name="equipe",
-        verbose_name="Relatório",
     )
     tecnico = models.ForeignKey(
         Tecnico,
         on_delete=models.PROTECT,
-        verbose_name="Técnico",
     )
     papel = models.CharField(
         "Papel",
@@ -395,7 +379,7 @@ class RelatorioTecnicoEquipe(models.Model):
 
 
 # ─────────────────────────────────────────────────────────────────
-# ITEM DE DESPESA (linhas da prestação de contas)
+# ITEM DE DESPESA
 # ─────────────────────────────────────────────────────────────────
 
 
@@ -404,19 +388,15 @@ class ItemDespesa(models.Model):
         RelatorioTecnico,
         on_delete=models.CASCADE,
         related_name="despesas",
-        verbose_name="Relatório",
     )
     ordem = models.PositiveSmallIntegerField("Ordem", default=0)
     data = models.DateField("Data")
     tipo = models.CharField(
-        "Tipo de despesa",
+        "Tipo",
         max_length=20,
         choices=TipoDespesa.choices,
     )
-    descricao = models.CharField(
-        "Descrição / Fornecedor",
-        max_length=255,
-    )
+    descricao = models.CharField("Descrição / Fornecedor", max_length=255)
     valor = models.DecimalField(
         "Valor (R$)",
         max_digits=10,
@@ -428,16 +408,6 @@ class ItemDespesa(models.Model):
         max_length=10,
         choices=QuemPagou.choices,
         default=QuemPagou.TECNICO,
-    )
-    reembolsavel = models.BooleanField(
-        "Reembolsável",
-        default=True,
-        help_text="Despesas pagas pela empresa não são reembolsáveis.",
-    )
-    centro_custo = models.CharField(
-        "Centro de custo / Classificação",
-        max_length=100,
-        blank=True,
     )
     comprovante = models.FileField(
         "Comprovante",
@@ -454,44 +424,30 @@ class ItemDespesa(models.Model):
         ordering = ["ordem", "data", "tipo"]
 
     def __str__(self):
-        return f"{self.get_tipo_display()} — R$ {self.valor} ({self.data})"
+        return f"{self.get_tipo_display()} — R$ {self.valor}"
 
     def clean(self):
         erros = {}
-
-        # Despesa paga pela empresa não pode ser reembolsável
-        if self.quem_pagou == QuemPagou.EMPRESA and self.reembolsavel:
-            erros["reembolsavel"] = "Despesas pagas pela empresa não são reembolsáveis."
-
-        # Data deve estar dentro do período do relatório
         if self.relatorio_id and self.data:
             rel = self.relatorio
             if self.data < rel.data_inicio or self.data > rel.data_fim:
                 erros["data"] = (
-                    f"A data deve estar entre "
-                    f"{rel.data_inicio.strftime('%d/%m/%Y')} e "
-                    f"{rel.data_fim.strftime('%d/%m/%Y')}."
+                    f"Data fora do período do relatório "
+                    f"({rel.data_inicio:%d/%m/%Y} a {rel.data_fim:%d/%m/%Y})."
                 )
-
-        # Verifica limite da política de valores
         if self.tipo and self.data and self.valor:
             limite = PoliticaValor.limite_para(self.tipo, self.data)
             if limite and self.valor > limite:
                 erros["valor"] = (
-                    f"O limite para {self.get_tipo_display()} é "
-                    f"R$ {limite:.2f}. Valor informado: R$ {self.valor:.2f}."
+                    f"Limite para {self.get_tipo_display()} é "
+                    f"R$ {limite:.2f}. Informado: R$ {self.valor:.2f}."
                 )
-
         if erros:
             raise ValidationError(erros)
 
-    @property
-    def eh_reembolsavel_ao_tecnico(self):
-        return self.quem_pagou == QuemPagou.TECNICO and self.reembolsavel
-
 
 # ─────────────────────────────────────────────────────────────────
-# TRECHO DE KM (deslocamento por trecho)
+# TRECHO DE KM
 # ─────────────────────────────────────────────────────────────────
 
 
@@ -500,7 +456,6 @@ class TrechoKm(models.Model):
         RelatorioTecnico,
         on_delete=models.CASCADE,
         related_name="trechos",
-        verbose_name="Relatório",
     )
     ordem = models.PositiveSmallIntegerField("Ordem", default=0)
     data = models.DateField("Data")
@@ -517,7 +472,6 @@ class TrechoKm(models.Model):
         max_digits=6,
         decimal_places=4,
         default=Decimal("0.00"),
-        help_text="Preenchido automaticamente pela política vigente.",
     )
     valor_calculado = models.DecimalField(
         "Valor calculado (R$)",
@@ -537,10 +491,8 @@ class TrechoKm(models.Model):
         return f"{self.origem} → {self.destino} ({self.km} km)"
 
     def save(self, *args, **kwargs):
-        # Preenche valor_km pela política vigente se não informado
         if not self.valor_km and self.data:
             self.valor_km = PoliticaValor.valor_km_vigente(self.data)
-        # Calcula valor automaticamente
         self.valor_calculado = (self.km * self.valor_km).quantize(Decimal("0.01"))
         super().save(*args, **kwargs)
 
@@ -551,16 +503,15 @@ class TrechoKm(models.Model):
                 raise ValidationError(
                     {
                         "data": (
-                            f"A data deve estar entre "
-                            f"{rel.data_inicio.strftime('%d/%m/%Y')} e "
-                            f"{rel.data_fim.strftime('%d/%m/%Y')}."
+                            f"Data fora do período do relatório "
+                            f"({rel.data_inicio:%d/%m/%Y} a {rel.data_fim:%d/%m/%Y})."
                         )
                     }
                 )
 
 
 # ─────────────────────────────────────────────────────────────────
-# ADIANTAMENTO (mantido separado para histórico financeiro)
+# ADIANTAMENTO
 # ─────────────────────────────────────────────────────────────────
 
 
@@ -574,7 +525,6 @@ class Adiantamento(models.Model):
         Tecnico,
         on_delete=models.PROTECT,
         related_name="adiantamentos",
-        verbose_name="Técnico",
     )
     relatorio = models.ForeignKey(
         RelatorioTecnico,
@@ -582,7 +532,6 @@ class Adiantamento(models.Model):
         related_name="adiantamentos",
         null=True,
         blank=True,
-        verbose_name="Relatório vinculado",
     )
     tipo = models.CharField(
         "Tipo",
