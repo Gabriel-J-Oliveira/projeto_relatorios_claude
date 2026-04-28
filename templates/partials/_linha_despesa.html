@@ -1,22 +1,75 @@
-{# Linha de despesa NOVA — retornada pela view #}
+{# Linha de despesa NOVA — corrigida para validação manual #}
 <tr class="linha-despesa"
     id="linha-despesa-nova-{{ idx }}"
     data-form-index="{{ idx }}">
+
+  {% with prefix="despesas-"|add:idx %}
   <td class="p-1 px-3">
-    {{ form.id }}{{ form.ordem }}
-    <div class="d-none">{{ form.DELETE }}</div>
-    {{ form.data }}
+    {# Campos ocultos vitais para o FormSet #}
+    <input type="hidden" name="{{ prefix }}-id" id="id_{{ prefix }}-id" value="{{ form.id.value|default:'' }}">
+    <input type="hidden" name="{{ prefix }}-ordem" id="id_{{ prefix }}-ordem" value="{{ idx }}">
+    <div class="d-none">
+        <input type="checkbox" name="{{ prefix }}-DELETE" id="id_{{ prefix }}-DELETE">
+    </div>
+
+    {# Campo Data #}
+    <input type="date" 
+           name="{{ prefix }}-data" 
+           id="id_{{ prefix }}-data" 
+           value="{{ form.data.value|default:'' }}" 
+           class="form-control form-control-sm">
   </td>
-  <td class="p-1">{{ form.tipo }}</td>
-  <td class="p-1">{{ form.descricao }}</td>
-  <td class="p-1">{{ form.valor }}</td>
-  <td class="p-1">{{ form.quem_pagou }}</td>
+
+  <td class="p-1">
+    <select name="{{ prefix }}-tipo" id="id_{{ prefix }}-tipo" class="form-select form-select-sm">
+      {% for value, label in form.fields.tipo.choices %}
+        <option value="{{ value }}" {% if form.tipo.value == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </td>
+
+  <td class="p-1">
+    <input type="text" 
+           name="{{ prefix }}-descricao" 
+           id="id_{{ prefix }}-descricao" 
+           value="{{ form.descricao.value|default:'' }}" 
+           placeholder="Fornecedor / Detalhe" 
+           class="form-control form-control-sm">
+  </td>
+
+  <td class="p-1">
+    <input type="number" 
+           step="0.01" 
+           name="{{ prefix }}-valor" 
+           id="id_{{ prefix }}-valor" 
+           value="{{ form.valor.value|default:'' }}" 
+           class="form-control form-control-sm campo-valor-desp" 
+           oninput="recalcular()">
+  </td>
+
+  <td class="p-1">
+    <select name="{{ prefix }}-quem_pagou" 
+            id="id_{{ prefix }}-quem_pagou" 
+            class="form-select form-select-sm campo-quem-pagou" 
+            onchange="recalcular()">
+      <option value="tecnico" {% if form.quem_pagou.value == "tecnico" %}selected{% endif %}>Técnico</option>
+      <option value="empresa" {% if form.quem_pagou.value == "empresa" %}selected{% endif %}>Empresa</option>
+    </select>
+  </td>
+
   <td class="p-1 text-center text-nowrap">
-<label class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 px-2 py-1 mb-0 cursor-pointer"           title="Anexar comprovante">
+    <label class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 px-2 py-1 mb-0 cursor-pointer" title="Anexar comprovante">
       <i class="bi bi-paperclip small text-nowrap"></i>
-      {{ form.comprovante }}
+      {# Input de arquivo manual #}
+      <input type="file" 
+             name="{{ prefix }}-comprovante" 
+             id="id_{{ prefix }}-comprovante" 
+             class="d-none" 
+             onchange="this.parentElement.classList.replace('btn-outline-secondary', 'btn-success')">
     </label>
   </td>
+  {% endwith %}
+
   <td class="p-1 text-center text-nowrap pe-3">
     <button type="button"
             class="btn btn-sm btn-outline-danger text-nowrap"

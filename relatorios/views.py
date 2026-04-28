@@ -1,4 +1,4 @@
-from django.shortcuts import render, get_object_or_404, redirect
+from django.shortcuts import render, get_object_or_404, redirect, render
 from django.views.generic import TemplateView, ListView
 from django.contrib import messages
 from django.http import HttpResponse
@@ -6,6 +6,7 @@ from django.db.models import Q, Sum
 from django.views.decorators.http import require_POST
 from decimal import Decimal
 import datetime
+import logging
 
 from .models import (
     RelatorioTecnico,
@@ -26,8 +27,29 @@ from .forms import (
     AdiantamentoForm,
     RelatorioFiltroForm,
     ItemDespesaForm,
-    TrechoKmForm
+    TrechoKmForm,
 )
+
+# ─────────────────────────────────────────────
+# Logs e debug
+# ─────────────────────────────────────────────
+logger = logging.getLogger(__name__)
+
+
+def relatorio_form(request, pk=None):
+    logger.debug("Entrou na view")
+
+    if request.method == "POST":
+        form = RelatorioTecnicoForm(request.POST, request.FILES)
+        fs_desp = ItemDespesaFormSet(request.POST, request.FILES)
+        fs_km = TrechoKmFormSet(request.POST, request.FILES)
+
+        if form.is_valid() and fs_desp.is_valid() and fs_km.is_valid():
+            ...
+        else:
+            logger.error(form.errors)
+            logger.error(fs_desp.errors)
+            logger.error(fs_km.errors)
 
 
 # ─────────────────────────────────────────────
@@ -119,45 +141,68 @@ class RelatorioListView(ListView):
 # ─────────────────────────────────────────────
 # CRIAR / EDITAR  — Single Save
 # ─────────────────────────────────────────────
-
-
 def relatorio_form_view(request, pk=None):
     """
     View unificada: cria ou edita relatório.
-
-    Fluxo Single-Save:
-    - Formulário principal + formsets de despesas e KM
-      são submetidos e validados juntos em um único POST.
-    - Não existe mais a obrigatoriedade de salvar o cabeçalho
-      antes de adicionar itens. Os itens são adicionados via
-      JavaScript puro (clonagem de linha) e submetidos junto
-      com o formulário principal.
     """
     instance = get_object_or_404(RelatorioTecnico, pk=pk) if pk else None
 
     if request.method == "POST":
-        form = RelatorioTecnicoForm(request.POST, instance=instance)
+        # FORM PRINCIPAL
+        form = RelatorioTecnicoForm(
+            request.POST,
+            request.FILES,
+            instance=instance,
+        )
+
+        # FORMSET DESPESAS
         fs_desp = ItemDespesaFormSet(
             request.POST,
             request.FILES,
             instance=instance,
             prefix="despesas",
         )
+
+        # FORMSET KM
         fs_km = TrechoKmFormSet(
             request.POST,
+            request.FILES,
             instance=instance,
             prefix="trechos",
         )
 
+        # Validação individual
         form_ok = form.is_valid()
         fs_desp_ok = fs_desp.is_valid()
+        print("\n========== POST TRECHOS ==========")
+        for k, v in request.POST.items():
+            if "trechos" in k:
+                print(f"{k}: {v}")
+        print("==================================\n")
         fs_km_ok = fs_km.is_valid()
 
-        if form_ok and fs_desp_ok and fs_km_ok:
-            relatorio = form.save()  # salva cabeçalho + equipe M2M
+        # DEBUG NO TERMINAL
+        print("\n========== DEBUG VALIDAÇÃO ==========")
+        print("FORM OK:", form_ok)
+        print("FORM ERRORS:", form.errors)
 
+        print("\nDESP OK:", fs_desp_ok)
+        print("DESP ERRORS:", fs_desp.errors)
+        print("DESP NON FORM:", fs_desp.non_form_errors())
+
+        print("\nKM OK:", fs_km_ok)
+        print("KM ERRORS:", fs_km.errors)
+        print("KM NON FORM:", fs_km.non_form_errors())
+        print("=====================================\n")
+
+        if form_ok and fs_desp_ok and fs_km_ok:
+            # salva cabeçalho
+            relatorio = form.save()
+
+            # salva formsets vinculados
             fs_desp.instance = relatorio
             fs_km.instance = relatorio
+
             fs_desp.save()
             fs_km.save()
 
@@ -171,10 +216,16 @@ def relatorio_form_view(request, pk=None):
 
     else:
         form = RelatorioTecnicoForm(instance=instance)
-        fs_desp = ItemDespesaFormSet(instance=instance, prefix="despesas")
-        fs_km = TrechoKmFormSet(instance=instance, prefix="trechos")
+        fs_desp = ItemDespesaFormSet(
+            instance=instance,
+            prefix="despesas",
+        )
+        fs_km = TrechoKmFormSet(
+            instance=instance,
+            prefix="trechos",
+        )
 
-    # Valor/km vigente para preencher novas linhas de KM via JS
+    # Valor/km vigente para preencher novas linhas
     valor_km_padrao = PoliticaValor.valor_km_vigente(
         instance.data_inicio if instance else datetime.date.today()
     )
@@ -193,9 +244,19 @@ def relatorio_form_view(request, pk=None):
         },
     )
 
+
+# ─────────────────────────────────────────────
+# NOVA LINHA DESPESA (HTMX)
+# ─────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# NOVA LINHA DESPESA
+# ─────────────────────────────────────────────
 def nova_linha_despesa(request):
     idx = request.GET.get("idx", 0)
-    form = ItemDespesaForm(prefix=f"despesas-{idx}")
+
+    # LINHA ALTERADA: Removido o -{idx} do prefixo
+    # form = ItemDespesaForm(prefix=f"despesas-{idx}")  <-- APAGUE ESTA LINHA
+    form = ItemDespesaForm(prefix="despesas")
 
     return render(
         request,
@@ -206,10 +267,16 @@ def nova_linha_despesa(request):
         },
     )
 
+
+# ─────────────────────────────────────────────
+# NOVA LINHA KM
+# ─────────────────────────────────────────────
 def nova_linha_km(request):
     idx = request.GET.get("idx", 0)
 
-    form = TrechoKmForm(prefix=f"trechos-{idx}")
+    # LINHA ALTERADA: Removido o -{idx} do prefixo
+    # form = TrechoKmForm(prefix=f"trechos-{idx}")  <-- APAGUE ESTA LINHA
+    form = TrechoKmForm(prefix="trechos")
 
     return render(
         request,
@@ -219,6 +286,7 @@ def nova_linha_km(request):
             "idx": idx,
         },
     )
+
 
 # ─────────────────────────────────────────────
 # DETALHE

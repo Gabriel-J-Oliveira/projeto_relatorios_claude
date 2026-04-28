@@ -8,7 +8,7 @@
   </li>
   <li class="breadcrumb-item">
     <a href="{% url 'relatorios:relatorio_list' %}"
-       class="text-decoration-none">Relatórios</a>
+      class="text-decoration-none">Relatórios</a>
   </li>
   <li class="breadcrumb-item active">{{ titulo_pagina }}</li>
 {% endblock %}
@@ -44,7 +44,7 @@
                   <button class="nav-link active d-flex align-items-center gap-2 px-3 py-2"
                           id="tab-dados-btn"
                           data-bs-toggle="tab"
-                          data-bs-target="#tab-dados"
+                          data-bs-target="#tab-dados" 
                           type="button">
                     <i class="bi bi-clipboard-data"></i>
                     <span>Dados Gerais</span>
@@ -189,64 +189,27 @@
                 {# ABA 2 — DESPESAS                           #}
                 {# ══════════════════════════════════════════ #}
                 <div class="tab-pane fade" id="tab-despesas">
+                  <div>
+                    <h6 class="mb-0 fw-semibold">Despesas itemizadas</h6>
+                    <small class="text-muted">Uma linha por gasto, como na planilha.</small>
+                  </div>
                   <div class="table-responsive">
                     <table class="table table-sm align-middle mb-0 table-hover"
-                           id="tabela-despesas">
+                          id="tabela-despesas">
                       <thead class="table-light border-bottom">
                         <tr>
-                          <th class="px-3 py-2 fw-semibold text-muted small" style="width: 120px;">Data</th>
-                          <th class="px-3 py-2 fw-semibold text-muted small" style="width: 150px;">Tipo</th>
-                          <th class="px-3 py-2 fw-semibold text-muted small">Descrição / Fornecedor</th>
-                          <th class="px-3 py-2 fw-semibold text-muted small">Valor R$</th>
-                          <th class="px-3 py-2 fw-semibold text-muted small">Quem Pagou</th>
-                          <th class="px-3 py-2 fw-semibold text-muted small text-center">Comprovante</th>
-                          <th class="px-3 py-2" style="width: 50px;"></th>
+                          <th class="px-3 py-3 fw-semibold text-muted small" style="width: 120px;">Data</th>
+                          <th class="px-3 py-3 fw-semibold text-muted small" style="width: 150px;">Tipo</th>
+                          <th class="px-3 py-3 fw-semibold text-muted small">Descrição / Fornecedor</th>
+                          <th class="px-3 py-3 fw-semibold text-muted small">Valor R$</th>
+                          <th class="px-3 py-3 fw-semibold text-muted small">Quem Pagou</th>
+                          <th class="px-3 py-3 fw-semibold text-muted small text-center">Comprovante</th>
+                          <th class="px-3 py-3" style="width: 50px;"></th>
                         </tr>
                       </thead>
                       <tbody id="corpo-despesas" class="border-top-0">
                         {% for f in fs_desp %}
-                          <tr class="linha-despesa"
-                              data-form-index="{{ forloop.counter0 }}"
-                              {% if f.instance.pk %}data-pk="{{ f.instance.pk }}"{% endif %}>
-                            <td class="p-1 px-3">
-                              {{ f.id }}{{ f.ordem }}
-                              <div class="d-none">{{ f.DELETE }}</div>
-                              {{ f.data }}
-                              {% if f.data.errors %}<div class="text-danger" style="font-size:.7rem">{{ f.data.errors.0 }}</div>{% endif %}
-                            </td>
-                            <td class="p-1">{{ f.tipo }}</td>
-                            <td class="p-1">{{ f.descricao }}</td>
-                            <td class="p-1">
-                              {{ f.valor }}
-                              {% if f.valor.errors %}<div class="text-danger" style="font-size:.7rem">{{ f.valor.errors.0 }}</div>{% endif %}
-                            </td>
-                            <td class="p-1">{{ f.quem_pagou }}</td>
-                            <td class="p-1 text-center text-nowrap">
-                              {% if f.instance.comprovante %}
-                                <a href="{{ f.instance.comprovante.url }}"
-                                   target="_blank"
-                                   class="btn btn-sm btn-light text-success border px-2 py-1"
-                                   title="Ver Comprovante">
-                                  <i class="bi bi-file-earmark-check"></i>
-                                </a>
-                              {% else %}
-                                <label class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 px-2 py-1 mb-0 cursor-pointer"
-                                       title="Anexar comprovante">
-                                  <i class="bi bi-paperclip small"></i>
-                                  {{ f.comprovante }}
-                                </label>
-                              {% endif %}
-                            </td>
-                            <td class="p-1 text-center pe-3">
-                              <button type="button"
-                                      class="btn btn-sm btn-outline-danger text-nowrap"
-                                      onclick="removerLinha(this)"
-                                      title="Remover linha">
-                                <i class="bi bi-trash3"></i>
-                                Remover
-                              </button>
-                            </td>
-                          </tr>
+                          {% include "partials/_linha_despesa.html" with form=f idx=forloop.counter0 %}
                         {% endfor %}
                       </tbody>
                       <tfoot class="bg-body-tertiary border-top">
@@ -279,10 +242,10 @@
                       <small class="text-muted">Origem, destino e distância por trecho.</small>
                     </div>
                   </div>
+                  
                   <div class="table-responsive">
-                    <table class="table table-bordered align-middle mb-0 table-hover"
-                           id="tabela-km">
-                      <thead class="table-light">
+                    <table class="table table-sm align-middle mb-0 table-hover" id="tabela-km">
+                      <thead class="table-light border-bottom">
                         <tr>
                           <th class="px-3 py-2 fw-semibold text-muted small" style="width: 120px;">Data</th>
                           <th class="px-3 py-2 fw-semibold text-muted small">Origem</th>
@@ -296,29 +259,7 @@
                       </thead>
                       <tbody id="corpo-trechos">
                         {% for f in fs_km %}
-                          <tr class="linha-trecho"
-                              data-form-index="{{ forloop.counter0 }}"
-                              {% if f.instance.pk %}data-pk="{{ f.instance.pk }}"{% endif %}>
-                            <td class="p-1 px-3">
-                              {{ f.id }}{{ f.ordem }}
-                              <div class="d-none">{{ f.DELETE }}</div>
-                              {{ f.data }}
-                            </td>
-                            <td class="p-1">{{ f.origem }}</td>
-                            <td class="p-1">{{ f.destino }}</td>
-                            <td class="p-1">{{ f.km }}</td>
-                            <td class="p-1">{{ f.valor_km }}</td>
-                            <td class="p-1 fw-bold text-dark small total-trecho">R$ {{ f.instance.valor_calculado|default:"0,00" }}</td>
-                            <td class="p-1">{{ f.observacao }}</td>
-                            <td class="p-1 text-center pe-3">
-                              <button type="button"
-                                      class="btn btn-sm btn-outline-danger"
-                                      onclick="removerLinha(this)"
-                                      title="Remover linha">
-                                <i class="bi bi-trash3"></i> Remover
-                              </button>
-                            </td>
-                          </tr>
+                          {% include "partials/_linha_trecho.html" with form=f idx=forloop.counter0 %}
                         {% endfor %}
                       </tbody>
                       <tfoot class="bg-body-tertiary border-top">
@@ -336,11 +277,12 @@
                       </tfoot>
                     </table>
                   </div>
-                  <div class="p-3 bg-light border border-top-0 d-flex align-items-center justify-content-between">
+
+                  <div class="p-3 bg-light border-top d-flex align-items-center justify-content-between">
                     <button type="button"
-                            class="btn btn-outline-primary btn-sm d-flex align-items-center gap-2 px-3"
+                            class="btn btn-sm btn-primary d-flex align-items-center gap-2 px-3"
                             onclick="adicionarLinhaKm()">
-                      <i class="bi bi-plus-lg"></i> Adicionar trecho
+                      <i class="bi bi-plus-circle"></i> Adicionar trecho
                     </button>
                     <span class="text-muted small">
                       <i class="bi bi-shield-check me-1"></i>Valor/KM padrão: <strong>R$ {{ valor_km_padrao }}</strong> (política vigente).
@@ -357,7 +299,7 @@
                       <div class="card border-0 bg-body-tertiary shadow-none rounded-3 h-100">
                         <div class="card-header bg-transparent border-bottom py-2 px-3">
                           <small class="fw-bold text-uppercase text-muted"
-                                 style="font-size: 0.7rem;
+                                style="font-size: 0.7rem;
                                         letter-spacing: 0.5px">
                             <i class="bi bi-person-badge me-1"></i>Pago pelo Técnico
                           </small>
@@ -383,7 +325,7 @@
                       <div class="card border-0 bg-body-tertiary shadow-none rounded-3 h-100">
                         <div class="card-header bg-transparent border-bottom py-2 px-3">
                           <small class="fw-bold text-uppercase text-muted"
-                                 style="font-size: 0.7rem;
+                                style="font-size: 0.7rem;
                                         letter-spacing: 0.5px">
                             <i class="bi bi-building me-1"></i>Pago pela Empresa
                           </small>
@@ -403,10 +345,10 @@
                     {# Saldo #}
                     <div class="col-md-4">
                       <div class="card border-primary border-opacity-25 shadow-none rounded-3 h-100"
-                           id="card-saldo">
+                          id="card-saldo">
                         <div class="card-header bg-primary bg-opacity-10 border-bottom border-primary border-opacity-10 py-2 px-3">
                           <small class="fw-bold text-uppercase text-primary"
-                                 style="font-size: 0.7rem;
+                                style="font-size: 0.7rem;
                                         letter-spacing: 0.5px">
                             <i class="bi bi-calculator me-1"></i>Acerto Financeiro
                           </small>
@@ -426,8 +368,8 @@
                               <span class="fw-bold fs-4 text-success" id="res-saldo">R$ 0,00</span>
                             </div>
                             <div class="small mt-2 p-2 rounded bg-light text-center text-muted"
-                                 id="res-msg"
-                                 style="font-size: 0.75rem"></div>
+                                id="res-msg"
+                                style="font-size: 0.75rem"></div>
                           </div>
                         </div>
                       </div>
@@ -439,7 +381,8 @@
               {# ── RODAPÉ DE AÇÕES ── #}
               <div class="d-flex justify-content-between align-items-center mt-3 py-3 px-4 bg-border rounded shadow-sm border">
                 <a href="{% url 'relatorios:relatorio_list' %}"
-                   class="btn btn-outline-secondary btn-sm">
+                  
+                class="btn btn-outline-secondary btn-sm">
                   <i class="bi bi-arrow-left me-1"></i>Voltar
                 </a>
                 <div class="d-flex gap-2">
@@ -468,7 +411,7 @@
         {% block extra_js %}
           <script>
   /* ═══════════════════════════════════════════════════════════════
-     CONTROLE DO FORMULÁRIO — Single Save sem HTMX
+    CONTROLE DO FORMULÁRIO — Single Save sem HTMX
      ═══════════════════════════════════════════════════════════════ */
   const URL_NOVA_LINHA_DESPESA = "{% url 'relatorios:nova_linha_despesa' %}";
 

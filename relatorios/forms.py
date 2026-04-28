@@ -11,11 +11,9 @@ from .models import (
 )
 import datetime
 
-
 # ─────────────────────────────────────────────
 # MIXIN BOOTSTRAP
 # ─────────────────────────────────────────────
-
 
 class BootstrapMixin:
     def __init__(self, *args, **kwargs):
@@ -32,11 +30,9 @@ class BootstrapMixin:
             else:
                 w.attrs.setdefault("class", "form-control form-control-sm")
 
-
 # ─────────────────────────────────────────────
 # CABEÇALHO
 # ─────────────────────────────────────────────
-
 
 class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
     """
@@ -162,11 +158,9 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
                 tecnico_id=pk,
             )
 
-
 # ─────────────────────────────────────────────
 # ITEM DE DESPESA
 # ─────────────────────────────────────────────
-
 
 class ItemDespesaForm(BootstrapMixin, forms.ModelForm):
 
@@ -225,19 +219,15 @@ ItemDespesaFormSet = inlineformset_factory(
     ItemDespesa,
     form=ItemDespesaForm,
     formset=BaseItemDespesaFormSet,
-    extra=1,
+    extra=0,
     min_num=0,
     can_delete=True,
 )
-
-
 # ─────────────────────────────────────────────
 # TRECHO DE KM
 # ─────────────────────────────────────────────
 
-
 class TrechoKmForm(BootstrapMixin, forms.ModelForm):
-
     class Meta:
         model = TrechoKm
         fields = [
@@ -251,7 +241,10 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
         ]
         widgets = {
             "data": forms.DateInput(
-                attrs={"type": "date", "class": "form-control form-control-sm"},
+                attrs={
+                    "type": "date",
+                    "class": "form-control form-control-sm",
+                },
                 format="%Y-%m-%d",
             ),
             "ordem": forms.HiddenInput(),
@@ -259,15 +252,33 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["origem"].widget.attrs["placeholder"] = "Cidade origem"
-        self.fields["destino"].widget.attrs["placeholder"] = "Cidade destino"
-        self.fields["km"].widget.attrs["placeholder"] = "0,0"
-        self.fields["valor_km"].widget.attrs["placeholder"] = "0,0000"
-        self.fields["observacao"].widget.attrs["placeholder"] = "Observação"
-        self.fields["km"].widget.attrs["class"] += " campo-km"
-        self.fields["valor_km"].widget.attrs["class"] += " campo-vkm"
 
-        # Preenche valor_km pela política vigente se for form vazio
+        self.fields["origem"].widget.attrs.update({
+            "class": "form-control form-control-sm",
+            "placeholder": "Cidade origem",
+        })
+
+        self.fields["destino"].widget.attrs.update({
+            "class": "form-control form-control-sm",
+            "placeholder": "Cidade destino",
+        })
+
+        self.fields["km"].widget.attrs.update({
+            "class": "form-control form-control-sm campo-km",
+            "placeholder": "0,0",
+        })
+
+        self.fields["valor_km"].widget.attrs.update({
+            "class": "form-control form-control-sm campo-vkm",
+            "placeholder": "0,0000",
+        })
+
+        self.fields["observacao"].widget.attrs.update({
+            "class": "form-control form-control-sm",
+            "placeholder": "Observação",
+        })
+
+        # Preenche valor_km pela política vigente se o form estiver vazio
         if not self.instance.pk and not self.initial.get("valor_km"):
             self.initial["valor_km"] = PoliticaValor.valor_km_vigente(
                 datetime.date.today()
@@ -278,11 +289,10 @@ TrechoKmFormSet = inlineformset_factory(
     RelatorioTecnico,
     TrechoKm,
     form=TrechoKmForm,
-    extra=1,
+    extra=0,
     min_num=0,
     can_delete=True,
 )
-
 
 # ─────────────────────────────────────────────
 # FILTRO LISTAGEM

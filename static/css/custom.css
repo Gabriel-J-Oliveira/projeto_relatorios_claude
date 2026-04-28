@@ -4,6 +4,11 @@ body {
   font-size: .9rem;
 }
 
+.table thead th {
+    background-color: var(--bs-tertiary-bg);
+    color: var(--bs-secondary-color);
+}
+
 /* ── SIDEBAR ── */
 #sidebar {
   transition: width 0.25s ease;

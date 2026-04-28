@@ -124,3 +124,17 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 # ─── Redirecionamento de login ────────────────────────────────────────────────
 LOGIN_URL = "/admin/login/"
 LOGIN_REDIRECT_URL = "/dashboard/"
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "DEBUG",
+    },
+}

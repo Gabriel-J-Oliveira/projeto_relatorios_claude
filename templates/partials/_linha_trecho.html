@@ -1,23 +1,78 @@
 <tr class="linha-trecho"
     id="linha-trecho-nova-{{ idx }}"
     data-form-index="{{ idx }}">
+  
   <td class="p-1 px-3">
-    {{ form.id }}{{ form.ordem }}
-    <div class="d-none">{{ form.DELETE }}</div>
-    {{ form.data }}
+    {# Campos ocultos necessários para o Django identificar a instância e a ordem #}
+    {% with prefix="trechos-"|add:idx %}
+      <input type="hidden" name="{{ prefix }}-id" id="id_{{ prefix }}-id" value="{{ form.id.value|default:'' }}">
+      <input type="hidden" name="{{ prefix }}-ordem" id="id_{{ prefix }}-ordem" value="{{ idx }}">
+      <div class="d-none">
+        <input type="checkbox" name="{{ prefix }}-DELETE" id="id_{{ prefix }}-DELETE">
+      </div>
+
+      {# Renderização dos campos com o prefixo numerado correto #}
+      <input type="date" 
+             name="{{ prefix }}-data" 
+             id="id_{{ prefix }}-data" 
+             value="{{ form.data.value|default:'' }}" 
+             class="form-control form-control-sm">
   </td>
-  <td class="p-1">{{ form.origem }}</td>
-  <td class="p-1">{{ form.destino }}</td>
-  <td class="p-1">{{ form.km }}</td>
-  <td class="p-1">{{ form.valor_km }}</td>
-  <td class="p-1 fw-bold text-dark small total-trecho">R$ 0,00</td>
-  <td class="p-1">{{ form.observacao }}</td>
+
+  <td class="p-1">
+    <input type="text" 
+           name="{{ prefix }}-origem" 
+           id="id_{{ prefix }}-origem" 
+           value="{{ form.origem.value|default:'' }}" 
+           placeholder="Cidade origem"
+           class="form-control form-control-sm">
+  </td>
+
+  <td class="p-1">
+    <input type="text" 
+           name="{{ prefix }}-destino" 
+           id="id_{{ prefix }}-destino" 
+           value="{{ form.destino.value|default:'' }}" 
+           placeholder="Cidade destino"
+           class="form-control form-control-sm">
+  </td>
+
+  <td class="p-1">
+    <input type="number" step="0.1"
+           name="{{ prefix }}-km" 
+           id="id_{{ prefix }}-km" 
+           value="{{ form.km.value|default:'' }}" 
+           class="form-control form-control-sm campo-km"
+           oninput="calcularTrechoKm(this); recalcular();">
+  </td>
+
+  <td class="p-1">
+    <input type="number" step="0.0001"
+           name="{{ prefix }}-valor_km" 
+           id="id_{{ prefix }}-valor_km" 
+           value="{{ form.valor_km.value|default:'' }}" 
+           class="form-control form-control-sm campo-vkm"
+           oninput="calcularTrechoKm(this); recalcular();">
+  </td>
+
+  <td class="p-1 fw-bold small total-trecho align-middle">R$ 0,00</td>
+
+  <td class="p-1">
+    <input type="text" 
+           name="{{ prefix }}-observacao" 
+           id="id_{{ prefix }}-observacao" 
+           value="{{ form.observacao.value|default:'' }}" 
+           placeholder="Observação"
+           class="form-control form-control-sm">
+  </td>
+    {% endwith %}
+
   <td class="p-1 text-center pe-3">
     <button type="button"
             class="btn btn-sm btn-outline-danger text-nowrap"
             onclick="removerLinha(this)"
             title="Remover linha">
-      <i class="bi bi-trash3"></i>
+      <i class="bi bi-trash3"></i> Remover
     </button>
   </td>
 </tr>
