@@ -1,4 +1,4 @@
-from django.shortcuts import render, get_object_or_404, redirect, render
+from django.shortcuts import render, get_object_or_404, redirect
 from django.views.generic import TemplateView, ListView
 from django.contrib import messages
 from django.http import HttpResponse
@@ -6,7 +6,6 @@ from django.db.models import Q, Sum
 from django.views.decorators.http import require_POST
 from decimal import Decimal
 import datetime
-import logging
 
 from .models import (
     RelatorioTecnico,
@@ -30,68 +29,273 @@ from .forms import (
     TrechoKmForm,
 )
 
-# ─────────────────────────────────────────────
-# Logs e debug
-# ─────────────────────────────────────────────
-logger = logging.getLogger(__name__)
-
-
-def relatorio_form(request, pk=None):
-    logger.debug("Entrou na view")
-
-    if request.method == "POST":
-        form = RelatorioTecnicoForm(request.POST, request.FILES)
-        fs_desp = ItemDespesaFormSet(request.POST, request.FILES)
-        fs_km = TrechoKmFormSet(request.POST, request.FILES)
-
-        if form.is_valid() and fs_desp.is_valid() and fs_km.is_valid():
-            ...
-        else:
-            logger.error(form.errors)
-            logger.error(fs_desp.errors)
-            logger.error(fs_km.errors)
-
 
 # ─────────────────────────────────────────────
 # DASHBOARD
 # ─────────────────────────────────────────────
-
 
 class DashboardView(TemplateView):
     template_name = "dashboard/dashboard.html"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        total = RelatorioTecnico.objects.count()
-        d = total or 1
+
+        total_relatorios = RelatorioTecnico.objects.count()
+        total_base = total_relatorios or 1
+
+        total_pendentes = RelatorioTecnico.objects.filter(
+            status=StatusRelatorio.PENDENTE
+        ).count()
+
+        total_adiantamentos = Adiantamento.objects.aggregate(total=Sum("valor"))[
+            "total"
+        ] or Decimal("0.00")
+
+        total_despesas = RelatorioTecnico.objects.aggregate(
+            total=Sum("despesas")
+        )["total"] or Decimal("0.00")
+
+        total_tecnicos = Tecnico.objects.filter(ativo=True).count()
+        total_clientes = Cliente.objects.filter(ativo=True).count()
+
+        # Detecta automaticamente qual campo de técnico existe no model
+        model_fields = {field.name for field in RelatorioTecnico._meta.get_fields()}
+        select_related_fields = ["cliente"]
+
+        if "tecnico" in model_fields:
+            select_related_fields.append("tecnico")
+        elif "tecnico_responsavel" in model_fields:
+            select_related_fields.append("tecnico_responsavel")
+
+        relatorios_recentes = RelatorioTecnico.objects.select_related(
+            *select_related_fields
+        ).order_by("-criado_em")[:8]
+
+        # Percentuais por status: usa apenas os status realmente existentes
+        status_keys = [
+            "rascunho",
+            "pendente",
+            "fechado",
+            "aprovado",
+            "faturado",
+        ]
+
+        status_choices = dict(getattr(StatusRelatorio, "choices", []))
+
+        percentuais = {}
+        for status in status_keys:
+            if status in status_choices:
+                percentuais[status] = round(
+                    RelatorioTecnico.objects.filter(status=status).count()
+                    / total_base
+                    * 100
+                )
+            else:
+                percentuais[status] = 0
+
+        def moeda(valor):
+            return (
+                f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            )
 
         ctx.update(
             {
                 "titulo_pagina": "Dashboard",
-                "total_relatorios": total,
-                "total_pendentes": RelatorioTecnico.objects.filter(
-                    status=StatusRelatorio.PENDENTE
-                ).count(),
-                "total_tecnicos": Tecnico.objects.filter(ativo=True).count(),
-                "total_clientes": Cliente.objects.filter(ativo=True).count(),
-                "pct_rascunho": round(
-                    RelatorioTecnico.objects.filter(status="rascunho").count() / d * 100
-                ),
-                "pct_pendente": round(
-                    RelatorioTecnico.objects.filter(status="pendente").count() / d * 100
-                ),
-                "pct_aprovado": round(
-                    RelatorioTecnico.objects.filter(status="aprovado").count() / d * 100
-                ),
-                "pct_faturado": round(
-                    RelatorioTecnico.objects.filter(status="faturado").count() / d * 100
-                ),
-                "relatorios_recentes": RelatorioTecnico.objects.select_related(
-                    "cliente", "tecnico_responsavel"
-                ).order_by("-criado_em")[:8],
+                # Valores brutos
+                "total_relatorios": total_relatorios,
+                "total_pendentes": total_pendentes,
+                "total_adiantamentos_valor": total_adiantamentos,
+                "total_despesas_valor": total_despesas,
+                "total_tecnicos": total_tecnicos,
+                "total_clientes": total_clientes,
+                # Valores formatados
+                "total_adiantamentos": moeda(total_adiantamentos),
+                "total_despesas": moeda(total_despesas),
+                # Cards da tela
+                "cards": [
+                    {
+                        "titulo": "Total de Relatórios",
+                        "valor": total_relatorios,
+                        "icone": "bi-file-earmark-text",
+                        "cor": "primary",
+                        "rodape": "relatórios cadastrados",
+                    },
+                    {
+                        "titulo": "Adiantamentos",
+                        "valor": moeda(total_adiantamentos),
+                        "icone": "bi-cash-coin",
+                        "cor": "success",
+                        "rodape": "total lançado",
+                    },
+                    {
+                        "titulo": "Pendentes",
+                        "valor": total_pendentes,
+                        "icone": "bi-hourglass-split",
+                        "cor": "warning",
+                        "rodape": "aguardando fechamento",
+                    },
+                    {
+                        "titulo": "Total de Despesas",
+                        "valor": moeda(total_despesas),
+                        "icone": "bi-graph-up-arrow",
+                        "cor": "danger",
+                        "rodape": "em despesas registradas",
+                    },
+                ],
+                # Lista recente
+                "relatorios_recentes": relatorios_recentes,
+                # Percentuais para barras / progresso
+                "pct_rascunho": percentuais.get("rascunho", 0),
+                "pct_pendente": percentuais.get("pendente", 0),
+                "pct_fechado": percentuais.get("fechado", 0),
+                "pct_aprovado": percentuais.get("aprovado", 0),
+                "pct_faturado": percentuais.get("faturado", 0),
+                # Apoio visual / estatísticas extras
+                "percentuais_status": percentuais,
             }
         )
+
         return ctx
+
+
+def _form_has_content(form):
+    if not hasattr(form, "cleaned_data"):
+        return False
+    if form.cleaned_data.get("DELETE"):
+        return False
+
+    values = []
+    for key, value in form.cleaned_data.items():
+        if key in {"DELETE", "id", "relatorio"}:
+            continue
+        values.append(value)
+
+    return any(value not in (None, "", [], ()) for value in values)
+
+
+def _sync_tecnicos_apoio(relatorio, tecnicos_apoio):
+    RelatorioTecnicoTecnico.objects.filter(
+        relatorio=relatorio,
+        papel=PapelTecnico.APOIO,
+    ).delete()
+
+    for tecnico in tecnicos_apoio:
+        RelatorioTecnicoTecnico.objects.create(
+            relatorio=relatorio,
+            tecnico=tecnico,
+            papel=PapelTecnico.APOIO,
+        )
+
+
+def _render_form(request, *, instance=None):
+    instance = instance or RelatorioTecnico()
+
+    if request.method == "POST":
+        form = RelatorioTecnicoForm(request.POST, request.FILES, instance=instance)
+        despesas_formset = ItemDespesaFormSet(
+            request.POST,
+            request.FILES,
+            instance=instance,
+            prefix="despesas",
+        )
+        km_formset = TrechoKmFormSet(
+            request.POST,
+            request.FILES,
+            instance=instance,
+            prefix="kms",
+        )
+
+        if form.is_valid() and despesas_formset.is_valid() and km_formset.is_valid():
+            status = form.cleaned_data.get("status")
+            tem_despesa = any(_form_has_content(f) for f in despesas_formset.forms)
+
+            if (
+                status in {StatusRelatorio.FECHADO, StatusRelatorio.FATURADO}
+                and not tem_despesa
+            ):
+                form.add_error(
+                    None,
+                    "É necessário informar ao menos um item de despesa para fechar o relatório.",
+                )
+            else:
+                if status == StatusRelatorio.FATURADO:
+                    for f in despesas_formset.forms:
+                        if not _form_has_content(f):
+                            continue
+                        comprovante = f.cleaned_data.get("comprovante") or getattr(
+                            f.instance, "comprovante", None
+                        )
+                        if not comprovante:
+                            f.add_error(
+                                "comprovante",
+                                "Comprovante obrigatório para status Faturado.",
+                            )
+                            break
+
+                if not form.errors and not despesas_formset.errors:
+                    with transaction.atomic():
+                        relatorio = form.save(commit=False)
+                        relatorio.save()
+
+                        tecnicos_apoio = form.cleaned_data.get("tecnicos_apoio", [])
+                        _sync_tecnicos_apoio(relatorio, tecnicos_apoio)
+
+                        despesas_formset.instance = relatorio
+                        kms_formset.instance = relatorio
+
+                        itens = despesas_formset.save(commit=False)
+                        for item in itens:
+                            item.relatorio = relatorio
+                            item.save()
+                        for obj in despesas_formset.deleted_objects:
+                            obj.delete()
+
+                        trechos = kms_formset.save(commit=False)
+                        for trecho in trechos:
+                            trecho.relatorio = relatorio
+                            trecho.save()
+                        for obj in kms_formset.deleted_objects:
+                            obj.delete()
+
+                        relatorio.recalcular_totais(commit=True)
+
+                        messages.success(
+                            request, f"Relatório {relatorio.numero} salvo com sucesso."
+                        )
+                        return redirect("relatorios:relatorio_list")
+
+        messages.error(request, "Corrija os erros abaixo antes de salvar.")
+
+    else:
+        form = RelatorioTecnicoForm(instance=instance)
+        despesas_formset = ItemDespesaFormSet(instance=instance, prefix="despesas")
+        km_formset = TrechoKmFormSet(instance=instance, prefix="kms")
+
+    return render(
+        request,
+        "relatorios/relatorio_form.html",
+        {
+            "titulo_pagina": (
+                "Novo Relatório"
+                if not instance.pk
+                else f"Editar Relatório {instance.numero}"
+            ),
+            "acao": "Criar" if not instance.pk else "Salvar alterações",
+            "form": form,
+            "despesas_formset": despesas_formset,
+            "km_formset": km_formset,
+            "relatorio": instance,
+        },
+    )
+
+
+def relatorio_create(request):
+    return _render_form(request)
+
+
+def relatorio_update(request, pk):
+    relatorio = get_object_or_404(RelatorioTecnico, pk=pk)
+    return _render_form(request, instance=relatorio)
 
 
 # ─────────────────────────────────────────────
@@ -141,68 +345,45 @@ class RelatorioListView(ListView):
 # ─────────────────────────────────────────────
 # CRIAR / EDITAR  — Single Save
 # ─────────────────────────────────────────────
+
+
 def relatorio_form_view(request, pk=None):
     """
     View unificada: cria ou edita relatório.
+
+    Fluxo Single-Save:
+    - Formulário principal + formsets de despesas e KM
+      são submetidos e validados juntos em um único POST.
+    - Não existe mais a obrigatoriedade de salvar o cabeçalho
+      antes de adicionar itens. Os itens são adicionados via
+      JavaScript puro (clonagem de linha) e submetidos junto
+      com o formulário principal.
     """
     instance = get_object_or_404(RelatorioTecnico, pk=pk) if pk else None
 
     if request.method == "POST":
-        # FORM PRINCIPAL
-        form = RelatorioTecnicoForm(
-            request.POST,
-            request.FILES,
-            instance=instance,
-        )
-
-        # FORMSET DESPESAS
+        form = RelatorioTecnicoForm(request.POST, instance=instance)
         fs_desp = ItemDespesaFormSet(
             request.POST,
             request.FILES,
             instance=instance,
             prefix="despesas",
         )
-
-        # FORMSET KM
         fs_km = TrechoKmFormSet(
             request.POST,
-            request.FILES,
             instance=instance,
             prefix="trechos",
         )
 
-        # Validação individual
         form_ok = form.is_valid()
         fs_desp_ok = fs_desp.is_valid()
-        print("\n========== POST TRECHOS ==========")
-        for k, v in request.POST.items():
-            if "trechos" in k:
-                print(f"{k}: {v}")
-        print("==================================\n")
         fs_km_ok = fs_km.is_valid()
 
-        # DEBUG NO TERMINAL
-        print("\n========== DEBUG VALIDAÇÃO ==========")
-        print("FORM OK:", form_ok)
-        print("FORM ERRORS:", form.errors)
-
-        print("\nDESP OK:", fs_desp_ok)
-        print("DESP ERRORS:", fs_desp.errors)
-        print("DESP NON FORM:", fs_desp.non_form_errors())
-
-        print("\nKM OK:", fs_km_ok)
-        print("KM ERRORS:", fs_km.errors)
-        print("KM NON FORM:", fs_km.non_form_errors())
-        print("=====================================\n")
-
         if form_ok and fs_desp_ok and fs_km_ok:
-            # salva cabeçalho
-            relatorio = form.save()
+            relatorio = form.save()  # salva cabeçalho + equipe M2M
 
-            # salva formsets vinculados
             fs_desp.instance = relatorio
             fs_km.instance = relatorio
-
             fs_desp.save()
             fs_km.save()
 
@@ -216,16 +397,10 @@ def relatorio_form_view(request, pk=None):
 
     else:
         form = RelatorioTecnicoForm(instance=instance)
-        fs_desp = ItemDespesaFormSet(
-            instance=instance,
-            prefix="despesas",
-        )
-        fs_km = TrechoKmFormSet(
-            instance=instance,
-            prefix="trechos",
-        )
+        fs_desp = ItemDespesaFormSet(instance=instance, prefix="despesas")
+        fs_km = TrechoKmFormSet(instance=instance, prefix="trechos")
 
-    # Valor/km vigente para preencher novas linhas
+    # Valor/km vigente para preencher novas linhas de KM via JS
     valor_km_padrao = PoliticaValor.valor_km_vigente(
         instance.data_inicio if instance else datetime.date.today()
     )
@@ -245,18 +420,9 @@ def relatorio_form_view(request, pk=None):
     )
 
 
-# ─────────────────────────────────────────────
-# NOVA LINHA DESPESA (HTMX)
-# ─────────────────────────────────────────────
-# ─────────────────────────────────────────────
-# NOVA LINHA DESPESA
-# ─────────────────────────────────────────────
 def nova_linha_despesa(request):
     idx = request.GET.get("idx", 0)
-
-    # LINHA ALTERADA: Removido o -{idx} do prefixo
-    # form = ItemDespesaForm(prefix=f"despesas-{idx}")  <-- APAGUE ESTA LINHA
-    form = ItemDespesaForm(prefix="despesas")
+    form = ItemDespesaForm(prefix=f"despesas-{idx}")
 
     return render(
         request,
@@ -268,15 +434,10 @@ def nova_linha_despesa(request):
     )
 
 
-# ─────────────────────────────────────────────
-# NOVA LINHA KM
-# ─────────────────────────────────────────────
 def nova_linha_km(request):
     idx = request.GET.get("idx", 0)
 
-    # LINHA ALTERADA: Removido o -{idx} do prefixo
-    # form = TrechoKmForm(prefix=f"trechos-{idx}")  <-- APAGUE ESTA LINHA
-    form = TrechoKmForm(prefix="trechos")
+    form = TrechoKmForm(prefix=f"trechos-{idx}")
 
     return render(
         request,
