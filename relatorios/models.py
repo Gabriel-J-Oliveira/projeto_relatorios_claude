@@ -137,11 +137,9 @@ class Cliente(models.Model):
     def cidade_uf(self):
         return f"{self.cidade}/{self.uf}"
 
-
 # ─────────────────────────────────────────────────────────────────
 # POLÍTICA DE VALORES
 # ─────────────────────────────────────────────────────────────────
-
 
 class PoliticaValor(models.Model):
     tipo_despesa = models.CharField(
@@ -244,6 +242,17 @@ class RelatorioTecnico(models.Model):
         verbose_name="Equipe adicional",
     )
 
+    STATUS_CHOICES = [
+    ("rascunho", "Rascunho"),
+    ("enviado", "Enviado"),
+    ]
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="rascunho",
+    )
+    
     # Atendimento
     cidade_atendimento = models.CharField("Cidade de atendimento", max_length=100)
     uf_atendimento = models.CharField(

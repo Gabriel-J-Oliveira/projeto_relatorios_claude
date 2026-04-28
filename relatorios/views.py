@@ -34,6 +34,7 @@ from .forms import (
 # DASHBOARD
 # ─────────────────────────────────────────────
 
+
 class DashboardView(TemplateView):
     template_name = "dashboard/dashboard.html"
 
@@ -51,9 +52,17 @@ class DashboardView(TemplateView):
             "total"
         ] or Decimal("0.00")
 
-        total_despesas = RelatorioTecnico.objects.aggregate(
-            total=Sum("despesas")
+        total_itens = RelatorioTecnico.objects.aggregate(total=Sum("despesas__valor"))[
+            "total"
+        ] or Decimal("0.00")
+
+        # 2. Soma todos os valores calculados de KM (conforme sua property total_km)
+        total_km_valor = RelatorioTecnico.objects.aggregate(
+            total=Sum("trechos__valor_calculado")
         )["total"] or Decimal("0.00")
+
+        # 3. O total do card é a soma dos dois
+        total_despesas_valor = total_itens + total_km_valor
 
         total_tecnicos = Tecnico.objects.filter(ativo=True).count()
         total_clientes = Cliente.objects.filter(ativo=True).count()
@@ -105,27 +114,27 @@ class DashboardView(TemplateView):
                 "total_relatorios": total_relatorios,
                 "total_pendentes": total_pendentes,
                 "total_adiantamentos_valor": total_adiantamentos,
-                "total_despesas_valor": total_despesas,
+                "total_despesas_valor": total_despesas_valor,  # Corrigido para a variável da soma total
                 "total_tecnicos": total_tecnicos,
                 "total_clientes": total_clientes,
-                # Valores formatados
+                # Valores formatados para uso genérico
                 "total_adiantamentos": moeda(total_adiantamentos),
-                "total_despesas": moeda(total_despesas),
-                # Cards da tela
+                "total_despesas": moeda(total_despesas_valor),  # Corrigido
+                # Cards da tela (Iterados no HTML)
                 "cards": [
                     {
                         "titulo": "Total de Relatórios",
                         "valor": total_relatorios,
                         "icone": "bi-file-earmark-text",
                         "cor": "primary",
-                        "rodape": "relatórios cadastrados",
+                        "rodape": f"{total_relatorios} relatórios cadastrados",
                     },
                     {
                         "titulo": "Adiantamentos",
                         "valor": moeda(total_adiantamentos),
                         "icone": "bi-cash-coin",
                         "cor": "success",
-                        "rodape": "total lançado",
+                        "rodape": "total lançado no sistema",
                     },
                     {
                         "titulo": "Pendentes",
@@ -136,21 +145,21 @@ class DashboardView(TemplateView):
                     },
                     {
                         "titulo": "Total de Despesas",
-                        "valor": moeda(total_despesas),
+                        "valor": moeda(total_despesas_valor),  # Agora exibe Itens + KM
                         "icone": "bi-graph-up-arrow",
                         "cor": "danger",
-                        "rodape": "em despesas registradas",
+                        "rodape": "soma de itens e deslocamento",
                     },
                 ],
-                # Lista recente
+                # Lista de relatórios para a tabela
                 "relatorios_recentes": relatorios_recentes,
-                # Percentuais para barras / progresso
+                # Percentuais para as barras de progresso
                 "pct_rascunho": percentuais.get("rascunho", 0),
                 "pct_pendente": percentuais.get("pendente", 0),
                 "pct_fechado": percentuais.get("fechado", 0),
                 "pct_aprovado": percentuais.get("aprovado", 0),
                 "pct_faturado": percentuais.get("faturado", 0),
-                # Apoio visual / estatísticas extras
+                # Objeto completo de percentuais caso precise no template
                 "percentuais_status": percentuais,
             }
         )
@@ -280,6 +289,7 @@ def _render_form(request, *, instance=None):
                 if not instance.pk
                 else f"Editar Relatório {instance.numero}"
             ),
+            "salvar_rascunho" : "Salvar Como rascunho",
             "acao": "Criar" if not instance.pk else "Salvar alterações",
             "form": form,
             "despesas_formset": despesas_formset,

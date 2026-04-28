@@ -57,7 +57,7 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         model = RelatorioTecnico
         fields = [
             "numero",
-            "status",
+            #"status",
             "cliente",
             "tecnico_responsavel",
             "cidade_atendimento",
