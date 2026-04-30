@@ -29,7 +29,6 @@ from .forms import (
     TrechoKmForm,
 )
 
-
 # ─────────────────────────────────────────────
 # DASHBOARD
 # ─────────────────────────────────────────────
@@ -289,8 +288,8 @@ def _render_form(request, *, instance=None):
                 if not instance.pk
                 else f"Editar Relatório {instance.numero}"
             ),
-            "salvar_rascunho" : "Salvar Como rascunho",
-            "acao": "Criar" if not instance.pk else "Salvar alterações",
+            "salvar_rascunho": "Salvar Como rascunho",
+            "enviar": "Criar e enviar" if not instance.pk else "Salvar alterações",
             "form": form,
             "despesas_formset": despesas_formset,
             "km_formset": km_formset,
@@ -371,6 +370,8 @@ def relatorio_form_view(request, pk=None):
     """
     instance = get_object_or_404(RelatorioTecnico, pk=pk) if pk else None
 
+    resumo_erros = []
+
     if request.method == "POST":
         form = RelatorioTecnicoForm(request.POST, instance=instance)
         fs_desp = ItemDespesaFormSet(
@@ -390,7 +391,18 @@ def relatorio_form_view(request, pk=None):
         fs_km_ok = fs_km.is_valid()
 
         if form_ok and fs_desp_ok and fs_km_ok:
-            relatorio = form.save()  # salva cabeçalho + equipe M2M
+            acao = request.POST.get("acao", "rascunho")
+
+            relatorio = form.save(commit=False)
+
+            if acao == "rascunho":
+                relatorio.status = "rascunho"
+
+            elif acao == "enviar":
+                relatorio.status = "pendente"
+
+            relatorio.save()
+            form.save_m2m()
 
             fs_desp.instance = relatorio
             fs_km.instance = relatorio
@@ -404,6 +416,32 @@ def relatorio_form_view(request, pk=None):
             return redirect("relatorios:relatorio_detail", pk=relatorio.pk)
 
         messages.error(request, "Corrija os erros indicados antes de salvar.")
+        if not form_ok:
+            resumo_erros.append(
+                "Dados Gerais possui campos inválidos ou obrigatórios não preenchidos."
+            )
+
+        if not fs_desp_ok:
+            qtd_erros_desp = sum(1 for erro in fs_desp.errors if erro)
+            resumo_erros.append(f"Despesas possui {qtd_erros_desp} inconsistência(s).")
+
+        if not fs_km_ok:
+            qtd_erros_km = sum(1 for erro in fs_km.errors if erro)
+            resumo_erros.append(f"Trechos/KM possui {qtd_erros_km} inconsistência(s).")
+
+        # Debug temporário
+        if not form_ok:
+            print("ERROS FORM:", form.errors)
+
+        if not fs_desp_ok:
+            print("ERROS DESP:", fs_desp.errors)
+            print(fs_desp.non_form_errors())
+
+        if not fs_km_ok:
+            print("ERROS KM:", fs_km.errors)
+            print(fs_km.non_form_errors())
+
+        print(request.POST)
 
     else:
         form = RelatorioTecnicoForm(instance=instance)
@@ -411,9 +449,9 @@ def relatorio_form_view(request, pk=None):
         fs_km = TrechoKmFormSet(instance=instance, prefix="trechos")
 
     # Valor/km vigente para preencher novas linhas de KM via JS
-    valor_km_padrao = PoliticaValor.valor_km_vigente(
-        instance.data_inicio if instance else datetime.date.today()
-    )
+    valor_km_cliente = None
+    if form.instance and form.instance.cliente:
+        valor_km_cliente = form.instance.cliente.valor_km_padrao
 
     return render(
         request,
@@ -424,8 +462,10 @@ def relatorio_form_view(request, pk=None):
             "fs_km": fs_km,
             "instance": instance,
             "titulo_pagina": "Editar Relatório" if instance else "Novo Relatório",
-            "acao": "Salvar alterações" if instance else "Criar Relatório",
+            "salvar_rascunho": "Salvar rascunho",
+            "enviar": "Salvar alterações" if instance else "Criar Relatório",
             "valor_km_padrao": str(valor_km_padrao),
+            "resumo_erros": resumo_erros,
         },
     )
 
@@ -572,7 +612,8 @@ def tecnico_form_view(request, pk=None):
             "form": form,
             "instance": instance,
             "titulo_pagina": "Editar Técnico" if instance else "Novo Técnico",
-            "acao": "Salvar" if instance else "Cadastrar",
+            "salvar_rascunho": "Salvar rascunho",
+            "enviar": "Salvar alterações" if instance else "Cadastrar",
         },
     )
 
@@ -636,7 +677,8 @@ def cliente_form_view(request, pk=None):
             "form": form,
             "instance": instance,
             "titulo_pagina": "Editar Cliente" if instance else "Novo Cliente",
-            "acao": "Salvar" if instance else "Cadastrar",
+            "salvar_rascunho": "Salvar rascunho",
+            "enviar": "Salvar" if instance else "Cadastrar",
         },
     )
 
@@ -700,7 +742,8 @@ def adiantamento_form_view(request, pk=None):
             "form": form,
             "instance": instance,
             "titulo_pagina": "Editar Adiantamento" if instance else "Novo Adiantamento",
-            "acao": "Salvar" if instance else "Registrar",
+            "salvar_rascunho": "Salvar rascunho",
+            "enviar": "Salvar" if instance else "Registrar",
         },
     )
 

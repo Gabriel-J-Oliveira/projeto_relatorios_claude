@@ -210,7 +210,6 @@ class PoliticaValor(models.Model):
 # RELATÓRIO TÉCNICO
 # ─────────────────────────────────────────────────────────────────
 
-
 class RelatorioTecnico(models.Model):
     # Identificação
     numero = models.CharField("Número", max_length=30, unique=True)
@@ -391,7 +390,6 @@ class RelatorioTecnicoEquipe(models.Model):
 # ITEM DE DESPESA
 # ─────────────────────────────────────────────────────────────────
 
-
 class ItemDespesa(models.Model):
     relatorio = models.ForeignKey(
         RelatorioTecnico,
@@ -459,7 +457,6 @@ class ItemDespesa(models.Model):
 # TRECHO DE KM
 # ─────────────────────────────────────────────────────────────────
 
-
 class TrechoKm(models.Model):
     relatorio = models.ForeignKey(
         RelatorioTecnico,
@@ -517,7 +514,17 @@ class TrechoKm(models.Model):
                         )
                     }
                 )
+    @property
+    def valor_km_padrao(self):
+        if self.relatorio and self.relatorio.cliente:
+            return self.relatorio.cliente.valor_km_padrao
+        return None
 
+    @property
+    def km_fora_politica(self):
+        if self.valor_km_padrao is None:
+            return False
+        return self.valor_km != self.valor_km_padrao
 
 # ─────────────────────────────────────────────────────────────────
 # ADIANTAMENTO

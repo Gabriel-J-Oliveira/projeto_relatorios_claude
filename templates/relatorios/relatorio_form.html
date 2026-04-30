@@ -32,6 +32,9 @@
             <form method="post"
                   enctype="multipart/form-data"
                   id="form-relatorio"
+                  data-inicio="{{ instance.data_inicio|date:'Y-m-d'|default:'' }}"
+                  data-fim="{{ instance.data_fim|date:'Y-m-d'|default:'' }}"
+                  data-valor-km-cliente="{{ valor_km_padrao }}"
                   novalidate>
               {% csrf_token %}
               {# Management forms — obrigatórios para Django formsets (Operação Real) #}
@@ -60,7 +63,8 @@
                     <i class="bi bi-receipt"></i>
                     <span>Despesas</span>
                     <span class="badge bg-primary rounded-pill ms-1"
-                          x-text="contarLinhas('despesas')">0</span>
+                          x-text="contarLinhas('despesas')"
+                          id="badge-despesas">0</span>
                   </button>
                 </li>
                 <li class="nav-item">
@@ -71,8 +75,7 @@
                           type="button">
                     <i class="bi bi-geo-alt"></i>
                     <span>KM</span>
-                    <span class="badge bg-secondary rounded-pill ms-1"
-                          x-text="contarLinhas('trechos')">0</span>
+                    <span class="badge bg-secondary rounded-pill ms-1" id="badge-km">0</span>
                   </button>
                 </li>
                 <li class="nav-item ms-auto">
@@ -86,6 +89,17 @@
                   </button>
                 </li>
               </ul>
+              {% if resumo_erros %}
+                <div class="alert alert-danger border-0 shadow-sm mb-4">
+                  <div class="d-flex align-items-center mb-2">
+                    <i class="bi bi-exclamation-octagon-fill me-2"></i>
+                    <strong>Não foi possível salvar o relatório</strong>
+                  </div>
+                  <ul class="small mb-0 ps-3">
+                    {% for erro in resumo_erros %}<li>{{ erro }}</li>{% endfor %}
+                  </ul>
+                </div>
+              {% endif %}
               <div class="tab-content bg-body border-top-0 rounded-bottom shadow-sm">
                 {# ══════════════════════════════════════════ #}
                 {# ABA 1 — DADOS GERAIS                       #}
@@ -190,7 +204,7 @@
                     <small class="text-muted">Uma linha por gasto, como na planilha.</small>
                   </div>
                   <div class="table-responsive">
-                    <table class="table table-sm align-middle mb-0 table-hover"
+                    <table class="table table-sm align-top mb-0 table-hover"
                            id="tabela-despesas">
                       <thead class="table-light border-bottom">
                         <tr>
@@ -239,7 +253,7 @@
                     </div>
                   </div>
                   <div class="table-responsive">
-                    <table class="table table-sm align-middle mb-0 table-hover" id="tabela-km">
+                    <table class="table table-sm align-top mb-0 table-hover" id="tabela-km">
                       <thead class="table-light border-bottom">
                         <tr>
                           <th class="px-3 py-2 fw-semibold text-muted small" style="width: 120px;">Data</th>
@@ -279,7 +293,9 @@
                       <i class="bi bi-plus-circle"></i> Adicionar trecho
                     </button>
                     <span class="text-muted small">
-                      <i class="bi bi-shield-check me-1"></i>Valor/KM padrão: <strong>R$ {{ valor_km_padrao }}</strong> (política vigente).
+                      <i class="bi bi-shield-check me-1"></i>
+                      Valor/KM padrão:
+                      <strong id="valor-km-ref">R$ {{ valor_km_padrao }}</strong>
                     </span>
                   </div>
                 </div>
@@ -381,16 +397,46 @@
                 <div class="d-flex gap-2">
                   <button type="submit"
                           name="acao_form"
+                          id="btn-enviar-rascunho"
                           value="rascunho"
-                          class="btn btn-outline-secondary btn-sm">
-                    <i class="bi bi-save me-1"></i>{{ acao }}
+                          class="btn btn-secondary btn-sm">
+                    <i class="bi bi-save me-1"></i>{{ salvar_rascunho }}
                   </button>
                   <button type="submit"
-                          name="acao_form"
-                          value="enviar"
+                          id="btn-enviar-relatorio"
                           class="btn btn-primary btn-sm">
-                    <i class="bi bi-send-check me-1"></i>{{ enviar }}
+                    <i class="bi bi-check-lg me-1"></i>{{ enviar }}
                   </button>
+                </div>
+                <!-- Modal confirmação sem comprovante -->
+                <div class="modal fade"
+                     id="modalSemComprovante"
+                     tabindex="-1"
+                     aria-hidden="true">
+                  <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-0 shadow">
+                      <div class="modal-header bg-warning-subtle">
+                        <h5 class="modal-title">
+                          <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+                          Atenção
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                      </div>
+                      <div class="modal-body">
+                        Existem despesas sem comprovante anexado.
+                        <br>
+                        Deseja enviar o relatório mesmo assim?
+                      </div>
+                      <div class="modal-footer">
+                        <button type="button"
+                                class="btn btn-outline-secondary btn-sm"
+                                data-bs-dismiss="modal">Revisar</button>
+                        <button type="button"
+                                class="btn btn-warning btn-sm"
+                                id="confirmar-envio-sem-comprovante">Enviar assim mesmo</button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </form>
@@ -448,6 +494,7 @@
     _idxDesp++;
     atualizarTotalForms(PREFIX_DESP, _idxDesp);
     recalcular();
+    atualizarBadgesAbas();
 
   } catch (error) {
     console.error(error);
@@ -478,23 +525,64 @@
   } catch (error) {
     console.error(error);
   }
+  atualizarBadgesAbas();
 }
 
   // ── Remover linha ─────────────────────────────────────────────
   function removerLinha(btn) {
-    const tr = btn.closest("tr");
-    // Se a linha já existe no banco, marca DELETE em vez de remover do DOM
-    const deleteFld = tr.querySelector("[name$='-DELETE']");
-    if (deleteFld && tr.dataset.pk) {
-      deleteFld.value = "on";
-      tr.style.opacity = "0.3";
-      tr.style.pointerEvents = "none";
-    } else {
-      tr.remove();
-    }
-    recalcular();
-  }
 
+    const tr = btn.closest("tr");
+
+    const deleteFld = tr.querySelector("[name$='-DELETE']");
+
+    // linha já salva
+    if (deleteFld && tr.dataset.pk) {
+
+        deleteFld.checked = true;
+        tr.style.display = "none";
+
+    } else {
+
+        tr.remove();
+
+        reindexarFormset("despesas", ".linha-despesa");
+        reindexarFormset("trechos", ".linha-trecho");
+    }
+    atualizarBadgesAbas();
+    recalcular();
+    Controller.onLinhaRemovida(tr);
+}
+
+function reindexarFormset(prefix, selector){
+
+    const linhas = document.querySelectorAll(selector);
+
+    linhas.forEach((linha,index)=>{
+
+        linha.dataset.formIndex=index;
+
+        linha.querySelectorAll("[name]").forEach(el=>{
+
+            el.name = el.name.replace(
+                new RegExp(`${prefix}-\\d+-`),
+                `${prefix}-${index}-`
+            );
+
+        });
+
+        linha.querySelectorAll("[id]").forEach(el=>{
+
+            el.id = el.id.replace(
+                new RegExp(`id_${prefix}-\\d+-`),
+                `id_${prefix}-${index}-`
+            );
+
+        });
+
+    });
+
+    atualizarTotalForms(prefix, linhas.length);
+}
 
   // ── Atualiza TOTAL_FORMS do management form ───────────────────
   function atualizarTotalForms(prefix, total) {

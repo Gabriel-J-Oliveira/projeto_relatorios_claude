@@ -15,6 +15,7 @@ import datetime
 # MIXIN BOOTSTRAP
 # ─────────────────────────────────────────────
 
+
 class BootstrapMixin:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -30,9 +31,11 @@ class BootstrapMixin:
             else:
                 w.attrs.setdefault("class", "form-control form-control-sm")
 
+
 # ─────────────────────────────────────────────
 # CABEÇALHO
 # ─────────────────────────────────────────────
+
 
 class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
     """
@@ -57,7 +60,7 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         model = RelatorioTecnico
         fields = [
             "numero",
-            #"status",
+            # "status",
             "cliente",
             "tecnico_responsavel",
             "cidade_atendimento",
@@ -158,9 +161,11 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
                 tecnico_id=pk,
             )
 
+
 # ─────────────────────────────────────────────
 # ITEM DE DESPESA
 # ─────────────────────────────────────────────
+
 
 class ItemDespesaForm(BootstrapMixin, forms.ModelForm):
 
@@ -198,20 +203,46 @@ class ItemDespesaForm(BootstrapMixin, forms.ModelForm):
 
 
 class BaseItemDespesaFormSet(BaseInlineFormSet):
-    """Valida que não haja linhas vazias inválidas."""
-
     def clean(self):
         if any(self.errors):
             return
+
+        relatorio = self.instance
+
         for form in self.forms:
+            if not hasattr(form, "cleaned_data"):
+                continue
+
             if form.cleaned_data.get("DELETE"):
                 continue
-            if not form.cleaned_data.get("tipo") and not form.cleaned_data.get("valor"):
-                continue  # linha vazia — ignorada
-            if form.cleaned_data.get("tipo") and not form.cleaned_data.get("valor"):
+
+            data = form.cleaned_data.get("data")
+            tipo = form.cleaned_data.get("tipo")
+            valor = form.cleaned_data.get("valor")
+
+            # linha vazia
+            if not any([data, tipo, valor]):
+                continue
+
+            if tipo and not valor:
                 form.add_error("valor", "Informe o valor.")
-            if form.cleaned_data.get("valor") and not form.cleaned_data.get("tipo"):
+
+            if valor and not tipo:
                 form.add_error("tipo", "Selecione o tipo.")
+
+            if valor is not None and valor <= 0:
+                form.add_error("valor", "Valor deve ser maior que zero.")
+
+            if data and relatorio and relatorio.data_inicio and relatorio.data_fim:
+                if data < relatorio.data_inicio or data > relatorio.data_fim:
+                    form.add_error(
+                        "data",
+                        (
+                            f"Data fora do período do relatório "
+                            f"({relatorio.data_inicio:%d/%m/%Y} a "
+                            f"{relatorio.data_fim:%d/%m/%Y})."
+                        ),
+                    )
 
 
 ItemDespesaFormSet = inlineformset_factory(
@@ -226,6 +257,7 @@ ItemDespesaFormSet = inlineformset_factory(
 # ─────────────────────────────────────────────
 # TRECHO DE KM
 # ─────────────────────────────────────────────
+
 
 class TrechoKmForm(BootstrapMixin, forms.ModelForm):
     class Meta:
@@ -253,30 +285,40 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.fields["origem"].widget.attrs.update({
-            "class": "form-control form-control-sm",
-            "placeholder": "Cidade origem",
-        })
+        self.fields["origem"].widget.attrs.update(
+            {
+                "class": "form-control form-control-sm",
+                "placeholder": "Cidade origem",
+            }
+        )
 
-        self.fields["destino"].widget.attrs.update({
-            "class": "form-control form-control-sm",
-            "placeholder": "Cidade destino",
-        })
+        self.fields["destino"].widget.attrs.update(
+            {
+                "class": "form-control form-control-sm",
+                "placeholder": "Cidade destino",
+            }
+        )
 
-        self.fields["km"].widget.attrs.update({
-            "class": "form-control form-control-sm campo-km",
-            "placeholder": "0,0",
-        })
+        self.fields["km"].widget.attrs.update(
+            {
+                "class": "form-control form-control-sm campo-km",
+                "placeholder": "0,0",
+            }
+        )
 
-        self.fields["valor_km"].widget.attrs.update({
-            "class": "form-control form-control-sm campo-vkm",
-            "placeholder": "0,0000",
-        })
+        self.fields["valor_km"].widget.attrs.update(
+            {
+                "class": "form-control form-control-sm campo-vkm",
+                "placeholder": "0,0000",
+            }
+        )
 
-        self.fields["observacao"].widget.attrs.update({
-            "class": "form-control form-control-sm",
-            "placeholder": "Observação",
-        })
+        self.fields["observacao"].widget.attrs.update(
+            {
+                "class": "form-control form-control-sm",
+                "placeholder": "Observação",
+            }
+        )
 
         # Preenche valor_km pela política vigente se o form estiver vazio
         if not self.instance.pk and not self.initial.get("valor_km"):
@@ -285,10 +327,66 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
             )
 
 
+class BaseTrechoKmFormSet(BaseInlineFormSet):
+    def clean(self):
+        if any(self.errors):
+            return
+
+        relatorio = self.instance
+
+        for form in self.forms:
+            if not hasattr(form, "cleaned_data"):
+                continue
+
+            if form.cleaned_data.get("DELETE"):
+                continue
+
+            data = form.cleaned_data.get("data")
+            origem = form.cleaned_data.get("origem")
+            destino = form.cleaned_data.get("destino")
+
+            # Linha totalmente vazia → ignora
+            if not any([data, origem, destino]):
+                continue
+
+            # Data fora do período
+            if data and relatorio and relatorio.data_inicio and relatorio.data_fim:
+                if data < relatorio.data_inicio or data > relatorio.data_fim:
+                    form.add_error(
+                        "data",
+                        (
+                            f"Data fora do período do relatório "
+                            f"({relatorio.data_inicio:%d/%m/%Y} a "
+                            f"{relatorio.data_fim:%d/%m/%Y})."
+                        ),
+                    )
+
+
+for form in self.forms:
+    if not hasattr(form, "cleaned_data"):
+        continue
+
+    if form.cleaned_data.get("DELETE"):
+        continue
+
+    valor_km = form.cleaned_data.get("valor_km")
+    relatorio = self.instance
+
+    if not valor_km or not relatorio or not relatorio.cliente:
+        continue
+
+    valor_padrao = relatorio.cliente.valor_km_padrao
+
+    if valor_km != valor_padrao:
+        form.add_error(
+            "valor_km", f"Valor diferente do padrão do cliente (R$ {valor_padrao})."
+        )
+
 TrechoKmFormSet = inlineformset_factory(
     RelatorioTecnico,
     TrechoKm,
     form=TrechoKmForm,
+    formset=BaseTrechoKmFormSet,
     extra=0,
     min_num=0,
     can_delete=True,
