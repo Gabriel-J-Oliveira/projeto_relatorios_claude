@@ -11,6 +11,41 @@ from .models import (
 )
 import datetime
 
+from django import forms
+
+# forms.py
+
+
+class ClienteSelectWithData(forms.Select):
+    """
+    Select customizado que injeta data-valor-km em cada <option>
+    a partir de um mapa {pk: valor_km} passado externamente.
+    """
+
+    def __init__(self, *args, **kwargs):
+        self.clientes_map = kwargs.pop("clientes_map", {})
+        super().__init__(*args, **kwargs)
+
+    def create_option(
+        self, name, value, label, selected, index, subindex=None, attrs=None
+    ):
+        option = super().create_option(
+            name, value, label, selected, index, subindex=subindex, attrs=attrs
+        )
+
+        if value:
+            # Django >= 4.0 envolve o valor em ModelChoiceIteratorValue
+            value_pk = value.value if hasattr(value, "value") else value
+            try:
+                valor_km = self.clientes_map.get(int(value_pk), 0) or 0
+            except (TypeError, ValueError):
+                valor_km = 0
+
+            option["attrs"]["data-valor-km"] = str(valor_km)
+
+        return option
+
+
 # ─────────────────────────────────────────────
 # MIXIN BOOTSTRAP
 # ─────────────────────────────────────────────
@@ -36,22 +71,16 @@ class BootstrapMixin:
 # CABEÇALHO
 # ─────────────────────────────────────────────
 
+# forms.py
 
 class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
-    """
-    Inclui campo extra 'tecnicos_equipe' para seleção múltipla de técnicos
-    que participaram do atendimento (além do responsável).
-    """
 
     tecnicos_equipe = forms.ModelMultipleChoiceField(
         queryset=Tecnico.objects.filter(ativo=True).order_by("nome"),
         required=False,
         label="Equipe (técnicos adicionais)",
         widget=forms.SelectMultiple(
-            attrs={
-                "class": "form-select form-select-sm",
-                "size": "5",
-            }
+            attrs={"class": "form-select form-select-sm", "size": "5"}
         ),
         help_text="Segure Ctrl (ou Cmd) para selecionar múltiplos.",
     )
@@ -60,7 +89,6 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         model = RelatorioTecnico
         fields = [
             "numero",
-            # "status",
             "cliente",
             "tecnico_responsavel",
             "cidade_atendimento",
@@ -74,6 +102,10 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
             "observacoes",
         ]
         widgets = {
+            # Instanciado SEM clientes_map — será injetado no __init__
+            "cliente": ClienteSelectWithData(
+                attrs={"class": "form-select form-select-sm"}
+            ),
             "data_inicio": forms.DateInput(
                 attrs={"type": "date", "class": "form-control form-control-sm"},
                 format="%Y-%m-%d",
@@ -85,28 +117,29 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
             "motivo": forms.Textarea(attrs={"rows": 4}),
             "observacoes": forms.Textarea(attrs={"rows": 3}),
         }
-        labels = {
-            "centro_custo": "Centro de Custo / Classificação",
-        }
+        labels = {"centro_custo": "Centro de Custo / Classificação"}
         help_texts = {
-            "centro_custo": ("Será aplicado a todas as despesas deste relatório."),
+            "centro_custo": "Será aplicado a todas as despesas deste relatório."
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.fields["cliente"].queryset = Cliente.objects.filter(ativo=True).order_by(
-            "nome"
-        )
-        self.fields["tecnico_responsavel"].queryset = Tecnico.objects.filter(
-            ativo=True
-        ).order_by("nome")
-        self.fields["numero"].widget.attrs["placeholder"] = "Ex: RT-2024-001"
-        self.fields["centro_custo"].widget.attrs[
-            "placeholder"
-        ] = "Ex: Manutenção, Instalação, Comercial..."
+        qs_clientes = Cliente.objects.filter(ativo=True).order_by("nome")
+        self.fields["cliente"].queryset = qs_clientes
 
-        # Pré-seleciona equipe existente ao editar
+        # Constrói o mapa e injeta no widget APÓS o queryset estar definido
+        clientes_map = {c.pk: float(c.valor_km or 0) for c in qs_clientes}
+        self.fields["cliente"].widget.clientes_map = clientes_map
+
+        self.fields["tecnico_responsavel"].queryset = (
+            Tecnico.objects.filter(ativo=True).order_by("nome")
+        )
+        self.fields["numero"].widget.attrs["placeholder"] = "Ex: RT-2024-001"
+        self.fields["centro_custo"].widget.attrs["placeholder"] = (
+            "Ex: Manutenção, Instalação, Comercial..."
+        )
+
         if self.instance and self.instance.pk:
             self.fields["tecnicos_equipe"].initial = (
                 self.instance.tecnicos_adicionais.values_list("pk", flat=True)
@@ -127,8 +160,6 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         fim = cd.get("data_fim")
         if ini and fim and fim < ini:
             self.add_error("data_fim", "Data fim não pode ser anterior à data início.")
-
-        # Técnico responsável não pode estar na equipe adicional
         resp = cd.get("tecnico_responsavel")
         equipe = cd.get("tecnicos_equipe", [])
         if resp and resp in equipe:
@@ -145,22 +176,14 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         return instance
 
     def _salvar_equipe(self, instance):
-        """Sincroniza a M2M de equipe com o que foi selecionado."""
         from .models import RelatorioTecnicoEquipe
-
         equipe_selecionada = set(
             t.pk for t in self.cleaned_data.get("tecnicos_equipe", [])
         )
-        # Remove quem saiu
         instance.equipe.exclude(tecnico_id__in=equipe_selecionada).delete()
-        # Adiciona quem é novo
         existentes = set(instance.equipe.values_list("tecnico_id", flat=True))
         for pk in equipe_selecionada - existentes:
-            RelatorioTecnicoEquipe.objects.create(
-                relatorio=instance,
-                tecnico_id=pk,
-            )
-
+            RelatorioTecnicoEquipe.objects.create(relatorio=instance, tecnico_id=pk)
 
 # ─────────────────────────────────────────────
 # ITEM DE DESPESA
@@ -260,6 +283,7 @@ ItemDespesaFormSet = inlineformset_factory(
 
 
 class TrechoKmForm(BootstrapMixin, forms.ModelForm):
+
     class Meta:
         model = TrechoKm
         fields = [
@@ -283,6 +307,7 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        valor_km_padrao = kwargs.pop("valor_km_padrao", None)
         super().__init__(*args, **kwargs)
 
         self.fields["origem"].widget.attrs.update(
@@ -320,11 +345,18 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
             }
         )
 
-        # Preenche valor_km pela política vigente se o form estiver vazio
-        if not self.instance.pk and not self.initial.get("valor_km"):
-            self.initial["valor_km"] = PoliticaValor.valor_km_vigente(
-                datetime.date.today()
-            )
+        if not self.is_bound and not self.instance.pk:
+            valor_final = None
+
+            if valor_km_padrao not in (None, ""):
+                valor_final = valor_km_padrao
+            else:
+                relatorio = getattr(self.instance, "relatorio", None)
+                if relatorio and getattr(relatorio, "cliente", None):
+                    valor_final = getattr(relatorio.cliente, "valor_km", None)
+
+            if valor_final not in (None, ""):
+                self.fields["valor_km"].initial = valor_final
 
 
 class BaseTrechoKmFormSet(BaseInlineFormSet):
@@ -362,25 +394,29 @@ class BaseTrechoKmFormSet(BaseInlineFormSet):
                     )
 
 
-for form in self.forms:
-    if not hasattr(form, "cleaned_data"):
-        continue
+"""
+Removido para permitir edição manual do valor_km sem bloquear o salvamento.
+        for form in self.forms:
+            if not hasattr(form, "cleaned_data"):
+                continue
 
-    if form.cleaned_data.get("DELETE"):
-        continue
+            if form.cleaned_data.get("DELETE"):
+                continue
 
-    valor_km = form.cleaned_data.get("valor_km")
-    relatorio = self.instance
+            valor_km = form.cleaned_data.get("valor_km")
+            relatorio = self.instance
 
-    if not valor_km or not relatorio or not relatorio.cliente:
-        continue
+            if not valor_km or not relatorio or not relatorio.cliente:
+                continue
 
-    valor_padrao = relatorio.cliente.valor_km_padrao
+            valor_padrao = relatorio.cliente.valor_km_padrao
 
-    if valor_km != valor_padrao:
-        form.add_error(
-            "valor_km", f"Valor diferente do padrão do cliente (R$ {valor_padrao})."
-        )
+            if valor_km != valor_padrao:
+                form.add_error(
+                    "valor_km",
+                    f"Valor diferente do padrão do cliente (R$ {valor_padrao}).",
+                )
+"""
 
 TrechoKmFormSet = inlineformset_factory(
     RelatorioTecnico,
@@ -464,8 +500,19 @@ class ClienteForm(BootstrapMixin, forms.ModelForm):
             "contato",
             "telefone",
             "email",
+            "valor_km",
             "ativo",
         ]
+
+        widgets = {
+            "valor_km": forms.NumberInput(
+                attrs={
+                    "step": "0.0001",
+                    "class": "form-control form-control-sm",
+                    "placeholder": "Ex: 1.2500",
+                }
+            ),
+        }
 
 
 class AdiantamentoForm(BootstrapMixin, forms.ModelForm):

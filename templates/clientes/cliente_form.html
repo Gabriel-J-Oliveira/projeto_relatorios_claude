@@ -3,6 +3,7 @@
 {% block titulo %}{{ titulo_pagina }}{% endblock %}
 {% block page_title %}{{ titulo_pagina }}{% endblock %}
 
+
 {% block breadcrumb %}
   <li class="breadcrumb-item">
     <a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a>
@@ -49,23 +50,33 @@
 
           <!-- Cidade e UF -->
           <div class="row g-3 mb-3">
-            <div class="col-md-8">
+            <div class="col-md-6">
               <label class="form-label fw-medium small">{{ form.cidade.label }}</label>
               {{ form.cidade }}
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
               <label class="form-label fw-medium small">{{ form.uf.label }}</label>
               {{ form.uf }}
             </div>
           </div>
 
-          <!-- Contato -->
-          <div class="mb-3">
-            <label class="form-label fw-medium small">
-              {{ form.contato.label }}
-              <span class="text-muted">(opcional)</span>
-            </label>
-            {{ form.contato }}
+          <div class= "row g-3 mb-3">
+            <!-- Contato -->
+            <div class="col-md-6">
+              <label class="form-label fw-medium small">
+                {{ form.contato.label }}
+                <span class="text-muted">(opcional)</span>
+              </label>
+              {{ form.contato }}
+            </div>
+
+            <!-- Valor KM Padrão -->
+            <div class="col-md-6">
+              <label class="form-label fw-medium small">
+                {{ form.valor_km.label }}
+              </label>
+              {{ form.valor_km }}
+            </div>
           </div>
 
           <!-- Telefone e Email -->

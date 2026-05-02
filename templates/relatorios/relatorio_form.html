@@ -34,8 +34,8 @@
                   id="form-relatorio"
                   data-inicio="{{ instance.data_inicio|date:'Y-m-d'|default:'' }}"
                   data-fim="{{ instance.data_fim|date:'Y-m-d'|default:'' }}"
-                  data-valor-km-cliente="{{ valor_km_padrao }}"
-                  novalidate>
+                  data-valor-km-cliente="{{ valor_km_padrao|default:0 }}"
+                novalidate>
               {% csrf_token %}
               {# Management forms — obrigatórios para Django formsets (Operação Real) #}
               {{ fs_desp.management_form }}
@@ -128,15 +128,23 @@
                       {{ form.centro_custo }}
                     </div>
                     {# Cliente / Responsável #}
+
                     <div class="col-md-6">
                       <label class="form-label fw-medium small text-muted">Cliente *</label>
                       {{ form.cliente }}
-                      {% if form.cliente.errors %}<div class="text-danger small mt-1">{{ form.cliente.errors.0 }}</div>{% endif %}
+                      {% if form.cliente.errors %}
+                        <div class="text-danger small mt-1">{{ form.cliente.errors.0 }}</div>
+                      {% endif %}
                     </div>
+
                     <div class="col-md-6">
                       <label class="form-label fw-medium small text-muted">Técnico Responsável *</label>
                       {{ form.tecnico_responsavel }}
+                      {% if form.tecnico_responsavel.errors %}
+                        <div class="text-danger small mt-1">{{ form.tecnico_responsavel.errors.0 }}</div>
+                      {% endif %}
                     </div>
+
                     {# Equipe adicional #}
                     <div class="col-12">
                       <label class="form-label fw-medium small text-muted">
@@ -503,11 +511,16 @@
 
 
   // ── Clonar linha de KM ─────────────────────────────────────────
-  async function adicionarLinhaKm() {
+async function adicionarLinhaKm() {
   const idx = _idxKm;
 
   try {
-    const response = await fetch(`/nova-linha-km/?idx=${idx}`);
+    const form = document.getElementById("form-relatorio");
+    const valorPadrao = form?.dataset.valorKmCliente || VKM_PADRAO || "0";
+
+    const response = await fetch(
+      `/nova-linha-km/?idx=${idx}&valor_km_padrao=${encodeURIComponent(valorPadrao)}`
+    );
 
     if (!response.ok) {
       throw new Error("Erro ao carregar nova linha KM.");
@@ -515,8 +528,11 @@
 
     const html = await response.text();
 
-    document.getElementById("corpo-trechos")
-      .insertAdjacentHTML("beforeend", html);
+    const corpo = document.getElementById("corpo-trechos");
+    corpo.insertAdjacentHTML("beforeend", html);
+
+    const novaLinha = corpo.querySelector(".linha-trecho:last-child");
+    preencherValorKmPadrao(novaLinha);
 
     _idxKm++;
     atualizarTotalForms(PREFIX_KM, _idxKm);
@@ -525,6 +541,7 @@
   } catch (error) {
     console.error(error);
   }
+
   atualizarBadgesAbas();
 }
 
@@ -711,6 +728,28 @@ function reindexarFormset(prefix, selector){
     };
   }
 
+  function atualizarValorKmPadraoAtual(valor) {
+  const form = document.getElementById("form-relatorio");
+  if (!form) return;
+
+  const numero = parseFloat(valor);
+  if (!Number.isFinite(numero) || numero <= 0) return;
+
+  form.dataset.valorKmCliente = numero.toFixed(2);
+
+  const ref = document.getElementById("valor-km-ref");
+  if (ref) {
+    ref.textContent = "R$ " + numero.toFixed(2).replace(".", ",");
+  }
+}
+
+document.addEventListener("blur", function (e) {
+  if (!e.target.matches('input[name$="-valor_km"]')) return;
+
+  if (e.target.value) {
+    atualizarValorKmPadraoAtual(e.target.value);
+  }
+}, true);
   // Inicialização imediata (sem Alpine em modo não-defer)
   document.addEventListener("DOMContentLoaded", () => recalcular());
           </script>

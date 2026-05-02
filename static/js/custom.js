@@ -136,7 +136,14 @@ const UI = (() => {
    * o seletor desejado.
    */
   function _container(campo, seletor) {
-    // Sobe até .form-group, td, ou a própria linha — máx 4 níveis
+    // 1. tenta no mesmo TD (mais correto)
+    const td = campo.closest("td");
+    if (td) {
+      const found = td.querySelector(seletor);
+      if (found) return found;
+    }
+
+    // 2. fallback (casos especiais)
     let el = campo.parentElement;
     for (let i = 0; i < 4; i++) {
       if (!el) break;
@@ -144,6 +151,7 @@ const UI = (() => {
       if (found) return found;
       el = el.parentElement;
     }
+
     return null;
   }
 
@@ -208,6 +216,11 @@ const UI = (() => {
   };
 })();
 
+document.addEventListener("blur", function (e) {
+  if (e.target.matches("input, select, textarea")) {
+    e.target.dataset.touched = "true";
+  }
+}, true);
 
 /* ============================================================
    3. HELPERS
@@ -527,12 +540,15 @@ const FieldRules = [
       const km = parseFloat(campoKm?.value);
       const vkm = parseFloat(campoVkm?.value);
 
-      // limpa erros primeiro
+      const kmTouched = campoKm?.dataset.touched;
+      const vkmTouched = campoVkm?.dataset.touched;
+
+      // limpa antes
       UI.clearError(campoKm);
       UI.clearError(campoVkm);
 
-      // regra: km obrigatório se qualquer campo preenchido
-      if ((campoKm?.value || campoVkm?.value)) {
+      // 🔥 só valida depois de interação
+      if (kmTouched || vkmTouched) {
 
         if (!campoKm?.value) {
           UI.setError(campoKm, "Informe o KM.");
@@ -558,11 +574,16 @@ const FieldRules = [
 
       if (!valor || !padrao) return;
 
-      if (valor !== padrao) {
+      const tolerancia = 0.0001;
+      const divergente = Math.abs(valor - padrao) > tolerancia;
+
+      if (divergente) {
         UI.setWarning(
           campo,
           `Valor diferente do padrão (${padrao.toFixed(2)}).`
         );
+      } else {
+        UI.clearWarning(campo);
       }
     }
   }
@@ -710,9 +731,28 @@ const Controller = (() => {
       ".linha-despesa input, .linha-despesa select, " +
       ".linha-trecho input, .linha-trecho select"
     ).forEach(campo => {
-      if (campo.value) validarCampo(campo);
+      if (campo.value) validarCampo(campo); function _validarLinhasIniciais() {
+        // 1. Preenche primeiro
+        document.querySelectorAll(".linha-trecho").forEach(linha => {
+          preencherValorKmPadrao(linha);
+        });
+
+        // 2. Valida campos
+        document.querySelectorAll(
+          ".linha-despesa input, .linha-despesa select, " +
+          ".linha-trecho input, .linha-trecho select"
+        ).forEach(campo => {
+          if (campo.value) validarCampo(campo);
+        });
+
+        // 3. Validação de grupo
+        GroupValidators.runAll();
+      }
     });
     GroupValidators.runAll();
+    document.querySelectorAll(".linha-trecho").forEach(linha => {
+      preencherValorKmPadrao(linha);
+    });
   }
 
   /**
@@ -722,6 +762,7 @@ const Controller = (() => {
   function onLinhaAdicionada(linha) {
     // Nenhuma validação de erro imediata — espera o usuário interagir.
     // Apenas atualiza badges e grupos.
+    preencherValorKmPadrao(linha);
     atualizarBadgesAbas();
     scheduleGroupValidation();
   }
@@ -737,46 +778,53 @@ const Controller = (() => {
   return { init, validarCampo, onLinhaAdicionada, onLinhaRemovida };
 })();
 
-function validarValorKm(campo) {
-  const linha = campo.closest(".linha-trecho");
-  if (!linha) return;
-
-  const form = document.getElementById("form-relatorio");
-  const valorPadrao = parseFloat(form?.dataset.valorKmCliente);
-
-  const valor = parseFloat(campo.value);
-  const aviso = linha.querySelector(".aviso-km");
-
-  if (!valor || !valorPadrao) {
-    if (aviso) aviso.textContent = "";
-    return;
-  }
-
-  if (valor !== valorPadrao) {
-    if (aviso) {
-      aviso.textContent = `Valor diferente do padrão (R$ ${valorPadrao.toFixed(2)})`;
-    }
-  } else {
-    if (aviso) aviso.textContent = "";
-  }
-}
-
 function getValorKmPadrao() {
   const form = document.getElementById("form-relatorio");
   return parseFloat(form?.dataset.valorKmCliente) || 0;
 }
 
 function preencherValorKmPadrao(linha) {
+  if (!linha) return;
+
   const campo = linha.querySelector('input[name$="-valor_km"]');
   if (!campo || campo.value) return;
 
   const form = document.getElementById("form-relatorio");
   const valor = parseFloat(form?.dataset.valorKmCliente);
 
-  if (valor) {
-    campo.value = valor.toFixed(4);
+  if (!Number.isFinite(valor) || valor <= 0) return;
+
+  campo.value = valor.toFixed(2);
+
+  const campoKm = linha.querySelector('input[name$="-km"]');
+  if (campoKm) {
+    calcularTrechoKm(campoKm);
   }
-}
+
+  recalcular();
+};
+
+const campoCliente = document.querySelector('[name="cliente"]');
+campoCliente?.addEventListener("change", function () {
+  const opt = this.selectedOptions?.[0];
+  const novoValor = parseFloat(opt?.dataset.valorKm || "");
+
+  if (!Number.isFinite(novoValor) || novoValor <= 0) return;
+
+  atualizarValorKmPadraoAtual(novoValor);
+
+  document.querySelectorAll(".linha-trecho").forEach(linha => {
+    const campo = linha.querySelector('input[name$="-valor_km"]');
+    if (campo && !campo.value) {
+      campo.value = novoValor.toFixed(2);
+      const campoKm = linha.querySelector('input[name$="-km"]');
+      if (campoKm) calcularTrechoKm(campoKm);
+    }
+  });
+
+  recalcular();
+});
+
 /* ============================================================
    9. INICIALIZAÇÃO
 ============================================================ */

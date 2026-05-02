@@ -106,10 +106,9 @@ class Tecnico(models.Model):
 # ─────────────────────────────────────────────────────────────────
 # CLIENTE
 # ─────────────────────────────────────────────────────────────────
-
-
 class Cliente(models.Model):
     nome = models.CharField("Nome / Razão Social", max_length=200)
+
     cnpj_cpf = models.CharField(
         "CNPJ / CPF",
         max_length=20,
@@ -117,12 +116,52 @@ class Cliente(models.Model):
         null=True,
         unique=True,
     )
-    cidade = models.CharField("Cidade", max_length=100)
-    uf = models.CharField("UF", max_length=2, choices=UF.choices, default=UF.PR)
-    contato = models.CharField("Contato", max_length=100, blank=True)
-    telefone = models.CharField("Telefone", max_length=20, blank=True)
-    email = models.EmailField("E-mail", blank=True)
+
+    cidade = models.CharField(
+        "Cidade",
+        max_length=100,
+        blank=True,
+        null=True,
+    )
+
+    uf = models.CharField(
+        "UF",
+        max_length=2,
+        choices=UF.choices,
+        blank=True,
+        null=True,
+    )
+
+    contato = models.CharField(
+        "Contato",
+        max_length=100,
+        blank=True,
+        null=True,
+    )
+
+    telefone = models.CharField(
+        "Telefone",
+        max_length=20,
+        blank=True,
+        null=True,
+    )
+
+    email = models.EmailField(
+        "E-mail",
+        blank=True,
+        null=True,
+    )
+
     ativo = models.BooleanField("Ativo", default=True)
+
+    valor_km = models.DecimalField(
+        "Valor por KM (R$)",
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+    )
+
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -135,11 +174,15 @@ class Cliente(models.Model):
 
     @property
     def cidade_uf(self):
-        return f"{self.cidade}/{self.uf}"
+        if self.cidade and self.uf:
+            return f"{self.cidade}/{self.uf}"
+        return self.cidade or self.uf or "-"
+
 
 # ─────────────────────────────────────────────────────────────────
 # POLÍTICA DE VALORES
 # ─────────────────────────────────────────────────────────────────
+
 
 class PoliticaValor(models.Model):
     tipo_despesa = models.CharField(
@@ -210,6 +253,7 @@ class PoliticaValor(models.Model):
 # RELATÓRIO TÉCNICO
 # ─────────────────────────────────────────────────────────────────
 
+
 class RelatorioTecnico(models.Model):
     # Identificação
     numero = models.CharField("Número", max_length=30, unique=True)
@@ -242,8 +286,8 @@ class RelatorioTecnico(models.Model):
     )
 
     STATUS_CHOICES = [
-    ("rascunho", "Rascunho"),
-    ("enviado", "Enviado"),
+        ("rascunho", "Rascunho"),
+        ("enviado", "Enviado"),
     ]
 
     status = models.CharField(
@@ -251,7 +295,7 @@ class RelatorioTecnico(models.Model):
         choices=STATUS_CHOICES,
         default="rascunho",
     )
-    
+
     # Atendimento
     cidade_atendimento = models.CharField("Cidade de atendimento", max_length=100)
     uf_atendimento = models.CharField(
@@ -390,6 +434,7 @@ class RelatorioTecnicoEquipe(models.Model):
 # ITEM DE DESPESA
 # ─────────────────────────────────────────────────────────────────
 
+
 class ItemDespesa(models.Model):
     relatorio = models.ForeignKey(
         RelatorioTecnico,
@@ -457,6 +502,7 @@ class ItemDespesa(models.Model):
 # TRECHO DE KM
 # ─────────────────────────────────────────────────────────────────
 
+
 class TrechoKm(models.Model):
     relatorio = models.ForeignKey(
         RelatorioTecnico,
@@ -514,6 +560,7 @@ class TrechoKm(models.Model):
                         )
                     }
                 )
+
     @property
     def valor_km_padrao(self):
         if self.relatorio and self.relatorio.cliente:
@@ -525,6 +572,7 @@ class TrechoKm(models.Model):
         if self.valor_km_padrao is None:
             return False
         return self.valor_km != self.valor_km_padrao
+
 
 # ─────────────────────────────────────────────────────────────────
 # ADIANTAMENTO
