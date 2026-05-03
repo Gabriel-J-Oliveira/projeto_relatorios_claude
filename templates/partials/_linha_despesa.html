@@ -45,8 +45,9 @@
            value="{{ form.descricao.value|default:'' }}"
            placeholder="Fornecedor / Detalhe"
            class="form-control form-control-sm">
-      <div class="text-warning small aviso-inline aviso-duplicata"></div>
-  </td>
+    <div class="text-warning small aviso-inline"></div>
+    <div class="text-warning small aviso-duplicata"></div>
+</td>
   <td class="p-1 pt-3 col-md-1">
     <input type="number"
            step="0.01"
@@ -77,6 +78,7 @@
       <input type="file"
              name="despesas-{{ idx }}-comprovante"
              id="id_despesas-{{ idx }}-comprovante"
+             class="form-sm"
              onchange=" this.parentElement.classList.replace( 'btn-outline-secondary', 'btn-success' )">
     </label>
   </td>

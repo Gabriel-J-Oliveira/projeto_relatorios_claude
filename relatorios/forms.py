@@ -73,6 +73,7 @@ class BootstrapMixin:
 
 # forms.py
 
+
 class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
 
     tecnicos_equipe = forms.ModelMultipleChoiceField(
@@ -132,13 +133,13 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         clientes_map = {c.pk: float(c.valor_km or 0) for c in qs_clientes}
         self.fields["cliente"].widget.clientes_map = clientes_map
 
-        self.fields["tecnico_responsavel"].queryset = (
-            Tecnico.objects.filter(ativo=True).order_by("nome")
-        )
+        self.fields["tecnico_responsavel"].queryset = Tecnico.objects.filter(
+            ativo=True
+        ).order_by("nome")
         self.fields["numero"].widget.attrs["placeholder"] = "Ex: RT-2024-001"
-        self.fields["centro_custo"].widget.attrs["placeholder"] = (
-            "Ex: Manutenção, Instalação, Comercial..."
-        )
+        self.fields["centro_custo"].widget.attrs[
+            "placeholder"
+        ] = "Ex: Manutenção, Instalação, Comercial..."
 
         if self.instance and self.instance.pk:
             self.fields["tecnicos_equipe"].initial = (
@@ -177,6 +178,7 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
 
     def _salvar_equipe(self, instance):
         from .models import RelatorioTecnicoEquipe
+
         equipe_selecionada = set(
             t.pk for t in self.cleaned_data.get("tecnicos_equipe", [])
         )
@@ -184,6 +186,7 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         existentes = set(instance.equipe.values_list("tecnico_id", flat=True))
         for pk in equipe_selecionada - existentes:
             RelatorioTecnicoEquipe.objects.create(relatorio=instance, tecnico_id=pk)
+
 
 # ─────────────────────────────────────────────
 # ITEM DE DESPESA
@@ -330,13 +333,13 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
                 "placeholder": "0,0",
             }
         )
-
-        self.fields["valor_km"].widget.attrs.update(
-            {
-                "class": "form-control form-control-sm campo-vkm",
-                "placeholder": "0,0000",
-            }
-        )
+        if valor_km_padrao and not self.initial.get("valor_km") and not self.data:
+            self.fields["valor_km"].widget.attrs.update(
+                {
+                    "class": "form-control form-control-sm campo-vkm",
+                    "placeholder": "0,0000",
+                }
+            )
 
         self.fields["observacao"].widget.attrs.update(
             {

@@ -23,7 +23,7 @@ class StatusRelatorio(models.TextChoices):
     APROVADO = "aprovado", "Aprovado"
     REJEITADO = "rejeitado", "Rejeitado"
     FATURADO = "faturado", "Faturado"
-
+    FECHADO = "fechado", "Fechado"
 
 class TipoLocalidade(models.TextChoices):
     CAPITAL = "capital", "Capital"
@@ -383,6 +383,7 @@ class RelatorioTecnico(models.Model):
             StatusRelatorio.APROVADO: "success",
             StatusRelatorio.REJEITADO: "danger",
             StatusRelatorio.FATURADO: "info",
+            StatusRelatorio.FECHADO: "info",
         }.get(self.status, "secondary")
 
     def clean(self):

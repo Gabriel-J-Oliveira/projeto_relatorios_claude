@@ -67,7 +67,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
   }
 
+  let ultimaAcao = null;
 
+  document.getElementById("btn-enviar-rascunho")?.addEventListener("click", () => {
+    ultimaAcao = "rascunho";
+  });
+
+  document.getElementById("btn-enviar-relatorio")?.addEventListener("click", () => {
+    ultimaAcao = "enviar";
+  });
 
   form.addEventListener("submit", function (e) {
 
@@ -75,7 +83,8 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    if (faltamComprovantes()) {
+    // Só valida comprovante se for envio
+    if (ultimaAcao === "enviar" && faltamComprovantes()) {
       e.preventDefault();
       modal.show();
     }
@@ -84,23 +93,20 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
   confirmar.addEventListener("click", function () {
-
     form.dataset.confirmado = "1";
 
-    let acao = form.querySelector('[name="acao"]');
+    // Remove qualquer input hidden "acao" anterior para não duplicar
+    form.querySelectorAll('input[type="hidden"][name="acao"]').forEach(el => el.remove());
 
-    if (!acao) {
-      acao = document.createElement("input");
-      acao.type = "hidden";
-      acao.name = "acao";
-      acao.value = "enviar";
-      form.appendChild(acao);
-    }
+    // Cria um input hidden com value="enviar" — este SIM vai no POST
+    const inputAcao = document.createElement("input");
+    inputAcao.type = "hidden";
+    inputAcao.name = "acao";
+    inputAcao.value = "enviar";
+    form.appendChild(inputAcao);
 
     modal.hide();
-
     form.submit();
-
   });
 
 });
@@ -217,9 +223,22 @@ const UI = (() => {
 })();
 
 document.addEventListener("blur", function (e) {
+
+  // 1. Marca campo como "tocado" (global)
   if (e.target.matches("input, select, textarea")) {
     e.target.dataset.touched = "true";
   }
+
+  // 2. Regra específica: valor_km
+  if (e.target.matches('input[name$="-valor_km"]')) {
+
+    if (e.target.value) {
+      e.target.dataset.editado = "true";
+      validarKmGlobal();
+    }
+
+  }
+
 }, true);
 
 /* ============================================================
@@ -246,7 +265,7 @@ function linhaRemovida(linha) {
 /** Retorna linhas ativas de um seletor */
 function linhasAtivas(selector) {
   return Array.from(document.querySelectorAll(selector))
-    .filter(l => l.style.display !== "none");
+    .filter(l => !linhaRemovida(l));
 }
 
 
@@ -339,83 +358,81 @@ const GroupValidators = {
    * → aviso apenas na última linha do grupo
    */
   multiplasRefeicoes() {
-    const linhas = linhasAtivas(".linha-despesa");
+  const linhas = linhasAtivas(".linha-despesa");
 
-    // 🔥 limpa tudo primeiro (só linhas ativas)
-    linhas.forEach(linha =>
-      UI.clearGroupWarning(linha, ".aviso-refeicao")
+  // limpa tudo (inclusive removidas)
+  document.querySelectorAll(".linha-despesa").forEach(linha =>
+    UI.clearGroupWarning(linha, ".aviso-refeicao")
+  );
+
+  const mapa = {};
+
+  linhas.forEach(linha => {
+    const data = linha.querySelector('input[name$="-data"]')?.value;
+    const tipo = linha.querySelector('select[name$="-tipo"]')?.value;
+
+    if (!data) return;
+
+    const tipoNormalizado = (tipo || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+    if (tipoNormalizado !== "alimentacao") return;
+
+    (mapa[data] = mapa[data] || []).push(linha);
+  });
+
+  Object.values(mapa).forEach(grupo => {
+    if (grupo.length < 4) return;
+
+    const ultima = grupo[grupo.length - 1];
+
+    UI.setGroupWarning(
+      ultima,
+      ".aviso-refeicao",
+      `Muitas refeições nesta data (${grupo.length}).`
     );
-
-    const mapa = {};
-
-    linhas.forEach(linha => {
-      const data = linha.querySelector('input[name$="-data"]')?.value;
-      const tipo = linha.querySelector('select[name$="-tipo"]')?.value;
-
-      if (!data) return;
-
-      const tipoNormalizado = (tipo || "")
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-
-      if (tipoNormalizado !== "alimentacao") return;
-
-      (mapa[data] = mapa[data] || []).push(linha);
-    });
-
-    Object.values(mapa).forEach(grupo => {
-      if (grupo.length < 4) return;
-
-      // 🔥 SEMPRE pega a última linha atual (já recalculado)
-      const ultima = grupo[grupo.length - 1];
-
-      UI.setGroupWarning(
-        ultima,
-        ".aviso-refeicao",
-        `Muitas refeições nesta data (${grupo.length}).`
-      );
-    });
-  },
+  });
+},
 
   /**
    * Despesas duplicadas: mesmo (data + tipo + valor)
    * → aviso em todas as linhas duplicadas (exceto a primeira)
    */
   despesasDuplicadas() {
-    const linhas = linhasAtivas(".linha-despesa");
+  const linhas = linhasAtivas(".linha-despesa");
 
-    // 🔥 limpa tudo antes
-    linhas.forEach(linha =>
-      UI.clearGroupWarning(linha, ".aviso-duplicata")
-    );
+  // limpa tudo antes
+  document.querySelectorAll(".linha-despesa").forEach(linha =>
+    UI.clearGroupWarning(linha, ".aviso-duplicata")
+  );
 
-    const mapa = {};
+  const mapa = {};
 
-    linhas.forEach(linha => {
-      const data = linha.querySelector('input[name$="-data"]')?.value;
-      const tipo = linha.querySelector('select[name$="-tipo"]')?.value;
-      const valor = linha.querySelector('input[name$="-valor"]')?.value?.trim();
+  linhas.forEach(linha => {
+    const data = linha.querySelector('input[name$="-data"]')?.value;
+    const tipo = linha.querySelector('select[name$="-tipo"]')?.value;
+    const valor = linha.querySelector('input[name$="-valor"]')?.value?.trim();
 
-      if (!data || !tipo || !valor) return;
+    if (!data || !tipo || !valor) return;
 
-      const chave = `${data}|${tipo}|${valor}`;
-      (mapa[chave] = mapa[chave] || []).push(linha);
+    const chave = `${data}|${tipo}|${valor}`;
+    (mapa[chave] = mapa[chave] || []).push(linha);
+  });
+
+  Object.values(mapa).forEach(grupo => {
+    if (grupo.length < 2) return;
+
+    grupo.slice(1).forEach(linha => {
+      UI.setGroupWarning(
+        linha,
+        ".aviso-duplicata",
+        "Possível despesa duplicada (mesma data, tipo e valor)."
+      );
     });
-
-    Object.values(mapa).forEach(grupo => {
-      if (grupo.length < 2) return;
-
-      // 🔥 recalcula SEMPRE com base no estado atual
-      grupo.slice(1).forEach(linha => {
-        UI.setGroupWarning(
-          linha,
-          ".aviso-duplicata",
-          "Possível despesa duplicada (mesma data, tipo e valor)."
-        );
-      });
-    });
-  },
+  });
+},
 
   /**
    * 5+ deslocamentos no mesmo dia
@@ -463,6 +480,12 @@ const GroupValidators = {
    Cada regra é { test: fn → bool, onFail: fn, onPass: fn }
    "test" retorna true se a regra se aplica ao campo recebido.
 ============================================================ */
+// ADICIONAR antes da definição de FieldRules:
+function getValorKmPadrao() {
+  const form = document.getElementById("form-relatorio");
+  return parseFloat(form?.dataset?.valorKmCliente) || 0;
+}
+
 const FieldRules = [
 
   // --- ERROS ---
@@ -568,7 +591,6 @@ const FieldRules = [
     run(campo) {
       const valor = parseFloat(campo.value) || 0;
       const padrao = getValorKmPadrao();
-
       // limpa antes
       UI.clearWarning(campo);
 
@@ -616,21 +638,23 @@ function atualizarBadgesAbas() {
   }
 }
 
+// ADICIONAR antes de Controller.init() ou dentro do objeto Controller:
+function _validarLinhasIniciais() {
+  document.querySelectorAll(".linha-despesa, .linha-trecho").forEach(linha => {
+    linha.querySelectorAll("input, select, textarea").forEach(campo => {
+      if (campo.name) Controller.validarCampo?.(campo);
+    });
+  });
+}
 
 /* ============================================================
    8. CONTROLLER — ponto de entrada e gestão de eventos
 ============================================================ */
 const Controller = (() => {
 
-  /**
-   * Aplica todas as FieldRules que se aplicam ao campo.
-   * Não chama GroupValidators — isso é feito separadamente
-   * para controlar a ordem de execução.
-   */
   function validarCampo(campo) {
     if (!campo?.name) return;
 
-    // Ignora campos dentro de linhas removidas
     const linha = campo.closest(".linha-despesa, .linha-trecho");
     if (linha && linhaRemovida(linha)) return;
 
@@ -639,11 +663,8 @@ const Controller = (() => {
     });
   }
 
-  /**
-   * Debounce simples: agrupa chamadas rápidas em uma só.
-   * Evita reprocessar GroupValidators a cada tecla.
-   */
   let _timer = null;
+
   function scheduleGroupValidation() {
     clearTimeout(_timer);
     _timer = setTimeout(() => {
@@ -651,40 +672,30 @@ const Controller = (() => {
       atualizarBadgesAbas();
     }, 150);
   }
+
   function init() {
     const form = document.getElementById("form-relatorio");
     if (!form) return;
 
-    // input → valida campo + agenda validações de grupo
     form.addEventListener("input", e => {
       FormState.dirty(e.target);
       validarCampo(e.target);
       scheduleGroupValidation();
     });
 
-    // change → valida campo + trata mudanças de período
     form.addEventListener("change", e => {
       FormState.dirty(e.target);
       validarCampo(e.target);
 
-      // 🔥 NOVO: se alterar período, revalida TODAS as despesas
       if (e.target.name === "data_inicio" || e.target.name === "data_fim") {
-
-        const datasDespesas = document.querySelectorAll(
-          ".linha-despesa input[type='date']"
-        );
-
-        datasDespesas.forEach(campo => {
-          validarCampo(campo);
-        });
+        document.querySelectorAll(".linha-despesa input[type='date']")
+          .forEach(campo => validarCampo(campo));
       }
 
       scheduleGroupValidation();
     });
 
-    // blur → trata campos "touched" e datas
     form.addEventListener("blur", e => {
-
       if (e.target.name?.includes("-valor")) {
         FormState.touch(e.target);
         validarCampo(e.target);
@@ -695,134 +706,71 @@ const Controller = (() => {
         validarCampo(e.target);
         scheduleGroupValidation();
       }
-
-    }
-      , true); // capture = pega antes do stop
+    }, true);
 
     form.addEventListener("submit", function (e) {
-      // força validação completa
       GroupValidators.runAll();
 
       const temErro = document.querySelectorAll(".is-invalid").length > 0;
 
       if (temErro) {
         e.preventDefault();
+        alert("Existem erros no formulário.");
 
-        alert("Existem erros no formulário. Corrija antes de enviar.");
-
-        // opcional: focar primeiro erro
         const primeiroErro = document.querySelector(".is-invalid");
         if (primeiroErro) primeiroErro.focus();
       }
     });
-    // Validação inicial (edição de relatório)
-    _validarLinhasIniciais();
 
     atualizarBadgesAbas();
+    validarKmGlobal();
   }
 
-  /**
-   * Valida todos os campos já presentes ao carregar a página.
-   * Não marca campos "não tocados" com erro — apenas detecta
-   * estados já inválidos (ex: datas fora do período).
-   */
-  function _validarLinhasIniciais() {
-    document.querySelectorAll(
-      ".linha-despesa input, .linha-despesa select, " +
-      ".linha-trecho input, .linha-trecho select"
-    ).forEach(campo => {
-      if (campo.value) validarCampo(campo); function _validarLinhasIniciais() {
-        // 1. Preenche primeiro
-        document.querySelectorAll(".linha-trecho").forEach(linha => {
-          preencherValorKmPadrao(linha);
-        });
+  // 🔥 ESSA PARTE FALTAVA
+  return {
+    init,
+    validarCampo
+  };
 
-        // 2. Valida campos
-        document.querySelectorAll(
-          ".linha-despesa input, .linha-despesa select, " +
-          ".linha-trecho input, .linha-trecho select"
-        ).forEach(campo => {
-          if (campo.value) validarCampo(campo);
-        });
-
-        // 3. Validação de grupo
-        GroupValidators.runAll();
-      }
-    });
-    GroupValidators.runAll();
-    document.querySelectorAll(".linha-trecho").forEach(linha => {
-      preencherValorKmPadrao(linha);
-    });
-  }
-
-  /**
-   * Chamado pelo código que adiciona linhas dinamicamente.
-   * Exemplo: Controller.onLinhaAdicionada(novaLinha)
-   */
-  function onLinhaAdicionada(linha) {
-    // Nenhuma validação de erro imediata — espera o usuário interagir.
-    // Apenas atualiza badges e grupos.
-    preencherValorKmPadrao(linha);
-    atualizarBadgesAbas();
-    scheduleGroupValidation();
-  }
-
-  /**
-   * Chamado quando uma linha é marcada como removida.
-   */
-  function onLinhaRemovida(_linha) {
-    atualizarBadgesAbas();
-    scheduleGroupValidation();
-  }
-
-  return { init, validarCampo, onLinhaAdicionada, onLinhaRemovida };
 })();
-
-function getValorKmPadrao() {
-  const form = document.getElementById("form-relatorio");
-  return parseFloat(form?.dataset.valorKmCliente) || 0;
-}
-
-function preencherValorKmPadrao(linha) {
-  if (!linha) return;
-
-  const campo = linha.querySelector('input[name$="-valor_km"]');
-  if (!campo || campo.value) return;
-
-  const form = document.getElementById("form-relatorio");
-  const valor = parseFloat(form?.dataset.valorKmCliente);
-
-  if (!Number.isFinite(valor) || valor <= 0) return;
-
-  campo.value = valor.toFixed(2);
-
-  const campoKm = linha.querySelector('input[name$="-km"]');
-  if (campoKm) {
-    calcularTrechoKm(campoKm);
-  }
-
-  recalcular();
-};
-
+/**
+ * Valida todos os campos já presentes ao carregar a página.
+ * Não marca campos "não tocados" com erro — apenas detecta
+ * estados já inválidos (ex: datas fora do período).
+ */
 const campoCliente = document.querySelector('[name="cliente"]');
+
 campoCliente?.addEventListener("change", function () {
+  const form = document.getElementById("form-relatorio");
+
+  // 1. pega valor antigo ANTES de qualquer alteração
+  const valorAntigo = parseFloat(form?.dataset.valorKmCliente);
+
   const opt = this.selectedOptions?.[0];
   const novoValor = parseFloat(opt?.dataset.valorKm || "");
 
   if (!Number.isFinite(novoValor) || novoValor <= 0) return;
 
-  atualizarValorKmPadraoAtual(novoValor);
-
   document.querySelectorAll(".linha-trecho").forEach(linha => {
     const campo = linha.querySelector('input[name$="-valor_km"]');
-    if (campo && !campo.value) {
+    if (!campo) return;
+
+    const foiEditado = campo.dataset.editado === "true";
+
+    // ✔️ regra correta
+    if (!campo.value || !foiEditado) {
       campo.value = novoValor.toFixed(2);
+
       const campoKm = linha.querySelector('input[name$="-km"]');
       if (campoKm) calcularTrechoKm(campoKm);
     }
   });
 
+  // 🔵 2. só agora atualiza o padrão global
+  atualizarValorKmPadraoAtual(novoValor);
+
   recalcular();
+  validarKmGlobal();
 });
 
 /* ============================================================
