@@ -63,6 +63,28 @@
   </span>
 </div>
 
+{% if avisos_financeiro %}
+<div class="card border-warning border-opacity-50 shadow-sm mb-4" id="card-atencao-financeiro">
+  <div class="card-header bg-warning-subtle border-warning border-opacity-25 py-3">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+      <h6 class="mb-0 fw-semibold">Atenção</h6>
+      <span class="badge bg-warning text-dark rounded-pill ms-auto">{{ avisos_financeiro|length }}</span>
+    </div>
+  </div>
+  <div class="list-group list-group-flush">
+    {% for aviso in avisos_financeiro %}
+      <button type="button"
+              class="list-group-item list-group-item-action d-flex align-items-start gap-2 py-2 aviso-financeiro"
+              data-target-linha="{{ aviso.linha_id }}">
+        <i class="bi {{ aviso.icone }} text-warning mt-1"></i>
+        <span class="small text-start">{{ aviso.mensagem }}</span>
+      </button>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 <div class="row g-3">
 
   <!-- COLUNA PRINCIPAL -->
@@ -112,9 +134,9 @@
             {% endif %}
           </dd>
 
-          {% if relatorio.area_gasto %}
+          {% if relatorio.centro_custo %}
           <dt class="col-sm-4 text-muted fw-medium">Área / C. Custo</dt>
-          <dd class="col-sm-8">{{ relatorio.area_gasto }}</dd>
+          <dd class="col-sm-8">{{ relatorio.centro_custo }}</dd>
           {% endif %}
         </dl>
         <hr class="my-3">
@@ -145,14 +167,13 @@
                 <th class="small fw-semibold text-muted">Descrição</th>
                 <th class="small fw-semibold text-muted">Valor</th>
                 <th class="small fw-semibold text-muted">Pago por</th>
-                <th class="small fw-semibold text-muted text-center">Reemb.</th>
                 <th class="small fw-semibold text-muted">C. Custo</th>
                 <th class="small fw-semibold text-muted text-center">Doc.</th>
               </tr>
             </thead>
             <tbody>
               {% for d in relatorio.despesas.all %}
-              <tr>
+              <tr id="linha-despesa-{{ forloop.counter }}" class="linha-despesa">
                 <td class="ps-3 small text-muted">{{ d.data|date:"d/m/Y" }}</td>
                 <td>
                   <span class="badge bg-body-tertiary text-body-secondary small">
@@ -168,14 +189,7 @@
                   <span class="badge bg-secondary-subtle text-secondary">Empresa</span>
                   {% endif %}
                 </td>
-                <td class="text-center">
-                  {% if d.reembolsavel %}
-                  <i class="bi bi-check-circle-fill text-success"></i>
-                  {% else %}
-                  <i class="bi bi-x-circle text-muted"></i>
-                  {% endif %}
-                </td>
-                <td class="small text-muted">{{ d.centro_custo|default:"—" }}</td>
+                <td class="small text-muted">{{ relatorio.centro_custo|default:"—" }}</td>
                 <td class="text-center">
                   {% if d.comprovante %}
                   <a href="{{ d.comprovante.url }}" target="_blank" class="btn btn-sm btn-outline-success px-1 py-0">
@@ -194,7 +208,7 @@
                 <td class="small fw-bold text-success">
                   R$ {{ relatorio.total_despesas_tecnico|add:relatorio.total_despesas_empresa }}
                 </td>
-                <td colspan="4"></td>
+                <td colspan="3"></td>
               </tr>
             </tfoot>
           </table>
@@ -231,7 +245,7 @@
             </thead>
             <tbody>
               {% for t in relatorio.trechos.all %}
-              <tr>
+              <tr id="linha-trecho-{{ forloop.counter }}" class="linha-trecho">
                 <td class="ps-3 small text-muted">{{ t.data|date:"d/m/Y" }}</td>
                 <td class="small">{{ t.origem }}</td>
                 <td class="small">{{ t.destino }}</td>
@@ -350,5 +364,48 @@
   </div>
 
 </div>
+
+<style>
+  .linha-alerta-financeiro {
+    position: relative;
+    outline: 2px solid var(--bs-warning);
+    outline-offset: -2px;
+    box-shadow: 0 0 0 .25rem rgba(255, 193, 7, .25);
+    animation: destaqueFinanceiro 1.2s ease-in-out;
+  }
+
+  .linha-alerta-financeiro > * {
+    background-color: rgba(255, 193, 7, .18) !important;
+  }
+
+  @keyframes destaqueFinanceiro {
+    0% { background-color: rgba(255, 193, 7, .32); }
+    100% { background-color: transparent; }
+  }
+</style>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".aviso-financeiro").forEach(function (item) {
+      item.addEventListener("click", function () {
+        const targetId = item.dataset.targetLinha;
+        const linha = document.getElementById(targetId);
+
+        if (!linha) return;
+
+        linha.scrollIntoView({ behavior: "smooth", block: "center" });
+        linha.classList.remove("linha-alerta-financeiro");
+
+        window.setTimeout(function () {
+          linha.classList.add("linha-alerta-financeiro");
+        }, 250);
+
+        window.setTimeout(function () {
+          linha.classList.remove("linha-alerta-financeiro");
+        }, 3500);
+      });
+    });
+  });
+</script>
 
 {% endblock %}

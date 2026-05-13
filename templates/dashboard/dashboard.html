@@ -68,13 +68,19 @@
                         <div class="fw-semibold text-body-emphasis small">{{ relatorio.numero }}</div>
                         <div class="text-muted" style="font-size: .8rem;">{{ relatorio.cliente }}</div>
                       </td>
-                      <td class="small">{{ relatorio.tecnico }}</td>
-                      <td class="small text-muted">{{ relatorio.data|date:"d/m/Y" }}</td>
+                      <td class="small">{{ relatorio.tecnico_responsavel }}</td>
+                      <td class="small text-muted">{{ relatorio.data_inicio|date:"d/m/Y" }}</td>
                       <td>
                         {% if relatorio.status == 'pendente' %}
                           <span class="badge bg-warning-subtle text-warning rounded-pill px-2">Pendente</span>
+                        {% elif relatorio.status == 'rascunho' %}
+                          <span class="badge bg-secondary-subtle text-secondary rounded-pill px-2">Rascunho</span>
+                        {% elif relatorio.status == 'aprovado' %}
+                          <span class="badge bg-success-subtle text-success rounded-pill px-2">Aprovado</span>
+                        {% elif relatorio.status == 'rejeitado' %}
+                          <span class="badge bg-danger-subtle text-danger rounded-pill px-2">Rejeitado</span>
                         {% elif relatorio.status == 'fechado' %}
-                          <span class="badge bg-success-subtle text-success rounded-pill px-2">Fechado</span>
+                          <span class="badge bg-info-subtle text-info rounded-pill px-2">Fechado</span>
                         {% else %}
                           <span class="badge bg-info-subtle text-info rounded-pill px-2">Faturado</span>
                         {% endif %}

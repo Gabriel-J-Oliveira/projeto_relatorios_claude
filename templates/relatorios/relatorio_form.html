@@ -23,7 +23,7 @@
             <i class="bi bi-file-earmark-text text-primary fs-5"></i>
             <h6 class="mb-0 fw-semibold">{{ titulo_pagina }}</h6>
           </div>
-          <span class="badge bg-{{ form.instance.status_badge|default:'secondary' }}">
+          <span class="badge bg-{{ form.instance.status_badge_cor|default:'secondary' }}">
             {{ form.instance.get_status_display|default:"Rascunho" }}
           </span>
         </div>
@@ -541,6 +541,7 @@
     CONTROLE DO FORMULÁRIO — Single Save sem HTMX
      ═══════════════════════════════════════════════════════════════ */
   const URL_NOVA_LINHA_DESPESA = "{% url 'relatorios:nova_linha_despesa' %}";
+  const URL_NOVA_LINHA_KM = "{% url 'relatorios:nova_linha_km' %}";
 
   // ── Contadores de índice (nunca reutilizados) ──────────────────
   let _idxDesp = {{ fs_desp.total_form_count }};
@@ -591,7 +592,7 @@ async function adicionarLinhaKm() {
     const valorPadrao = form?.dataset?.valorKmCliente || "0";
 
     const response = await fetch(
-      `/nova-linha-km/?idx=${idx}&valor_km_padrao=${encodeURIComponent(valorPadrao)}`
+      `${URL_NOVA_LINHA_KM}?idx=${idx}&valor_km_padrao=${encodeURIComponent(valorPadrao)}`
     );
 
     if (!response.ok) {

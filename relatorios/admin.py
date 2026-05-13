@@ -80,9 +80,8 @@ class ItemDespesaInline(admin.TabularInline):
         "descricao",
         "valor",
         "quem_pagou",
-        "reembolsavel",
-        "centro_custo",
         "comprovante",
+        "observacoes",
     ]
 
 
@@ -153,7 +152,7 @@ class RelatorioTecnicoAdmin(admin.ModelAdmin):
                     ("cidade_atendimento", "uf_atendimento", "tipo_localidade"),
                     ("data_inicio", "data_fim"),
                     "motivo",
-                    "area_gasto",
+                    "centro_custo",
                 ),
             },
         ),
@@ -209,6 +208,8 @@ class RelatorioTecnicoAdmin(admin.ModelAdmin):
             "aprovado": "#198754",
             "rejeitado": "#dc3545",
             "faturado": "#0dcaf0",
+            "fechado": "#0dcaf0",
+            "rejeitado": "#dc3545",
         }
         cor = cores.get(obj.status, "#6c757d")
         return format_html(

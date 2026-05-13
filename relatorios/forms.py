@@ -7,11 +7,7 @@ from .models import (
     Tecnico,
     Cliente,
     Adiantamento,
-    PoliticaValor,
 )
-import datetime
-
-from django import forms
 
 # forms.py
 
@@ -218,6 +214,16 @@ class ItemDespesaForm(BootstrapMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        for name in [
+            "data",
+            "tipo",
+            "descricao",
+            "valor",
+            "quem_pagou",
+            "comprovante",
+            "observacoes",
+        ]:
+            self.fields[name].required = False
         self.fields["descricao"].widget.attrs["placeholder"] = "Fornecedor / Detalhe"
         self.fields["valor"].widget.attrs["placeholder"] = "0,00"
         self.fields["comprovante"].widget.attrs.update(
@@ -244,17 +250,29 @@ class BaseItemDespesaFormSet(BaseInlineFormSet):
 
             data = form.cleaned_data.get("data")
             tipo = form.cleaned_data.get("tipo")
+            descricao = form.cleaned_data.get("descricao")
             valor = form.cleaned_data.get("valor")
+            quem_pagou = form.cleaned_data.get("quem_pagou")
+            comprovante = form.cleaned_data.get("comprovante")
+            observacoes = form.cleaned_data.get("observacoes")
 
             # linha vazia
-            if not any([data, tipo, valor]):
+            if not form.instance.pk and not any(
+                [data, tipo, descricao, valor, comprovante, observacoes]
+            ):
                 continue
+
+            if not data:
+                form.add_error("data", "Informe a data.")
 
             if tipo and not valor:
                 form.add_error("valor", "Informe o valor.")
 
             if valor and not tipo:
                 form.add_error("tipo", "Selecione o tipo.")
+
+            if not descricao:
+                form.add_error("descricao", "Informe a descrição.")
 
             if valor is not None and valor <= 0:
                 form.add_error("valor", "Valor deve ser maior que zero.")
@@ -312,6 +330,8 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         valor_km_padrao = kwargs.pop("valor_km_padrao", None)
         super().__init__(*args, **kwargs)
+        for name in ["data", "origem", "destino", "km", "valor_km", "observacao"]:
+            self.fields[name].required = False
 
         self.fields["origem"].widget.attrs.update(
             {
@@ -379,10 +399,28 @@ class BaseTrechoKmFormSet(BaseInlineFormSet):
             data = form.cleaned_data.get("data")
             origem = form.cleaned_data.get("origem")
             destino = form.cleaned_data.get("destino")
+            km = form.cleaned_data.get("km")
+            valor_km = form.cleaned_data.get("valor_km")
+            observacao = form.cleaned_data.get("observacao")
 
             # Linha totalmente vazia → ignora
-            if not any([data, origem, destino]):
+            if not form.instance.pk and not any(
+                [data, origem, destino, km, valor_km, observacao]
+            ):
                 continue
+
+            if not data:
+                form.add_error("data", "Informe a data.")
+            if not origem:
+                form.add_error("origem", "Informe a origem.")
+            if not destino:
+                form.add_error("destino", "Informe o destino.")
+            if km is None:
+                form.add_error("km", "Informe o KM.")
+            elif km <= 0:
+                form.add_error("km", "KM deve ser maior que zero.")
+            if valor_km is None:
+                form.add_error("valor_km", "Informe o valor por KM.")
 
             # Data fora do período
             if data and relatorio and relatorio.data_inicio and relatorio.data_fim:

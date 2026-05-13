@@ -1,6 +1,7 @@
 <tr class="linha-trecho"
     id="linha-trecho-nova-{{ idx }}"
-    data-form-index="{{ idx }}">
+    data-form-index="{{ idx }}"
+    {% if form.instance.pk %}data-pk="{{ form.instance.pk }}"{% endif %}>
   <td class="p-1 px-3 pt-3">
     <input type="hidden"
            name="trechos-{{ idx }}-id"
@@ -13,7 +14,8 @@
     <div class="d-none">
       <input type="checkbox"
              name="trechos-{{ idx }}-DELETE"
-             id="id_trechos-{{ idx }}-DELETE">
+             id="id_trechos-{{ idx }}-DELETE"
+             {% if form.DELETE.value %}checked{% endif %}>
     </div>
     <input type="date"
            name="trechos-{{ idx }}-data"
@@ -68,7 +70,7 @@
         class="form-control form-control-sm campo-vkm"
         oninput="calcularTrechoKm(this); recalcular(); validarKmGlobal();">
   <!-- aviso -->
-  <div class="text-warning small aviso-km"></div>
+  <div class="text-warning small aviso-inline"></div>
   <div class="invalid-feedback d-block small erro-inline"></div>
 </td>
   <td class="p-1 px-3 pt-4 fw-bold small total-trecho text-start">R$ 0,00</td>

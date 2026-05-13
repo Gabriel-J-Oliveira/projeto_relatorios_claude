@@ -285,17 +285,6 @@ class RelatorioTecnico(models.Model):
         verbose_name="Equipe adicional",
     )
 
-    STATUS_CHOICES = [
-        ("rascunho", "Rascunho"),
-        ("enviado", "Enviado"),
-    ]
-
-    status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        default="rascunho",
-    )
-
     # Atendimento
     cidade_atendimento = models.CharField("Cidade de atendimento", max_length=100)
     uf_atendimento = models.CharField(
@@ -563,16 +552,13 @@ class TrechoKm(models.Model):
                 )
 
     @property
-    def valor_km_padrao(self):
-        if self.relatorio and self.relatorio.cliente:
-            return self.relatorio.cliente.valor_km_padrao
-        return None
-
-    @property
     def km_fora_politica(self):
-        if self.valor_km_padrao is None:
+        valor_km_cliente = None
+        if self.relatorio and self.relatorio.cliente:
+            valor_km_cliente = self.relatorio.cliente.valor_km
+        if valor_km_cliente is None:
             return False
-        return self.valor_km != self.valor_km_padrao
+        return self.valor_km != valor_km_cliente
 
 
 # ─────────────────────────────────────────────────────────────────

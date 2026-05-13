@@ -15,7 +15,9 @@ const html = document.documentElement;
 
 const savedTheme = localStorage.getItem('theme') || 'light';
 html.setAttribute('data-bs-theme', savedTheme);
-themeIcon.className = savedTheme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill';
+if (themeIcon) {
+  themeIcon.className = savedTheme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill';
+}
 
 if (themeToggle) {
   themeToggle.addEventListener('click', () => {
@@ -23,7 +25,9 @@ if (themeToggle) {
     const next = current === 'dark' ? 'light' : 'dark';
     html.setAttribute('data-bs-theme', next);
     localStorage.setItem('theme', next);
-    themeIcon.className = next === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill';
+    if (themeIcon) {
+      themeIcon.className = next === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill';
+    }
   });
 }
 
@@ -33,11 +37,11 @@ document.addEventListener("DOMContentLoaded", function () {
   const form = document.getElementById("form-relatorio");
   const btnEnviar = document.getElementById("btn-enviar-relatorio");
   const confirmar = document.getElementById("confirmar-envio-sem-comprovante");
-  const modal = new bootstrap.Modal(
-    document.getElementById("modalSemComprovante")
-  );
+  const modalEl = document.getElementById("modalSemComprovante");
 
-  if (!form || !btnEnviar) return;
+  if (!form || !btnEnviar || !confirmar || !modalEl) return;
+
+  const modal = new bootstrap.Modal(modalEl);
 
 
   function faltamComprovantes() {

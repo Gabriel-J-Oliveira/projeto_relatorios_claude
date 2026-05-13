@@ -1,11 +1,9 @@
 import logging
-import datetime
 from decimal import Decimal
 
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Q, Sum
-from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 from django.views.generic import ListView, TemplateView
@@ -13,12 +11,9 @@ from django.views.generic import ListView, TemplateView
 from .models import (
     Adiantamento,
     Cliente,
-    ItemDespesa,
-    PoliticaValor,
     RelatorioTecnico,
     StatusRelatorio,
     Tecnico,
-    TrechoKm,
 )
 from .forms import (
     AdiantamentoForm,
@@ -74,7 +69,7 @@ def _form_has_content(form) -> bool:
     values = [
         v
         for k, v in form.cleaned_data.items()
-        if k not in {"DELETE", "id", "relatorio"}
+        if k not in {"DELETE", "id", "relatorio", "ordem", "quem_pagou"}
     ]
     return any(v not in (None, "", [], ()) for v in values)
 
@@ -96,6 +91,122 @@ def _sync_equipe(relatorio, tecnicos_apoio):
 # ─────────────────────────────────────────────
 # DASHBOARD
 # ─────────────────────────────────────────────
+
+
+def _formatar_data(data):
+    return data.strftime("%d/%m/%Y") if data else "-"
+
+
+def _avisos_financeiro(relatorio):
+    avisos = []
+    despesas = list(relatorio.despesas.all())
+    trechos = list(relatorio.trechos.all())
+
+    despesas_por_data = {}
+    despesas_duplicadas = {}
+    despesas_sem_comprovante = []
+
+    for idx, despesa in enumerate(despesas, start=1):
+        linha_id = f"linha-despesa-{idx}"
+        descricao = (despesa.descricao or "").strip()
+        observacoes = (despesa.observacoes or "").strip()
+
+        if descricao and len(descricao) < 4:
+            avisos.append(
+                {
+                    "tipo": "descricao_curta",
+                    "mensagem": f"Verificar item {idx}: descrição pode não ter sido preenchida corretamente.",
+                    "linha_id": linha_id,
+                    "icone": "bi-pencil-square",
+                }
+            )
+
+        if despesa.tipo == "alimentacao" and despesa.data:
+            despesas_por_data.setdefault(despesa.data, []).append((idx, despesa))
+
+        if despesa.valor and despesa.valor > Decimal("300.00") and not observacoes:
+            avisos.append(
+                {
+                    "tipo": "despesa_alta_sem_observacao",
+                    "mensagem": "Despesa alta sem detalhamento em observações.",
+                    "linha_id": linha_id,
+                    "icone": "bi-cash-coin",
+                }
+            )
+
+        if not despesa.comprovante:
+            despesas_sem_comprovante.append((idx, despesa))
+
+        chave_duplicada = (despesa.data, despesa.tipo, despesa.valor)
+        despesas_duplicadas.setdefault(chave_duplicada, []).append((idx, despesa))
+
+    for data, itens in despesas_por_data.items():
+        if len(itens) >= 4:
+            ultimo_idx = itens[-1][0]
+            avisos.append(
+                {
+                    "tipo": "muitas_refeicoes",
+                    "mensagem": f"O usuário incluiu {len(itens)} refeições na data {_formatar_data(data)}.",
+                    "linha_id": f"linha-despesa-{ultimo_idx}",
+                    "icone": "bi-cup-hot",
+                }
+            )
+
+    if despesas_sem_comprovante:
+        primeiro_idx = despesas_sem_comprovante[0][0]
+        avisos.append(
+            {
+                "tipo": "falta_comprovante",
+                "mensagem": f"{len(despesas_sem_comprovante)} despesas foram enviadas sem comprovante.",
+                "linha_id": f"linha-despesa-{primeiro_idx}",
+                "icone": "bi-paperclip",
+            }
+        )
+
+    for itens in despesas_duplicadas.values():
+        if len(itens) >= 2:
+            segundo_idx = itens[1][0]
+            avisos.append(
+                {
+                    "tipo": "despesa_duplicada",
+                    "mensagem": "Possível despesa duplicada encontrada.",
+                    "linha_id": f"linha-despesa-{segundo_idx}",
+                    "icone": "bi-files",
+                }
+            )
+
+    trechos_por_data = {}
+    valor_km_padrao = relatorio.cliente.valor_km if relatorio.cliente_id else None
+
+    for idx, trecho in enumerate(trechos, start=1):
+        linha_id = f"linha-trecho-{idx}"
+
+        if trecho.data:
+            trechos_por_data.setdefault(trecho.data, []).append((idx, trecho))
+
+        if valor_km_padrao and trecho.valor_km != valor_km_padrao:
+            avisos.append(
+                {
+                    "tipo": "valor_km_divergente",
+                    "mensagem": f"Verificar trecho {idx}: valor KM diferente do padrão do cliente.",
+                    "linha_id": linha_id,
+                    "icone": "bi-speedometer2",
+                }
+            )
+
+    for data, itens in trechos_por_data.items():
+        if len(itens) >= 5:
+            ultimo_idx = itens[-1][0]
+            avisos.append(
+                {
+                    "tipo": "muitos_deslocamentos",
+                    "mensagem": f"O usuário incluiu muitos deslocamentos na data {_formatar_data(data)}.",
+                    "linha_id": f"linha-trecho-{ultimo_idx}",
+                    "icone": "bi-geo-alt",
+                }
+            )
+
+    return avisos
 
 
 class DashboardView(TemplateView):
@@ -396,20 +507,26 @@ def relatorio_form_view(request, pk=None):
                         _sync_equipe(relatorio, tecnicos_apoio)
 
                         fs_desp.instance = relatorio
-                        itens_salvos = fs_desp.save(commit=False)
-                        for item in itens_salvos:
+                        for f in fs_desp.forms:
+                            if not _form_has_content(f):
+                                continue
+                            item = f.save(commit=False)
                             item.relatorio = relatorio
                             item.save()
-                        for obj in fs_desp.deleted_objects:
-                            obj.delete()
+                        for f in fs_desp.deleted_forms:
+                            if f.instance.pk:
+                                f.instance.delete()
 
                         fs_km.instance = relatorio
-                        trechos_salvos = fs_km.save(commit=False)
-                        for trecho in trechos_salvos:
+                        for f in fs_km.forms:
+                            if not _form_has_content(f):
+                                continue
+                            trecho = f.save(commit=False)
                             trecho.relatorio = relatorio
                             trecho.save()
-                        for obj in fs_km.deleted_objects:
-                            obj.delete()
+                        for f in fs_km.deleted_forms:
+                            if f.instance.pk:
+                                f.instance.delete()
 
                         logger.info(
                             "Relatório %s salvo (pk=%s, status=%s, acao=%s).",
@@ -605,6 +722,7 @@ def relatorio_detail_view(request, pk):
         "relatorios/relatorio_detail.html",
         {
             "relatorio": relatorio,
+            "avisos_financeiro": _avisos_financeiro(relatorio),
             "titulo_pagina": f"Relatório {relatorio.numero}",
         },
     )

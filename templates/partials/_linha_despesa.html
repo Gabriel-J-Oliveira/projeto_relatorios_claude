@@ -1,6 +1,7 @@
 <tr class="linha-despesa"
     id="linha-despesa-nova-{{ idx }}"
-    data-form-index="{{ idx }}">
+    data-form-index="{{ idx }}"
+    {% if form.instance.pk %}data-pk="{{ form.instance.pk }}"{% endif %}>
   <td class="p-1 px-3 pt-3 col-md-1">
     <input type="hidden"
            name="despesas-{{ idx }}-id"
@@ -13,7 +14,8 @@
     <div class="d-none">
       <input type="checkbox"
              name="despesas-{{ idx }}-DELETE"
-             id="id_despesas-{{ idx }}-DELETE">
+             id="id_despesas-{{ idx }}-DELETE"
+             {% if form.DELETE.value %}checked{% endif %}>
     </div>
     <input type="date"
            name="despesas-{{ idx }}-data"
@@ -73,6 +75,14 @@
     </select>
   </td>
   <td class="p-1 text-center text-nowrap col-md-3 pt-3">
+    {% if form.instance.comprovante %}
+      <a href="{{ form.instance.comprovante.url }}"
+         target="_blank"
+         class="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1 px-2 py-1 mb-1">
+        <i class="bi bi-file-earmark-check small"></i>
+        Atual
+      </a>
+    {% endif %}
     <label class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 px-2 py-1 mb-0 cursor-pointer">
       <i class="bi bi-paperclip small"></i>
       <input type="file"

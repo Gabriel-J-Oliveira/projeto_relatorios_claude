@@ -76,9 +76,9 @@
             <th class="ps-4 py-3 fw-semibold text-muted small">Número</th>
             <th class="py-3 fw-semibold text-muted small">Cliente</th>
             <th class="py-3 fw-semibold text-muted small">Técnico</th>
-            <th class="py-3 fw-semibold text-muted small">Data</th>
-            <th class="py-3 fw-semibold text-muted small">Horas</th>
-            <th class="py-3 fw-semibold text-muted small">Despesas</th>
+            <th class="py-3 fw-semibold text-muted small">Período</th>
+            <th class="py-3 fw-semibold text-muted small">KM</th>
+            <th class="py-3 fw-semibold text-muted small">Total</th>
             <th class="py-3 fw-semibold text-muted small">Status</th>
             <th class="py-3 fw-semibold text-muted small text-end pe-4">Ações</th>
           </tr>
@@ -96,15 +96,24 @@
               <div class="small fw-medium">{{ r.cliente.nome }}</div>
               <div class="text-muted" style="font-size:.78rem;">{{ r.cidade_atendimento }}</div>
             </td>
-            <td class="small">{{ r.tecnico.nome }}</td>
-            <td class="small text-muted">{{ r.data_atendimento|date:"d/m/Y" }}</td>
-            <td class="small">{{ r.horas_trabalhadas }}h</td>
-            <td class="small">R$ {{ r.valor_despesas }}</td>
+            <td class="small">{{ r.tecnico_responsavel.nome }}</td>
+            <td class="small text-muted">
+              {{ r.data_inicio|date:"d/m/Y" }}
+              {% if r.data_inicio != r.data_fim %} a {{ r.data_fim|date:"d/m/Y" }}{% endif %}
+            </td>
+            <td class="small">{{ r.total_km_percorrido }} km</td>
+            <td class="small">R$ {{ r.total_despesas }}</td>
             <td>
               {% if r.status == 'pendente' %}
                 <span class="badge bg-warning-subtle text-warning rounded-pill px-3">Pendente</span>
+              {% elif r.status == 'rascunho' %}
+                <span class="badge bg-secondary-subtle text-secondary rounded-pill px-3">Rascunho</span>
+              {% elif r.status == 'aprovado' %}
+                <span class="badge bg-success-subtle text-success rounded-pill px-3">Aprovado</span>
+              {% elif r.status == 'rejeitado' %}
+                <span class="badge bg-danger-subtle text-danger rounded-pill px-3">Rejeitado</span>
               {% elif r.status == 'fechado' %}
-                <span class="badge bg-success-subtle text-success rounded-pill px-3">Fechado</span>
+                <span class="badge bg-info-subtle text-info rounded-pill px-3">Fechado</span>
               {% else %}
                 <span class="badge bg-info-subtle text-info rounded-pill px-3">Faturado</span>
               {% endif %}
