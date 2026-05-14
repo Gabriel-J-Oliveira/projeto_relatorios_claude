@@ -100,6 +100,13 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         ]
         widgets = {
             # Instanciado SEM clientes_map — será injetado no __init__
+            "numero": forms.TextInput(
+                attrs={
+                    "class": "form-control form-control-sm",
+                    "inputmode": "numeric",
+                    "readonly": "readonly",
+                }
+            ),
             "cliente": ClienteSelectWithData(
                 attrs={"class": "form-select form-select-sm"}
             ),
@@ -120,6 +127,7 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        numero_sugerido = kwargs.pop("numero_sugerido", None)
         super().__init__(*args, **kwargs)
 
         qs_clientes = Cliente.objects.filter(ativo=True).order_by("nome")
@@ -132,7 +140,12 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         self.fields["tecnico_responsavel"].queryset = Tecnico.objects.filter(
             ativo=True
         ).order_by("nome")
-        self.fields["numero"].widget.attrs["placeholder"] = "Ex: RT-2024-001"
+        self.fields["numero"].required = False
+        self.fields["numero"].disabled = True
+        self.fields["numero"].widget.attrs["placeholder"] = "Gerado automaticamente"
+        self.fields["numero"].help_text = "Gerado automaticamente ao salvar."
+        if not self.instance.pk and numero_sugerido:
+            self.fields["numero"].initial = numero_sugerido
         self.fields["centro_custo"].widget.attrs[
             "placeholder"
         ] = "Ex: Manutenção, Instalação, Comercial..."
@@ -143,10 +156,14 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
             )
 
     def clean_numero(self):
-        numero = self.cleaned_data.get("numero", "").strip().upper()
-        qs = RelatorioTecnico.objects.filter(numero=numero)
         if self.instance.pk:
-            qs = qs.exclude(pk=self.instance.pk)
+            return self.instance.numero
+
+        numero = str(self.cleaned_data.get("numero") or "").strip()
+        if not numero:
+            return numero
+
+        qs = RelatorioTecnico.objects.filter(numero=numero)
         if qs.exists():
             raise forms.ValidationError("Número já cadastrado.")
         return numero

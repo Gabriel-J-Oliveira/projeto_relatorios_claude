@@ -1,3 +1,4 @@
+{% load l10n %}
 <tr class="linha-trecho"
     id="linha-trecho-nova-{{ idx }}"
     data-form-index="{{ idx }}"
@@ -20,7 +21,7 @@
     <input type="date"
            name="trechos-{{ idx }}-data"
            id="id_trechos-{{ idx }}-data"
-           value="{{ form.data.value|default:'' }}"
+           value="{% if form.data.value %}{{ form.data.value|date:'Y-m-d'|default:form.data.value }}{% endif %}"
            class="form-control form-control-sm {% if form.data.errors %}is-invalid{% endif %}">
     <div class="invalid-feedback d-block small erro-inline">
       {% if form.data.errors %}{{ form.data.errors.0 }}{% endif %}
@@ -54,7 +55,7 @@
            step="0.1"
            name="trechos-{{ idx }}-km"
            id="id_trechos-{{ idx }}-km"
-           value="{{ form.km.value|default:'' }}"
+           value="{{ form.km.value|default:''|unlocalize }}"
            class="form-control form-control-sm campo-km {% if form.km.errors %}is-invalid{% endif %}"
            oninput="calcularTrechoKm(this); recalcular(); validarKmGlobal();">
     <div class="invalid-feedback d-block small erro-inline">
@@ -66,12 +67,14 @@
         step="0.0001"
         name="trechos-{{ idx }}-valor_km"
         id="id_trechos-{{ idx }}-valor_km"
-        value="{{ form.valor_km.value|default:'' }}"
-        class="form-control form-control-sm campo-vkm"
+        value="{{ form.valor_km.value|default:''|unlocalize }}"
+        class="form-control form-control-sm campo-vkm {% if form.valor_km.errors %}is-invalid{% endif %}"
         oninput="calcularTrechoKm(this); recalcular(); validarKmGlobal();">
   <!-- aviso -->
   <div class="text-warning small aviso-inline"></div>
-  <div class="invalid-feedback d-block small erro-inline"></div>
+  <div class="invalid-feedback d-block small erro-inline">
+    {% if form.valor_km.errors %}{{ form.valor_km.errors.0 }}{% endif %}
+  </div>
 </td>
   <td class="p-1 px-3 pt-4 fw-bold small total-trecho text-start">R$ 0,00</td>
   <td class="p-1 pt-3">

@@ -102,7 +102,7 @@
               {% if r.data_inicio != r.data_fim %} a {{ r.data_fim|date:"d/m/Y" }}{% endif %}
             </td>
             <td class="small">{{ r.total_km_percorrido }} km</td>
-            <td class="small">R$ {{ r.total_despesas }}</td>
+            <td class="small">R$ {{ r.total_despesas|floatformat:2 }}</td>
             <td>
               {% if r.status == 'pendente' %}
                 <span class="badge bg-warning-subtle text-warning rounded-pill px-3">Pendente</span>
@@ -124,14 +124,23 @@
                    class="btn btn-sm btn-outline-secondary" title="Ver">
                   <i class="bi bi-eye"></i>
                 </a>
-                <a href="{% url 'relatorios:relatorio_update' r.pk %}"
-                   class="btn btn-sm btn-outline-primary" title="Editar">
-                  <i class="bi bi-pencil"></i>
-                </a>
-                <a href="{% url 'relatorios:relatorio_delete' r.pk %}"
-                   class="btn btn-sm btn-outline-danger" title="Excluir">
-                  <i class="bi bi-trash"></i>
-                </a>
+                <form method="post" action="{% url 'relatorios:relatorio_duplicate' r.pk %}" class="d-inline">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-outline-secondary btn-sm" title="Duplicar">
+                    <i class="bi bi-files"></i>
+                    <span class="ms-1"></span>
+                  </button>
+                </form>
+                {% if r.status != 'aprovado' and r.status != 'faturado' %}
+                  <a href="{% url 'relatorios:relatorio_update' r.pk %}"
+                     class="btn btn-sm btn-outline-primary" title="Editar">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                  <a href="{% url 'relatorios:relatorio_delete' r.pk %}"
+                     class="btn btn-sm btn-outline-danger" title="Excluir">
+                    <i class="bi bi-trash"></i>
+                  </a>
+                {% endif %}
               </div>
             </td>
           </tr>

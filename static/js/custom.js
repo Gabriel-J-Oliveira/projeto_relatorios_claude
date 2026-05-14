@@ -272,6 +272,25 @@ function linhasAtivas(selector) {
     .filter(l => !linhaRemovida(l));
 }
 
+function linhaTemConteudo(linha) {
+  if (!linha || linhaRemovida(linha)) return false;
+
+  const campos = Array.from(
+    linha.querySelectorAll("input, select, textarea")
+  ).filter(campo =>
+    campo.name &&
+    !campo.name.endsWith("-id") &&
+    !campo.name.endsWith("-ordem") &&
+    !campo.name.endsWith("-DELETE") &&
+    !campo.name.endsWith("-quem_pagou")
+  );
+
+  return campos.some(campo => {
+    if (campo.type === "file") return campo.files && campo.files.length > 0;
+    return Boolean(String(campo.value || "").trim());
+  });
+}
+
 
 /* ============================================================
    4. VALIDADORES INDIVIDUAIS
@@ -331,6 +350,15 @@ const Validators = {
     const v = campo.value?.trim();
     if (v && v.length < 4) {
       return { ok: false, msg: "Descrição pouco detalhada." };
+    }
+    return { ok: true };
+  },
+
+  descricaoObrigatoria(campo) {
+    const linha = campo.closest(".linha-despesa");
+    if (!linhaTemConteudo(linha)) return { ok: true };
+    if (!campo.value?.trim()) {
+      return { ok: false, msg: "Informe a descrição." };
     }
     return { ok: true };
   },
@@ -504,6 +532,14 @@ const FieldRules = [
   },
 
   {
+    test: c => c.name?.includes("-descricao"),
+    run(campo) {
+      const r = Validators.descricaoObrigatoria(campo);
+      r.ok ? UI.clearError(campo) : UI.setError(campo, r.msg);
+    },
+  },
+
+  {
     // Tipo obrigatório (select de despesas)
     test: c => c.tagName === "SELECT" && c.name?.includes("-tipo"),
     run(campo) {
@@ -624,8 +660,12 @@ function atualizarBadgesAbas() {
   const badgeKm = document.getElementById("badge-km");
 
   if (badgeDesp) {
-    const erros = document.querySelectorAll("#corpo-despesas .is-invalid").length;
-    const total = document.querySelectorAll("#corpo-despesas .linha-despesa").length;
+    const linhas = linhasAtivas("#corpo-despesas .linha-despesa");
+    const erros = linhas.reduce(
+      (total, linha) => total + linha.querySelectorAll(".is-invalid").length,
+      0
+    );
+    const total = linhas.length;
     badgeDesp.className = erros > 0
       ? "badge bg-danger rounded-pill ms-1"
       : "badge bg-primary rounded-pill ms-1";
@@ -633,8 +673,12 @@ function atualizarBadgesAbas() {
   }
 
   if (badgeKm) {
-    const erros = document.querySelectorAll("#corpo-trechos .is-invalid").length;
-    const total = document.querySelectorAll("#corpo-trechos .linha-trecho").length;
+    const linhas = linhasAtivas("#corpo-trechos .linha-trecho");
+    const erros = linhas.reduce(
+      (total, linha) => total + linha.querySelectorAll(".is-invalid").length,
+      0
+    );
+    const total = linhas.length;
     badgeKm.className = erros > 0
       ? "badge bg-danger rounded-pill ms-1"
       : "badge bg-secondary rounded-pill ms-1";
@@ -713,15 +757,26 @@ const Controller = (() => {
     }, true);
 
     form.addEventListener("submit", function (e) {
+      linhasAtivas(".linha-despesa, .linha-trecho").forEach(linha => {
+        if (!linhaTemConteudo(linha)) return;
+        linha.querySelectorAll("input, select, textarea").forEach(campo => {
+          FormState.touch(campo);
+          validarCampo(campo);
+        });
+      });
+
       GroupValidators.runAll();
 
-      const temErro = document.querySelectorAll(".is-invalid").length > 0;
+      const temErro = linhasAtivas(".linha-despesa, .linha-trecho")
+        .some(linha => linha.querySelector(".is-invalid"));
 
       if (temErro) {
         e.preventDefault();
         alert("Existem erros no formulário.");
 
-        const primeiroErro = document.querySelector(".is-invalid");
+        const primeiraLinhaComErro = linhasAtivas(".linha-despesa, .linha-trecho")
+          .find(linha => linha.querySelector(".is-invalid"));
+        const primeiroErro = primeiraLinhaComErro?.querySelector(".is-invalid");
         if (primeiroErro) primeiroErro.focus();
       }
     });

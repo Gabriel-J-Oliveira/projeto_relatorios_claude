@@ -7,9 +7,14 @@ Mudanças:
 """
 
 from django.db import models
+from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
 from decimal import Decimal
+
+
+def _valor_monetario(valor):
+    return (valor or Decimal("0.00")).quantize(Decimal("0.01"))
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -321,6 +326,15 @@ class RelatorioTecnico(models.Model):
     )
 
     observacoes = models.TextField("Observações gerais", blank=True)
+    aprovado_em = models.DateTimeField("Aprovado em", null=True, blank=True)
+    aprovado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="relatorios_aprovados",
+        verbose_name="Aprovado por",
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
@@ -336,29 +350,36 @@ class RelatorioTecnico(models.Model):
 
     @property
     def total_despesas_tecnico(self):
-        return self.despesas.filter(quem_pagou=QuemPagou.TECNICO).aggregate(
+        total = self.despesas.filter(quem_pagou=QuemPagou.TECNICO).aggregate(
             t=models.Sum("valor")
         )["t"] or Decimal("0.00")
+        return _valor_monetario(total)
 
     @property
     def total_despesas_empresa(self):
-        return self.despesas.filter(quem_pagou=QuemPagou.EMPRESA).aggregate(
+        total = self.despesas.filter(quem_pagou=QuemPagou.EMPRESA).aggregate(
             t=models.Sum("valor")
         )["t"] or Decimal("0.00")
+        return _valor_monetario(total)
 
     @property
     def total_km(self):
-        return self.trechos.aggregate(t=models.Sum("valor_calculado"))["t"] or Decimal(
+        total = self.trechos.aggregate(t=models.Sum("valor_calculado"))["t"] or Decimal(
             "0.00"
         )
+        return _valor_monetario(total)
 
     @property
     def total_despesas(self):
-        return self.total_despesas_tecnico + self.total_despesas_empresa + self.total_km
+        return _valor_monetario(
+            self.total_despesas_tecnico + self.total_despesas_empresa + self.total_km
+        )
 
     @property
     def saldo(self):
-        return self.total_despesas_tecnico + self.total_km - self.valor_adiantamento
+        return _valor_monetario(
+            self.total_despesas_tecnico + self.total_km - self.valor_adiantamento
+        )
 
     @property
     def total_km_percorrido(self):
@@ -432,7 +453,7 @@ class ItemDespesa(models.Model):
         related_name="despesas",
     )
     ordem = models.PositiveSmallIntegerField("Ordem", default=0)
-    data = models.DateField("Data")
+    data = models.DateField("Data", null=True, blank=True)
     tipo = models.CharField(
         "Tipo",
         max_length=20,
@@ -444,6 +465,13 @@ class ItemDespesa(models.Model):
         max_digits=10,
         decimal_places=2,
         validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    valor_aprovado = models.DecimalField(
+        "Valor aprovado (R$)",
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
     )
     quem_pagou = models.CharField(
         "Quem pagou",
@@ -500,7 +528,7 @@ class TrechoKm(models.Model):
         related_name="trechos",
     )
     ordem = models.PositiveSmallIntegerField("Ordem", default=0)
-    data = models.DateField("Data")
+    data = models.DateField("Data", null=True, blank=True)
     origem = models.CharField("Origem", max_length=150)
     destino = models.CharField("Destino", max_length=150)
     km = models.DecimalField(
@@ -514,6 +542,13 @@ class TrechoKm(models.Model):
         max_digits=6,
         decimal_places=4,
         default=Decimal("0.00"),
+    )
+    valor_km_aprovado = models.DecimalField(
+        "Valor por km aprovado (R$)",
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
     )
     valor_calculado = models.DecimalField(
         "Valor calculado (R$)",

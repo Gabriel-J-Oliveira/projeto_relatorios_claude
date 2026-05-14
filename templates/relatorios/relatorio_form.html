@@ -23,9 +23,20 @@
             <i class="bi bi-file-earmark-text text-primary fs-5"></i>
             <h6 class="mb-0 fw-semibold">{{ titulo_pagina }}</h6>
           </div>
-          <span class="badge bg-{{ form.instance.status_badge_cor|default:'secondary' }}">
-            {{ form.instance.get_status_display|default:"Rascunho" }}
-          </span>
+          <div class="d-flex align-items-center gap-2">
+            {% if not instance %}
+              <button type="button"
+                      class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1"
+                      data-bs-toggle="modal"
+                      data-bs-target="#modalImportarRelatorio">
+                <i class="bi bi-download"></i>
+                Importar dados de relatório antigo
+              </button>
+            {% endif %}
+            <span class="badge bg-{{ form.instance.status_badge_cor|default:'secondary' }}">
+              {{ form.instance.get_status_display|default:"Rascunho" }}
+            </span>
+          </div>
         </div>
 
         <div class="card-body py-4 px-4">
@@ -144,8 +155,9 @@
                 <div class="row g-3">
                   {# Número / Status #}
                   <div class="col-md-4">
-                    <label class="form-label fw-medium small text-muted">Número *</label>
+                    <label class="form-label fw-medium small text-muted">Número</label>
                     {{ form.numero }}
+                    <div class="form-text small">Gerado automaticamente ao salvar.</div>
                     {% if form.numero.errors %}
                       <div class="text-danger small mt-1">{{ form.numero.errors.0 }}</div>
                     {% endif %}
@@ -364,7 +376,7 @@
 
                     <span class="small text-muted mb-0">
                       Valor/KM padrão:
-                      <strong id="valor-km-ref">R$ {{ valor_km_padrao }}</strong>
+                      <strong id="valor-km-ref">R$ {{ valor_km_padrao|floatformat:2 }}</strong>
                     </span>
                   </div>
                 </div>
@@ -483,6 +495,129 @@
                 </button>
               </div>
 
+              <!-- Modal importação de relatório antigo -->
+              <div class="modal fade"
+                   id="modalImportarRelatorio"
+                   tabindex="-1"
+                   aria-hidden="true">
+                <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                  <div class="modal-content border-0 shadow">
+                    <div class="modal-header bg-light">
+                      <h5 class="modal-title">
+                        <i class="bi bi-download me-2 text-primary"></i>
+                        Importar dados de relatório antigo
+                      </h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                      <div class="row g-2 align-items-end mb-3">
+                        <div class="col-12 col-md-3">
+                          <label class="form-label small text-muted">Cliente</label>
+                          <select class="form-select form-select-sm" id="importar-filtro-cliente">
+                            <option value="">Todos</option>
+                            {% for cliente in clientes_importacao %}
+                              <option value="{{ cliente.pk }}">{{ cliente.nome }}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
+                        <div class="col-12 col-md-3">
+                          <label class="form-label small text-muted">Técnico</label>
+                          <select class="form-select form-select-sm" id="importar-filtro-tecnico">
+                            <option value="">Todos</option>
+                            {% for tecnico in tecnicos_importacao %}
+                              <option value="{{ tecnico.pk }}">{{ tecnico.nome }}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
+                        <div class="col-6 col-md-2">
+                          <label class="form-label small text-muted">De</label>
+                          <input type="date" class="form-control form-control-sm" id="importar-filtro-data-inicio">
+                        </div>
+                        <div class="col-6 col-md-2">
+                          <label class="form-label small text-muted">Até</label>
+                          <input type="date" class="form-control form-control-sm" id="importar-filtro-data-fim">
+                        </div>
+                        <div class="col-12 col-md-2">
+                          <label class="form-label small text-muted">Busca</label>
+                          <div class="input-group input-group-sm">
+                            <input type="search" class="form-control" id="importar-filtro-busca" placeholder="Número, cliente...">
+                            <button type="button" class="btn btn-outline-primary" id="btn-buscar-importacao">
+                              <i class="bi bi-search"></i>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="table-responsive border rounded mb-3">
+                        <table class="table table-hover align-middle mb-0">
+                          <thead class="table-light">
+                            <tr>
+                              <th class="small text-muted">Data</th>
+                              <th class="small text-muted">Cliente</th>
+                              <th class="small text-muted">Técnico</th>
+                              <th class="small text-muted">Status</th>
+                              <th class="small text-muted">Valor total</th>
+                              <th class="small text-muted text-end">Ação</th>
+                            </tr>
+                          </thead>
+                          <tbody id="importar-relatorios-lista">
+                            <tr>
+                              <td colspan="6" class="text-center text-muted small py-4">
+                                Use os filtros para buscar relatórios.
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div id="importar-opcoes" class="border rounded p-3 d-none">
+                        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                          <div>
+                            <div class="fw-semibold small">Dados selecionados</div>
+                            <div class="text-muted small" id="importar-relatorio-selecionado"></div>
+                          </div>
+                        </div>
+                        <div class="row g-2">
+                          <div class="col-6 col-md">
+                            <div class="form-check">
+                              <input class="form-check-input" type="checkbox" id="importar-cliente" checked>
+                              <label class="form-check-label small" for="importar-cliente">Cliente</label>
+                            </div>
+                          </div>
+                          <div class="col-6 col-md">
+                            <div class="form-check">
+                              <input class="form-check-input" type="checkbox" id="importar-tecnico" checked>
+                              <label class="form-check-label small" for="importar-tecnico">Técnico</label>
+                            </div>
+                          </div>
+                          <div class="col-6 col-md">
+                            <div class="form-check">
+                              <input class="form-check-input" type="checkbox" id="importar-apoio" checked>
+                              <label class="form-check-label small" for="importar-apoio">Apoio</label>
+                            </div>
+                          </div>
+                          <div class="col-6 col-md">
+                            <div class="form-check">
+                              <input class="form-check-input" type="checkbox" id="importar-despesas" checked>
+                              <label class="form-check-label small" for="importar-despesas">Despesas</label>
+                            </div>
+                          </div>
+                          <div class="col-6 col-md">
+                            <div class="form-check">
+                              <input class="form-check-input" type="checkbox" id="importar-trechos" checked>
+                              <label class="form-check-label small" for="importar-trechos">Deslocamentos</label>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <!-- Modal confirmação sem comprovante -->
               <div class="modal fade"
                    id="modalSemComprovante"
@@ -542,6 +677,9 @@
      ═══════════════════════════════════════════════════════════════ */
   const URL_NOVA_LINHA_DESPESA = "{% url 'relatorios:nova_linha_despesa' %}";
   const URL_NOVA_LINHA_KM = "{% url 'relatorios:nova_linha_km' %}";
+  const URL_IMPORTAR_RELATORIOS = "{% url 'relatorios:relatorio_import_list' %}";
+  const URL_IMPORTAR_DETALHE_BASE = "{% url 'relatorios:relatorio_import_detail' 0 %}";
+  const RELATORIO_ATUAL_ID = "{{ instance.pk|default:'' }}";
 
   // ── Contadores de índice (nunca reutilizados) ──────────────────
   let _idxDesp = {{ fs_desp.total_form_count }};
@@ -551,6 +689,175 @@
   const PREFIX_DESP = "despesas";
   const PREFIX_KM = "trechos";
   const VKM_PADRAO = "{{ valor_km_padrao }}";
+
+  function linhaEstaRemovida(linha) {
+    return (
+      linha?.classList.contains("linha-removida") ||
+      linha?.style.display === "none" ||
+      linha?.querySelector('[name$="-DELETE"]')?.checked
+    );
+  }
+
+  function linhasAtivasFormulario(selector) {
+    return Array.from(document.querySelectorAll(selector))
+      .filter(linha => !linhaEstaRemovida(linha));
+  }
+
+  function normalizarNumero(valor) {
+    const texto = String(valor || "").trim();
+    if (!texto) return 0;
+    const normalizado = texto.includes(",")
+      ? texto.replace(/\./g, "").replace(",", ".")
+      : texto;
+    const numero = parseFloat(normalizado);
+    return Number.isFinite(numero) ? numero : 0;
+  }
+
+  let relatorioImportacaoSelecionado = null;
+
+  function urlDetalheImportacao(id) {
+    return URL_IMPORTAR_DETALHE_BASE.replace("/0/", `/${id}/`);
+  }
+
+  function campoPorNome(nome) {
+    return document.querySelector(`[name="${nome}"]`);
+  }
+
+  function definirValorCampo(campo, valor) {
+    if (!campo) return;
+    campo.value = valor ?? "";
+    campo.dispatchEvent(new Event("input", { bubbles: true }));
+    campo.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  function definirMultiselect(campo, valores) {
+    if (!campo) return;
+    const selecionados = new Set((valores || []).map(String));
+    Array.from(campo.options).forEach(option => {
+      option.selected = selecionados.has(option.value);
+    });
+    campo.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  function definirCampoLinha(linha, sufixo, valor) {
+    definirValorCampo(linha?.querySelector(`[name$="-${sufixo}"]`), valor);
+  }
+
+  async function buscarRelatoriosImportacao() {
+    const params = new URLSearchParams();
+    const filtros = {
+      cliente: document.getElementById("importar-filtro-cliente")?.value,
+      tecnico: document.getElementById("importar-filtro-tecnico")?.value,
+      data_inicio: document.getElementById("importar-filtro-data-inicio")?.value,
+      data_fim: document.getElementById("importar-filtro-data-fim")?.value,
+      busca: document.getElementById("importar-filtro-busca")?.value,
+      excluir: RELATORIO_ATUAL_ID,
+    };
+
+    Object.entries(filtros).forEach(([chave, valor]) => {
+      if (valor) params.set(chave, valor);
+    });
+
+    const corpo = document.getElementById("importar-relatorios-lista");
+    if (corpo) {
+      corpo.innerHTML = '<tr><td colspan="6" class="text-center text-muted small py-4">Buscando relatórios...</td></tr>';
+    }
+
+    const response = await fetch(`${URL_IMPORTAR_RELATORIOS}?${params.toString()}`);
+    if (!response.ok) throw new Error("Erro ao buscar relatórios.");
+    const data = await response.json();
+
+    if (!corpo) return;
+    if (!data.relatorios.length) {
+      corpo.innerHTML = '<tr><td colspan="6" class="text-center text-muted small py-4">Nenhum relatório encontrado.</td></tr>';
+      return;
+    }
+
+    corpo.innerHTML = data.relatorios.map(relatorio => `
+      <tr>
+        <td class="small text-muted">${relatorio.data}</td>
+        <td class="small">${relatorio.cliente}</td>
+        <td class="small">${relatorio.tecnico}</td>
+        <td><span class="badge bg-secondary-subtle text-secondary rounded-pill">${relatorio.status}</span></td>
+        <td class="small">${relatorio.total}</td>
+        <td class="text-end">
+          <button type="button"
+                  class="btn btn-outline-secondary btn-sm"
+                  data-importar-relatorio="${relatorio.id}">
+            Selecionar
+          </button>
+        </td>
+      </tr>
+    `).join("");
+  }
+
+  async function selecionarRelatorioImportacao(id) {
+    const response = await fetch(urlDetalheImportacao(id));
+    if (!response.ok) throw new Error("Erro ao carregar relatório selecionado.");
+    relatorioImportacaoSelecionado = await response.json();
+
+    document.getElementById("importar-opcoes")?.classList.remove("d-none");
+    const titulo = document.getElementById("importar-relatorio-selecionado");
+    if (titulo) {
+      titulo.textContent = `Relatório ${relatorioImportacaoSelecionado.numero}`;
+    }
+    await aplicarImportacaoRelatorio();
+  }
+
+  async function importarDespesasRelatorio(despesas) {
+    for (const despesa of despesas || []) {
+      const linha = await adicionarLinhaDespesa();
+      definirCampoLinha(linha, "tipo", despesa.tipo);
+      definirCampoLinha(linha, "descricao", despesa.descricao);
+      definirCampoLinha(linha, "valor", despesa.valor);
+      definirCampoLinha(linha, "observacoes", despesa.observacoes);
+      definirCampoLinha(linha, "quem_pagou", "tecnico");
+    }
+  }
+
+  async function importarTrechosRelatorio(trechos) {
+    for (const trecho of trechos || []) {
+      const linha = await adicionarLinhaKm();
+      definirCampoLinha(linha, "origem", trecho.origem);
+      definirCampoLinha(linha, "destino", trecho.destino);
+      definirCampoLinha(linha, "km", trecho.km);
+      definirCampoLinha(linha, "valor_km", trecho.valor_km);
+      const campoCalculo = linha?.querySelector(".campo-km") || linha?.querySelector(".campo-vkm");
+      if (campoCalculo) calcularTrechoKm(campoCalculo);
+    }
+  }
+
+  async function aplicarImportacaoRelatorio() {
+    if (!relatorioImportacaoSelecionado) return;
+    const dados = relatorioImportacaoSelecionado;
+
+    if (document.getElementById("importar-cliente")?.checked) {
+      definirValorCampo(campoPorNome("cliente"), dados.cliente_id);
+    }
+    if (document.getElementById("importar-tecnico")?.checked) {
+      definirValorCampo(campoPorNome("tecnico_responsavel"), dados.tecnico_id);
+    }
+    if (document.getElementById("importar-apoio")?.checked) {
+      definirMultiselect(campoPorNome("tecnicos_equipe"), dados.apoio_ids);
+    }
+    if (document.getElementById("importar-despesas")?.checked) {
+      await importarDespesasRelatorio(dados.despesas);
+    }
+    if (document.getElementById("importar-trechos")?.checked) {
+      await importarTrechosRelatorio(dados.trechos);
+    }
+
+    recalcular();
+    atualizarBadgesAbas();
+    validarKmGlobal();
+    if (typeof GroupValidators !== "undefined") {
+      GroupValidators.runAll();
+    }
+
+    const modalEl = document.getElementById("modalImportarRelatorio");
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    modal?.hide();
+  }
 
 
   // ── Clonar linha de DESPESA ────────────────────────────────────
@@ -568,16 +875,19 @@
 
     const html = await response.text();
 
-    document.getElementById("corpo-despesas")
-      .insertAdjacentHTML("beforeend", html);
+    const corpo = document.getElementById("corpo-despesas");
+    corpo.insertAdjacentHTML("beforeend", html);
+    const novaLinha = corpo.querySelector(".linha-despesa:last-child");
 
     _idxDesp++;
     atualizarTotalForms(PREFIX_DESP, _idxDesp);
     recalcular();
     atualizarBadgesAbas();
+    return novaLinha;
 
   } catch (error) {
     console.error(error);
+    return null;
   }
 }
 
@@ -608,7 +918,7 @@ async function adicionarLinhaKm() {
     const campoVkm = novaLinha?.querySelector('input[name$="-valor_km"]');
 
     if (campoVkm && !campoVkm.value) {
-      const valorPadrao = parseFloat(form.dataset.valorKmCliente);
+      const valorPadrao = normalizarNumero(form.dataset.valorKmCliente);
       if (valorPadrao) {
         campoVkm.value = valorPadrao.toFixed(2);
       }
@@ -618,12 +928,14 @@ async function adicionarLinhaKm() {
     _idxKm++;
     atualizarTotalForms(PREFIX_KM, _idxKm);
     recalcular();
+    atualizarBadgesAbas();
+    return novaLinha;
 
   } catch (error) {
     console.error(error);
+    return null;
   }
 
-  atualizarBadgesAbas();
 }
 
   // ── Remover linha ─────────────────────────────────────────────
@@ -633,7 +945,7 @@ async function adicionarLinhaKm() {
   const deleteFld = tr.querySelector("[name$='-DELETE']");
 
   // linha já salva (soft delete)
-  if (deleteFld && tr.dataset.pk) {
+  if (deleteFld) {
 
     deleteFld.checked = true;
     tr.classList.add("linha-removida"); // 🔥 importante
@@ -642,9 +954,6 @@ async function adicionarLinhaKm() {
   } else {
 
     tr.remove();
-
-    reindexarFormset("despesas", ".linha-despesa");
-    reindexarFormset("trechos", ".linha-trecho");
   }
 
   recalcular();
@@ -654,37 +963,6 @@ async function adicionarLinhaKm() {
   setTimeout(() => {
     GroupValidators.runAll();
   }, 0);
-}
-
-function reindexarFormset(prefix, selector){
-
-    const linhas = document.querySelectorAll(selector);
-
-    linhas.forEach((linha,index)=>{
-
-        linha.dataset.formIndex=index;
-
-        linha.querySelectorAll("[name]").forEach(el=>{
-
-            el.name = el.name.replace(
-                new RegExp(`${prefix}-\\d+-`),
-                `${prefix}-${index}-`
-            );
-
-        });
-
-        linha.querySelectorAll("[id]").forEach(el=>{
-
-            el.id = el.id.replace(
-                new RegExp(`id_${prefix}-\\d+-`),
-                `id_${prefix}-${index}-`
-            );
-
-        });
-
-    });
-
-    atualizarTotalForms(prefix, linhas.length);
 }
 
   // ── Atualiza TOTAL_FORMS do management form ───────────────────
@@ -697,8 +975,8 @@ function reindexarFormset(prefix, selector){
   // ── Cálculo do total de cada trecho KM ───────────────────────
   function calcularTrechoKm(input) {
     const tr = input.closest("tr");
-    const km = parseFloat(tr.querySelector(".campo-km")?.value) || 0;
-    const vkm = parseFloat(tr.querySelector(".campo-vkm")?.value) || 0;
+    const km = normalizarNumero(tr.querySelector(".campo-km")?.value);
+    const vkm = normalizarNumero(tr.querySelector(".campo-vkm")?.value);
     const cel = tr.querySelector(".total-trecho");
     if (cel) cel.textContent = "R$ " + (km * vkm).toFixed(2).replace(".", ",");
   }
@@ -710,8 +988,8 @@ function reindexarFormset(prefix, selector){
 
     // Despesas
     document.querySelectorAll(".linha-despesa").forEach(tr => {
-      if (tr.style.opacity === "0.3") return; // marcada para deleção
-      const val = parseFloat(tr.querySelector(".campo-valor-desp")?.value) || 0;
+      if (linhaEstaRemovida(tr)) return;
+      const val = normalizarNumero(tr.querySelector(".campo-valor-desp")?.value);
       const quem = tr.querySelector(".campo-quem-pagou")?.value || "tecnico";
       if (quem === "tecnico") totalTec += val;
       else totalEmp += val;
@@ -719,17 +997,17 @@ function reindexarFormset(prefix, selector){
 
     let totalKmPx = 0, totalKmKm = 0;
     document.querySelectorAll(".linha-trecho").forEach(tr => {
-      if (tr.style.opacity === "0.3") return;
-      const km = parseFloat(tr.querySelector(".campo-km")?.value) || 0;
-      const vkm = parseFloat(tr.querySelector(".campo-vkm")?.value) || 0;
+      if (linhaEstaRemovida(tr)) return;
+      const km = normalizarNumero(tr.querySelector(".campo-km")?.value);
+      const vkm = normalizarNumero(tr.querySelector(".campo-vkm")?.value);
       totalKmKm += km;
       totalKmPx += km * vkm;
     });
 
     const totalGeral = totalTec + totalEmp + totalKmPx;
-    const adiant = parseFloat(
+    const adiant = normalizarNumero(
       document.querySelector("[name='valor_adiantamento']")?.value
-    ) || 0;
+    );
     const saldo = totalTec + totalKmPx - adiant;
 
     // Rodapés das tabelas
@@ -764,12 +1042,8 @@ function reindexarFormset(prefix, selector){
     }
 
     // Badges das abas
-    const nDesp = document.querySelectorAll(
-      ".linha-despesa:not([style*='opacity: 0.3'])"
-    ).length;
-    const nKm = document.querySelectorAll(
-      ".linha-trecho:not([style*='opacity: 0.3'])"
-    ).length;
+    const nDesp = linhasAtivasFormulario(".linha-despesa").length;
+    const nKm = linhasAtivasFormulario(".linha-trecho").length;
 
     document.querySelectorAll("[x-text]").forEach(el => {
       if (el.getAttribute("x-text").includes("despesas")) el.textContent = nDesp;
@@ -783,16 +1057,16 @@ function validarKmGlobal() {
 
   if (!form) return 0;
 
-  const valorPadrao = parseFloat(form.dataset.valorKmCliente);
+  const valorPadrao = normalizarNumero(form.dataset.valorKmCliente);
   if (!Number.isFinite(valorPadrao)) return 0;
 
   let temDivergencia = false;
 
-  document.querySelectorAll(".linha-trecho").forEach(linha => {
+  linhasAtivasFormulario(".linha-trecho").forEach(linha => {
     const campo = linha.querySelector('input[name$="-valor_km"]');
     if (!campo || !campo.value) return;
 
-    const valorLinha = parseFloat(campo.value);
+    const valorLinha = normalizarNumero(campo.value);
     if (!Number.isFinite(valorLinha)) return;
 
     if (Math.abs(valorLinha - valorPadrao) > 0.0001) {
@@ -842,8 +1116,8 @@ function validarKmGlobal() {
   }
 
   function contarLinhas(tipo) {
-    return document.querySelectorAll(
-      `.linha-${tipo === "despesas" ? "despesa" : "trecho"}:not([style*='opacity'])`
+    return linhasAtivasFormulario(
+      `.linha-${tipo === "despesas" ? "despesa" : "trecho"}`
     ).length;
   }
 
@@ -858,9 +1132,9 @@ function validarKmGlobal() {
         // Recalcular ao carregar (edição)
         recalcular();
         // Recalcular totais de trechos existentes ao editar
-        document.querySelectorAll(".linha-trecho").forEach(tr => {
-          const km = parseFloat(tr.querySelector(".campo-km")?.value) || 0;
-          const vkm = parseFloat(tr.querySelector(".campo-vkm")?.value) || 0;
+        linhasAtivasFormulario(".linha-trecho").forEach(tr => {
+          const km = normalizarNumero(tr.querySelector(".campo-km")?.value);
+          const vkm = normalizarNumero(tr.querySelector(".campo-vkm")?.value);
           const cel = tr.querySelector(".total-trecho");
           if (cel && km && vkm) {
             cel.textContent = "R$ " + (km * vkm).toFixed(2).replace(".", ",");
@@ -875,7 +1149,7 @@ function validarKmGlobal() {
   const form = document.getElementById("form-relatorio");
   if (!form) return;
 
-  const numero = parseFloat(valor);
+  const numero = normalizarNumero(valor);
   if (!Number.isFinite(numero) || numero <= 0) return;
 
   form.dataset.valorKmCliente = numero.toFixed(2);
@@ -894,6 +1168,27 @@ document.addEventListener("blur", function (e) {
   }
 }, true);
   // Inicialização imediata (sem Alpine em modo não-defer)
-  document.addEventListener("DOMContentLoaded", () => recalcular());
+  document.addEventListener("DOMContentLoaded", () => {
+    recalcular();
+    const modalImportacao = document.getElementById("modalImportarRelatorio");
+    modalImportacao?.addEventListener("shown.bs.modal", buscarRelatoriosImportacao);
+    document.getElementById("btn-buscar-importacao")
+      ?.addEventListener("click", buscarRelatoriosImportacao);
+    document.getElementById("importar-filtro-busca")
+      ?.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          buscarRelatoriosImportacao();
+        }
+      });
+    ["importar-filtro-cliente", "importar-filtro-tecnico", "importar-filtro-data-inicio", "importar-filtro-data-fim"]
+      .forEach(id => document.getElementById(id)?.addEventListener("change", buscarRelatoriosImportacao));
+    document.getElementById("importar-relatorios-lista")
+      ?.addEventListener("click", event => {
+        const botao = event.target.closest("[data-importar-relatorio]");
+        if (!botao) return;
+        selecionarRelatorioImportacao(botao.dataset.importarRelatorio);
+      });
+  });
           </script>
         {% endblock %}

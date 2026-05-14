@@ -116,7 +116,7 @@
               {% endif %}
             </td>
             <td class="fw-semibold {% if a.tipo == 'adiantamento' %}text-success{% else %}text-warning{% endif %}">
-              R$ {{ a.valor }}
+              R$ {{ a.valor|floatformat:2 }}
             </td>
             <td class="text-end pe-4">
               <div class="d-flex gap-1 justify-content-end">

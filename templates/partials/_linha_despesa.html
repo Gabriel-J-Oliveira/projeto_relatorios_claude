@@ -1,3 +1,4 @@
+{% load l10n %}
 <tr class="linha-despesa"
     id="linha-despesa-nova-{{ idx }}"
     data-form-index="{{ idx }}"
@@ -20,7 +21,7 @@
     <input type="date"
            name="despesas-{{ idx }}-data"
            id="id_despesas-{{ idx }}-data"
-           value="{{ form.data.value|default:'' }}"
+           value="{% if form.data.value %}{{ form.data.value|date:'Y-m-d'|default:form.data.value }}{% endif %}"
            class="form-control form-control-sm {% if form.data.errors %}is-invalid{% endif %}">
     <div class="invalid-feedback d-block small erro-inline">
       {% if form.data.errors %}{{ form.data.errors.0 }}{% endif %}
@@ -46,7 +47,10 @@
            id="id_despesas-{{ idx }}-descricao"
            value="{{ form.descricao.value|default:'' }}"
            placeholder="Fornecedor / Detalhe"
-           class="form-control form-control-sm">
+           class="form-control form-control-sm {% if form.descricao.errors %}is-invalid{% endif %}">
+    <div class="invalid-feedback d-block small erro-inline">
+      {% if form.descricao.errors %}{{ form.descricao.errors.0 }}{% endif %}
+    </div>
     <div class="text-warning small aviso-inline"></div>
     <div class="text-warning small aviso-duplicata"></div>
 </td>
@@ -55,7 +59,7 @@
            step="0.01"
            name="despesas-{{ idx }}-valor"
            id="id_despesas-{{ idx }}-valor"
-           value="{{ form.valor.value|default:'' }}"
+           value="{{ form.valor.value|default:''|unlocalize }}"
            class="form-control form-control-sm campo-valor-desp"
            oninput="recalcular()">
     <div class="invalid-feedback d-block small erro-inline">
@@ -88,9 +92,12 @@
       <input type="file"
              name="despesas-{{ idx }}-comprovante"
              id="id_despesas-{{ idx }}-comprovante"
-             class="form-sm"
-             onchange=" this.parentElement.classList.replace( 'btn-outline-secondary', 'btn-success' )">
+              class="form-sm {% if form.comprovante.errors %}is-invalid{% endif %}"
+              onchange=" this.parentElement.classList.replace( 'btn-outline-secondary', 'btn-success' )">
     </label>
+    <div class="invalid-feedback d-block small erro-inline">
+      {% if form.comprovante.errors %}{{ form.comprovante.errors.0 }}{% endif %}
+    </div>
   </td>
   <td class="p-1 pt-3 col-md-3">
     <input type="text"

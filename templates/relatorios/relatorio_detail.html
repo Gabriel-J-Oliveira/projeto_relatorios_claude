@@ -15,9 +15,19 @@
 
 {% block page_actions %}
 <div class="d-flex gap-2">
+  {% if relatorio.status == 'aprovado' or relatorio.status == 'faturado' %}
+  <a href="{% url 'relatorios:relatorio_reembolso_pdf' relatorio.pk %}"
+     target="_blank"
+     rel="noopener"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-file-earmark-pdf me-1"></i>Gerar PDF
+  </a>
+  {% endif %}
+  {% if relatorio.status != 'aprovado' and relatorio.status != 'faturado' %}
   <a href="{% url 'relatorios:relatorio_update' relatorio.pk %}" class="btn btn-primary btn-sm">
     <i class="bi bi-pencil me-1"></i>Editar
   </a>
+  {% endif %}
   {% if relatorio.status == 'rascunho' %}
   <form method="post" action="{% url 'relatorios:relatorio_status' relatorio.pk 'pendente' %}">
     {% csrf_token %}
@@ -26,29 +36,25 @@
     </button>
   </form>
   {% elif relatorio.status == 'pendente' %}
-  <form method="post" action="{% url 'relatorios:relatorio_status' relatorio.pk 'aprovado' %}">
-    {% csrf_token %}
-    <button class="btn btn-success btn-sm">
-      <i class="bi bi-check-lg me-1"></i>Aprovar
-    </button>
-  </form>
+  <button type="submit"
+          form="form-valores-aprovados-financeiro"
+          formmethod="post"
+          formaction="{% url 'relatorios:relatorio_status' relatorio.pk 'aprovado' %}"
+          class="btn btn-success btn-sm">
+    <i class="bi bi-check-lg me-1"></i>Aprovar
+  </button>
   <form method="post" action="{% url 'relatorios:relatorio_status' relatorio.pk 'rejeitado' %}">
     {% csrf_token %}
     <button class="btn btn-danger btn-sm">
       <i class="bi bi-x-lg me-1"></i>Rejeitar
     </button>
   </form>
-  {% elif relatorio.status == 'aprovado' %}
-  <form method="post" action="{% url 'relatorios:relatorio_status' relatorio.pk 'faturado' %}">
-    {% csrf_token %}
-    <button class="btn btn-info btn-sm">
-      <i class="bi bi-check2-all me-1"></i>Faturar
-    </button>
-  </form>
   {% endif %}
+  {% if relatorio.status != 'aprovado' and relatorio.status != 'faturado' %}
   <a href="{% url 'relatorios:relatorio_delete' relatorio.pk %}" class="btn btn-outline-danger btn-sm">
     <i class="bi bi-trash me-1"></i>Excluir
   </a>
+  {% endif %}
 </div>
 {% endblock %}
 
@@ -64,26 +70,30 @@
 </div>
 
 {% if avisos_financeiro %}
-<div class="card border-warning border-opacity-50 shadow-sm mb-4" id="card-atencao-financeiro">
-  <div class="card-header bg-warning-subtle border-warning border-opacity-25 py-3">
-    <div class="d-flex align-items-center gap-2">
-      <i class="bi bi-exclamation-triangle-fill text-warning"></i>
-      <h6 class="mb-0 fw-semibold">Atenção</h6>
-      <span class="badge bg-warning text-dark rounded-pill ms-auto">{{ avisos_financeiro|length }}</span>
-    </div>
+<div class="alert alert-warning border-0 shadow-sm mb-4" id="card-atencao-financeiro">
+  <div class="d-flex align-items-center mb-2">
+    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+    <strong>Atenção</strong>
+    <span class="badge bg-warning text-dark rounded-pill ms-auto">{{ avisos_financeiro|length }}</span>
   </div>
-  <div class="list-group list-group-flush">
+  <ul class="small mb-0 ps-3">
     {% for aviso in avisos_financeiro %}
-      <button type="button"
-              class="list-group-item list-group-item-action d-flex align-items-start gap-2 py-2 aviso-financeiro"
-              data-target-linha="{{ aviso.linha_id }}">
-        <i class="bi {{ aviso.icone }} text-warning mt-1"></i>
-        <span class="small text-start">{{ aviso.mensagem }}</span>
-      </button>
+      <li>
+        <button type="button"
+                class="btn btn-link text-reset text-decoration-none p-0 text-start aviso-financeiro"
+                data-target-linha="{{ aviso.linha_id }}"
+                data-target-linhas="{{ aviso.linha_ids|join:',' }}">
+          <i class="bi {{ aviso.icone }} me-1"></i>
+          {{ aviso.mensagem }}
+        </button>
+      </li>
     {% endfor %}
-  </div>
+  </ul>
 </div>
 {% endif %}
+
+<form method="post" id="form-valores-aprovados-financeiro">
+  {% csrf_token %}
 
 <div class="row g-3">
 
@@ -165,7 +175,8 @@
                 <th class="ps-3 small fw-semibold text-muted">Data</th>
                 <th class="small fw-semibold text-muted">Tipo</th>
                 <th class="small fw-semibold text-muted">Descrição</th>
-                <th class="small fw-semibold text-muted">Valor</th>
+                <th class="small fw-semibold text-muted">Valor Solicitado</th>
+                <th class="small fw-semibold text-muted">Valor Aprovado</th>
                 <th class="small fw-semibold text-muted">Pago por</th>
                 <th class="small fw-semibold text-muted">C. Custo</th>
                 <th class="small fw-semibold text-muted text-center">Doc.</th>
@@ -181,7 +192,17 @@
                   </span>
                 </td>
                 <td class="small">{{ d.descricao }}</td>
-                <td class="small fw-semibold">R$ {{ d.valor }}</td>
+                <td class="small fw-semibold">R$ {{ d.valor|floatformat:2 }}</td>
+                <td>
+                  <input type="text"
+                         inputmode="decimal"
+                         name="despesa_{{ d.pk }}_valor_aprovado"
+                         value="{{ d.valor_aprovado|default_if_none:'' }}"
+                         placeholder="Integral"
+                         class="form-control form-control-sm campo-aprovado-despesa"
+                         data-valor-original="{{ d.valor }}"
+                         {% if relatorio.status == 'aprovado' or relatorio.status == 'faturado' %}disabled{% endif %}>
+                </td>
                 <td class="small">
                   {% if d.quem_pagou == 'tecnico' %}
                   <span class="badge bg-primary-subtle text-primary">Técnico</span>
@@ -206,8 +227,9 @@
               <tr>
                 <td colspan="3" class="ps-3 small text-end text-muted">Total despesas</td>
                 <td class="small fw-bold text-success">
-                  R$ {{ relatorio.total_despesas_tecnico|add:relatorio.total_despesas_empresa }}
+                  R$ {{ relatorio.total_despesas_tecnico|add:relatorio.total_despesas_empresa|floatformat:2 }}
                 </td>
+                <td class="small fw-bold text-success" id="total-aprovado-despesas">R$ 0,00</td>
                 <td colspan="3"></td>
               </tr>
             </tfoot>
@@ -238,8 +260,10 @@
                 <th class="small fw-semibold text-muted">Origem</th>
                 <th class="small fw-semibold text-muted">Destino</th>
                 <th class="small fw-semibold text-muted">KM</th>
-                <th class="small fw-semibold text-muted">R$/KM</th>
-                <th class="small fw-semibold text-muted">Total</th>
+                <th class="small fw-semibold text-muted">R$/KM Solicitado</th>
+                <th class="small fw-semibold text-muted">R$/KM Aprovado</th>
+                <th class="small fw-semibold text-muted">Total Solicitado</th>
+                <th class="small fw-semibold text-muted">Total Aprovado</th>
                 <th class="small fw-semibold text-muted">Obs.</th>
               </tr>
             </thead>
@@ -250,8 +274,20 @@
                 <td class="small">{{ t.origem }}</td>
                 <td class="small">{{ t.destino }}</td>
                 <td class="small">{{ t.km }} km</td>
-                <td class="small text-muted">R$ {{ t.valor_km }}</td>
-                <td class="small fw-semibold text-success">R$ {{ t.valor_calculado }}</td>
+                <td class="small text-muted">R$ {{ t.valor_km|floatformat:2 }}</td>
+                <td>
+                  <input type="text"
+                         inputmode="decimal"
+                         name="trecho_{{ t.pk }}_valor_km_aprovado"
+                         value="{{ t.valor_km_aprovado|default_if_none:'' }}"
+                         placeholder="Integral"
+                         class="form-control form-control-sm campo-aprovado-km"
+                         data-km="{{ t.km }}"
+                         data-valor-km-original="{{ t.valor_km }}"
+                         {% if relatorio.status == 'aprovado' or relatorio.status == 'faturado' %}disabled{% endif %}>
+                </td>
+                <td class="small fw-semibold text-success">R$ {{ t.valor_calculado|floatformat:2 }}</td>
+                <td class="small fw-semibold text-success total-aprovado-km-linha">R$ {{ t.valor_calculado|floatformat:2 }}</td>
                 <td class="small text-muted">{{ t.observacao|default:"—" }}</td>
               </tr>
               {% endfor %}
@@ -261,7 +297,9 @@
                 <td colspan="3" class="ps-3 small text-end text-muted">Total KM</td>
                 <td class="small">{{ relatorio.total_km_percorrido }} km</td>
                 <td></td>
-                <td class="small fw-bold text-success">R$ {{ relatorio.total_km }}</td>
+                <td></td>
+                <td class="small fw-bold text-success">R$ {{ relatorio.total_km|floatformat:2 }}</td>
+                <td class="small fw-bold text-success" id="total-aprovado-km">R$ 0,00</td>
                 <td></td>
               </tr>
             </tfoot>
@@ -289,24 +327,28 @@
         <div class="d-flex flex-column gap-2 small">
           <div class="d-flex justify-content-between py-1 border-bottom">
             <span class="text-muted">Despesas (técnico)</span>
-            <span class="fw-semibold">R$ {{ relatorio.total_despesas_tecnico }}</span>
+            <span class="fw-semibold">R$ {{ relatorio.total_despesas_tecnico|floatformat:2 }}</span>
           </div>
           <div class="d-flex justify-content-between py-1 border-bottom">
             <span class="text-muted">Despesas (empresa)</span>
-            <span class="fw-semibold">R$ {{ relatorio.total_despesas_empresa }}</span>
+            <span class="fw-semibold">R$ {{ relatorio.total_despesas_empresa|floatformat:2 }}</span>
           </div>
           <div class="d-flex justify-content-between py-1 border-bottom">
             <span class="text-muted">Deslocamento (KM)</span>
-            <span class="fw-semibold">R$ {{ relatorio.total_km }}</span>
+            <span class="fw-semibold">R$ {{ relatorio.total_km|floatformat:2 }}</span>
           </div>
           <div class="d-flex justify-content-between py-1 border-bottom">
-            <span class="fw-medium">Total de despesas</span>
-            <span class="fw-bold">R$ {{ relatorio.total_despesas }}</span>
+            <span class="fw-medium">Total Solicitado</span>
+            <span class="fw-bold">R$ {{ relatorio.total_despesas|floatformat:2 }}</span>
+          </div>
+          <div class="d-flex justify-content-between py-1 border-bottom">
+            <span class="fw-medium">Total Aprovado</span>
+            <span class="fw-bold text-success" id="total-aprovado-financeiro">R$ 0,00</span>
           </div>
           <div class="d-flex justify-content-between py-1 border-bottom">
             <span class="text-muted">(-) Adiantamento</span>
             <span class="fw-semibold text-danger">
-              R$ {{ relatorio.valor_adiantamento }}
+              R$ {{ relatorio.valor_adiantamento|floatformat:2 }}
             </span>
           </div>
         </div>
@@ -317,7 +359,7 @@
             <span class="fw-bold">Saldo a reembolsar</span>
             <span class="fw-bold fs-5
                   {% if relatorio.saldo >= 0 %}text-success{% else %}text-danger{% endif %}">
-              R$ {{ relatorio.saldo }}
+              R$ {{ relatorio.saldo|floatformat:2 }}
             </span>
           </div>
           <div class="small mt-1
@@ -349,6 +391,16 @@
             <span class="text-muted">Atualizado em</span>
             <span>{{ relatorio.atualizado_em|date:"d/m/Y H:i" }}</span>
           </div>
+          {% if relatorio.aprovado_em %}
+          <div class="d-flex justify-content-between">
+            <span class="text-muted">Aprovado em</span>
+            <span>{{ relatorio.aprovado_em|date:"d/m/Y H:i" }}</span>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span class="text-muted">Aprovado por</span>
+            <span>{{ relatorio.aprovado_por|default:"-" }}</span>
+          </div>
+          {% endif %}
           <div class="d-flex justify-content-between">
             <span class="text-muted">Total de despesas</span>
             <span>{{ relatorio.despesas.count }} item(s)</span>
@@ -365,17 +417,21 @@
 
 </div>
 
+</form>
+
 <style>
   .linha-alerta-financeiro {
-    position: relative;
-    outline: 2px solid var(--bs-warning);
-    outline-offset: -2px;
-    box-shadow: 0 0 0 .25rem rgba(255, 193, 7, .25);
     animation: destaqueFinanceiro 1.2s ease-in-out;
   }
 
   .linha-alerta-financeiro > * {
     background-color: rgba(255, 193, 7, .18) !important;
+  }
+
+  .campo-aprovado-despesa,
+  .campo-aprovado-km {
+    min-width: 110px;
+    max-width: 130px;
   }
 
   @keyframes destaqueFinanceiro {
@@ -388,23 +444,101 @@
   document.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll(".aviso-financeiro").forEach(function (item) {
       item.addEventListener("click", function () {
-        const targetId = item.dataset.targetLinha;
-        const linha = document.getElementById(targetId);
+        const targetIds = (item.dataset.targetLinhas || item.dataset.targetLinha || "")
+          .split(",")
+          .map(function (targetId) {
+            return targetId.trim();
+          })
+          .filter(Boolean);
+        const linhas = targetIds
+          .map(function (targetId) {
+            return document.getElementById(targetId);
+          })
+          .filter(Boolean);
 
-        if (!linha) return;
+        if (!linhas.length) return;
 
-        linha.scrollIntoView({ behavior: "smooth", block: "center" });
-        linha.classList.remove("linha-alerta-financeiro");
+        linhas[0].scrollIntoView({ behavior: "smooth", block: "center" });
+        linhas.forEach(function (linha) {
+          linha.classList.remove("linha-alerta-financeiro");
+        });
 
         window.setTimeout(function () {
-          linha.classList.add("linha-alerta-financeiro");
+          linhas.forEach(function (linha) {
+            linha.classList.add("linha-alerta-financeiro");
+          });
         }, 250);
 
         window.setTimeout(function () {
-          linha.classList.remove("linha-alerta-financeiro");
+          linhas.forEach(function (linha) {
+            linha.classList.remove("linha-alerta-financeiro");
+          });
         }, 3500);
       });
     });
+
+    function parseDecimalFinanceiro(valor) {
+      const texto = String(valor || "").trim();
+      if (!texto) return 0;
+
+      const normalizado = texto.includes(",")
+        ? texto.replace(/\./g, "").replace(",", ".")
+        : texto;
+      const numero = Number.parseFloat(normalizado);
+
+      return Number.isFinite(numero) ? numero : 0;
+    }
+
+    function formatarMoeda(valor) {
+      return "R$ " + valor.toFixed(2).replace(".", ",");
+    }
+
+    function atualizarTotaisAprovados() {
+      let totalDespesas = 0;
+      let totalKm = 0;
+
+      document.querySelectorAll(".campo-aprovado-despesa").forEach(function (input) {
+        const original = parseDecimalFinanceiro(input.dataset.valorOriginal);
+        const aprovado = input.value.trim()
+          ? parseDecimalFinanceiro(input.value)
+          : original;
+
+        totalDespesas += aprovado;
+      });
+
+      document.querySelectorAll(".campo-aprovado-km").forEach(function (input) {
+        const km = parseDecimalFinanceiro(input.dataset.km);
+        const valorKmOriginal = parseDecimalFinanceiro(input.dataset.valorKmOriginal);
+        const valorKmAprovado = input.value.trim()
+          ? parseDecimalFinanceiro(input.value)
+          : valorKmOriginal;
+        const totalLinha = km * valorKmAprovado;
+        const linha = input.closest("tr");
+        const totalLinhaEl = linha?.querySelector(".total-aprovado-km-linha");
+
+        if (totalLinhaEl) {
+          totalLinhaEl.textContent = formatarMoeda(totalLinha);
+        }
+
+        totalKm += totalLinha;
+      });
+
+      const totalDespesasEl = document.getElementById("total-aprovado-despesas");
+      const totalKmEl = document.getElementById("total-aprovado-km");
+      const totalFinanceiroEl = document.getElementById("total-aprovado-financeiro");
+
+      if (totalDespesasEl) totalDespesasEl.textContent = formatarMoeda(totalDespesas);
+      if (totalKmEl) totalKmEl.textContent = formatarMoeda(totalKm);
+      if (totalFinanceiroEl) totalFinanceiroEl.textContent = formatarMoeda(totalDespesas + totalKm);
+    }
+
+    document
+      .querySelectorAll(".campo-aprovado-despesa, .campo-aprovado-km")
+      .forEach(function (input) {
+        input.addEventListener("input", atualizarTotaisAprovados);
+      });
+
+    atualizarTotaisAprovados();
   });
 </script>
 
