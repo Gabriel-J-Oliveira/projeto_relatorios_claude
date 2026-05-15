@@ -1,0 +1,304 @@
+@page {
+  size: A4;
+  margin: 18mm 14mm 18mm;
+
+  @bottom-left {
+    content: "CONTROL SUL GESTÃO EMPRESARIAL";
+    color: #6b7280;
+    font-size: 8px;
+  }
+
+  @bottom-center {
+    content: "Página " counter(page) " de " counter(pages);
+    color: #6b7280;
+    font-size: 8px;
+  }
+
+  @bottom-right {
+    content: "Relatório financeiro interno";
+    color: #6b7280;
+    font-size: 8px;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: #1f2937;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 10px;
+  line-height: 1.42;
+}
+
+.pdf-header {
+  align-items: flex-start;
+  border-bottom: 2px solid #1f2937;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+}
+
+.brand {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.brand-mark {
+  align-items: center;
+  background: #1f2937;
+  border-radius: 6px;
+  color: #ffffff;
+  display: flex;
+  font-size: 18px;
+  font-weight: 700;
+  height: 42px;
+  justify-content: center;
+  letter-spacing: 0;
+  width: 42px;
+}
+
+.company {
+  color: #6b7280;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+h1 {
+  color: #111827;
+  font-size: 20px;
+  line-height: 1.1;
+  margin: 3px 0 0;
+}
+
+h2 {
+  color: #111827;
+  font-size: 13px;
+  margin: 0 0 9px;
+}
+
+.header-meta {
+  text-align: right;
+}
+
+.label,
+.summary-card span {
+  color: #6b7280;
+  display: block;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  margin-bottom: 3px;
+  text-transform: uppercase;
+}
+
+.number {
+  color: #111827;
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.section {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  padding: 12px;
+}
+
+.section-title-row {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.meta-grid,
+.summary-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.meta-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.summary-grid {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.meta-grid strong,
+.summary-card strong {
+  color: #111827;
+  font-size: 11px;
+}
+
+.summary-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 9px;
+}
+
+.summary-card.approved {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.summary-card.removed {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.summary-card.balance {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.data-table {
+  border-collapse: collapse;
+  page-break-inside: auto;
+  width: 100%;
+}
+
+.data-table th,
+.data-table td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 6px 5px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.data-table th {
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+}
+
+.data-table tr {
+  page-break-inside: avoid;
+}
+
+.data-table.compact th,
+.data-table.compact td {
+  padding: 5px;
+}
+
+.amount {
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+.badge {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  padding: 2px 6px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.badge-success,
+.status-aprovado {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.badge-danger,
+.status-rejeitado {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.badge-warning,
+.status-conferencia_pendente {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-ajuste_pendente {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.status-rascunho {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.status {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 8px;
+  font-weight: 700;
+  padding: 4px 8px;
+}
+
+.row-rejected td {
+  background: #fff1f2;
+  color: #7f1d1d;
+  opacity: 0.78;
+}
+
+.row-adjusted td {
+  background: #fffbeb;
+}
+
+.notice-list {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  margin: 0;
+  padding: 8px 12px 8px 20px;
+}
+
+.notice-list li {
+  margin: 3px 0;
+}
+
+.note-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.note {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.note p {
+  margin: 3px 0 0;
+}
+
+.empty {
+  color: #6b7280;
+  font-style: italic;
+  margin: 0;
+}
+
+.page-break-avoid {
+  page-break-inside: avoid;
+}
+
+.document-footer {
+  border-top: 1px solid #e5e7eb;
+  color: #6b7280;
+  display: flex;
+  font-size: 8px;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding-top: 8px;
+}

@@ -157,7 +157,7 @@
                   <div class="col-md-4">
                     <label class="form-label fw-medium small text-muted">Número</label>
                     {{ form.numero }}
-                    <div class="form-text small">Gerado automaticamente ao salvar.</div>
+                    <div class="form-text small">Gerado automaticamente ao enviar para conferência.</div>
                     {% if form.numero.errors %}
                       <div class="text-danger small mt-1">{{ form.numero.errors.0 }}</div>
                     {% endif %}
@@ -1189,6 +1189,13 @@ document.addEventListener("blur", function (e) {
         if (!botao) return;
         selecionarRelatorioImportacao(botao.dataset.importarRelatorio);
       });
+    document.querySelectorAll("form[method='post']").forEach(form => {
+      form.addEventListener("submit", () => {
+        form.querySelectorAll("button[type='submit']").forEach(button => {
+          button.disabled = true;
+        });
+      });
+    });
   });
           </script>
         {% endblock %}

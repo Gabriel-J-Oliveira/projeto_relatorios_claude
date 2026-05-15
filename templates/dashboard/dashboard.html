@@ -71,19 +71,9 @@
                       <td class="small">{{ relatorio.tecnico_responsavel }}</td>
                       <td class="small text-muted">{{ relatorio.data_inicio|date:"d/m/Y" }}</td>
                       <td>
-                        {% if relatorio.status == 'pendente' %}
-                          <span class="badge bg-warning-subtle text-warning rounded-pill px-2">Pendente</span>
-                        {% elif relatorio.status == 'rascunho' %}
-                          <span class="badge bg-secondary-subtle text-secondary rounded-pill px-2">Rascunho</span>
-                        {% elif relatorio.status == 'aprovado' %}
-                          <span class="badge bg-success-subtle text-success rounded-pill px-2">Aprovado</span>
-                        {% elif relatorio.status == 'rejeitado' %}
-                          <span class="badge bg-danger-subtle text-danger rounded-pill px-2">Rejeitado</span>
-                        {% elif relatorio.status == 'fechado' %}
-                          <span class="badge bg-info-subtle text-info rounded-pill px-2">Fechado</span>
-                        {% else %}
-                          <span class="badge bg-info-subtle text-info rounded-pill px-2">Faturado</span>
-                        {% endif %}
+                        <span class="badge bg-{{ relatorio.status_badge_cor }}-subtle text-{{ relatorio.status_badge_cor }} rounded-pill px-2">
+                          {{ relatorio.get_status_display }}
+                        </span>
                       </td>
                       <td class="text-end pe-4">
                         <a href="{% url 'relatorios:relatorio_detail' relatorio.id %}"
@@ -132,29 +122,29 @@
           <div class="d-flex flex-column gap-3">
             <div>
               <div class="d-flex justify-content-between small mb-1">
-                <span class="fw-medium">Pendentes</span>
-                <span class="text-muted">0%</span>
+                <span class="fw-medium">Conferência</span>
+                <span class="text-muted">{{ pct_conferencia }}%</span>
               </div>
               <div class="progress" style="height: 6px;">
-                <div class="progress-bar bg-warning" style="width: 0%"></div>
+                <div class="progress-bar bg-warning" style="width: {{ pct_conferencia }}%"></div>
               </div>
             </div>
             <div>
               <div class="d-flex justify-content-between small mb-1">
-                <span class="fw-medium">Fechados</span>
-                <span class="text-muted">0%</span>
+                <span class="fw-medium">Ajuste</span>
+                <span class="text-muted">{{ pct_ajuste }}%</span>
               </div>
               <div class="progress" style="height: 6px;">
-                <div class="progress-bar bg-success" style="width: 0%"></div>
+                <div class="progress-bar bg-orange" style="width: {{ pct_ajuste }}%"></div>
               </div>
             </div>
             <div>
               <div class="d-flex justify-content-between small mb-1">
-                <span class="fw-medium">Faturados</span>
-                <span class="text-muted">0%</span>
+                <span class="fw-medium">Aprovados</span>
+                <span class="text-muted">{{ pct_aprovado }}%</span>
               </div>
               <div class="progress" style="height: 6px;">
-                <div class="progress-bar bg-info" style="width: 0%"></div>
+                <div class="progress-bar bg-success" style="width: {{ pct_aprovado }}%"></div>
               </div>
             </div>
           </div>

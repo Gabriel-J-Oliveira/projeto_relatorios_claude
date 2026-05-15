@@ -90,3 +90,21 @@ header.navbar {
 [data-bs-theme="dark"] .bg-light {
     background-color: var(--bs-body-bg) !important;
 }
+
+.bg-orange {
+  background-color: #fd7e14 !important;
+}
+
+.bg-orange-subtle {
+  background-color: #fff3e8 !important;
+}
+
+.text-orange {
+  color: #b45309 !important;
+}
+
+.alert-orange {
+  --bs-alert-color: #8a3d05;
+  --bs-alert-bg: #fff3e8;
+  --bs-alert-border-color: #ffc38a;
+}

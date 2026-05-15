@@ -11,10 +11,16 @@ urlpatterns = [
     path("relatorios/novo/", views.relatorio_form_view, name="relatorio_create"),
     path("relatorios/<int:pk>/", views.relatorio_detail_view, name="relatorio_detail"),
     path("relatorios/<int:pk>/pdf-reembolso/", views.relatorio_reembolso_pdf_view, name="relatorio_reembolso_pdf"),
+    path("relatorios/<int:pk>/pdf-interno/", views.relatorio_pdf_interno_view, name="relatorio_pdf_interno"),
     path("relatorios/<int:pk>/editar/", views.relatorio_form_view, name="relatorio_update"),
     path("relatorios/<int:pk>/excluir/", views.relatorio_delete_view, name="relatorio_delete"),
     path("relatorios/<int:pk>/duplicar/", views.relatorio_duplicate_view, name="relatorio_duplicate"),
     path("relatorios/<int:pk>/status/<str:status>/", views.relatorio_status_view, name="relatorio_status"),
+    path(
+        "relatorios/<int:pk>/itens/<str:tipo>/<int:item_pk>/<str:acao>/",
+        views.relatorio_item_financeiro_view,
+        name="relatorio_item_financeiro",
+    ),
     path("relatorios/importar/listar/", views.relatorio_import_list_json, name="relatorio_import_list"),
     path("relatorios/importar/<int:pk>/", views.relatorio_import_detail_json, name="relatorio_import_detail"),
 

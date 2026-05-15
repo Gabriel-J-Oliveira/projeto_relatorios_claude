@@ -3,7 +3,9 @@ Settings base — compartilhado entre todos os ambientes.
 Não use este arquivo diretamente. Use dev.py ou prod.py.
 """
 
+import json
 from pathlib import Path
+
 from decouple import config
 
 # ─── Diretório raiz do projeto ───────────────────────────────────────────────
@@ -122,8 +124,82 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 
 # ─── Redirecionamento de login ────────────────────────────────────────────────
-LOGIN_URL = "/admin/login/"
+LOGIN_URL = "/login/"
 LOGIN_REDIRECT_URL = "/dashboard/"
+LOGOUT_REDIRECT_URL = "/login/"
+
+# ─── Integração futura com AD/LDAP ────────────────────────────────────────────
+# Mapeamento declarativo de grupos externos para grupos formais do ERP.
+# A autenticação LDAP ainda não usa esta configuração; ela alimenta apenas a
+# camada desacoplada de sincronização preparada em relatorios.services.identidade.
+#
+# Exemplo futuro:
+# AD_GROUP_MAPPING = {
+#     "CN=ERP-Financeiro,OU=Grupos,DC=empresa,DC=local": "Financeiro",
+#     "ERP-Tecnicos": "Tecnico",
+# }
+AD_GROUP_MAPPING = config("AD_GROUP_MAPPING", default="{}", cast=json.loads)
+
+# ─── Autenticação LDAP/Active Directory ───────────────────────────────────────
+# O backend LDAP fica antes do ModelBackend, mas só tenta autenticar quando
+# LDAP_AUTH_ENABLED=True. Com a flag desligada, o login local Django segue igual.
+AUTHENTICATION_BACKENDS = [
+    "relatorios.services.identidade.ldap_backend.ActiveDirectoryBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
+
+LDAP_AUTH_ENABLED = config("LDAP_AUTH_ENABLED", default=False, cast=bool)
+LDAP_SERVER_URI = config("LDAP_SERVER_URI", default="")
+LDAP_BIND_DN = config("LDAP_BIND_DN", default="")
+LDAP_BIND_PASSWORD = config("LDAP_BIND_PASSWORD", default="")
+LDAP_USER_SEARCH_BASE_DN = config("LDAP_USER_SEARCH_BASE_DN", default="")
+LDAP_USER_SEARCH_FILTER = config(
+    "LDAP_USER_SEARCH_FILTER",
+    default="(sAMAccountName=%(user)s)",
+)
+LDAP_GROUP_SEARCH_BASE_DN = config("LDAP_GROUP_SEARCH_BASE_DN", default="")
+LDAP_GROUP_SEARCH_FILTER = config("LDAP_GROUP_SEARCH_FILTER", default="(objectClass=group)")
+LDAP_REQUIRE_GROUP = config("LDAP_REQUIRE_GROUP", default="")
+LDAP_ACTIVE_DIRECTORY_DOMAIN = config("LDAP_ACTIVE_DIRECTORY_DOMAIN", default="")
+LDAP_NORMALIZE_USERNAME = config("LDAP_NORMALIZE_USERNAME", default=True, cast=bool)
+LDAP_START_TLS = config("LDAP_START_TLS", default=False, cast=bool)
+LDAP_DISABLE_REFERRALS = config("LDAP_DISABLE_REFERRALS", default=True, cast=bool)
+
+if LDAP_AUTH_ENABLED:
+    import ldap
+    from django_auth_ldap.config import LDAPSearch, NestedActiveDirectoryGroupType
+
+    AUTH_LDAP_SERVER_URI = LDAP_SERVER_URI
+    AUTH_LDAP_BIND_DN = LDAP_BIND_DN
+    AUTH_LDAP_BIND_PASSWORD = LDAP_BIND_PASSWORD
+    AUTH_LDAP_USER_SEARCH = LDAPSearch(
+        LDAP_USER_SEARCH_BASE_DN,
+        ldap.SCOPE_SUBTREE,
+        LDAP_USER_SEARCH_FILTER,
+    )
+    AUTH_LDAP_ALWAYS_UPDATE_USER = True
+    AUTH_LDAP_USER_ATTR_MAP = {
+        "first_name": "givenName",
+        "last_name": "sn",
+        "email": "mail",
+    }
+    AUTH_LDAP_MIRROR_GROUPS = False
+    AUTH_LDAP_FIND_GROUP_PERMS = False
+    AUTH_LDAP_START_TLS = LDAP_START_TLS
+
+    AUTH_LDAP_CONNECTION_OPTIONS = {}
+    if LDAP_DISABLE_REFERRALS:
+        AUTH_LDAP_CONNECTION_OPTIONS[ldap.OPT_REFERRALS] = 0
+
+    if LDAP_GROUP_SEARCH_BASE_DN:
+        AUTH_LDAP_GROUP_SEARCH = LDAPSearch(
+            LDAP_GROUP_SEARCH_BASE_DN,
+            ldap.SCOPE_SUBTREE,
+            LDAP_GROUP_SEARCH_FILTER,
+        )
+        AUTH_LDAP_GROUP_TYPE = NestedActiveDirectoryGroupType()
+        if LDAP_REQUIRE_GROUP:
+            AUTH_LDAP_REQUIRE_GROUP = LDAP_REQUIRE_GROUP
 
 LOGGING = {
     "version": 1,
@@ -136,5 +212,17 @@ LOGGING = {
     "root": {
         "handlers": ["console"],
         "level": "DEBUG",
+    },
+    "loggers": {
+        "django_auth_ldap": {
+            "handlers": ["console"],
+            "level": "DEBUG" if LDAP_AUTH_ENABLED else "INFO",
+            "propagate": False,
+        },
+        "relatorios.services.identidade": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }

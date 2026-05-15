@@ -204,11 +204,9 @@ class RelatorioTecnicoAdmin(admin.ModelAdmin):
     def col_status(self, obj):
         cores = {
             "rascunho": "#6c757d",
-            "pendente": "#ffc107",
+            "conferencia_pendente": "#ffc107",
+            "ajuste_pendente": "#fd7e14",
             "aprovado": "#198754",
-            "rejeitado": "#dc3545",
-            "faturado": "#0dcaf0",
-            "fechado": "#0dcaf0",
             "rejeitado": "#dc3545",
         }
         cor = cores.get(obj.status, "#6c757d")

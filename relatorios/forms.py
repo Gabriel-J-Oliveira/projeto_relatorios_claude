@@ -127,7 +127,7 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
-        numero_sugerido = kwargs.pop("numero_sugerido", None)
+        kwargs.pop("numero_sugerido", None)
         super().__init__(*args, **kwargs)
 
         qs_clientes = Cliente.objects.filter(ativo=True).order_by("nome")
@@ -140,12 +140,14 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         self.fields["tecnico_responsavel"].queryset = Tecnico.objects.filter(
             ativo=True
         ).order_by("nome")
+        for name in ["data_inicio", "data_fim"]:
+            self.fields[name].input_formats = ["%Y-%m-%d", "%d/%m/%Y"]
         self.fields["numero"].required = False
         self.fields["numero"].disabled = True
-        self.fields["numero"].widget.attrs["placeholder"] = "Gerado automaticamente"
-        self.fields["numero"].help_text = "Gerado automaticamente ao salvar."
-        if not self.instance.pk and numero_sugerido:
-            self.fields["numero"].initial = numero_sugerido
+        self.fields["numero"].widget.attrs["placeholder"] = "Gerado no envio"
+        self.fields["numero"].help_text = "Gerado automaticamente ao enviar para conferência."
+        if self.instance and self.instance.pk and not self.instance.numero:
+            self.fields["numero"].initial = "Rascunho"
         self.fields["centro_custo"].widget.attrs[
             "placeholder"
         ] = "Ex: Manutenção, Instalação, Comercial..."
@@ -161,7 +163,7 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
 
         numero = str(self.cleaned_data.get("numero") or "").strip()
         if not numero:
-            return numero
+            return None
 
         qs = RelatorioTecnico.objects.filter(numero=numero)
         if qs.exists():
@@ -231,6 +233,7 @@ class ItemDespesaForm(BootstrapMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["data"].input_formats = ["%Y-%m-%d", "%d/%m/%Y"]
         for name in [
             "data",
             "tipo",
@@ -347,6 +350,7 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         valor_km_padrao = kwargs.pop("valor_km_padrao", None)
         super().__init__(*args, **kwargs)
+        self.fields["data"].input_formats = ["%Y-%m-%d", "%d/%m/%Y"]
         for name in ["data", "origem", "destino", "km", "valor_km", "observacao"]:
             self.fields[name].required = False
 

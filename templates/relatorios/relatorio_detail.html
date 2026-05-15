@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block titulo %}{{ relatorio.numero }}{% endblock %}
-{% block page_title %}Relatório {{ relatorio.numero }}{% endblock %}
+{% block titulo %}{{ relatorio.identificador }}{% endblock %}
+{% block page_title %}Relatório {{ relatorio.identificador }}{% endblock %}
 
 {% block breadcrumb %}
 <li class="breadcrumb-item">
@@ -10,12 +10,18 @@
 <li class="breadcrumb-item">
   <a href="{% url 'relatorios:relatorio_list' %}" class="text-decoration-none">Relatórios</a>
 </li>
-<li class="breadcrumb-item active">{{ relatorio.numero }}</li>
+<li class="breadcrumb-item active">{{ relatorio.identificador }}</li>
 {% endblock %}
 
 {% block page_actions %}
 <div class="d-flex gap-2">
-  {% if relatorio.status == 'aprovado' or relatorio.status == 'faturado' %}
+  <a href="{% url 'relatorios:relatorio_pdf_interno' relatorio.pk %}"
+     target="_blank"
+     rel="noopener"
+     class="btn btn-outline-dark btn-sm">
+    <i class="bi bi-file-earmark-text me-1"></i>Gerar PDF interno
+  </a>
+  {% if relatorio.status == 'aprovado' %}
   <a href="{% url 'relatorios:relatorio_reembolso_pdf' relatorio.pk %}"
      target="_blank"
      rel="noopener"
@@ -23,19 +29,19 @@
     <i class="bi bi-file-earmark-pdf me-1"></i>Gerar PDF
   </a>
   {% endif %}
-  {% if relatorio.status != 'aprovado' and relatorio.status != 'faturado' %}
+  {% if pode_editar_relatorio %}
   <a href="{% url 'relatorios:relatorio_update' relatorio.pk %}" class="btn btn-primary btn-sm">
     <i class="bi bi-pencil me-1"></i>Editar
   </a>
   {% endif %}
   {% if relatorio.status == 'rascunho' %}
-  <form method="post" action="{% url 'relatorios:relatorio_status' relatorio.pk 'pendente' %}">
+  <form method="post" action="{% url 'relatorios:relatorio_status' relatorio.pk 'conferencia_pendente' %}">
     {% csrf_token %}
     <button class="btn btn-warning btn-sm">
       <i class="bi bi-send me-1"></i>Enviar p/ Aprovação
     </button>
   </form>
-  {% elif relatorio.status == 'pendente' %}
+  {% elif relatorio.status == 'conferencia_pendente' %}
   <button type="submit"
           form="form-valores-aprovados-financeiro"
           formmethod="post"
@@ -43,14 +49,20 @@
           class="btn btn-success btn-sm">
     <i class="bi bi-check-lg me-1"></i>Aprovar
   </button>
-  <form method="post" action="{% url 'relatorios:relatorio_status' relatorio.pk 'rejeitado' %}">
-    {% csrf_token %}
-    <button class="btn btn-danger btn-sm">
-      <i class="bi bi-x-lg me-1"></i>Rejeitar
-    </button>
-  </form>
+  <button type="button"
+          class="btn btn-warning btn-sm text-dark"
+          data-bs-toggle="modal"
+          data-bs-target="#modalSolicitarAjuste">
+    <i class="bi bi-arrow-counterclockwise me-1"></i>Solicitar ajuste
+  </button>
+  <button type="button"
+          class="btn btn-danger btn-sm"
+          data-bs-toggle="modal"
+          data-bs-target="#modalRejeitarRelatorio">
+    <i class="bi bi-x-lg me-1"></i>Rejeitar relatório
+  </button>
   {% endif %}
-  {% if relatorio.status != 'aprovado' and relatorio.status != 'faturado' %}
+  {% if pode_editar_relatorio %}
   <a href="{% url 'relatorios:relatorio_delete' relatorio.pk %}" class="btn btn-outline-danger btn-sm">
     <i class="bi bi-trash me-1"></i>Excluir
   </a>
@@ -68,6 +80,32 @@
     Atualizado em {{ relatorio.atualizado_em|date:"d/m/Y H:i" }}
   </span>
 </div>
+
+{% if relatorio.motivo_rejeicao and relatorio.status == 'ajuste_pendente' %}
+<div class="alert alert-warning border-0 shadow-sm mb-4">
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <strong>Este relatório retornou para correção pelo financeiro.</strong>
+    <span class="badge bg-warning text-dark ms-auto">{{ relatorio.get_status_display }}</span>
+  </div>
+  <div class="small">
+    <span class="fw-semibold">Justificativa:</span>
+    {{ relatorio.motivo_rejeicao|linebreaksbr }}
+  </div>
+</div>
+{% elif relatorio.motivo_rejeicao and relatorio.status == 'rejeitado' %}
+<div class="alert alert-danger border-0 shadow-sm mb-4">
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <i class="bi bi-x-octagon-fill"></i>
+    <strong>Este relatório foi rejeitado definitivamente.</strong>
+    <span class="badge bg-danger ms-auto">{{ relatorio.get_status_display }}</span>
+  </div>
+  <div class="small">
+    <span class="fw-semibold">Justificativa:</span>
+    {{ relatorio.motivo_rejeicao|linebreaksbr }}
+  </div>
+</div>
+{% endif %}
 
 {% if avisos_financeiro %}
 <div class="alert alert-warning border-0 shadow-sm mb-4" id="card-atencao-financeiro">
@@ -109,7 +147,7 @@
       <div class="card-body">
         <dl class="row mb-0 small">
           <dt class="col-sm-4 text-muted fw-medium">Número</dt>
-          <dd class="col-sm-8 fw-semibold">{{ relatorio.numero }}</dd>
+          <dd class="col-sm-8 fw-semibold">{{ relatorio.identificador }}</dd>
 
           <dt class="col-sm-4 text-muted fw-medium">Cliente</dt>
           <dd class="col-sm-8">{{ relatorio.cliente.nome }}</dd>
@@ -138,9 +176,13 @@
 
           <dt class="col-sm-4 text-muted fw-medium">Período</dt>
           <dd class="col-sm-8">
-            {{ relatorio.data_inicio|date:"d/m/Y" }}
-            {% if relatorio.data_inicio != relatorio.data_fim %}
-            até {{ relatorio.data_fim|date:"d/m/Y" }}
+            {% if relatorio.data_inicio %}
+              {{ relatorio.data_inicio|date:"d/m/Y" }}
+              {% if relatorio.data_fim and relatorio.data_inicio != relatorio.data_fim %}
+              até {{ relatorio.data_fim|date:"d/m/Y" }}
+              {% endif %}
+            {% else %}
+              <span class="text-muted">A preencher</span>
             {% endif %}
           </dd>
 
@@ -180,18 +222,32 @@
                 <th class="small fw-semibold text-muted">Pago por</th>
                 <th class="small fw-semibold text-muted">C. Custo</th>
                 <th class="small fw-semibold text-muted text-center">Doc.</th>
+                <th class="small fw-semibold text-muted text-end pe-3">Ação</th>
               </tr>
             </thead>
             <tbody>
               {% for d in relatorio.despesas.all %}
-              <tr id="linha-despesa-{{ forloop.counter }}" class="linha-despesa">
-                <td class="ps-3 small text-muted">{{ d.data|date:"d/m/Y" }}</td>
+              <tr id="linha-despesa-{{ forloop.counter }}"
+                  class="linha-despesa {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}table-danger opacity-75{% endif %}">
+                <td class="ps-3 small text-muted">{{ d.data|date:"d/m/Y"|default:"A preencher" }}</td>
                 <td>
                   <span class="badge bg-body-tertiary text-body-secondary small">
                     {{ d.get_tipo_display }}
                   </span>
+                  {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
+                  <span class="badge bg-danger-subtle text-danger small ms-1">REJEITADO</span>
+                  {% elif d.valor_ajustado %}
+                  <span class="badge bg-warning-subtle text-warning small ms-1">Valor ajustado</span>
+                  {% endif %}
                 </td>
-                <td class="small">{{ d.descricao }}</td>
+                <td class="small">
+                  {{ d.descricao }}
+                  {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
+                    {% if d.motivo_rejeicao or d.motivo_recusa %}
+                    <div class="text-danger small mt-1">{{ d.motivo_rejeicao|default:d.motivo_recusa }}</div>
+                    {% endif %}
+                  {% endif %}
+                </td>
                 <td class="small fw-semibold">R$ {{ d.valor|floatformat:2 }}</td>
                 <td>
                   <input type="text"
@@ -201,7 +257,9 @@
                          placeholder="Integral"
                          class="form-control form-control-sm campo-aprovado-despesa"
                          data-valor-original="{{ d.valor }}"
-                         {% if relatorio.status == 'aprovado' or relatorio.status == 'faturado' %}disabled{% endif %}>
+                         data-status-financeiro="{% if d.rejeitado %}rejeitado{% else %}{{ d.status_financeiro }}{% endif %}"
+                         {% if relatorio.status == 'aprovado' or relatorio.status == 'rejeitado' or d.rejeitado or d.status_financeiro == 'rejeitado' %}disabled{% endif %}>
+                  <div class="small text-muted mt-1">Final: R$ {{ d.valor_final|floatformat:2 }}</div>
                 </td>
                 <td class="small">
                   {% if d.quem_pagou == 'tecnico' %}
@@ -220,6 +278,26 @@
                   <span class="text-muted small">—</span>
                   {% endif %}
                 </td>
+                <td class="text-end pe-3">
+                  {% if relatorio.status != 'aprovado' and relatorio.status != 'rejeitado' %}
+                    {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
+                    <button type="submit"
+                            form="form-restaurar-despesa-{{ d.pk }}"
+                            class="btn btn-sm btn-primary">
+                      <i class="bi bi-arrow-counterclockwise me-1"></i>Reativar item
+                    </button>
+                    {% else %}
+                    <button type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modal-rejeitar-despesa-{{ d.pk }}">
+                      <i class="bi bi-x-circle me-1"></i>Rejeitar item
+                    </button>
+                    {% endif %}
+                  {% else %}
+                  <span class="text-muted small">—</span>
+                  {% endif %}
+                </td>
               </tr>
               {% endfor %}
             </tbody>
@@ -229,8 +307,8 @@
                 <td class="small fw-bold text-success">
                   R$ {{ relatorio.total_despesas_tecnico|add:relatorio.total_despesas_empresa|floatformat:2 }}
                 </td>
-                <td class="small fw-bold text-success" id="total-aprovado-despesas">R$ 0,00</td>
-                <td colspan="3"></td>
+                <td class="small fw-bold text-success" id="total-aprovado-despesas">R$ {{ relatorio.total_aprovado_despesas|floatformat:2 }}</td>
+                <td colspan="4"></td>
               </tr>
             </tfoot>
           </table>
@@ -265,12 +343,14 @@
                 <th class="small fw-semibold text-muted">Total Solicitado</th>
                 <th class="small fw-semibold text-muted">Total Aprovado</th>
                 <th class="small fw-semibold text-muted">Obs.</th>
+                <th class="small fw-semibold text-muted text-end pe-3">Ação</th>
               </tr>
             </thead>
             <tbody>
               {% for t in relatorio.trechos.all %}
-              <tr id="linha-trecho-{{ forloop.counter }}" class="linha-trecho">
-                <td class="ps-3 small text-muted">{{ t.data|date:"d/m/Y" }}</td>
+              <tr id="linha-trecho-{{ forloop.counter }}"
+                  class="linha-trecho {% if t.rejeitado or t.status_financeiro == 'rejeitado' %}table-danger opacity-75{% endif %}">
+                <td class="ps-3 small text-muted">{{ t.data|date:"d/m/Y"|default:"A preencher" }}</td>
                 <td class="small">{{ t.origem }}</td>
                 <td class="small">{{ t.destino }}</td>
                 <td class="small">{{ t.km }} km</td>
@@ -284,11 +364,46 @@
                          class="form-control form-control-sm campo-aprovado-km"
                          data-km="{{ t.km }}"
                          data-valor-km-original="{{ t.valor_km }}"
-                         {% if relatorio.status == 'aprovado' or relatorio.status == 'faturado' %}disabled{% endif %}>
+                         data-status-financeiro="{% if t.rejeitado %}rejeitado{% else %}{{ t.status_financeiro }}{% endif %}"
+                         {% if relatorio.status == 'aprovado' or relatorio.status == 'rejeitado' or t.rejeitado or t.status_financeiro == 'rejeitado' %}disabled{% endif %}>
                 </td>
                 <td class="small fw-semibold text-success">R$ {{ t.valor_calculado|floatformat:2 }}</td>
-                <td class="small fw-semibold text-success total-aprovado-km-linha">R$ {{ t.valor_calculado|floatformat:2 }}</td>
-                <td class="small text-muted">{{ t.observacao|default:"—" }}</td>
+                <td class="small fw-semibold text-success total-aprovado-km-linha">R$ {{ t.valor_final|floatformat:2 }}</td>
+                <td class="small text-muted">
+                  {{ t.observacao|default:"—" }}
+                  {% if t.rejeitado or t.status_financeiro == 'rejeitado' %}
+                  <div class="mt-1">
+                    <span class="badge bg-danger-subtle text-danger small">REJEITADO</span>
+                  </div>
+                  {% if t.motivo_rejeicao or t.motivo_recusa %}
+                  <div class="text-danger small mt-1">{{ t.motivo_rejeicao|default:t.motivo_recusa }}</div>
+                  {% endif %}
+                  {% elif t.valor_ajustado %}
+                  <div class="mt-1">
+                    <span class="badge bg-warning-subtle text-warning small">Valor ajustado</span>
+                  </div>
+                  {% endif %}
+                </td>
+                <td class="text-end pe-3">
+                  {% if relatorio.status != 'aprovado' and relatorio.status != 'rejeitado' %}
+                    {% if t.rejeitado or t.status_financeiro == 'rejeitado' %}
+                    <button type="submit"
+                            form="form-restaurar-trecho-{{ t.pk }}"
+                            class="btn btn-sm btn-primary">
+                      <i class="bi bi-arrow-counterclockwise me-1"></i>Reativar item
+                    </button>
+                    {% else %}
+                    <button type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modal-rejeitar-trecho-{{ t.pk }}">
+                      <i class="bi bi-x-circle me-1"></i>Rejeitar item
+                    </button>
+                    {% endif %}
+                  {% else %}
+                  <span class="text-muted small">—</span>
+                  {% endif %}
+                </td>
               </tr>
               {% endfor %}
             </tbody>
@@ -296,10 +411,10 @@
               <tr>
                 <td colspan="3" class="ps-3 small text-end text-muted">Total KM</td>
                 <td class="small">{{ relatorio.total_km_percorrido }} km</td>
-                <td></td>
+                <td colspan="2"></td>
                 <td></td>
                 <td class="small fw-bold text-success">R$ {{ relatorio.total_km|floatformat:2 }}</td>
-                <td class="small fw-bold text-success" id="total-aprovado-km">R$ 0,00</td>
+                <td class="small fw-bold text-success" id="total-aprovado-km">R$ {{ relatorio.total_aprovado_km|floatformat:2 }}</td>
                 <td></td>
               </tr>
             </tfoot>
@@ -339,11 +454,15 @@
           </div>
           <div class="d-flex justify-content-between py-1 border-bottom">
             <span class="fw-medium">Total Solicitado</span>
-            <span class="fw-bold">R$ {{ relatorio.total_despesas|floatformat:2 }}</span>
+            <span class="fw-bold">R$ {{ relatorio.total_solicitado|floatformat:2 }}</span>
           </div>
           <div class="d-flex justify-content-between py-1 border-bottom">
             <span class="fw-medium">Total Aprovado</span>
-            <span class="fw-bold text-success" id="total-aprovado-financeiro">R$ 0,00</span>
+            <span class="fw-bold text-success" id="total-aprovado-financeiro">R$ {{ relatorio.total_aprovado|floatformat:2 }}</span>
+          </div>
+          <div class="d-flex justify-content-between py-1 border-bottom {% if relatorio.diferenca_removida > 0 %}text-danger{% endif %}">
+            <span class="fw-medium">Diferença removida</span>
+            <span class="fw-bold">R$ {{ relatorio.diferenca_removida|floatformat:2 }}</span>
           </div>
           <div class="d-flex justify-content-between py-1 border-bottom">
             <span class="text-muted">(-) Adiantamento</span>
@@ -353,21 +472,28 @@
           </div>
         </div>
 
+        {% if relatorio.diferenca_removida > 0 %}
+        <div class="alert alert-warning border-0 shadow-sm mt-3 mb-0 py-2 small">
+          <i class="bi bi-exclamation-triangle-fill me-1"></i>
+          Há valores removidos ou ajustados no total aprovado.
+        </div>
+        {% endif %}
+
         <div class="mt-3 p-3 rounded-3
-             {% if relatorio.saldo >= 0 %}bg-success-subtle{% else %}bg-danger-subtle{% endif %}">
+             {% if relatorio.saldo_aprovado >= 0 %}bg-success-subtle{% else %}bg-danger-subtle{% endif %}">
           <div class="d-flex justify-content-between align-items-center">
-            <span class="fw-bold">Saldo a reembolsar</span>
+            <span class="fw-bold">Saldo aprovado a reembolsar</span>
             <span class="fw-bold fs-5
-                  {% if relatorio.saldo >= 0 %}text-success{% else %}text-danger{% endif %}">
-              R$ {{ relatorio.saldo|floatformat:2 }}
+                  {% if relatorio.saldo_aprovado >= 0 %}text-success{% else %}text-danger{% endif %}">
+              R$ {{ relatorio.saldo_aprovado|floatformat:2 }}
             </span>
           </div>
           <div class="small mt-1
-               {% if relatorio.saldo >= 0 %}text-success{% else %}text-danger{% endif %}">
-            {% if relatorio.saldo > 0 %}
+               {% if relatorio.saldo_aprovado >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {% if relatorio.saldo_aprovado > 0 %}
             <i class="bi bi-arrow-left-circle me-1"></i>
             Empresa deve reembolsar o técnico.
-            {% elif relatorio.saldo < 0 %} <i class="bi bi-arrow-right-circle me-1"></i>
+            {% elif relatorio.saldo_aprovado < 0 %} <i class="bi bi-arrow-right-circle me-1"></i>
               Técnico deve devolver à empresa.
               {% else %}
               <i class="bi bi-check-circle me-1"></i>
@@ -380,7 +506,7 @@
     </div>
 
     <!-- Auditoria -->
-    <div class="card border-0 shadow-sm">
+    <div class="card border-0 shadow-sm mb-3">
       <div class="card-body small">
         <div class="d-flex flex-column gap-2">
           <div class="d-flex justify-content-between">
@@ -413,11 +539,196 @@
       </div>
     </div>
 
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center gap-2">
+        <i class="bi bi-clock-history text-primary"></i>
+        <h6 class="mb-0 fw-semibold">Histórico do relatório</h6>
+      </div>
+      <div class="card-body">
+        {% if relatorio.historicos.all %}
+          <div class="d-flex flex-column gap-3">
+            {% for evento in relatorio.historicos.all %}
+              <div class="border-bottom pb-3 {% if forloop.last %}border-0 pb-0{% endif %}">
+                <div class="d-flex justify-content-between gap-2 align-items-start mb-1">
+                  <span class="badge rounded-pill
+                    {% if evento.badge_cor == 'orange' %}bg-orange-subtle text-orange
+                    {% else %}bg-{{ evento.badge_cor }}-subtle text-{{ evento.badge_cor }}{% endif %}">
+                    {{ evento.acao }}
+                  </span>
+                  <span class="small text-muted text-nowrap">
+                    {{ evento.data_hora|date:"d/m/Y H:i" }}
+                  </span>
+                </div>
+                <div class="small text-body">{{ evento.descricao }}</div>
+                <div class="small text-muted mt-1">
+                  {% if evento.usuario %}
+                    {{ evento.usuario.get_full_name|default:evento.usuario.username }}
+                  {% else %}
+                    Sistema
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="small text-muted mb-0">Nenhum histórico registrado.</p>
+        {% endif %}
+      </div>
+    </div>
+
   </div>
 
 </div>
 
 </form>
+
+{% if relatorio.status != 'aprovado' and relatorio.status != 'rejeitado' %}
+  {% for d in relatorio.despesas.all %}
+    {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
+    <form id="form-restaurar-despesa-{{ d.pk }}"
+          method="post"
+          action="{% url 'relatorios:relatorio_item_financeiro' relatorio.pk 'despesa' d.pk 'restaurar' %}">
+      {% csrf_token %}
+    </form>
+    {% else %}
+    <div class="modal fade" id="modal-rejeitar-despesa-{{ d.pk }}" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+          <form method="post" action="{% url 'relatorios:relatorio_item_financeiro' relatorio.pk 'despesa' d.pk 'rejeitar' %}">
+            {% csrf_token %}
+            <div class="modal-header bg-danger-subtle">
+              <h5 class="modal-title">
+                <i class="bi bi-x-circle me-2"></i>Rejeitar item
+              </h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+              <p class="small text-muted mb-3">{{ d.descricao }} — R$ {{ d.valor|floatformat:2 }}</p>
+              <label for="motivo-recusa-despesa-{{ d.pk }}" class="form-label fw-semibold">Justificativa</label>
+              <textarea id="motivo-recusa-despesa-{{ d.pk }}"
+                        name="motivo_rejeicao"
+                        class="form-control"
+                        rows="4"
+                        required></textarea>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+              <button type="submit" class="btn btn-danger btn-sm">
+                <i class="bi bi-x-circle me-1"></i>Confirmar rejeição
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  {% endfor %}
+
+  {% for t in relatorio.trechos.all %}
+    {% if t.rejeitado or t.status_financeiro == 'rejeitado' %}
+    <form id="form-restaurar-trecho-{{ t.pk }}"
+          method="post"
+          action="{% url 'relatorios:relatorio_item_financeiro' relatorio.pk 'trecho' t.pk 'restaurar' %}">
+      {% csrf_token %}
+    </form>
+    {% else %}
+    <div class="modal fade" id="modal-rejeitar-trecho-{{ t.pk }}" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+          <form method="post" action="{% url 'relatorios:relatorio_item_financeiro' relatorio.pk 'trecho' t.pk 'rejeitar' %}">
+            {% csrf_token %}
+            <div class="modal-header bg-danger-subtle">
+              <h5 class="modal-title">
+                <i class="bi bi-x-circle me-2"></i>Rejeitar item
+              </h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+              <p class="small text-muted mb-3">{{ t.origem }} → {{ t.destino }} — {{ t.km }} km</p>
+              <label for="motivo-recusa-trecho-{{ t.pk }}" class="form-label fw-semibold">Justificativa</label>
+              <textarea id="motivo-recusa-trecho-{{ t.pk }}"
+                        name="motivo_rejeicao"
+                        class="form-control"
+                        rows="4"
+                        required></textarea>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+              <button type="submit" class="btn btn-danger btn-sm">
+                <i class="bi bi-x-circle me-1"></i>Confirmar rejeição
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+{% if relatorio.status == 'conferencia_pendente' %}
+<div class="modal fade" id="modalSolicitarAjuste" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <form method="post" action="{% url 'relatorios:relatorio_status' relatorio.pk 'ajuste_pendente' %}">
+        {% csrf_token %}
+        <div class="modal-header bg-warning-subtle">
+          <h5 class="modal-title">
+            <i class="bi bi-arrow-counterclockwise me-2"></i>Solicitar ajuste
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <label for="motivo-ajuste" class="form-label fw-semibold">Justificativa</label>
+          <textarea id="motivo-ajuste"
+                    name="motivo_rejeicao"
+                    class="form-control"
+                    rows="4"
+                    required></textarea>
+          <div class="form-text">Informe claramente o que precisa ser corrigido pelo técnico.</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-warning btn-sm text-dark">
+            <i class="bi bi-send me-1"></i>Enviar para correção
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalRejeitarRelatorio" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <form method="post" action="{% url 'relatorios:relatorio_status' relatorio.pk 'rejeitado' %}">
+        {% csrf_token %}
+        <div class="modal-header bg-danger-subtle">
+          <h5 class="modal-title">
+            <i class="bi bi-x-octagon-fill me-2"></i>Rejeitar relatório
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <label for="motivo-rejeicao" class="form-label fw-semibold">Justificativa</label>
+          <textarea id="motivo-rejeicao"
+                    name="motivo_rejeicao"
+                    class="form-control"
+                    rows="4"
+                    required></textarea>
+          <div class="form-text">Esta ação bloqueia o relatório definitivamente.</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-danger btn-sm">
+            <i class="bi bi-x-lg me-1"></i>Rejeitar definitivamente
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 <style>
   .linha-alerta-financeiro {
@@ -477,68 +788,14 @@
       });
     });
 
-    function parseDecimalFinanceiro(valor) {
-      const texto = String(valor || "").trim();
-      if (!texto) return 0;
-
-      const normalizado = texto.includes(",")
-        ? texto.replace(/\./g, "").replace(",", ".")
-        : texto;
-      const numero = Number.parseFloat(normalizado);
-
-      return Number.isFinite(numero) ? numero : 0;
-    }
-
-    function formatarMoeda(valor) {
-      return "R$ " + valor.toFixed(2).replace(".", ",");
-    }
-
-    function atualizarTotaisAprovados() {
-      let totalDespesas = 0;
-      let totalKm = 0;
-
-      document.querySelectorAll(".campo-aprovado-despesa").forEach(function (input) {
-        const original = parseDecimalFinanceiro(input.dataset.valorOriginal);
-        const aprovado = input.value.trim()
-          ? parseDecimalFinanceiro(input.value)
-          : original;
-
-        totalDespesas += aprovado;
+    document.querySelectorAll("form[method='post']").forEach(function (form) {
+      form.addEventListener("submit", function () {
+        form.querySelectorAll("button[type='submit']").forEach(function (button) {
+          button.disabled = true;
+        });
       });
+    });
 
-      document.querySelectorAll(".campo-aprovado-km").forEach(function (input) {
-        const km = parseDecimalFinanceiro(input.dataset.km);
-        const valorKmOriginal = parseDecimalFinanceiro(input.dataset.valorKmOriginal);
-        const valorKmAprovado = input.value.trim()
-          ? parseDecimalFinanceiro(input.value)
-          : valorKmOriginal;
-        const totalLinha = km * valorKmAprovado;
-        const linha = input.closest("tr");
-        const totalLinhaEl = linha?.querySelector(".total-aprovado-km-linha");
-
-        if (totalLinhaEl) {
-          totalLinhaEl.textContent = formatarMoeda(totalLinha);
-        }
-
-        totalKm += totalLinha;
-      });
-
-      const totalDespesasEl = document.getElementById("total-aprovado-despesas");
-      const totalKmEl = document.getElementById("total-aprovado-km");
-      const totalFinanceiroEl = document.getElementById("total-aprovado-financeiro");
-
-      if (totalDespesasEl) totalDespesasEl.textContent = formatarMoeda(totalDespesas);
-      if (totalKmEl) totalKmEl.textContent = formatarMoeda(totalKm);
-      if (totalFinanceiroEl) totalFinanceiroEl.textContent = formatarMoeda(totalDespesas + totalKm);
-    }
-
-    document
-      .querySelectorAll(".campo-aprovado-despesa, .campo-aprovado-km")
-      .forEach(function (input) {
-        input.addEventListener("input", atualizarTotaisAprovados);
-      });
-
-    atualizarTotaisAprovados();
   });
 </script>
 

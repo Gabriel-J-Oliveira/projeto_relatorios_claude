@@ -1,9 +1,10 @@
 import logging
-import re
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 from django.contrib import messages
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
 from django.db.models import Q, Sum
 from django.http import HttpResponse, JsonResponse
@@ -19,10 +20,25 @@ from .models import (
     ItemDespesa,
     RelatorioTecnico,
     RelatorioTecnicoEquipe,
+    StatusFinanceiroItem,
     StatusRelatorio,
     Tecnico,
-    TipoAdiantamento,
+    TipoEventoHistorico,
     TrechoKm,
+)
+from .services.historico_service import registrar_evento
+from .services.autorizacao_service import (
+    exigir_financeiro,
+    usuario_pode_atuar_como_financeiro,
+    usuario_pode_editar_relatorio,
+)
+from .services.workflow_service import (
+    WorkflowError,
+    aprovar_relatorio,
+    enviar_para_conferencia,
+    rejeitar_relatorio,
+    relatorio_bloqueado as workflow_relatorio_bloqueado,
+    solicitar_ajuste,
 )
 from .forms import (
     AdiantamentoForm,
@@ -38,7 +54,7 @@ from .forms import (
 
 logger = logging.getLogger(__name__)
 
-BLOQUEIO_POS_APROVACAO = {StatusRelatorio.APROVADO, StatusRelatorio.FATURADO}
+BLOQUEIO_POS_APROVACAO = {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
 
 
 # ─────────────────────────────────────────────
@@ -99,55 +115,7 @@ def _sync_equipe(relatorio, tecnicos_apoio):
             )
 
 
-def _extrair_sequencial_relatorio(numero):
-    match = re.search(r"(\d+)$", str(numero or ""))
-    return int(match.group(1)) if match else 0
-
-
-def _proximo_numero_relatorio():
-    maior = 0
-    for numero in RelatorioTecnico.objects.values_list("numero", flat=True):
-        maior = max(maior, _extrair_sequencial_relatorio(numero))
-    return str(maior + 1)
-
-
-def _atribuir_numero_automatico(relatorio):
-    RelatorioTecnico.objects.select_for_update().order_by("pk").last()
-    relatorio.numero = _proximo_numero_relatorio()
-
-
-def _registrar_adiantamento_do_relatorio(relatorio):
-    valor = relatorio.valor_adiantamento or Decimal("0.00")
-    if valor <= 0:
-        return
-
-    descricao = f"Adiantamento vinculado ao relatório {relatorio.numero}"
-    adiantamento = (
-        Adiantamento.objects.select_for_update()
-        .filter(relatorio=relatorio, tipo=TipoAdiantamento.ADIANTAMENTO)
-        .order_by("pk")
-        .first()
-    )
-
-    if adiantamento:
-        adiantamento.tecnico = relatorio.tecnico_responsavel
-        adiantamento.valor = valor
-        adiantamento.data = relatorio.data_inicio
-        adiantamento.descricao = descricao
-        adiantamento.save(update_fields=["tecnico", "valor", "data", "descricao"])
-        return
-
-    Adiantamento.objects.create(
-        tecnico=relatorio.tecnico_responsavel,
-        relatorio=relatorio,
-        tipo=TipoAdiantamento.ADIANTAMENTO,
-        valor=valor,
-        data=relatorio.data_inicio,
-        descricao=descricao,
-    )
-
-
-def _duplicar_relatorio(original):
+def _duplicar_relatorio(original, usuario=None):
     novo = RelatorioTecnico(
         cliente=original.cliente,
         tecnico_responsavel=original.tecnico_responsavel,
@@ -162,8 +130,14 @@ def _duplicar_relatorio(original):
         observacoes=original.observacoes,
         status=StatusRelatorio.RASCUNHO,
     )
-    _atribuir_numero_automatico(novo)
     novo.save()
+    registrar_evento(
+        novo,
+        usuario,
+        TipoEventoHistorico.CRIADO,
+        f"Rascunho criado a partir da duplicação do relatório {original.identificador}.",
+        {"origem_relatorio_id": original.pk, "origem_numero": original.numero},
+    )
 
     for apoio in original.equipe.select_related("tecnico").all():
         RelatorioTecnicoEquipe.objects.create(
@@ -269,76 +243,16 @@ def _itens_pdf_reembolso(relatorio):
     return itens
 
 
-def _parse_decimal_financeiro(valor):
-    valor = (valor or "").strip()
-    if not valor:
-        return None
-
-    if "," in valor:
-        valor = valor.replace(".", "").replace(",", ".")
-
-    try:
-        numero = Decimal(valor).quantize(Decimal("0.01"))
-    except (InvalidOperation, ValueError):
-        raise ValueError("valor inválido")
-
-    if numero < 0:
-        raise ValueError("valor inválido")
-
-    return numero
-
-
 def _usuario_pode_aprovar_financeiro(user):
-    return bool(user.is_authenticated and (user.is_staff or user.is_superuser))
+    return usuario_pode_atuar_como_financeiro(user)
 
 
 def _relatorio_bloqueado(relatorio):
-    return relatorio.status in BLOQUEIO_POS_APROVACAO
+    return workflow_relatorio_bloqueado(relatorio)
 
 
-def _salvar_valores_aprovados_financeiro(request, relatorio, consolidar=False):
-    despesas = list(relatorio.despesas.select_for_update())
-    trechos = list(relatorio.trechos.select_for_update())
-    novos_valores_despesas = []
-    novos_valores_trechos = []
-    erros = []
-
-    for despesa in despesas:
-        nome_campo = f"despesa_{despesa.pk}_valor_aprovado"
-        try:
-            valor_aprovado = _parse_decimal_financeiro(request.POST.get(nome_campo))
-        except ValueError:
-            erros.append(f"Valor aprovado inválido na despesa {despesa.pk}.")
-            continue
-        if consolidar and valor_aprovado is None:
-            valor_aprovado = despesa.valor
-        novos_valores_despesas.append((despesa, valor_aprovado))
-
-    for trecho in trechos:
-        nome_campo = f"trecho_{trecho.pk}_valor_km_aprovado"
-        try:
-            valor_km_aprovado = _parse_decimal_financeiro(request.POST.get(nome_campo))
-        except ValueError:
-            erros.append(f"Valor KM aprovado inválido no trecho {trecho.pk}.")
-            continue
-        if consolidar and valor_km_aprovado is None:
-            valor_km_aprovado = trecho.valor_km.quantize(Decimal("0.01"))
-        novos_valores_trechos.append((trecho, valor_km_aprovado))
-
-    if erros:
-        return erros
-
-    for despesa, valor_aprovado in novos_valores_despesas:
-        if despesa.valor_aprovado != valor_aprovado:
-            despesa.valor_aprovado = valor_aprovado
-            despesa.save(update_fields=["valor_aprovado"])
-
-    for trecho, valor_km_aprovado in novos_valores_trechos:
-        if trecho.valor_km_aprovado != valor_km_aprovado:
-            trecho.valor_km_aprovado = valor_km_aprovado
-            trecho.save(update_fields=["valor_km_aprovado"])
-
-    return []
+def _relatorio_editavel_por_usuario(relatorio, user):
+    return usuario_pode_editar_relatorio(user, relatorio)
 
 
 def _avisos_financeiro(relatorio):
@@ -482,7 +396,7 @@ def _avisos_financeiro(relatorio):
     return avisos
 
 
-class DashboardView(TemplateView):
+class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/dashboard.html"
 
     def get_context_data(self, **kwargs):
@@ -491,8 +405,8 @@ class DashboardView(TemplateView):
         total_relatorios = RelatorioTecnico.objects.count()
         total_base = total_relatorios or 1
 
-        total_pendentes = RelatorioTecnico.objects.filter(
-            status=StatusRelatorio.PENDENTE
+        total_conferencia = RelatorioTecnico.objects.filter(
+            status=StatusRelatorio.CONFERENCIA
         ).count()
 
         total_adiantamentos = Adiantamento.objects.aggregate(total=Sum("valor"))[
@@ -522,7 +436,13 @@ class DashboardView(TemplateView):
             *select_related_fields
         ).order_by("-criado_em")[:8]
 
-        status_keys = ["rascunho", "pendente", "fechado", "aprovado", "faturado"]
+        status_keys = [
+            StatusRelatorio.RASCUNHO,
+            StatusRelatorio.CONFERENCIA,
+            StatusRelatorio.AJUSTE,
+            StatusRelatorio.APROVADO,
+            StatusRelatorio.REJEITADO,
+        ]
         status_choices = dict(getattr(StatusRelatorio, "choices", []))
         percentuais = {
             status: (
@@ -546,7 +466,8 @@ class DashboardView(TemplateView):
             {
                 "titulo_pagina": "Dashboard",
                 "total_relatorios": total_relatorios,
-                "total_pendentes": total_pendentes,
+                "total_pendentes": total_conferencia,
+                "total_conferencia": total_conferencia,
                 "total_adiantamentos_valor": total_adiantamentos,
                 "total_despesas_valor": total_despesas_valor,
                 "total_tecnicos": total_tecnicos,
@@ -569,11 +490,11 @@ class DashboardView(TemplateView):
                         "rodape": "total lançado no sistema",
                     },
                     {
-                        "titulo": "Pendentes",
-                        "valor": total_pendentes,
+                        "titulo": "Conferência",
+                        "valor": total_conferencia,
                         "icone": "bi-hourglass-split",
                         "cor": "warning",
-                        "rodape": "aguardando fechamento",
+                        "rodape": "aguardando conferÃªncia",
                     },
                     {
                         "titulo": "Total de Despesas",
@@ -585,10 +506,10 @@ class DashboardView(TemplateView):
                 ],
                 "relatorios_recentes": relatorios_recentes,
                 "pct_rascunho": percentuais.get("rascunho", 0),
-                "pct_pendente": percentuais.get("pendente", 0),
-                "pct_fechado": percentuais.get("fechado", 0),
+                "pct_pendente": percentuais.get(StatusRelatorio.CONFERENCIA, 0),
+                "pct_conferencia": percentuais.get(StatusRelatorio.CONFERENCIA, 0),
+                "pct_ajuste": percentuais.get(StatusRelatorio.AJUSTE, 0),
                 "pct_aprovado": percentuais.get("aprovado", 0),
-                "pct_faturado": percentuais.get("faturado", 0),
                 "percentuais_status": percentuais,
             }
         )
@@ -601,7 +522,7 @@ class DashboardView(TemplateView):
 # ─────────────────────────────────────────────
 
 
-class RelatorioListView(ListView):
+class RelatorioListView(LoginRequiredMixin, ListView):
     model = RelatorioTecnico
     template_name = "relatorios/relatorio_list.html"
     context_object_name = "relatorios"
@@ -645,6 +566,7 @@ class RelatorioListView(ListView):
 # ─────────────────────────────────────────────
 
 
+@login_required
 def relatorio_form_view(request, pk=None):
     """
     View única para criar e editar relatórios.
@@ -656,8 +578,11 @@ def relatorio_form_view(request, pk=None):
                           NUNCA é gravada no banco diretamente.
     """
     instance = get_object_or_404(RelatorioTecnico, pk=pk) if pk else None
-    if instance and _relatorio_bloqueado(instance):
-        messages.error(request, "Relatório aprovado não pode ser editado.")
+    if instance and not _relatorio_editavel_por_usuario(instance, request.user):
+        if instance.status == StatusRelatorio.AJUSTE:
+            messages.error(request, "Relatório em ajuste deve ser editado pelo técnico.")
+        else:
+            messages.error(request, "Relatório aprovado ou rejeitado não pode ser editado.")
         return redirect("relatorios:relatorio_detail", pk=instance.pk)
 
     resumo_erros = []
@@ -689,7 +614,6 @@ def relatorio_form_view(request, pk=None):
             request.POST,
             request.FILES,
             instance=instance,
-            numero_sugerido=None if instance else _proximo_numero_relatorio(),
         )
 
         fs_desp = ItemDespesaFormSet(
@@ -732,47 +656,11 @@ def relatorio_form_view(request, pk=None):
             relatorio = form.save(commit=False)
 
             if acao == "rascunho":
-                relatorio.status = StatusRelatorio.RASCUNHO
+                relatorio.status = instance.status if instance else StatusRelatorio.RASCUNHO
             else:
-                # "enviar" ou qualquer valor desconhecido → pendente
-                relatorio.status = StatusRelatorio.PENDENTE
+                relatorio.status = instance.status if instance else StatusRelatorio.RASCUNHO
 
-            tem_despesa = any(_form_has_content(f) for f in fs_desp.forms)
-
-            # ── Validações extras (apenas para status que exigem) ─────────────
-            # Usamos uma flag local em vez de re-checar .errors dos formsets,
-            # porque fs_desp.errors retorna [{}, {}, ...] para forms vazios
-            # (dicts vazios são falsy individualmente, mas a lista é truthy),
-            # o que tornava o teste `not any(fs_desp.errors)` não confiável.
             erros_extras = False
-
-            if (
-                relatorio.status in {StatusRelatorio.FECHADO, StatusRelatorio.FATURADO}
-                and not tem_despesa
-            ):
-                form.add_error(
-                    None,
-                    "É necessário informar ao menos um item de despesa para fechar o relatório.",
-                )
-                erros_extras = True
-
-            elif relatorio.status == StatusRelatorio.FATURADO:
-                # Comprovante obrigatório só para FATURADO (não para PENDENTE).
-                # Para PENDENTE, o aviso é feito via modal no frontend — o
-                # usuário pode confirmar e enviar sem comprovante.
-                for f in fs_desp.forms:
-                    if not _form_has_content(f):
-                        continue
-                    comprovante = f.cleaned_data.get("comprovante") or getattr(
-                        f.instance, "comprovante", None
-                    )
-                    if not comprovante:
-                        f.add_error(
-                            "comprovante",
-                            "Comprovante obrigatório para status Faturado.",
-                        )
-                        erros_extras = True
-                        break
 
             # ── Salvar ────────────────────────────────────────────────────────
             # Condição limpa: só usa a flag local + form.errors do principal.
@@ -782,8 +670,7 @@ def relatorio_form_view(request, pk=None):
             if not erros_extras and not form.errors:
                 try:
                     with transaction.atomic():
-                        if not instance:
-                            _atribuir_numero_automatico(relatorio)
+                        relatorio_novo = instance is None
                         relatorio.save()
                         form.save_m2m()
 
@@ -812,9 +699,25 @@ def relatorio_form_view(request, pk=None):
                             if f.instance.pk:
                                 f.instance.delete()
 
+                        usuario_historico = (
+                            request.user if request.user.is_authenticated else None
+                        )
+                        if relatorio_novo:
+                            registrar_evento(
+                                relatorio,
+                                usuario_historico,
+                                TipoEventoHistorico.CRIADO,
+                                f"Rascunho {relatorio.identificador} criado.",
+                            )
+                        if acao != "rascunho":
+                            relatorio = enviar_para_conferencia(
+                                relatorio.pk,
+                                usuario_historico,
+                            )
+
                         logger.info(
                             "Relatório %s salvo (pk=%s, status=%s, acao=%s).",
-                            relatorio.numero,
+                            relatorio.identificador,
                             relatorio.pk,
                             relatorio.status,
                             acao,
@@ -822,10 +725,36 @@ def relatorio_form_view(request, pk=None):
 
                     messages.success(
                         request,
-                        f"Relatório {relatorio.numero} salvo com sucesso.",
+                        f"Relatório {relatorio.identificador} salvo com sucesso.",
                     )
                     return redirect("relatorios:relatorio_detail", pk=relatorio.pk)
 
+                except WorkflowError as exc:
+                    messages.error(request, str(exc))
+                    resumo_erros.append(str(exc))
+                    return render(
+                        request,
+                        "relatorios/relatorio_form.html",
+                        {
+                            "form": form,
+                            "fs_desp": fs_desp,
+                            "fs_km": fs_km,
+                            "instance": instance,
+                            "clientes_importacao": Cliente.objects.filter(
+                                ativo=True
+                            ).order_by("nome"),
+                            "tecnicos_importacao": Tecnico.objects.filter(
+                                ativo=True
+                            ).order_by("nome"),
+                            "titulo_pagina": (
+                                f"Editar Relatório {instance.identificador}"
+                                if instance
+                                else "Novo Relatório"
+                            ),
+                            "valor_km_padrao": valor_km_padrao,
+                            "resumo_erros": resumo_erros,
+                        },
+                    )
                 except Exception as exc:
                     logger.exception("Erro ao salvar relatório: %s", exc)
                     messages.error(request, "Erro interno ao salvar. Tente novamente.")
@@ -845,7 +774,7 @@ def relatorio_form_view(request, pk=None):
                                 ativo=True
                             ).order_by("nome"),
                             "titulo_pagina": (
-                                f"Editar Relatório {instance.numero}"
+                                f"Editar Relatório {instance.identificador}"
                                 if instance
                                 else "Novo Relatório"
                             ),
@@ -874,10 +803,7 @@ def relatorio_form_view(request, pk=None):
 
     # ── GET ───────────────────────────────────────────────────────────────────
     else:
-        form = RelatorioTecnicoForm(
-            instance=instance,
-            numero_sugerido=None if instance else _proximo_numero_relatorio(),
-        )
+        form = RelatorioTecnicoForm(instance=instance)
 
         fs_desp = ItemDespesaFormSet(
             instance=instance,
@@ -902,7 +828,7 @@ def relatorio_form_view(request, pk=None):
             "clientes_importacao": Cliente.objects.filter(ativo=True).order_by("nome"),
             "tecnicos_importacao": Tecnico.objects.filter(ativo=True).order_by("nome"),
             "titulo_pagina": (
-                f"Editar Relatório {instance.numero}" if instance else "Novo Relatório"
+                f"Editar Relatório {instance.identificador}" if instance else "Novo Relatório"
             ),
             "salvar_rascunho": "Salvar rascunho",
             "enviar": "Salvar alterações" if instance else "Criar Relatório",
@@ -928,6 +854,7 @@ def relatorio_update(request, pk):
 # ─────────────────────────────────────────────
 
 
+@login_required
 def nova_linha_despesa(request):
     """
     Retorna o HTML de uma nova linha de despesa vazia.
@@ -956,6 +883,7 @@ def nova_linha_despesa(request):
 # ─────────────────────────────────────────────
 
 
+@login_required
 def nova_linha_km(request):
     """
     Retorna o HTML de uma nova linha de trecho KM.
@@ -1005,11 +933,12 @@ def nova_linha_km(request):
 # ─────────────────────────────────────────────
 
 
+@login_required
 def relatorio_detail_view(request, pk):
     relatorio = get_object_or_404(
         RelatorioTecnico.objects.select_related(
             "cliente", "tecnico_responsavel"
-        ).prefetch_related("despesas", "trechos", "equipe__tecnico"),
+        ).prefetch_related("despesas", "trechos", "equipe__tecnico", "historicos__usuario"),
         pk=pk,
     )
 
@@ -1019,7 +948,10 @@ def relatorio_detail_view(request, pk):
         {
             "relatorio": relatorio,
             "avisos_financeiro": _avisos_financeiro(relatorio),
-            "titulo_pagina": f"Relatório {relatorio.numero}",
+            "pode_editar_relatorio": _relatorio_editavel_por_usuario(
+                relatorio, request.user
+            ),
+            "titulo_pagina": f"Relatório {relatorio.identificador}",
         },
     )
 
@@ -1029,6 +961,7 @@ def relatorio_detail_view(request, pk):
 # ─────────────────────────────────────────────
 
 
+@login_required
 def relatorio_reembolso_pdf_view(request, pk):
     relatorio = get_object_or_404(
         RelatorioTecnico.objects.select_related(
@@ -1040,7 +973,7 @@ def relatorio_reembolso_pdf_view(request, pk):
         ),
         pk=pk,
     )
-    if relatorio.status not in {StatusRelatorio.APROVADO, StatusRelatorio.FATURADO}:
+    if relatorio.status != StatusRelatorio.APROVADO:
         messages.error(request, "O PDF oficial só pode ser gerado após aprovação.")
         return redirect("relatorios:relatorio_detail", pk=pk)
 
@@ -1082,14 +1015,72 @@ def relatorio_reembolso_pdf_view(request, pk):
     return response
 
 
+@login_required
+@exigir_financeiro
+def relatorio_pdf_interno_view(request, pk):
+    relatorio = get_object_or_404(
+        RelatorioTecnico.objects.select_related(
+            "cliente",
+            "tecnico_responsavel",
+            "aprovado_por",
+        ).prefetch_related(
+            "despesas",
+            "trechos",
+            "equipe__tecnico",
+            "historicos__usuario",
+        ),
+        pk=pk,
+    )
+    emitido_em = timezone.localtime(timezone.now())
+    usuario_gerador = request.user if request.user.is_authenticated else None
+    historicos_resumidos = relatorio.historicos.all()[:10]
+    anexos = [despesa for despesa in relatorio.despesas.all() if despesa.comprovante]
+
+    html = render_to_string(
+        "relatorios/pdf/interno.html",
+        {
+            "relatorio": relatorio,
+            "empresa": "CONTROL SUL GESTÃO EMPRESARIAL",
+            "emitido_em": emitido_em,
+            "usuario_gerador": usuario_gerador,
+            "avisos_financeiro": _avisos_financeiro(relatorio),
+            "historicos_resumidos": historicos_resumidos,
+            "anexos": anexos,
+        },
+        request=request,
+    )
+
+    try:
+        from weasyprint import CSS, HTML
+    except Exception as exc:
+        logger.exception("WeasyPrint não está disponível: %s", exc)
+        messages.error(
+            request,
+            "WeasyPrint não está disponível neste ambiente. Verifique a instalação das dependências nativas.",
+        )
+        return redirect("relatorios:relatorio_detail", pk=pk)
+
+    css_path = settings.BASE_DIR / "static" / "css" / "pdf-relatorio.css"
+    pdf = HTML(
+        string=html,
+        base_url=request.build_absolute_uri("/"),
+    ).write_pdf(stylesheets=[CSS(filename=str(css_path))])
+
+    filename = f"relatorio-interno-{relatorio.numero}.pdf"
+    response = HttpResponse(pdf, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="{filename}"'
+    return response
+
+
+@login_required
 def relatorio_delete_view(request, pk):
     relatorio = get_object_or_404(RelatorioTecnico, pk=pk)
     if _relatorio_bloqueado(relatorio):
-        messages.error(request, "Relatório aprovado não pode ser excluído.")
+        messages.error(request, "Relatório aprovado ou rejeitado não pode ser excluído.")
         return redirect("relatorios:relatorio_detail", pk=pk)
 
     if request.method == "POST":
-        numero = relatorio.numero
+        numero = relatorio.identificador
         relatorio.delete()
         messages.success(request, f"Relatório {numero} excluído.")
         return redirect("relatorios:relatorio_list")
@@ -1109,6 +1100,7 @@ def relatorio_delete_view(request, pk):
 
 
 @require_GET
+@login_required
 def relatorio_import_list_json(request):
     qs = RelatorioTecnico.objects.select_related(
         "cliente",
@@ -1144,7 +1136,7 @@ def relatorio_import_list_json(request):
     relatorios = [
         {
             "id": relatorio.pk,
-            "numero": relatorio.numero,
+            "numero": relatorio.identificador,
             "data": _formatar_data(relatorio.data_inicio),
             "cliente": relatorio.cliente.nome,
             "tecnico": relatorio.tecnico_responsavel.nome,
@@ -1157,6 +1149,7 @@ def relatorio_import_list_json(request):
 
 
 @require_GET
+@login_required
 def relatorio_import_detail_json(request, pk):
     relatorio = get_object_or_404(
         RelatorioTecnico.objects.select_related(
@@ -1173,7 +1166,7 @@ def relatorio_import_detail_json(request, pk):
     return JsonResponse(
         {
             "id": relatorio.pk,
-            "numero": relatorio.numero,
+            "numero": relatorio.identificador,
             "cliente_id": relatorio.cliente_id,
             "tecnico_id": relatorio.tecnico_responsavel_id,
             "apoio_ids": list(relatorio.equipe.values_list("tecnico_id", flat=True)),
@@ -1200,6 +1193,7 @@ def relatorio_import_detail_json(request, pk):
 
 
 @require_POST
+@login_required
 def relatorio_duplicate_view(request, pk):
     original = get_object_or_404(
         RelatorioTecnico.objects.select_related(
@@ -1215,7 +1209,8 @@ def relatorio_duplicate_view(request, pk):
 
     try:
         with transaction.atomic():
-            novo = _duplicar_relatorio(original)
+            usuario_historico = request.user if request.user.is_authenticated else None
+            novo = _duplicar_relatorio(original, usuario_historico)
     except Exception as exc:
         logger.exception("Erro ao duplicar relatÃ³rio %s: %s", pk, exc)
         messages.error(request, "Erro interno ao duplicar relatÃ³rio. Tente novamente.")
@@ -1223,17 +1218,17 @@ def relatorio_duplicate_view(request, pk):
 
     messages.success(
         request,
-        f"RelatÃ³rio {original.numero} duplicado como rascunho {novo.numero}.",
+        f"Relatório {original.identificador} duplicado como {novo.identificador}.",
     )
     return redirect("relatorios:relatorio_update", pk=novo.pk)
 
 
 @require_POST
-def relatorio_status_view(request, pk, status):
-    status_validos = [s[0] for s in StatusRelatorio.choices]
-
-    if status not in status_validos:
-        messages.error(request, "Status inválido.")
+@login_required
+@exigir_financeiro
+def relatorio_item_financeiro_view(request, pk, tipo, item_pk, acao):
+    if tipo not in {"despesa", "trecho"} or acao not in {"rejeitar", "restaurar"}:
+        messages.error(request, "Ação inválida para o item.")
         return redirect("relatorios:relatorio_detail", pk=pk)
 
     try:
@@ -1241,39 +1236,143 @@ def relatorio_status_view(request, pk, status):
             relatorio = get_object_or_404(
                 RelatorioTecnico.objects.select_for_update(), pk=pk
             )
-
             if _relatorio_bloqueado(relatorio):
-                messages.error(request, "Relatório aprovado está bloqueado para alterações.")
+                messages.error(
+                    request,
+                    "Relatório aprovado ou rejeitado está bloqueado para alterações.",
+                )
                 return redirect("relatorios:relatorio_detail", pk=pk)
 
-            if status == StatusRelatorio.PENDENTE:
-                erros = relatorio.pode_enviar()
-                if erros:
-                    for e in erros:
-                        messages.error(request, e)
+            modelo = ItemDespesa if tipo == "despesa" else TrechoKm
+            item = get_object_or_404(
+                modelo.objects.select_for_update(),
+                pk=item_pk,
+                relatorio=relatorio,
+            )
+
+            usuario_historico = (
+                request.user if request.user.is_authenticated else None
+            )
+
+            if acao == "rejeitar":
+                motivo = (
+                    request.POST.get("motivo_rejeicao")
+                    or request.POST.get("motivo_recusa")
+                    or ""
+                ).strip()
+                if not motivo:
+                    messages.error(request, "Informe a justificativa da rejeição do item.")
                     return redirect("relatorios:relatorio_detail", pk=pk)
 
-            if status == StatusRelatorio.APROVADO:
-                erros = _salvar_valores_aprovados_financeiro(
-                    request, relatorio, consolidar=True
+                agora = timezone.now()
+                item.rejeitado = True
+                item.motivo_rejeicao = motivo
+                item.rejeitado_por = usuario_historico
+                item.rejeitado_em = agora
+                item.status_financeiro = StatusFinanceiroItem.REJEITADO
+                item.motivo_recusa = motivo
+                item.save(
+                    update_fields=[
+                        "rejeitado",
+                        "motivo_rejeicao",
+                        "rejeitado_por",
+                        "rejeitado_em",
+                        "status_financeiro",
+                        "motivo_recusa",
+                    ]
                 )
-                if erros:
-                    for erro in erros:
-                        messages.error(request, erro)
-                    return redirect("relatorios:relatorio_detail", pk=pk)
 
-                relatorio.aprovado_em = timezone.now()
-                relatorio.aprovado_por = (
-                    request.user if request.user.is_authenticated else None
+                if tipo == "despesa":
+                    descricao = f"Despesa rejeitada pelo financeiro: {motivo}"
+                else:
+                    descricao = f"Trecho KM rejeitado pelo financeiro: {motivo}"
+
+                registrar_evento(
+                    relatorio,
+                    usuario_historico,
+                    TipoEventoHistorico.ITEM_REJEITADO,
+                    descricao,
+                    {
+                        "tipo_item": tipo,
+                        "item_id": item.pk,
+                        "motivo": motivo,
+                    },
                 )
-                _registrar_adiantamento_do_relatorio(relatorio)
+                messages.success(request, "Item removido do reembolso.")
 
-            relatorio.status = status
-            update_fields = ["status", "atualizado_em"]
-            if status == StatusRelatorio.APROVADO:
-                update_fields.extend(["aprovado_em", "aprovado_por"])
-            relatorio.save(update_fields=update_fields)
+            else:
+                item.rejeitado = False
+                item.motivo_rejeicao = ""
+                item.rejeitado_por = None
+                item.rejeitado_em = None
+                item.status_financeiro = StatusFinanceiroItem.APROVADO
+                item.motivo_recusa = ""
+                item.save(
+                    update_fields=[
+                        "rejeitado",
+                        "motivo_rejeicao",
+                        "rejeitado_por",
+                        "rejeitado_em",
+                        "status_financeiro",
+                        "motivo_recusa",
+                    ]
+                )
+                registrar_evento(
+                    relatorio,
+                    usuario_historico,
+                    TipoEventoHistorico.ITEM_REATIVADO,
+                    "Item restaurado pelo financeiro.",
+                    {
+                        "tipo_item": tipo,
+                        "item_id": item.pk,
+                    },
+                )
+                messages.success(request, "Item restaurado para o reembolso.")
 
+    except Exception as exc:
+        logger.exception("Erro ao alterar item financeiro do relatório %s: %s", pk, exc)
+        messages.error(request, "Erro interno ao alterar item. Tente novamente.")
+
+    return redirect("relatorios:relatorio_detail", pk=pk)
+
+
+@require_POST
+@login_required
+def relatorio_status_view(request, pk, status):
+    try:
+        usuario_historico = request.user if request.user.is_authenticated else None
+        if status == StatusRelatorio.CONFERENCIA:
+            relatorio = enviar_para_conferencia(pk, usuario_historico)
+        elif status in {
+            StatusRelatorio.AJUSTE,
+            StatusRelatorio.REJEITADO,
+            StatusRelatorio.APROVADO,
+        } and not usuario_pode_atuar_como_financeiro(request.user):
+            messages.error(request, "Você não tem permissão para executar esta ação financeira.")
+            return redirect("relatorios:relatorio_detail", pk=pk)
+        elif status == StatusRelatorio.AJUSTE:
+            relatorio = solicitar_ajuste(
+                pk,
+                usuario_historico,
+                request.POST.get("motivo_rejeicao", ""),
+            )
+        elif status == StatusRelatorio.REJEITADO:
+            relatorio = rejeitar_relatorio(
+                pk,
+                usuario_historico,
+                request.POST.get("motivo_rejeicao", ""),
+            )
+        elif status == StatusRelatorio.APROVADO:
+            relatorio = aprovar_relatorio(pk, usuario_historico, request.POST)
+        else:
+            messages.error(request, "Status inválido.")
+            return redirect("relatorios:relatorio_detail", pk=pk)
+    except WorkflowError as exc:
+        messages.error(request, str(exc))
+        return redirect("relatorios:relatorio_detail", pk=pk)
+    except RelatorioTecnico.DoesNotExist:
+        messages.error(request, "Relatório não encontrado.")
+        return redirect("relatorios:relatorio_list")
     except Exception as exc:
         logger.exception("Erro ao alterar status do relatório %s: %s", pk, exc)
         messages.error(request, "Erro interno ao alterar status. Tente novamente.")
@@ -1291,7 +1390,7 @@ def relatorio_status_view(request, pk, status):
 # ─────────────────────────────────────────────
 
 
-class TecnicoListView(ListView):
+class TecnicoListView(LoginRequiredMixin, ListView):
     model = Tecnico
     template_name = "tecnicos/tecnico_list.html"
     context_object_name = "tecnicos"
@@ -1311,6 +1410,7 @@ class TecnicoListView(ListView):
         return ctx
 
 
+@login_required
 def tecnico_form_view(request, pk=None):
     instance = get_object_or_404(Tecnico, pk=pk) if pk else None
     form = TecnicoForm(request.POST or None, instance=instance)
@@ -1331,6 +1431,7 @@ def tecnico_form_view(request, pk=None):
     )
 
 
+@login_required
 def tecnico_delete_view(request, pk):
     tecnico = get_object_or_404(Tecnico, pk=pk)
     if request.method == "POST":
@@ -1352,7 +1453,7 @@ def tecnico_delete_view(request, pk):
 # ─────────────────────────────────────────────
 
 
-class ClienteListView(ListView):
+class ClienteListView(LoginRequiredMixin, ListView):
     model = Cliente
     template_name = "clientes/cliente_list.html"
     context_object_name = "clientes"
@@ -1376,6 +1477,7 @@ class ClienteListView(ListView):
         return ctx
 
 
+@login_required
 def cliente_form_view(request, pk=None):
     instance = get_object_or_404(Cliente, pk=pk) if pk else None
     form = ClienteForm(request.POST or None, instance=instance)
@@ -1396,6 +1498,7 @@ def cliente_form_view(request, pk=None):
     )
 
 
+@login_required
 def cliente_delete_view(request, pk):
     cliente = get_object_or_404(Cliente, pk=pk)
     if request.method == "POST":
@@ -1417,7 +1520,7 @@ def cliente_delete_view(request, pk):
 # ─────────────────────────────────────────────
 
 
-class AdiantamentoListView(ListView):
+class AdiantamentoListView(LoginRequiredMixin, ListView):
     model = Adiantamento
     template_name = "adiantamentos/adiantamento_list.html"
     context_object_name = "adiantamentos"
@@ -1441,6 +1544,7 @@ class AdiantamentoListView(ListView):
         return ctx
 
 
+@login_required
 def adiantamento_form_view(request, pk=None):
     instance = get_object_or_404(Adiantamento, pk=pk) if pk else None
     form = AdiantamentoForm(request.POST or None, instance=instance)
@@ -1461,6 +1565,7 @@ def adiantamento_form_view(request, pk=None):
     )
 
 
+@login_required
 def adiantamento_delete_view(request, pk):
     obj = get_object_or_404(Adiantamento, pk=pk)
     if request.method == "POST":

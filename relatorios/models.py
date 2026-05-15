@@ -24,11 +24,28 @@ def _valor_monetario(valor):
 
 class StatusRelatorio(models.TextChoices):
     RASCUNHO = "rascunho", "Rascunho"
-    PENDENTE = "pendente", "Pendente aprovação"
+    CONFERENCIA = "conferencia_pendente", "Conferência pendente"
+    AJUSTE = "ajuste_pendente", "Ajuste pendente"
     APROVADO = "aprovado", "Aprovado"
     REJEITADO = "rejeitado", "Rejeitado"
-    FATURADO = "faturado", "Faturado"
-    FECHADO = "fechado", "Fechado"
+
+
+class StatusFinanceiroItem(models.TextChoices):
+    APROVADO = "aprovado", "Aprovado"
+    REJEITADO = "rejeitado", "Rejeitado"
+
+
+class TipoEventoHistorico(models.TextChoices):
+    CRIADO = "criado", "Relatório criado"
+    ENVIADO = "enviado", "Relatório enviado para conferência"
+    AJUSTE_SOLICITADO = "ajuste_solicitado", "Financeiro solicitou ajustes"
+    REENVIADO = "reenviado", "Relatório reenviado para conferência"
+    APROVADO = "aprovado", "Relatório aprovado"
+    REJEITADO = "rejeitado", "Relatório rejeitado definitivamente"
+    ITEM_REJEITADO = "item_rejeitado", "Item rejeitado pelo financeiro"
+    ITEM_REATIVADO = "item_reativado", "Item reativado pelo financeiro"
+    VALOR_ALTERADO = "valor_alterado", "Valor aprovado alterado"
+
 
 class TipoLocalidade(models.TextChoices):
     CAPITAL = "capital", "Capital"
@@ -261,10 +278,16 @@ class PoliticaValor(models.Model):
 
 class RelatorioTecnico(models.Model):
     # Identificação
-    numero = models.CharField("Número", max_length=30, unique=True)
+    numero = models.CharField(
+        "Número",
+        max_length=30,
+        unique=True,
+        null=True,
+        blank=True,
+    )
     status = models.CharField(
         "Status",
-        max_length=20,
+        max_length=30,
         choices=StatusRelatorio.choices,
         default=StatusRelatorio.RASCUNHO,
     )
@@ -326,6 +349,7 @@ class RelatorioTecnico(models.Model):
     )
 
     observacoes = models.TextField("Observações gerais", blank=True)
+    motivo_rejeicao = models.TextField("Justificativa financeira", blank=True)
     aprovado_em = models.DateTimeField("Aprovado em", null=True, blank=True)
     aprovado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -344,7 +368,11 @@ class RelatorioTecnico(models.Model):
         ordering = ["-data_inicio", "-criado_em"]
 
     def __str__(self):
-        return f"{self.numero} — {self.cliente}"
+        return f"{self.identificador} — {self.cliente}"
+
+    @property
+    def identificador(self):
+        return self.numero or f"Rascunho #{self.pk or 'novo'}"
 
     # ── Financeiro ──────────────────────────────────────────────
 
@@ -376,9 +404,53 @@ class RelatorioTecnico(models.Model):
         )
 
     @property
+    def total_solicitado(self):
+        return self.total_despesas
+
+    @property
+    def total_aprovado_despesas(self):
+        total = sum(
+            (despesa.valor_final for despesa in self.despesas.all()),
+            Decimal("0.00"),
+        )
+        return _valor_monetario(total)
+
+    @property
+    def total_aprovado_km(self):
+        total = sum(
+            (trecho.valor_final for trecho in self.trechos.all()),
+            Decimal("0.00"),
+        )
+        return _valor_monetario(total)
+
+    @property
+    def total_aprovado(self):
+        return _valor_monetario(self.total_aprovado_despesas + self.total_aprovado_km)
+
+    @property
+    def diferenca_removida(self):
+        diferenca = self.total_solicitado - self.total_aprovado
+        return _valor_monetario(diferenca if diferenca > 0 else Decimal("0.00"))
+
+    @property
     def saldo(self):
         return _valor_monetario(
             self.total_despesas_tecnico + self.total_km - self.valor_adiantamento
+        )
+
+    @property
+    def saldo_aprovado(self):
+        total_empresa_aprovado = sum(
+            (
+                despesa.valor_final
+                for despesa in self.despesas.filter(quem_pagou=QuemPagou.EMPRESA)
+            ),
+            Decimal("0.00"),
+        )
+        return _valor_monetario(
+            self.total_aprovado
+            - _valor_monetario(total_empresa_aprovado)
+            - self.valor_adiantamento
         )
 
     @property
@@ -389,11 +461,10 @@ class RelatorioTecnico(models.Model):
     def status_badge_cor(self):
         return {
             StatusRelatorio.RASCUNHO: "secondary",
-            StatusRelatorio.PENDENTE: "warning",
+            StatusRelatorio.CONFERENCIA: "warning",
+            StatusRelatorio.AJUSTE: "orange",
             StatusRelatorio.APROVADO: "success",
             StatusRelatorio.REJEITADO: "danger",
-            StatusRelatorio.FATURADO: "info",
-            StatusRelatorio.FECHADO: "info",
         }.get(self.status, "secondary")
 
     def clean(self):
@@ -408,6 +479,80 @@ class RelatorioTecnico(models.Model):
         if not self.despesas.exists() and not self.trechos.exists():
             erros.append("Adicione pelo menos uma despesa ou trecho de KM.")
         return erros
+
+
+class HistoricoRelatorio(models.Model):
+    relatorio = models.ForeignKey(
+        RelatorioTecnico,
+        on_delete=models.CASCADE,
+        related_name="historicos",
+    )
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="historicos_relatorios",
+    )
+    acao = models.CharField("Ação", max_length=100)
+    tipo_evento = models.CharField(
+        "Tipo de evento",
+        max_length=30,
+        choices=TipoEventoHistorico.choices,
+        default=TipoEventoHistorico.CRIADO,
+        db_index=True,
+    )
+    descricao = models.TextField("Descrição", blank=True)
+    created_at = models.DateTimeField("Criado em", auto_now_add=True)
+    data_hora = models.DateTimeField("Data/hora", auto_now_add=True, db_index=True)
+    dados_json = models.JSONField("Dados JSON", default=dict, blank=True)
+
+    class Meta:
+        verbose_name = "Histórico do Relatório"
+        verbose_name_plural = "Históricos dos Relatórios"
+        ordering = ["-data_hora", "-created_at"]
+
+    def __str__(self):
+        return f"{self.relatorio.numero} — {self.acao}"
+
+    @property
+    def badge_cor(self):
+        return {
+            TipoEventoHistorico.CRIADO: "secondary",
+            TipoEventoHistorico.ENVIADO: "warning",
+            TipoEventoHistorico.AJUSTE_SOLICITADO: "orange",
+            TipoEventoHistorico.REENVIADO: "warning",
+            TipoEventoHistorico.APROVADO: "success",
+            TipoEventoHistorico.REJEITADO: "danger",
+            TipoEventoHistorico.ITEM_REJEITADO: "danger",
+            TipoEventoHistorico.ITEM_REATIVADO: "primary",
+            TipoEventoHistorico.VALOR_ALTERADO: "info",
+        }.get(self.tipo_evento, "secondary")
+
+
+def registrar_historico(relatorio, usuario, acao, descricao, dados_json=None):
+    from .services.historico_service import registrar_evento
+
+    return registrar_evento(
+        relatorio=relatorio,
+        usuario=usuario,
+        tipo_evento=acao,
+        descricao=descricao,
+        dados_json=dados_json,
+    )
+
+
+class SequencialRelatorio(models.Model):
+    chave = models.CharField("Chave", max_length=50, unique=True)
+    proximo_numero = models.PositiveIntegerField("Próximo número", default=1)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Sequencial de Relatório"
+        verbose_name_plural = "Sequenciais de Relatórios"
+
+    def __str__(self):
+        return f"{self.chave}: {self.proximo_numero}"
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -473,6 +618,24 @@ class ItemDespesa(models.Model):
         null=True,
         blank=True,
     )
+    status_financeiro = models.CharField(
+        "Status financeiro",
+        max_length=10,
+        choices=StatusFinanceiroItem.choices,
+        default=StatusFinanceiroItem.APROVADO,
+    )
+    motivo_recusa = models.TextField("Motivo da recusa", blank=True)
+    rejeitado = models.BooleanField("Rejeitado pelo financeiro", default=False)
+    motivo_rejeicao = models.TextField("Motivo da rejeição", blank=True)
+    rejeitado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="despesas_rejeitadas",
+        verbose_name="Rejeitado por",
+    )
+    rejeitado_em = models.DateTimeField("Rejeitado em", null=True, blank=True)
     quem_pagou = models.CharField(
         "Quem pagou",
         max_length=10,
@@ -495,6 +658,23 @@ class ItemDespesa(models.Model):
 
     def __str__(self):
         return f"{self.get_tipo_display()} — R$ {self.valor}"
+
+    @property
+    def valor_final(self):
+        if self.rejeitado or self.status_financeiro == StatusFinanceiroItem.REJEITADO:
+            return Decimal("0.00")
+        return _valor_monetario(
+            self.valor_aprovado if self.valor_aprovado is not None else self.valor
+        )
+
+    @property
+    def valor_ajustado(self):
+        return (
+            not self.rejeitado
+            and self.status_financeiro == StatusFinanceiroItem.APROVADO
+            and self.valor_aprovado is not None
+            and self.valor_aprovado != self.valor
+        )
 
     def clean(self):
         erros = {}
@@ -550,6 +730,24 @@ class TrechoKm(models.Model):
         null=True,
         blank=True,
     )
+    status_financeiro = models.CharField(
+        "Status financeiro",
+        max_length=10,
+        choices=StatusFinanceiroItem.choices,
+        default=StatusFinanceiroItem.APROVADO,
+    )
+    motivo_recusa = models.TextField("Motivo da recusa", blank=True)
+    rejeitado = models.BooleanField("Rejeitado pelo financeiro", default=False)
+    motivo_rejeicao = models.TextField("Motivo da rejeição", blank=True)
+    rejeitado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="trechos_km_rejeitados",
+        verbose_name="Rejeitado por",
+    )
+    rejeitado_em = models.DateTimeField("Rejeitado em", null=True, blank=True)
     valor_calculado = models.DecimalField(
         "Valor calculado (R$)",
         max_digits=10,
@@ -566,6 +764,29 @@ class TrechoKm(models.Model):
 
     def __str__(self):
         return f"{self.origem} → {self.destino} ({self.km} km)"
+
+    @property
+    def valor_km_final(self):
+        return (
+            self.valor_km_aprovado
+            if self.valor_km_aprovado is not None
+            else self.valor_km
+        )
+
+    @property
+    def valor_final(self):
+        if self.rejeitado or self.status_financeiro == StatusFinanceiroItem.REJEITADO:
+            return Decimal("0.00")
+        return _valor_monetario(self.km * self.valor_km_final)
+
+    @property
+    def valor_ajustado(self):
+        return (
+            not self.rejeitado
+            and self.status_financeiro == StatusFinanceiroItem.APROVADO
+            and self.valor_km_aprovado is not None
+            and self.valor_km_aprovado != self.valor_km
+        )
 
     def save(self, *args, **kwargs):
         if not self.valor_km and self.data:

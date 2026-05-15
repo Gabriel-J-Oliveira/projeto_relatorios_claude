@@ -89,7 +89,7 @@
             <td class="ps-4">
               <a href="{% url 'relatorios:relatorio_detail' r.pk %}"
                  class="fw-semibold text-primary text-decoration-none">
-                {{ r.numero }}
+                {{ r.identificador }}
               </a>
             </td>
             <td>
@@ -104,19 +104,9 @@
             <td class="small">{{ r.total_km_percorrido }} km</td>
             <td class="small">R$ {{ r.total_despesas|floatformat:2 }}</td>
             <td>
-              {% if r.status == 'pendente' %}
-                <span class="badge bg-warning-subtle text-warning rounded-pill px-3">Pendente</span>
-              {% elif r.status == 'rascunho' %}
-                <span class="badge bg-secondary-subtle text-secondary rounded-pill px-3">Rascunho</span>
-              {% elif r.status == 'aprovado' %}
-                <span class="badge bg-success-subtle text-success rounded-pill px-3">Aprovado</span>
-              {% elif r.status == 'rejeitado' %}
-                <span class="badge bg-danger-subtle text-danger rounded-pill px-3">Rejeitado</span>
-              {% elif r.status == 'fechado' %}
-                <span class="badge bg-info-subtle text-info rounded-pill px-3">Fechado</span>
-              {% else %}
-                <span class="badge bg-info-subtle text-info rounded-pill px-3">Faturado</span>
-              {% endif %}
+              <span class="badge bg-{{ r.status_badge_cor }}-subtle text-{{ r.status_badge_cor }} rounded-pill px-3">
+                {{ r.get_status_display }}
+              </span>
             </td>
             <td class="text-end pe-4">
               <div class="d-flex gap-1 justify-content-end">
@@ -131,7 +121,7 @@
                     <span class="ms-1"></span>
                   </button>
                 </form>
-                {% if r.status != 'aprovado' and r.status != 'faturado' %}
+                {% if r.status != 'aprovado' and r.status != 'rejeitado' %}
                   <a href="{% url 'relatorios:relatorio_update' r.pk %}"
                      class="btn btn-sm btn-outline-primary" title="Editar">
                     <i class="bi bi-pencil"></i>

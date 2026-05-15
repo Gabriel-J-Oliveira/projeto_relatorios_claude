@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <title>Relatório Financeiro Interno {{ relatorio.identificador }}</title>
+</head>
+<body>
+  <header class="pdf-header">
+    <div class="brand">
+      <div class="brand-mark">CS</div>
+      <div>
+        <div class="company">{{ empresa }}</div>
+        <h1>Relatório Financeiro Interno</h1>
+      </div>
+    </div>
+    <div class="header-meta">
+      <div class="label">Relatório</div>
+      <div class="number">{{ relatorio.identificador }}</div>
+      <span class="status status-{{ relatorio.status }}">{{ relatorio.get_status_display }}</span>
+    </div>
+  </header>
+
+  <section class="section">
+    <h2>Dados do relatório</h2>
+    <div class="meta-grid">
+      <div>
+        <span class="label">Técnico</span>
+        <strong>{{ relatorio.tecnico_responsavel.nome }}</strong>
+      </div>
+      <div>
+        <span class="label">Cliente</span>
+        <strong>{{ relatorio.cliente.nome }}</strong>
+      </div>
+      <div>
+        <span class="label">Período</span>
+        <strong>{{ relatorio.data_inicio|date:"d/m/Y" }} a {{ relatorio.data_fim|date:"d/m/Y" }}</strong>
+      </div>
+      <div>
+        <span class="label">Emissão</span>
+        <strong>{{ emitido_em|date:"d/m/Y H:i" }}</strong>
+      </div>
+      <div>
+        <span class="label">Atendimento</span>
+        <strong>{{ relatorio.cidade_atendimento }}/{{ relatorio.uf_atendimento }}</strong>
+      </div>
+      <div>
+        <span class="label">Centro de custo</span>
+        <strong>{{ relatorio.centro_custo|default:"-" }}</strong>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-title-row">
+      <h2>Resumo financeiro</h2>
+      {% if relatorio.diferenca_removida > 0 %}
+        <span class="badge badge-warning">Divergência financeira</span>
+      {% endif %}
+    </div>
+    <div class="summary-grid">
+      <div class="summary-card">
+        <span>Total solicitado</span>
+        <strong>R$ {{ relatorio.total_solicitado|floatformat:2 }}</strong>
+      </div>
+      <div class="summary-card approved">
+        <span>Total aprovado</span>
+        <strong>R$ {{ relatorio.total_aprovado|floatformat:2 }}</strong>
+      </div>
+      <div class="summary-card removed">
+        <span>Diferença removida</span>
+        <strong>R$ {{ relatorio.diferenca_removida|floatformat:2 }}</strong>
+      </div>
+      <div class="summary-card">
+        <span>Adiantamento</span>
+        <strong>R$ {{ relatorio.valor_adiantamento|floatformat:2 }}</strong>
+      </div>
+      <div class="summary-card balance">
+        <span>Saldo final</span>
+        <strong>R$ {{ relatorio.saldo_aprovado|floatformat:2 }}</strong>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Despesas</h2>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Tipo</th>
+          <th>Descrição</th>
+          <th class="amount">Solicitado</th>
+          <th class="amount">Aprovado</th>
+          <th>Status</th>
+          <th>Motivo recusa</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for despesa in relatorio.despesas.all %}
+          <tr class="{% if despesa.rejeitado or despesa.status_financeiro == 'rejeitado' %}row-rejected{% elif despesa.valor_ajustado %}row-adjusted{% endif %}">
+            <td>{{ despesa.data|date:"d/m/Y"|default:"-" }}</td>
+            <td>{{ despesa.get_tipo_display }}</td>
+            <td>{{ despesa.descricao }}</td>
+            <td class="amount">R$ {{ despesa.valor|floatformat:2 }}</td>
+            <td class="amount">R$ {{ despesa.valor_final|floatformat:2 }}</td>
+            <td>
+              {% if despesa.rejeitado or despesa.status_financeiro == 'rejeitado' %}
+                <span class="badge badge-danger">REJEITADO</span>
+              {% elif despesa.valor_ajustado %}
+                <span class="badge badge-warning">AJUSTADO</span>
+              {% else %}
+                <span class="badge badge-success">APROVADO</span>
+              {% endif %}
+            </td>
+            <td>{{ despesa.motivo_rejeicao|default:despesa.motivo_recusa|default:"-" }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="empty">Nenhuma despesa registrada.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Trechos KM</h2>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Origem</th>
+          <th>Destino</th>
+          <th class="amount">KM</th>
+          <th class="amount">Valor/km original</th>
+          <th class="amount">Valor/km aprovado</th>
+          <th class="amount">Total final</th>
+          <th>Status</th>
+          <th>Motivo recusa</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for trecho in relatorio.trechos.all %}
+          <tr class="{% if trecho.rejeitado or trecho.status_financeiro == 'rejeitado' %}row-rejected{% elif trecho.valor_ajustado %}row-adjusted{% endif %}">
+            <td>{{ trecho.data|date:"d/m/Y"|default:"-" }}</td>
+            <td>{{ trecho.origem }}</td>
+            <td>{{ trecho.destino }}</td>
+            <td class="amount">{{ trecho.km|floatformat:1 }}</td>
+            <td class="amount">R$ {{ trecho.valor_km|floatformat:2 }}</td>
+            <td class="amount">R$ {{ trecho.valor_km_final|floatformat:2 }}</td>
+            <td class="amount">R$ {{ trecho.valor_final|floatformat:2 }}</td>
+            <td>
+              {% if trecho.rejeitado or trecho.status_financeiro == 'rejeitado' %}
+                <span class="badge badge-danger">REJEITADO</span>
+              {% elif trecho.valor_ajustado %}
+                <span class="badge badge-warning">AJUSTADO</span>
+              {% else %}
+                <span class="badge badge-success">APROVADO</span>
+              {% endif %}
+            </td>
+            <td>{{ trecho.motivo_rejeicao|default:trecho.motivo_recusa|default:"-" }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="9" class="empty">Nenhum trecho KM registrado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>Atenções identificadas</h2>
+    {% if avisos_financeiro %}
+      <ul class="notice-list">
+        {% for aviso in avisos_financeiro %}
+          <li>{{ aviso.mensagem }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="empty">Nenhum alerta financeiro identificado para este relatório.</p>
+    {% endif %}
+  </section>
+
+  <section class="section page-break-avoid">
+    <h2>Justificativas financeiras</h2>
+    {% if relatorio.motivo_rejeicao %}
+      <div class="note">
+        <strong>Justificativa do relatório:</strong>
+        <p>{{ relatorio.motivo_rejeicao }}</p>
+      </div>
+    {% endif %}
+    <div class="note-grid">
+      {% for despesa in relatorio.despesas.all %}
+        {% if despesa.rejeitado or despesa.status_financeiro == 'rejeitado' %}
+          <div class="note">
+            <strong>Despesa: {{ despesa.descricao }}</strong>
+            <p>{{ despesa.motivo_rejeicao|default:despesa.motivo_recusa|default:"Sem justificativa registrada." }}</p>
+          </div>
+        {% endif %}
+      {% endfor %}
+      {% for trecho in relatorio.trechos.all %}
+        {% if trecho.rejeitado or trecho.status_financeiro == 'rejeitado' %}
+          <div class="note">
+            <strong>Trecho KM: {{ trecho.origem }} → {{ trecho.destino }}</strong>
+            <p>{{ trecho.motivo_rejeicao|default:trecho.motivo_recusa|default:"Sem justificativa registrada." }}</p>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% if not relatorio.motivo_rejeicao and relatorio.diferenca_removida == 0 %}
+      <p class="empty">Nenhuma justificativa financeira registrada.</p>
+    {% endif %}
+  </section>
+
+  <section class="section page-break-avoid">
+    <h2>Histórico resumido</h2>
+    <table class="data-table compact">
+      <thead>
+        <tr>
+          <th>Data/hora</th>
+          <th>Usuário</th>
+          <th>Ação</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for historico in historicos_resumidos %}
+          <tr>
+            <td>{{ historico.data_hora|date:"d/m/Y H:i" }}</td>
+            <td>{% if historico.usuario %}{{ historico.usuario.get_full_name|default:historico.usuario.username }}{% else %}Sistema{% endif %}</td>
+            <td>{{ historico.acao }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3" class="empty">Nenhuma movimentação registrada.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="section page-break-avoid">
+    <h2>Anexos listados</h2>
+    {% if anexos %}
+      <table class="data-table compact">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Despesa</th>
+            <th>Arquivo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for anexo in anexos %}
+            <tr>
+              <td>{{ anexo.data|date:"d/m/Y"|default:"-" }}</td>
+              <td>{{ anexo.descricao }}</td>
+              <td>{{ anexo.comprovante.name }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="empty">Nenhum comprovante anexado ao relatório.</p>
+    {% endif %}
+  </section>
+
+  <footer class="document-footer">
+    <div>Gerado em {{ emitido_em|date:"d/m/Y H:i" }}</div>
+    <div>Gerado por {% if usuario_gerador %}{{ usuario_gerador.get_full_name|default:usuario_gerador.username }}{% else %}Sistema{% endif %}</div>
+    <div>{{ empresa }}</div>
+  </footer>
+</body>
+</html>
