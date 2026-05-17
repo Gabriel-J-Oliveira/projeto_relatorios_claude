@@ -1,0 +1,3433 @@
+[
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "admin",
+    "model": "logentry"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "auth",
+    "model": "group"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "auth",
+    "model": "permission"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "auth",
+    "model": "user"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "contenttypes",
+    "model": "contenttype"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "sessions",
+    "model": "session"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "relatorios",
+    "model": "adiantamento"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "relatorios",
+    "model": "cliente"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "relatorios",
+    "model": "itemdespesa"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "relatorios",
+    "model": "politicavalor"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "relatorios",
+    "model": "relatoriotecnico"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "relatorios",
+    "model": "relatoriotecnicoequipe"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "relatorios",
+    "model": "tecnico"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "relatorios",
+    "model": "trechokm"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "relatorios",
+    "model": "historicorelatorio"
+  }
+},
+{
+  "model": "contenttypes.contenttype",
+  "fields": {
+    "app_label": "relatorios",
+    "model": "sequencialrelatorio"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "q84h2lioasz8e6140chcnt152gekamz7",
+  "fields": {
+    "session_data": ".eJxVjLsOwjAMAP_FM4qaNCVuR_Z-Q-TYDimgVOpjQvw7qtQB1rvTvSHSvpW4r7rESWAAB5dfloifWg8hD6r32fBct2VK5kjMaVczzqKv29n-DQqtBQZgDpglCaljCV6wb4JiVpTWOr56QZTcNWixJU4NOfKhQ6LslS33BJ8vGlQ5Kw:1wNXSD:07oBft4vDbDzO8xV39gFYptfRVRElZ85AULvYXlRnE0",
+    "expire_date": "2026-05-28T14:54:25.399Z"
+  }
+},
+{
+  "model": "relatorios.tecnico",
+  "pk": 1,
+  "fields": {
+    "nome": "gabriel.oliveira",
+    "email": "gabriel@gmail.com",
+    "telefone": "444444444",
+    "ativo": true,
+    "criado_em": "2026-04-27T04:53:39.201Z"
+  }
+},
+{
+  "model": "relatorios.tecnico",
+  "pk": 2,
+  "fields": {
+    "nome": "Celina Goretti",
+    "email": "celina@gmail.com",
+    "telefone": "44444444",
+    "ativo": true,
+    "criado_em": "2026-05-02T17:57:17.046Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 1,
+  "fields": {
+    "nome": "Control Sul",
+    "cnpj_cpf": "9999999999",
+    "cidade": "Cascavel",
+    "uf": "PR",
+    "contato": "",
+    "telefone": "",
+    "email": "",
+    "ativo": true,
+    "valor_km": null,
+    "criado_em": "2026-04-27T04:53:58.943Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 2,
+  "fields": {
+    "nome": "A. J. BOBATO (LARISSA SUPERMERCADOS)",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.475Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 3,
+  "fields": {
+    "nome": "AGRÍCOLA URTIGÃO",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.68",
+    "criado_em": "2026-05-01T20:16:17.484Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 4,
+  "fields": {
+    "nome": "ALIMENTOS ZAELI LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.487Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 5,
+  "fields": {
+    "nome": "ARCO-IRIS AGROSILVOPASTORIL L TDA.",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "2.00",
+    "criado_em": "2026-05-01T20:16:17.490Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 6,
+  "fields": {
+    "nome": "AURELIO ROLIM ROCHA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.492Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 7,
+  "fields": {
+    "nome": "BRILHANTE TRANSPORTES NACIONAL E INTERNACIONAL",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.495Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 8,
+  "fields": {
+    "nome": "BRUXELAS COMERCIO DE ALIMENTOS",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.66",
+    "criado_em": "2026-05-01T20:16:17.497Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 9,
+  "fields": {
+    "nome": "CAED COM. IMP. E EXP. DE CEREAIS",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.500Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 10,
+  "fields": {
+    "nome": "CAED COMERCIO DE GRAOS",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.502Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 11,
+  "fields": {
+    "nome": "CAED LOGISTICA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.66",
+    "criado_em": "2026-05-01T20:16:17.505Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 12,
+  "fields": {
+    "nome": "CAMILO DIST. COMERCIAL DE ALIMENTOS",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.507Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 13,
+  "fields": {
+    "nome": "CANCELIER & FILHOS LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.66",
+    "criado_em": "2026-05-01T20:16:17.510Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 14,
+  "fields": {
+    "nome": "CARLOS DE MARCHI & OUTROS - CHACARA HELIO",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.35",
+    "criado_em": "2026-05-01T20:16:17.513Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 15,
+  "fields": {
+    "nome": "CASA CHICO DE PNEUS LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.35",
+    "criado_em": "2026-05-01T20:16:17.515Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 16,
+  "fields": {
+    "nome": "CENTER SUL COM. E DIST. EIRELI (SUPERMERCADO BAHNIUK)",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.518Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 17,
+  "fields": {
+    "nome": "CHAPADA COMÉRCIO DE ALIMENTOS",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.521Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 18,
+  "fields": {
+    "nome": "CIA BEAL DE ALIMENTOS",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.523Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 19,
+  "fields": {
+    "nome": "CIMA ENGENHARIA E EMPREENDIMENTOS LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.10",
+    "criado_em": "2026-05-01T20:16:17.526Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 20,
+  "fields": {
+    "nome": "CONTROLSUL GESTÃO EMPRESARIAL",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.35",
+    "criado_em": "2026-05-01T20:16:17.529Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 21,
+  "fields": {
+    "nome": "COSTA OESTE SERVICOS DE LIMPEZA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.531Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 22,
+  "fields": {
+    "nome": "CSD - COMPANHIA SULAMERICANA DE DISTRIBUICAO",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.78",
+    "criado_em": "2026-05-01T20:16:17.534Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 23,
+  "fields": {
+    "nome": "CURICACA - ARMAZENS GERAIS LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.536Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 24,
+  "fields": {
+    "nome": "DAPONT & CIA LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.78",
+    "criado_em": "2026-05-01T20:16:17.539Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 25,
+  "fields": {
+    "nome": "DELARA SUPERMERCADO LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.78",
+    "criado_em": "2026-05-01T20:16:17.541Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 26,
+  "fields": {
+    "nome": "DILETTARE",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.544Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 27,
+  "fields": {
+    "nome": "DIST. CIRCUITO - CIRCUITO ATACADO E VAREJO",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.546Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 28,
+  "fields": {
+    "nome": "D'MARCHE INDÚSTRIA DE COSMETICOS LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.35",
+    "criado_em": "2026-05-01T20:16:17.549Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 29,
+  "fields": {
+    "nome": "ELETROTRAFO PRODUTOS ELETRICOS",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.552Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 30,
+  "fields": {
+    "nome": "ERVA MATE SANTO ANTONIO",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.554Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 31,
+  "fields": {
+    "nome": "ESCRITÓRIO UNIVERSAL",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.35",
+    "criado_em": "2026-05-01T20:16:17.556Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 32,
+  "fields": {
+    "nome": "EXPOFRUT BRASIL IMPORTADORA E EXPORTADORA LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.559Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 33,
+  "fields": {
+    "nome": "FAROL COMERCIO DE ALIMENTOS EIRELI",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.561Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 34,
+  "fields": {
+    "nome": "GERALDO ALGERI & CIA LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.564Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 35,
+  "fields": {
+    "nome": "GILBERTO ALVIN ZOLLER",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "2.00",
+    "criado_em": "2026-05-01T20:16:17.566Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 36,
+  "fields": {
+    "nome": "GRACZYKI & GRACZYKI",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.569Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 37,
+  "fields": {
+    "nome": "GRAND VALLE AGRÍCOLA IMPORTADORA E EXPORTADORA LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.571Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 38,
+  "fields": {
+    "nome": "GRUPO ENDO",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.78",
+    "criado_em": "2026-05-01T20:16:17.574Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 39,
+  "fields": {
+    "nome": "GRUPO VALOR",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.54",
+    "criado_em": "2026-05-01T20:16:17.576Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 40,
+  "fields": {
+    "nome": "GUERRO & PAGNUSSAT LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.579Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 41,
+  "fields": {
+    "nome": "H.E. IND. E COM. DE LATICINIOS LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.78",
+    "criado_em": "2026-05-01T20:16:17.581Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 42,
+  "fields": {
+    "nome": "HELLEN COLCHÕES",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.584Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 43,
+  "fields": {
+    "nome": "ICTUS SOLUÇÕES EM ENERGIA LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.586Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 44,
+  "fields": {
+    "nome": "IGUMA COMERCIO DE CEREAIS",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.78",
+    "criado_em": "2026-05-01T20:16:17.589Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 45,
+  "fields": {
+    "nome": "INDEX FLORESTAL LTDA.",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.591Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 46,
+  "fields": {
+    "nome": "INDUSTRIA DE CONFECCOES K-DU",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.594Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 47,
+  "fields": {
+    "nome": "INSTITUTO ALTA PERFORMANCE",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.597Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 48,
+  "fields": {
+    "nome": "IRMÃOS NETTO LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.78",
+    "criado_em": "2026-05-01T20:16:17.599Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 49,
+  "fields": {
+    "nome": "ITALIANINHA TRANSPORTES DE PASSAGEIROS LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.602Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 50,
+  "fields": {
+    "nome": "ITALO SUPERMERCADOS LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.605Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 51,
+  "fields": {
+    "nome": "JCHAGAS ALIMENTOS LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.44",
+    "criado_em": "2026-05-01T20:16:17.607Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 52,
+  "fields": {
+    "nome": "JOÃO ANDRADE - HOLDING",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.610Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 53,
+  "fields": {
+    "nome": "JOÃO MAURICIO DANTAS LEITE",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.10",
+    "criado_em": "2026-05-01T20:16:17.613Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 54,
+  "fields": {
+    "nome": "JOÃO MUSSI KALACHE BACH & CIA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.78",
+    "criado_em": "2026-05-01T20:16:17.615Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 55,
+  "fields": {
+    "nome": "JOSÉ ROBERTO TEIXEIRA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.619Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 56,
+  "fields": {
+    "nome": "KELVE SUPERMERCADOS",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.35",
+    "criado_em": "2026-05-01T20:16:17.621Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 57,
+  "fields": {
+    "nome": "KOLTUN & COLATUSSO LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.624Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 58,
+  "fields": {
+    "nome": "KRAEMER & KRAEMER LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.54",
+    "criado_em": "2026-05-01T20:16:17.627Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 59,
+  "fields": {
+    "nome": "L. A. DALL ACQUA & CIA LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.629Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 60,
+  "fields": {
+    "nome": "LATICINIOS GUAIRA LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.632Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 61,
+  "fields": {
+    "nome": "LEJON AUTO SERVIÇO LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.634Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 62,
+  "fields": {
+    "nome": "LEO COSMETICOS LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.637Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 63,
+  "fields": {
+    "nome": "LGM SUPERMERCADOS LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.640Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 64,
+  "fields": {
+    "nome": "LWEBBER DISTRIBUIDORA LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.78",
+    "criado_em": "2026-05-01T20:16:17.642Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 65,
+  "fields": {
+    "nome": "MARIANO IVASKO & CIA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.78",
+    "criado_em": "2026-05-01T20:16:17.645Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 66,
+  "fields": {
+    "nome": "MERCEARIA MARONESI LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.647Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 67,
+  "fields": {
+    "nome": "MINERPHÓS",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.650Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 68,
+  "fields": {
+    "nome": "NESTOR LACHMAN & CIA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.652Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 69,
+  "fields": {
+    "nome": "NOMA DO BRASIL S.A.",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.78",
+    "criado_em": "2026-05-01T20:16:17.655Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 70,
+  "fields": {
+    "nome": "OBARA MIYAMOTO & CIA LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.657Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 71,
+  "fields": {
+    "nome": "PICO COMERCIO DE MOTOS LIMITADA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.660Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 72,
+  "fields": {
+    "nome": "PICO COMERCIO DE MOTOS LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.38",
+    "criado_em": "2026-05-01T20:16:17.662Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 73,
+  "fields": {
+    "nome": "PLANOS SUPERMERCADO LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.665Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 74,
+  "fields": {
+    "nome": "PLANTAR",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.31",
+    "criado_em": "2026-05-01T20:16:17.667Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 75,
+  "fields": {
+    "nome": "QUIMISUL PRODUTOS DE LIMPEZA EIRELI",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.78",
+    "criado_em": "2026-05-01T20:16:17.670Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 76,
+  "fields": {
+    "nome": "RANCHO S VETERINARIA LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.672Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 77,
+  "fields": {
+    "nome": "RECCO CONFECÇÕES LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.675Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 78,
+  "fields": {
+    "nome": "ROYAL SUPERMERCADOS",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.35",
+    "criado_em": "2026-05-01T20:16:17.677Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 79,
+  "fields": {
+    "nome": "SANCHES & VECCHIATE LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.78",
+    "criado_em": "2026-05-01T20:16:17.680Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 80,
+  "fields": {
+    "nome": "SAVANA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.682Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 81,
+  "fields": {
+    "nome": "SERILON BRASIL LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.10",
+    "criado_em": "2026-05-01T20:16:17.685Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 82,
+  "fields": {
+    "nome": "SICOOB CREDICAPITAL",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.35",
+    "criado_em": "2026-05-01T20:16:17.688Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 83,
+  "fields": {
+    "nome": "SIVIERO & CIA LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.690Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 84,
+  "fields": {
+    "nome": "SIVIERO & FILHOS LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.693Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 85,
+  "fields": {
+    "nome": "SIVIERO & LOPES LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.695Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 86,
+  "fields": {
+    "nome": "SORRISO SUPERMERCADOS",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.698Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 87,
+  "fields": {
+    "nome": "SPERAFICO AGROINDUSTRIAL",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.701Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 88,
+  "fields": {
+    "nome": "SPERAFICO DA AMAZONIA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.703Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 89,
+  "fields": {
+    "nome": "STO ANTONIO IND. E COM. DE ALIMENTOS - EIRELI",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.706Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 90,
+  "fields": {
+    "nome": "SUCOS LIFE",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.708Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 91,
+  "fields": {
+    "nome": "SUIAVI ALIMENTOS LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.78",
+    "criado_em": "2026-05-01T20:16:17.711Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 92,
+  "fields": {
+    "nome": "SUPER ATACADO S.A.",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.713Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 93,
+  "fields": {
+    "nome": "SUPERMERCADO BARP",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.716Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 94,
+  "fields": {
+    "nome": "SUPERMERCADO FREITAS LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.78",
+    "criado_em": "2026-05-01T20:16:17.718Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 95,
+  "fields": {
+    "nome": "SUPERMERCADO GEITTENES & CIA LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.78",
+    "criado_em": "2026-05-01T20:16:17.721Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 96,
+  "fields": {
+    "nome": "SUPERMERCADO INDUSTRIAL LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.723Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 97,
+  "fields": {
+    "nome": "SUPERMERCADO SAVISKI",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.75",
+    "criado_em": "2026-05-01T20:16:17.725Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 98,
+  "fields": {
+    "nome": "SUPERMERCADO TALEVI",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.74",
+    "criado_em": "2026-05-01T20:16:17.728Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 99,
+  "fields": {
+    "nome": "SUPERMERCADO VIVIAN LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.732Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 100,
+  "fields": {
+    "nome": "SUPERMERCADOS BAZA LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.735Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 101,
+  "fields": {
+    "nome": "SUPERMERCADOS IRANI LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.737Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 102,
+  "fields": {
+    "nome": "SUPERMERCARDO BAVARESCO",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.739Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 103,
+  "fields": {
+    "nome": "TEIXEIRA COMERCIO DE CEREAIS LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.742Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 104,
+  "fields": {
+    "nome": "TONELLO E MACHADO DA LUZ LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.744Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 105,
+  "fields": {
+    "nome": "TOZETTO E CIA LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.747Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 106,
+  "fields": {
+    "nome": "UNIÃO SUPLEMENTAÇÃO",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.85",
+    "criado_em": "2026-05-01T20:16:17.750Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 107,
+  "fields": {
+    "nome": "VALOR COMMODITIES",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.57",
+    "criado_em": "2026-05-01T20:16:17.752Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 108,
+  "fields": {
+    "nome": "WILMSEN & WILMSEN LTDA",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.00",
+    "criado_em": "2026-05-01T20:16:17.754Z"
+  }
+},
+{
+  "model": "relatorios.cliente",
+  "pk": 109,
+  "fields": {
+    "nome": "Z. HOLDING PARTICIPAÇÕES S/A",
+    "cnpj_cpf": null,
+    "cidade": null,
+    "uf": null,
+    "contato": null,
+    "telefone": null,
+    "email": null,
+    "ativo": true,
+    "valor_km": "1.10",
+    "criado_em": "2026-05-01T20:16:17.757Z"
+  }
+},
+{
+  "model": "relatorios.sequencialrelatorio",
+  "pk": 1,
+  "fields": {
+    "chave": "relatorio_oficial",
+    "proximo_numero": 102,
+    "atualizado_em": "2026-05-15T18:14:28.618Z"
+  }
+},
+{
+  "model": "relatorios.relatoriotecnicoequipe",
+  "pk": 1,
+  "fields": {
+    "relatorio": 4,
+    "tecnico": 2,
+    "papel": "apoio"
+  }
+},
+{
+  "model": "relatorios.relatoriotecnicoequipe",
+  "pk": 2,
+  "fields": {
+    "relatorio": 6,
+    "tecnico": 2,
+    "papel": "apoio"
+  }
+},
+{
+  "model": "relatorios.relatoriotecnicoequipe",
+  "pk": 3,
+  "fields": {
+    "relatorio": 7,
+    "tecnico": 2,
+    "papel": "apoio"
+  }
+},
+{
+  "model": "relatorios.relatoriotecnicoequipe",
+  "pk": 4,
+  "fields": {
+    "relatorio": 11,
+    "tecnico": 2,
+    "papel": "apoio"
+  }
+},
+{
+  "model": "relatorios.relatoriotecnicoequipe",
+  "pk": 5,
+  "fields": {
+    "relatorio": 12,
+    "tecnico": 2,
+    "papel": "apoio"
+  }
+},
+{
+  "model": "relatorios.adiantamento",
+  "pk": 1,
+  "fields": {
+    "tecnico": 1,
+    "relatorio": 2,
+    "tipo": "adiantamento",
+    "valor": "5820.00",
+    "data": "2026-04-20",
+    "descricao": "teste",
+    "criado_em": "2026-04-27T14:53:52.311Z"
+  }
+},
+{
+  "model": "relatorios.adiantamento",
+  "pk": 2,
+  "fields": {
+    "tecnico": 1,
+    "relatorio": 8,
+    "tipo": "adiantamento",
+    "valor": "2000.00",
+    "data": "2026-05-04",
+    "descricao": "Adiantamento vinculado ao relatório TESTE-CODEX1",
+    "criado_em": "2026-05-14T19:22:32.745Z"
+  }
+},
+{
+  "model": "relatorios.adiantamento",
+  "pk": 3,
+  "fields": {
+    "tecnico": 1,
+    "relatorio": 7,
+    "tipo": "adiantamento",
+    "valor": "1800.00",
+    "data": "2026-05-04",
+    "descricao": "Adiantamento vinculado ao relatório TESTE-98",
+    "criado_em": "2026-05-14T19:23:06.512Z"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add log entry",
+    "content_type": [
+      "admin",
+      "logentry"
+    ],
+    "codename": "add_logentry"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change log entry",
+    "content_type": [
+      "admin",
+      "logentry"
+    ],
+    "codename": "change_logentry"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete log entry",
+    "content_type": [
+      "admin",
+      "logentry"
+    ],
+    "codename": "delete_logentry"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view log entry",
+    "content_type": [
+      "admin",
+      "logentry"
+    ],
+    "codename": "view_logentry"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add permission",
+    "content_type": [
+      "auth",
+      "permission"
+    ],
+    "codename": "add_permission"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change permission",
+    "content_type": [
+      "auth",
+      "permission"
+    ],
+    "codename": "change_permission"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete permission",
+    "content_type": [
+      "auth",
+      "permission"
+    ],
+    "codename": "delete_permission"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view permission",
+    "content_type": [
+      "auth",
+      "permission"
+    ],
+    "codename": "view_permission"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add group",
+    "content_type": [
+      "auth",
+      "group"
+    ],
+    "codename": "add_group"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change group",
+    "content_type": [
+      "auth",
+      "group"
+    ],
+    "codename": "change_group"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete group",
+    "content_type": [
+      "auth",
+      "group"
+    ],
+    "codename": "delete_group"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view group",
+    "content_type": [
+      "auth",
+      "group"
+    ],
+    "codename": "view_group"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add user",
+    "content_type": [
+      "auth",
+      "user"
+    ],
+    "codename": "add_user"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change user",
+    "content_type": [
+      "auth",
+      "user"
+    ],
+    "codename": "change_user"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete user",
+    "content_type": [
+      "auth",
+      "user"
+    ],
+    "codename": "delete_user"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view user",
+    "content_type": [
+      "auth",
+      "user"
+    ],
+    "codename": "view_user"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add content type",
+    "content_type": [
+      "contenttypes",
+      "contenttype"
+    ],
+    "codename": "add_contenttype"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change content type",
+    "content_type": [
+      "contenttypes",
+      "contenttype"
+    ],
+    "codename": "change_contenttype"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete content type",
+    "content_type": [
+      "contenttypes",
+      "contenttype"
+    ],
+    "codename": "delete_contenttype"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view content type",
+    "content_type": [
+      "contenttypes",
+      "contenttype"
+    ],
+    "codename": "view_contenttype"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add session",
+    "content_type": [
+      "sessions",
+      "session"
+    ],
+    "codename": "add_session"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change session",
+    "content_type": [
+      "sessions",
+      "session"
+    ],
+    "codename": "change_session"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete session",
+    "content_type": [
+      "sessions",
+      "session"
+    ],
+    "codename": "delete_session"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view session",
+    "content_type": [
+      "sessions",
+      "session"
+    ],
+    "codename": "view_session"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add Cliente",
+    "content_type": [
+      "relatorios",
+      "cliente"
+    ],
+    "codename": "add_cliente"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change Cliente",
+    "content_type": [
+      "relatorios",
+      "cliente"
+    ],
+    "codename": "change_cliente"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete Cliente",
+    "content_type": [
+      "relatorios",
+      "cliente"
+    ],
+    "codename": "delete_cliente"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view Cliente",
+    "content_type": [
+      "relatorios",
+      "cliente"
+    ],
+    "codename": "view_cliente"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add Política de Valor",
+    "content_type": [
+      "relatorios",
+      "politicavalor"
+    ],
+    "codename": "add_politicavalor"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change Política de Valor",
+    "content_type": [
+      "relatorios",
+      "politicavalor"
+    ],
+    "codename": "change_politicavalor"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete Política de Valor",
+    "content_type": [
+      "relatorios",
+      "politicavalor"
+    ],
+    "codename": "delete_politicavalor"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view Política de Valor",
+    "content_type": [
+      "relatorios",
+      "politicavalor"
+    ],
+    "codename": "view_politicavalor"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add Técnico",
+    "content_type": [
+      "relatorios",
+      "tecnico"
+    ],
+    "codename": "add_tecnico"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change Técnico",
+    "content_type": [
+      "relatorios",
+      "tecnico"
+    ],
+    "codename": "change_tecnico"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete Técnico",
+    "content_type": [
+      "relatorios",
+      "tecnico"
+    ],
+    "codename": "delete_tecnico"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view Técnico",
+    "content_type": [
+      "relatorios",
+      "tecnico"
+    ],
+    "codename": "view_tecnico"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add Relatório Técnico",
+    "content_type": [
+      "relatorios",
+      "relatoriotecnico"
+    ],
+    "codename": "add_relatoriotecnico"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change Relatório Técnico",
+    "content_type": [
+      "relatorios",
+      "relatoriotecnico"
+    ],
+    "codename": "change_relatoriotecnico"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete Relatório Técnico",
+    "content_type": [
+      "relatorios",
+      "relatoriotecnico"
+    ],
+    "codename": "delete_relatoriotecnico"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view Relatório Técnico",
+    "content_type": [
+      "relatorios",
+      "relatoriotecnico"
+    ],
+    "codename": "view_relatoriotecnico"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add Item de Despesa",
+    "content_type": [
+      "relatorios",
+      "itemdespesa"
+    ],
+    "codename": "add_itemdespesa"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change Item de Despesa",
+    "content_type": [
+      "relatorios",
+      "itemdespesa"
+    ],
+    "codename": "change_itemdespesa"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete Item de Despesa",
+    "content_type": [
+      "relatorios",
+      "itemdespesa"
+    ],
+    "codename": "delete_itemdespesa"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view Item de Despesa",
+    "content_type": [
+      "relatorios",
+      "itemdespesa"
+    ],
+    "codename": "view_itemdespesa"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add Técnico da Equipe",
+    "content_type": [
+      "relatorios",
+      "relatoriotecnicoequipe"
+    ],
+    "codename": "add_relatoriotecnicoequipe"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change Técnico da Equipe",
+    "content_type": [
+      "relatorios",
+      "relatoriotecnicoequipe"
+    ],
+    "codename": "change_relatoriotecnicoequipe"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete Técnico da Equipe",
+    "content_type": [
+      "relatorios",
+      "relatoriotecnicoequipe"
+    ],
+    "codename": "delete_relatoriotecnicoequipe"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view Técnico da Equipe",
+    "content_type": [
+      "relatorios",
+      "relatoriotecnicoequipe"
+    ],
+    "codename": "view_relatoriotecnicoequipe"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add Adiantamento",
+    "content_type": [
+      "relatorios",
+      "adiantamento"
+    ],
+    "codename": "add_adiantamento"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change Adiantamento",
+    "content_type": [
+      "relatorios",
+      "adiantamento"
+    ],
+    "codename": "change_adiantamento"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete Adiantamento",
+    "content_type": [
+      "relatorios",
+      "adiantamento"
+    ],
+    "codename": "delete_adiantamento"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view Adiantamento",
+    "content_type": [
+      "relatorios",
+      "adiantamento"
+    ],
+    "codename": "view_adiantamento"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add Trecho de KM",
+    "content_type": [
+      "relatorios",
+      "trechokm"
+    ],
+    "codename": "add_trechokm"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change Trecho de KM",
+    "content_type": [
+      "relatorios",
+      "trechokm"
+    ],
+    "codename": "change_trechokm"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete Trecho de KM",
+    "content_type": [
+      "relatorios",
+      "trechokm"
+    ],
+    "codename": "delete_trechokm"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view Trecho de KM",
+    "content_type": [
+      "relatorios",
+      "trechokm"
+    ],
+    "codename": "view_trechokm"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add Histórico do Relatório",
+    "content_type": [
+      "relatorios",
+      "historicorelatorio"
+    ],
+    "codename": "add_historicorelatorio"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change Histórico do Relatório",
+    "content_type": [
+      "relatorios",
+      "historicorelatorio"
+    ],
+    "codename": "change_historicorelatorio"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete Histórico do Relatório",
+    "content_type": [
+      "relatorios",
+      "historicorelatorio"
+    ],
+    "codename": "delete_historicorelatorio"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view Histórico do Relatório",
+    "content_type": [
+      "relatorios",
+      "historicorelatorio"
+    ],
+    "codename": "view_historicorelatorio"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can add Sequencial de Relatório",
+    "content_type": [
+      "relatorios",
+      "sequencialrelatorio"
+    ],
+    "codename": "add_sequencialrelatorio"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can change Sequencial de Relatório",
+    "content_type": [
+      "relatorios",
+      "sequencialrelatorio"
+    ],
+    "codename": "change_sequencialrelatorio"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can delete Sequencial de Relatório",
+    "content_type": [
+      "relatorios",
+      "sequencialrelatorio"
+    ],
+    "codename": "delete_sequencialrelatorio"
+  }
+},
+{
+  "model": "auth.permission",
+  "fields": {
+    "name": "Can view Sequencial de Relatório",
+    "content_type": [
+      "relatorios",
+      "sequencialrelatorio"
+    ],
+    "codename": "view_sequencialrelatorio"
+  }
+},
+{
+  "model": "auth.group",
+  "fields": {
+    "name": "Financeiro",
+    "permissions": []
+  }
+},
+{
+  "model": "auth.group",
+  "fields": {
+    "name": "Tecnico",
+    "permissions": []
+  }
+},
+{
+  "model": "auth.group",
+  "fields": {
+    "name": "Gestor",
+    "permissions": []
+  }
+},
+{
+  "model": "auth.group",
+  "fields": {
+    "name": "Administrador ERP",
+    "permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$2gnE7qny4Db6S9RTtmER7J$W4rHNywbgC2fkLWkqTzNx4a2b/Mddiif/yqtv1Q2biI=",
+    "last_login": null,
+    "is_superuser": true,
+    "username": "gabriel.oliveira",
+    "first_name": "",
+    "last_name": "",
+    "email": "",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-04-27T04:52:26.957Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "relatorios.relatoriotecnico",
+  "pk": 1,
+  "fields": {
+    "numero": "TESTE",
+    "status": "rascunho",
+    "cliente": 1,
+    "tecnico_responsavel": 1,
+    "cidade_atendimento": "curitiba",
+    "uf_atendimento": "PR",
+    "tipo_localidade": "interior",
+    "data_inicio": "2026-04-16",
+    "data_fim": "2026-05-01",
+    "motivo": "Viagem para manutenção do servidor",
+    "centro_custo": "",
+    "valor_adiantamento": "0.00",
+    "observacoes": "",
+    "motivo_rejeicao": "",
+    "aprovado_em": null,
+    "aprovado_por": null,
+    "criado_em": "2026-04-27T04:55:08.679Z",
+    "atualizado_em": "2026-04-27T05:11:24.256Z"
+  }
+},
+{
+  "model": "relatorios.relatoriotecnico",
+  "pk": 2,
+  "fields": {
+    "numero": "TESTE3",
+    "status": "aprovado",
+    "cliente": 1,
+    "tecnico_responsavel": 1,
+    "cidade_atendimento": "Curitiba",
+    "uf_atendimento": "PR",
+    "tipo_localidade": "capital",
+    "data_inicio": "2026-04-21",
+    "data_fim": "2026-04-23",
+    "motivo": "teste",
+    "centro_custo": "",
+    "valor_adiantamento": "1000.00",
+    "observacoes": "",
+    "motivo_rejeicao": "",
+    "aprovado_em": null,
+    "aprovado_por": null,
+    "criado_em": "2026-04-27T13:31:37.027Z",
+    "atualizado_em": "2026-04-29T00:28:31.740Z"
+  }
+},
+{
+  "model": "relatorios.relatoriotecnico",
+  "pk": 3,
+  "fields": {
+    "numero": "TESTE15",
+    "status": "aprovado",
+    "cliente": 1,
+    "tecnico_responsavel": 1,
+    "cidade_atendimento": "curiiba",
+    "uf_atendimento": "PR",
+    "tipo_localidade": "capital",
+    "data_inicio": "2026-04-20",
+    "data_fim": "2026-04-26",
+    "motivo": "teste",
+    "centro_custo": "comercial",
+    "valor_adiantamento": "1800.00",
+    "observacoes": "",
+    "motivo_rejeicao": "",
+    "aprovado_em": null,
+    "aprovado_por": null,
+    "criado_em": "2026-04-28T02:50:49.380Z",
+    "atualizado_em": "2026-04-28T15:05:55.657Z"
+  }
+},
+{
+  "model": "relatorios.relatoriotecnico",
+  "pk": 4,
+  "fields": {
+    "numero": "TESTE-MULTIPLOS-TECNICOS",
+    "status": "conferencia_pendente",
+    "cliente": 20,
+    "tecnico_responsavel": 1,
+    "cidade_atendimento": "curitiba",
+    "uf_atendimento": "PR",
+    "tipo_localidade": "capital",
+    "data_inicio": "2024-10-07",
+    "data_fim": "2024-12-15",
+    "motivo": "teste",
+    "centro_custo": "comercial",
+    "valor_adiantamento": "1800.00",
+    "observacoes": "",
+    "motivo_rejeicao": "",
+    "aprovado_em": null,
+    "aprovado_por": null,
+    "criado_em": "2026-05-03T01:51:09.030Z",
+    "atualizado_em": "2026-05-03T01:54:04.626Z"
+  }
+},
+{
+  "model": "relatorios.relatoriotecnico",
+  "pk": 5,
+  "fields": {
+    "numero": "TESTE-SIMPLES",
+    "status": "conferencia_pendente",
+    "cliente": 20,
+    "tecnico_responsavel": 2,
+    "cidade_atendimento": "curitiba",
+    "uf_atendimento": "PR",
+    "tipo_localidade": "capital",
+    "data_inicio": "2026-04-01",
+    "data_fim": "2026-04-10",
+    "motivo": "teste",
+    "centro_custo": "comercial",
+    "valor_adiantamento": "1800.00",
+    "observacoes": "",
+    "motivo_rejeicao": "",
+    "aprovado_em": null,
+    "aprovado_por": null,
+    "criado_em": "2026-05-03T02:47:37.088Z",
+    "atualizado_em": "2026-05-11T12:51:46.932Z"
+  }
+},
+{
+  "model": "relatorios.relatoriotecnico",
+  "pk": 6,
+  "fields": {
+    "numero": "TESTE-EXIBIÇÃO",
+    "status": "rascunho",
+    "cliente": 20,
+    "tecnico_responsavel": 1,
+    "cidade_atendimento": "Curitiba",
+    "uf_atendimento": "PR",
+    "tipo_localidade": "capital",
+    "data_inicio": "2026-04-27",
+    "data_fim": "2026-04-30",
+    "motivo": "teste",
+    "centro_custo": "comercial",
+    "valor_adiantamento": "3000.00",
+    "observacoes": "",
+    "motivo_rejeicao": "",
+    "aprovado_em": null,
+    "aprovado_por": null,
+    "criado_em": "2026-05-04T12:47:55.649Z",
+    "atualizado_em": "2026-05-04T12:53:40.557Z"
+  }
+},
+{
+  "model": "relatorios.relatoriotecnico",
+  "pk": 7,
+  "fields": {
+    "numero": "TESTE-98",
+    "status": "aprovado",
+    "cliente": 10,
+    "tecnico_responsavel": 1,
+    "cidade_atendimento": "Curitiba",
+    "uf_atendimento": "PR",
+    "tipo_localidade": "capital",
+    "data_inicio": "2026-05-04",
+    "data_fim": "2026-05-07",
+    "motivo": "teste",
+    "centro_custo": "coemrcial",
+    "valor_adiantamento": "1800.00",
+    "observacoes": "",
+    "motivo_rejeicao": "",
+    "aprovado_em": "2026-05-14T19:23:06.501Z",
+    "aprovado_por": null,
+    "criado_em": "2026-05-13T14:39:44.999Z",
+    "atualizado_em": "2026-05-14T19:23:06.513Z"
+  }
+},
+{
+  "model": "relatorios.relatoriotecnico",
+  "pk": 8,
+  "fields": {
+    "numero": "TESTE-CODEX1",
+    "status": "aprovado",
+    "cliente": 6,
+    "tecnico_responsavel": 1,
+    "cidade_atendimento": "Curitiba",
+    "uf_atendimento": "PR",
+    "tipo_localidade": "capital",
+    "data_inicio": "2026-05-04",
+    "data_fim": "2026-05-08",
+    "motivo": "teste",
+    "centro_custo": "comercial",
+    "valor_adiantamento": "2000.00",
+    "observacoes": "",
+    "motivo_rejeicao": "",
+    "aprovado_em": "2026-05-14T19:22:32.695Z",
+    "aprovado_por": null,
+    "criado_em": "2026-05-13T19:17:27.724Z",
+    "atualizado_em": "2026-05-14T19:22:32.771Z"
+  }
+},
+{
+  "model": "relatorios.relatoriotecnico",
+  "pk": 10,
+  "fields": {
+    "numero": "99",
+    "status": "ajuste_pendente",
+    "cliente": 6,
+    "tecnico_responsavel": 1,
+    "cidade_atendimento": "Curitiba",
+    "uf_atendimento": "PR",
+    "tipo_localidade": "capital",
+    "data_inicio": "2026-05-04",
+    "data_fim": "2026-05-08",
+    "motivo": "teste",
+    "centro_custo": "comercial",
+    "valor_adiantamento": "0.00",
+    "observacoes": "",
+    "motivo_rejeicao": "Incluir comprovante no item x",
+    "aprovado_em": null,
+    "aprovado_por": null,
+    "criado_em": "2026-05-14T19:22:04.784Z",
+    "atualizado_em": "2026-05-15T14:01:21.887Z"
+  }
+},
+{
+  "model": "relatorios.relatoriotecnico",
+  "pk": 11,
+  "fields": {
+    "numero": "100",
+    "status": "rascunho",
+    "cliente": 10,
+    "tecnico_responsavel": 1,
+    "cidade_atendimento": "Curitiba",
+    "uf_atendimento": "PR",
+    "tipo_localidade": "capital",
+    "data_inicio": "2026-05-04",
+    "data_fim": "2026-05-07",
+    "motivo": "teste",
+    "centro_custo": "coemrcial",
+    "valor_adiantamento": "0.00",
+    "observacoes": "",
+    "motivo_rejeicao": "",
+    "aprovado_em": null,
+    "aprovado_por": null,
+    "criado_em": "2026-05-14T19:22:47.851Z",
+    "atualizado_em": "2026-05-14T19:22:47.851Z"
+  }
+},
+{
+  "model": "relatorios.relatoriotecnico",
+  "pk": 12,
+  "fields": {
+    "numero": "101",
+    "status": "rascunho",
+    "cliente": 10,
+    "tecnico_responsavel": 1,
+    "cidade_atendimento": "Curitiba",
+    "uf_atendimento": "PR",
+    "tipo_localidade": "capital",
+    "data_inicio": "2026-05-04",
+    "data_fim": "2026-05-07",
+    "motivo": "teste",
+    "centro_custo": "coemrcial",
+    "valor_adiantamento": "0.00",
+    "observacoes": "",
+    "motivo_rejeicao": "",
+    "aprovado_em": null,
+    "aprovado_por": null,
+    "criado_em": "2026-05-15T11:18:24.637Z",
+    "atualizado_em": "2026-05-15T11:18:24.638Z"
+  }
+},
+{
+  "model": "relatorios.historicorelatorio",
+  "pk": 1,
+  "fields": {
+    "relatorio": 10,
+    "usuario": null,
+    "acao": "Financeiro solicitou ajustes",
+    "tipo_evento": "ajuste_solicitado",
+    "descricao": "Financeiro solicitou correções: Incluir comprovante no item x",
+    "created_at": "2026-05-15T14:01:21.898Z",
+    "data_hora": "2026-05-15T14:01:21.898Z",
+    "dados_json": {}
+  }
+},
+{
+  "model": "relatorios.historicorelatorio",
+  "pk": 2,
+  "fields": {
+    "relatorio": 5,
+    "usuario": null,
+    "acao": "Item rejeitado pelo financeiro",
+    "tipo_evento": "item_rejeitado",
+    "descricao": "Despesa rejeitada pelo financeiro: teste",
+    "created_at": "2026-05-15T18:02:59.232Z",
+    "data_hora": "2026-05-15T18:02:59.232Z",
+    "dados_json": {
+      "tipo_item": "despesa",
+      "item_id": 3,
+      "motivo": "teste"
+    }
+  }
+},
+{
+  "model": "relatorios.itemdespesa",
+  "pk": 1,
+  "fields": {
+    "relatorio": 3,
+    "ordem": 0,
+    "data": "2026-04-20",
+    "tipo": "alimentacao",
+    "descricao": "Almoço",
+    "valor": "127.00",
+    "valor_aprovado": "127.00",
+    "status_financeiro": "aprovado",
+    "motivo_recusa": "",
+    "rejeitado": false,
+    "motivo_rejeicao": "",
+    "rejeitado_por": null,
+    "rejeitado_em": null,
+    "quem_pagou": "tecnico",
+    "comprovante": "",
+    "observacoes": "",
+    "criado_em": "2026-04-28T02:50:49.389Z"
+  }
+},
+{
+  "model": "relatorios.itemdespesa",
+  "pk": 2,
+  "fields": {
+    "relatorio": 4,
+    "ordem": 0,
+    "data": "2024-10-15",
+    "tipo": "alimentacao",
+    "descricao": "teste",
+    "valor": "80.00",
+    "valor_aprovado": null,
+    "status_financeiro": "aprovado",
+    "motivo_recusa": "",
+    "rejeitado": false,
+    "motivo_rejeicao": "",
+    "rejeitado_por": null,
+    "rejeitado_em": null,
+    "quem_pagou": "tecnico",
+    "comprovante": "",
+    "observacoes": "",
+    "criado_em": "2026-05-03T01:51:09.035Z"
+  }
+},
+{
+  "model": "relatorios.itemdespesa",
+  "pk": 3,
+  "fields": {
+    "relatorio": 5,
+    "ordem": 0,
+    "data": "2026-04-02",
+    "tipo": "alimentacao",
+    "descricao": "teste",
+    "valor": "90.00",
+    "valor_aprovado": null,
+    "status_financeiro": "rejeitado",
+    "motivo_recusa": "teste",
+    "rejeitado": true,
+    "motivo_rejeicao": "teste",
+    "rejeitado_por": null,
+    "rejeitado_em": "2026-05-15T18:02:59.228Z",
+    "quem_pagou": "tecnico",
+    "comprovante": "",
+    "observacoes": "",
+    "criado_em": "2026-05-03T02:47:37.092Z"
+  }
+},
+{
+  "model": "relatorios.itemdespesa",
+  "pk": 4,
+  "fields": {
+    "relatorio": 6,
+    "ordem": 0,
+    "data": "2026-04-28",
+    "tipo": "alimentacao",
+    "descricao": "aaaa",
+    "valor": "70.00",
+    "valor_aprovado": null,
+    "status_financeiro": "aprovado",
+    "motivo_recusa": "",
+    "rejeitado": false,
+    "motivo_rejeicao": "",
+    "rejeitado_por": null,
+    "rejeitado_em": null,
+    "quem_pagou": "tecnico",
+    "comprovante": "",
+    "observacoes": "",
+    "criado_em": "2026-05-04T12:47:55.663Z"
+  }
+},
+{
+  "model": "relatorios.itemdespesa",
+  "pk": 5,
+  "fields": {
+    "relatorio": 7,
+    "ordem": 0,
+    "data": "2026-05-05",
+    "tipo": "alimentacao",
+    "descricao": "almoço",
+    "valor": "35.00",
+    "valor_aprovado": "25.00",
+    "status_financeiro": "aprovado",
+    "motivo_recusa": "",
+    "rejeitado": false,
+    "motivo_rejeicao": "",
+    "rejeitado_por": null,
+    "rejeitado_em": null,
+    "quem_pagou": "tecnico",
+    "comprovante": "",
+    "observacoes": "",
+    "criado_em": "2026-05-13T14:39:45.018Z"
+  }
+},
+{
+  "model": "relatorios.itemdespesa",
+  "pk": 6,
+  "fields": {
+    "relatorio": 8,
+    "ordem": 0,
+    "data": "2026-05-05",
+    "tipo": "alimentacao",
+    "descricao": "almoço",
+    "valor": "350.00",
+    "valor_aprovado": "350.00",
+    "status_financeiro": "aprovado",
+    "motivo_recusa": "",
+    "rejeitado": false,
+    "motivo_rejeicao": "",
+    "rejeitado_por": null,
+    "rejeitado_em": null,
+    "quem_pagou": "tecnico",
+    "comprovante": "",
+    "observacoes": "",
+    "criado_em": "2026-05-13T19:17:27.762Z"
+  }
+},
+{
+  "model": "relatorios.itemdespesa",
+  "pk": 7,
+  "fields": {
+    "relatorio": 8,
+    "ordem": 1,
+    "data": "2026-05-05",
+    "tipo": "alimentacao",
+    "descricao": "almoço",
+    "valor": "350.00",
+    "valor_aprovado": "350.00",
+    "status_financeiro": "aprovado",
+    "motivo_recusa": "",
+    "rejeitado": false,
+    "motivo_rejeicao": "",
+    "rejeitado_por": null,
+    "rejeitado_em": null,
+    "quem_pagou": "tecnico",
+    "comprovante": "",
+    "observacoes": "",
+    "criado_em": "2026-05-14T13:34:28.204Z"
+  }
+},
+{
+  "model": "relatorios.itemdespesa",
+  "pk": 8,
+  "fields": {
+    "relatorio": 10,
+    "ordem": 0,
+    "data": "2026-05-05",
+    "tipo": "alimentacao",
+    "descricao": "almoço",
+    "valor": "350.00",
+    "valor_aprovado": null,
+    "status_financeiro": "aprovado",
+    "motivo_recusa": "",
+    "rejeitado": false,
+    "motivo_rejeicao": "",
+    "rejeitado_por": null,
+    "rejeitado_em": null,
+    "quem_pagou": "tecnico",
+    "comprovante": "",
+    "observacoes": "",
+    "criado_em": "2026-05-14T19:22:04.839Z"
+  }
+},
+{
+  "model": "relatorios.itemdespesa",
+  "pk": 9,
+  "fields": {
+    "relatorio": 10,
+    "ordem": 1,
+    "data": "2026-05-05",
+    "tipo": "alimentacao",
+    "descricao": "almoço",
+    "valor": "350.00",
+    "valor_aprovado": null,
+    "status_financeiro": "aprovado",
+    "motivo_recusa": "",
+    "rejeitado": false,
+    "motivo_rejeicao": "",
+    "rejeitado_por": null,
+    "rejeitado_em": null,
+    "quem_pagou": "tecnico",
+    "comprovante": "",
+    "observacoes": "",
+    "criado_em": "2026-05-14T19:22:04.839Z"
+  }
+},
+{
+  "model": "relatorios.itemdespesa",
+  "pk": 10,
+  "fields": {
+    "relatorio": 11,
+    "ordem": 0,
+    "data": null,
+    "tipo": "alimentacao",
+    "descricao": "almoço",
+    "valor": "35.00",
+    "valor_aprovado": null,
+    "status_financeiro": "aprovado",
+    "motivo_recusa": "",
+    "rejeitado": false,
+    "motivo_rejeicao": "",
+    "rejeitado_por": null,
+    "rejeitado_em": null,
+    "quem_pagou": "tecnico",
+    "comprovante": "",
+    "observacoes": "",
+    "criado_em": "2026-05-14T19:22:47.878Z"
+  }
+},
+{
+  "model": "relatorios.itemdespesa",
+  "pk": 11,
+  "fields": {
+    "relatorio": 12,
+    "ordem": 0,
+    "data": null,
+    "tipo": "alimentacao",
+    "descricao": "almoço",
+    "valor": "35.00",
+    "valor_aprovado": null,
+    "status_financeiro": "aprovado",
+    "motivo_recusa": "",
+    "rejeitado": false,
+    "motivo_rejeicao": "",
+    "rejeitado_por": null,
+    "rejeitado_em": null,
+    "quem_pagou": "tecnico",
+    "comprovante": "",
+    "observacoes": "",
+    "criado_em": "2026-05-15T11:18:24.647Z"
+  }
+},
+{
+  "model": "relatorios.trechokm",
+  "pk": 1,
+  "fields": {
+    "relatorio": 3,
+    "ordem": 0,
+    "data": "2026-04-20",
+    "origem": "cascavel",
+    "destino": "curitiba",
+    "km": "900.0",
+    "valor_km": "1.3500",
+    "valor_km_aprovado": "1.35",
+    "status_financeiro": "aprovado",
+    "motivo_recusa": "",
+    "rejeitado": false,
+    "motivo_rejeicao": "",
+    "rejeitado_por": null,
+    "rejeitado_em": null,
+    "valor_calculado": "1215.00",
+    "observacao": "teste"
+  }
+},
+{
+  "model": "relatorios.trechokm",
+  "pk": 2,
+  "fields": {
+    "relatorio": 6,
+    "ordem": 0,
+    "data": "2026-04-29",
+    "origem": "cascavel",
+    "destino": "curitiba",
+    "km": "70.0",
+    "valor_km": "1.3500",
+    "valor_km_aprovado": null,
+    "status_financeiro": "aprovado",
+    "motivo_recusa": "",
+    "rejeitado": false,
+    "motivo_rejeicao": "",
+    "rejeitado_por": null,
+    "rejeitado_em": null,
+    "valor_calculado": "94.50",
+    "observacao": ""
+  }
+},
+{
+  "model": "relatorios.trechokm",
+  "pk": 3,
+  "fields": {
+    "relatorio": 7,
+    "ordem": 0,
+    "data": "2026-05-05",
+    "origem": "cascavel",
+    "destino": "curitiba",
+    "km": "70.0",
+    "valor_km": "1.7800",
+    "valor_km_aprovado": "1.35",
+    "status_financeiro": "aprovado",
+    "motivo_recusa": "",
+    "rejeitado": false,
+    "motivo_rejeicao": "",
+    "rejeitado_por": null,
+    "rejeitado_em": null,
+    "valor_calculado": "124.60",
+    "observacao": ""
+  }
+},
+{
+  "model": "relatorios.trechokm",
+  "pk": 4,
+  "fields": {
+    "relatorio": 8,
+    "ordem": 0,
+    "data": "2026-05-05",
+    "origem": "Cascavel",
+    "destino": "curitiba",
+    "km": "90.0",
+    "valor_km": "1.8350",
+    "valor_km_aprovado": "1.84",
+    "status_financeiro": "aprovado",
+    "motivo_recusa": "",
+    "rejeitado": false,
+    "motivo_rejeicao": "",
+    "rejeitado_por": null,
+    "rejeitado_em": null,
+    "valor_calculado": "165.15",
+    "observacao": ""
+  }
+},
+{
+  "model": "relatorios.trechokm",
+  "pk": 5,
+  "fields": {
+    "relatorio": 10,
+    "ordem": 0,
+    "data": "2026-05-05",
+    "origem": "Cascavel",
+    "destino": "curitiba",
+    "km": "90.0",
+    "valor_km": "1.8350",
+    "valor_km_aprovado": null,
+    "status_financeiro": "aprovado",
+    "motivo_recusa": "",
+    "rejeitado": false,
+    "motivo_rejeicao": "",
+    "rejeitado_por": null,
+    "rejeitado_em": null,
+    "valor_calculado": "165.15",
+    "observacao": ""
+  }
+},
+{
+  "model": "relatorios.trechokm",
+  "pk": 6,
+  "fields": {
+    "relatorio": 11,
+    "ordem": 0,
+    "data": null,
+    "origem": "cascavel",
+    "destino": "curitiba",
+    "km": "70.0",
+    "valor_km": "1.7800",
+    "valor_km_aprovado": null,
+    "status_financeiro": "aprovado",
+    "motivo_recusa": "",
+    "rejeitado": false,
+    "motivo_rejeicao": "",
+    "rejeitado_por": null,
+    "rejeitado_em": null,
+    "valor_calculado": "124.60",
+    "observacao": ""
+  }
+},
+{
+  "model": "relatorios.trechokm",
+  "pk": 7,
+  "fields": {
+    "relatorio": 12,
+    "ordem": 0,
+    "data": null,
+    "origem": "cascavel",
+    "destino": "curitiba",
+    "km": "70.0",
+    "valor_km": "1.7800",
+    "valor_km_aprovado": null,
+    "status_financeiro": "aprovado",
+    "motivo_recusa": "",
+    "rejeitado": false,
+    "motivo_rejeicao": "",
+    "rejeitado_por": null,
+    "rejeitado_em": null,
+    "valor_calculado": "124.60",
+    "observacao": ""
+  }
+}
+]
