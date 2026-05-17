@@ -14,7 +14,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # ─── Segurança ────────────────────────────────────────────────────────────────
 SECRET_KEY = config("SECRET_KEY", default="django-insecure-change-me-in-production")
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="*", cast=lambda v: [s.strip() for s in v.split(",")])
+ALLOWED_HOSTS = config(
+    "ALLOWED_HOSTS",
+    default="localhost,127.0.0.1",
+    cast=lambda v: [s.strip() for s in v.split(",") if s.strip()],
+)
 
 
 # ─── Apps instalados ──────────────────────────────────────────────────────────
@@ -113,14 +117,18 @@ USE_TZ = True
 
 # ─── Arquivos estáticos ───────────────────────────────────────────────────────
 STATIC_URL = "/static/"
-STATICFILES_DIRS = [BASE_DIR / "static"]
-STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = []
+STATIC_ROOT = BASE_DIR / "static"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 
 # ─── Arquivos de mídia (uploads) ──────────────────────────────────────────────
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+
+# ─── Diretórios operacionais ─────────────────────────────────────────────────
+LOG_DIR = BASE_DIR / "logs"
 
 
 # ─── Chave primária padrão ────────────────────────────────────────────────────

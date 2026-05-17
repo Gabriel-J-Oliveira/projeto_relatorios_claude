@@ -1,0 +1,15 @@
+[Unit]
+Description=ERP Relatorios Gunicorn
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/erp-relatorios
+Environment="DJANGO_SETTINGS_MODULE=app_relatorios.settings.prod"
+ExecStart=/opt/erp-relatorios/venv/bin/gunicorn app_relatorios.wsgi:application --bind 127.0.0.1:8000 --workers 3 --timeout 60 --access-logfile /opt/erp-relatorios/logs/gunicorn-access.log --error-logfile /opt/erp-relatorios/logs/gunicorn-error.log
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
