@@ -10,6 +10,10 @@ DEBUG = True
 # Em dev, aceitar qualquer host
 ALLOWED_HOSTS = ["*"]
 
+# Em desenvolvimento, usar a pasta static como fonte e coletar em staticfiles
+STATICFILES_DIRS = [BASE_DIR / "static"]
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
 # Mostrar emails no terminal durante desenvolvimento
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 

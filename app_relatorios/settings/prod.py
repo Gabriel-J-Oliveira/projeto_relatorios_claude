@@ -2,13 +2,17 @@
 Settings de produção.
 
 Usado pelo WSGI/Gunicorn:
-gunicorn app_relatorios.wsgi:application --bind 0.0.0.0:8000
+gunicorn app_relatorios.wsgi:application --bind 127.0.0.1:8000 --workers 3 --timeout 60
 """
 
 from .base import *  # noqa
 
 
 DEBUG = False
+
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+STATIC_ROOT.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_HOSTS = config(
     "ALLOWED_HOSTS",
@@ -30,3 +34,36 @@ CSRF_COOKIE_SECURE = config("CSRF_COOKIE_SECURE", default=True, cast=bool)
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
+
+if config("POSTGRES_DB", default=""):
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": config("POSTGRES_DB"),
+            "USER": config("POSTGRES_USER"),
+            "PASSWORD": config("POSTGRES_PASSWORD"),
+            "HOST": config("POSTGRES_HOST", default="127.0.0.1"),
+            "PORT": config("POSTGRES_PORT", default="5432"),
+            "CONN_MAX_AGE": config("POSTGRES_CONN_MAX_AGE", default=60, cast=int),
+        }
+    }
+
+LOGGING["handlers"]["file"] = {
+    "class": "logging.handlers.RotatingFileHandler",
+    "filename": LOG_DIR / "django.log",
+    "maxBytes": 10 * 1024 * 1024,
+    "backupCount": 5,
+    "formatter": "verbose",
+}
+LOGGING["formatters"] = {
+    "verbose": {
+        "format": "{levelname} {asctime} {name} {process:d} {thread:d} {message}",
+        "style": "{",
+    },
+}
+LOGGING["root"]["handlers"] = ["console", "file"]
+LOGGING["loggers"]["django.request"] = {
+    "handlers": ["console", "file"],
+    "level": "ERROR",
+    "propagate": False,
+}
