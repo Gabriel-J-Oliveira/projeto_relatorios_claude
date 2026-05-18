@@ -1,0 +1,27 @@
+.env
+.env.*
+!.env.example
+
+db.sqlite3
+data.json
+
+__pycache__/
+*.py[cod]
+*.sqlite3
+
+venv/
+.venv/
+
+logs/*
+!logs/.gitkeep
+
+media/*
+!media/.gitkeep
+
+staticfiles/
+
+# Settings de ambiente com credenciais/hosts reais
+app_relatorios/settings/dev.py
+app_relatorios/settings/local.py
+app_relatorios/settings/*.local.py
+

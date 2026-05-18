@@ -6,6 +6,7 @@ Não use este arquivo diretamente. Use dev.py ou prod.py.
 import json
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from decouple import config
 
 # ─── Diretório raiz do projeto ───────────────────────────────────────────────
@@ -74,30 +75,12 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "django.template.context_processors.media",
             ],
         },
     },
 ]
 
-
-# ─── Banco de dados ───────────────────────────────────────────────────────────
-# Padrão SQLite — sobrescrito em prod.py para PostgreSQL
-DATABASES = {
-    "default": {
-        "ENGINE": config(
-            "DB_ENGINE",
-            default="django.db.backends.sqlite3"
-        ),
-        "NAME": config(
-            "DB_NAME",
-            default=BASE_DIR / "db.sqlite3"
-        ),
-        "USER": config("DB_USER", default=""),
-        "PASSWORD": config("DB_PASSWORD", default=""),
-        "HOST": config("DB_HOST", default=""),
-        "PORT": config("DB_PORT", default=""),
-    }
-}
 
 # ─── Validação de senhas ──────────────────────────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [
@@ -167,6 +150,11 @@ AUTHENTICATION_BACKENDS = [
 
 LDAP_AUTH_ENABLED = config("LDAP_AUTH_ENABLED", default=False, cast=bool)
 LDAP_SERVER_URI = config("LDAP_SERVER_URI", default="")
+LDAP_SERVER_URIS = config(
+    "LDAP_SERVER_URIS",
+    default=LDAP_SERVER_URI,
+    cast=lambda v: [uri.strip() for uri in v.split(",") if uri.strip()],
+)
 LDAP_BIND_DN = config("LDAP_BIND_DN", default="")
 LDAP_BIND_PASSWORD = config("LDAP_BIND_PASSWORD", default="")
 LDAP_USER_SEARCH_BASE_DN = config("LDAP_USER_SEARCH_BASE_DN", default="")
@@ -181,12 +169,34 @@ LDAP_ACTIVE_DIRECTORY_DOMAIN = config("LDAP_ACTIVE_DIRECTORY_DOMAIN", default=""
 LDAP_NORMALIZE_USERNAME = config("LDAP_NORMALIZE_USERNAME", default=True, cast=bool)
 LDAP_START_TLS = config("LDAP_START_TLS", default=False, cast=bool)
 LDAP_DISABLE_REFERRALS = config("LDAP_DISABLE_REFERRALS", default=True, cast=bool)
+LDAP_NETWORK_TIMEOUT = config("LDAP_NETWORK_TIMEOUT", default=5, cast=int)
+LDAP_OPERATION_TIMEOUT = config("LDAP_OPERATION_TIMEOUT", default=10, cast=int)
+LDAP_TLS_REQUIRE_CERT = config("LDAP_TLS_REQUIRE_CERT", default="DEMAND").upper()
+LDAP_CA_CERT_FILE = config("LDAP_CA_CERT_FILE", default="")
+LDAP_CA_CERT_DIR = config("LDAP_CA_CERT_DIR", default="")
+
+
+def _validar_configuracao_ldap():
+    obrigatorias = {
+        "LDAP_SERVER_URI ou LDAP_SERVER_URIS": LDAP_SERVER_URI or LDAP_SERVER_URIS,
+        "LDAP_BIND_DN": LDAP_BIND_DN,
+        "LDAP_BIND_PASSWORD": LDAP_BIND_PASSWORD,
+        "LDAP_USER_SEARCH_BASE_DN": LDAP_USER_SEARCH_BASE_DN,
+    }
+    ausentes = [nome for nome, valor in obrigatorias.items() if not valor]
+    if ausentes:
+        raise ImproperlyConfigured(
+            "LDAP_AUTH_ENABLED=True, mas faltam variaveis obrigatorias: "
+            + ", ".join(ausentes)
+        )
 
 if LDAP_AUTH_ENABLED:
+    _validar_configuracao_ldap()
+
     import ldap
     from django_auth_ldap.config import LDAPSearch, NestedActiveDirectoryGroupType
 
-    AUTH_LDAP_SERVER_URI = LDAP_SERVER_URI
+    AUTH_LDAP_SERVER_URI = LDAP_SERVER_URIS[0]
     AUTH_LDAP_BIND_DN = LDAP_BIND_DN
     AUTH_LDAP_BIND_PASSWORD = LDAP_BIND_PASSWORD
     AUTH_LDAP_USER_SEARCH = LDAPSearch(
@@ -207,6 +217,26 @@ if LDAP_AUTH_ENABLED:
     AUTH_LDAP_CONNECTION_OPTIONS = {}
     if LDAP_DISABLE_REFERRALS:
         AUTH_LDAP_CONNECTION_OPTIONS[ldap.OPT_REFERRALS] = 0
+    AUTH_LDAP_CONNECTION_OPTIONS[ldap.OPT_NETWORK_TIMEOUT] = LDAP_NETWORK_TIMEOUT
+    AUTH_LDAP_CONNECTION_OPTIONS[ldap.OPT_TIMEOUT] = LDAP_OPERATION_TIMEOUT
+
+    _LDAP_CERT_POLICY = {
+        "NEVER": ldap.OPT_X_TLS_NEVER,
+        "ALLOW": ldap.OPT_X_TLS_ALLOW,
+        "TRY": ldap.OPT_X_TLS_TRY,
+        "DEMAND": ldap.OPT_X_TLS_DEMAND,
+        "HARD": ldap.OPT_X_TLS_HARD,
+    }
+    AUTH_LDAP_GLOBAL_OPTIONS = {
+        ldap.OPT_X_TLS_REQUIRE_CERT: _LDAP_CERT_POLICY.get(
+            LDAP_TLS_REQUIRE_CERT,
+            ldap.OPT_X_TLS_DEMAND,
+        ),
+    }
+    if LDAP_CA_CERT_FILE:
+        AUTH_LDAP_GLOBAL_OPTIONS[ldap.OPT_X_TLS_CACERTFILE] = LDAP_CA_CERT_FILE
+    if LDAP_CA_CERT_DIR:
+        AUTH_LDAP_GLOBAL_OPTIONS[ldap.OPT_X_TLS_CACERTDIR] = LDAP_CA_CERT_DIR
 
     if LDAP_GROUP_SEARCH_BASE_DN:
         AUTH_LDAP_GROUP_SEARCH = LDAPSearch(

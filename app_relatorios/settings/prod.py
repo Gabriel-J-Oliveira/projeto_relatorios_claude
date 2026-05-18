@@ -5,6 +5,8 @@ Usado pelo WSGI/Gunicorn:
 gunicorn app_relatorios.wsgi:application --bind 127.0.0.1:8000 --workers 3 --timeout 60
 """
 
+from django.core.exceptions import ImproperlyConfigured
+
 from .base import *  # noqa
 
 
@@ -29,24 +31,28 @@ CSRF_TRUSTED_ORIGINS = config(
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
 
-SESSION_COOKIE_SECURE = config("SESSION_COOKIE_SECURE", default=True, cast=bool)
-CSRF_COOKIE_SECURE = config("CSRF_COOKIE_SECURE", default=True, cast=bool)
+# Em HTTP puro, cookies Secure não são armazenados/enviados pelo navegador.
+# Ative como True no .env quando o Nginx estiver servindo HTTPS.
+SESSION_COOKIE_SECURE = config("SESSION_COOKIE_SECURE", default=False, cast=bool)
+CSRF_COOKIE_SECURE = config("CSRF_COOKIE_SECURE", default=False, cast=bool)
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 
-if config("POSTGRES_DB", default=""):
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": config("POSTGRES_DB"),
-            "USER": config("POSTGRES_USER"),
-            "PASSWORD": config("POSTGRES_PASSWORD"),
-            "HOST": config("POSTGRES_HOST", default="127.0.0.1"),
-            "PORT": config("POSTGRES_PORT", default="5432"),
-            "CONN_MAX_AGE": config("POSTGRES_CONN_MAX_AGE", default=60, cast=int),
-        }
+if not config("POSTGRES_DB", default=""):
+    raise ImproperlyConfigured("POSTGRES_DB deve ser definido no ambiente de produção.")
+
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": config("POSTGRES_DB"),
+        "USER": config("POSTGRES_USER"),
+        "PASSWORD": config("POSTGRES_PASSWORD"),
+        "HOST": config("POSTGRES_HOST", default="127.0.0.1"),
+        "PORT": config("POSTGRES_PORT", default="5432"),
+        "CONN_MAX_AGE": config("POSTGRES_CONN_MAX_AGE", default=60, cast=int),
     }
+}
 
 LOGGING["handlers"]["file"] = {
     "class": "logging.handlers.RotatingFileHandler",
