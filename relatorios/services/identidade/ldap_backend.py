@@ -1,4 +1,5 @@
 import logging
+from dataclasses import replace
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -7,6 +8,10 @@ from django.test import override_settings
 
 from relatorios.services.identidade.auditoria_identidade_service import (
     registrar_evento_identidade,
+)
+from relatorios.services.identidade.cache_service import (
+    gravar_usuario_existe_ad,
+    obter_usuario_existe_ad,
 )
 from relatorios.services.identidade.grupo_mapping_service import (
     mapear_grupos_ad_para_django,
@@ -57,10 +62,10 @@ class ActiveDirectoryBackend:
             if getattr(settings, "LDAP_NORMALIZE_USERNAME", True)
             else username
         )
-        usuario_existe_no_ad = self._usuario_existe_no_ad(username_ldap)
         user = self._autenticar_em_dcs(request, username, username_ldap, password, **kwargs)
 
         if user is None:
+            usuario_existe_no_ad = self._usuario_existe_no_ad(username_ldap)
             logger.info("Autenticacao LDAP recusada para usuario %s.", username)
             registrar_evento_identidade(
                 "ldap_login_falha",
@@ -134,6 +139,15 @@ class ActiveDirectoryBackend:
         return None
 
     def _usuario_existe_no_ad(self, username_ldap):
+        usuario_em_cache = obter_usuario_existe_ad(username_ldap)
+        if usuario_em_cache is not None:
+            logger.info(
+                "Busca preventiva AD para usuario %s atendida por cache: %s.",
+                username_ldap,
+                "encontrado" if usuario_em_cache else "nao_encontrado",
+            )
+            return usuario_em_cache
+
         try:
             import ldap
             from ldap.filter import escape_filter_chars
@@ -172,6 +186,7 @@ class ActiveDirectoryBackend:
                     uri,
                     "encontrado" if existe else "nao_encontrado",
                 )
+                gravar_usuario_existe_ad(username_ldap, existe)
                 return existe
             except (ldap.TIMEOUT, ldap.SERVER_DOWN, ldap.CONNECT_ERROR) as exc:
                 ultimo_erro = exc
@@ -268,6 +283,7 @@ class ActiveDirectoryBackend:
                 user,
                 {"username": snapshot.username, "status": status},
             )
+            self._bloquear_usuario_ldap(user, snapshot, "status_ad_invalido")
             return False
         if not grupos_ad:
             logger.warning("Usuario LDAP %s autenticado sem grupos AD encontrados.", snapshot.username)
@@ -278,6 +294,19 @@ class ActiveDirectoryBackend:
             len(grupos_django),
             ", ".join(grupos_django) if grupos_django else "-",
         )
+
+        if getattr(settings, "LDAP_BLOCK_USERS_WITHOUT_ERP_GROUP", True) and not grupos_django:
+            logger.warning(
+                "Usuario LDAP %s bloqueado porque nao possui grupo ERP mapeado.",
+                snapshot.username,
+            )
+            registrar_evento_identidade(
+                "ldap_usuario_sem_grupo_erp",
+                user,
+                {"username": snapshot.username, "grupos_ad": grupos_ad},
+            )
+            self._bloquear_usuario_ldap(user, snapshot, "sem_grupo_erp")
+            return False
 
         resultado = sincronizar_usuario_externo(
             snapshot,
@@ -292,3 +321,22 @@ class ActiveDirectoryBackend:
             resultado.__dict__,
         )
         return True
+
+    def _bloquear_usuario_ldap(self, user, snapshot, motivo):
+        snapshot_bloqueado = replace(snapshot, is_active=False, grupos_ad=())
+        resultado = sincronizar_usuario_externo(
+            snapshot_bloqueado,
+            criar_usuario=True,
+            atualizar_dados=True,
+            atualizar_grupos=True,
+            marcar_senha_inutilizavel=True,
+        )
+        registrar_evento_identidade(
+            "ldap_usuario_bloqueado",
+            user,
+            {
+                "username": snapshot.username,
+                "motivo": motivo,
+                "grupos_removidos": resultado.grupos_removidos,
+            },
+        )

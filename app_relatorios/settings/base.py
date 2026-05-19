@@ -53,6 +53,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "relatorios.middleware.IdentidadeCorporativaMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -115,6 +116,29 @@ MEDIA_ROOT = BASE_DIR / "media"
 LOG_DIR = BASE_DIR / "logs"
 
 
+# Sessao corporativa: 60 minutos de inatividade.
+SESSION_COOKIE_AGE = config("SESSION_COOKIE_AGE", default=3600, cast=int)
+SESSION_SAVE_EVERY_REQUEST = config("SESSION_SAVE_EVERY_REQUEST", default=True, cast=bool)
+SESSION_EXPIRE_AT_BROWSER_CLOSE = config(
+    "SESSION_EXPIRE_AT_BROWSER_CLOSE",
+    default=False,
+    cast=bool,
+)
+
+
+# Cache operacional. Em producao multiworker pode ser substituido por Redis/Memcached
+# via prod.py/env sem alterar a aplicacao.
+CACHES = {
+    "default": {
+        "BACKEND": config(
+            "CACHE_BACKEND",
+            default="django.core.cache.backends.locmem.LocMemCache",
+        ),
+        "LOCATION": config("CACHE_LOCATION", default="erp-relatorios-cache"),
+    }
+}
+
+
 # ─── Chave primária padrão ────────────────────────────────────────────────────
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -175,6 +199,26 @@ LDAP_OPERATION_TIMEOUT = config("LDAP_OPERATION_TIMEOUT", default=10, cast=int)
 LDAP_TLS_REQUIRE_CERT = config("LDAP_TLS_REQUIRE_CERT", default="DEMAND").upper()
 LDAP_CA_CERT_FILE = config("LDAP_CA_CERT_FILE", default="")
 LDAP_CA_CERT_DIR = config("LDAP_CA_CERT_DIR", default="")
+LDAP_USER_EXISTS_CACHE_TIMEOUT = config(
+    "LDAP_USER_EXISTS_CACHE_TIMEOUT",
+    default=300,
+    cast=int,
+)
+LDAP_DIRECTORY_CACHE_TIMEOUT = config(
+    "LDAP_DIRECTORY_CACHE_TIMEOUT",
+    default=300,
+    cast=int,
+)
+LDAP_SESSION_REVALIDATE_SECONDS = config(
+    "LDAP_SESSION_REVALIDATE_SECONDS",
+    default=300,
+    cast=int,
+)
+LDAP_BLOCK_USERS_WITHOUT_ERP_GROUP = config(
+    "LDAP_BLOCK_USERS_WITHOUT_ERP_GROUP",
+    default=True,
+    cast=bool,
+)
 
 
 def _validar_configuracao_ldap():

@@ -1,6 +1,44 @@
 const sidebarToggle = document.getElementById('sidebar-toggle');
 const sidebarBackdrop = document.getElementById('sidebar-backdrop');
 
+window.ErpOperationalErrors = (() => {
+  function show(title, errors) {
+    const modalEl = document.getElementById('modalErrosOperacionais');
+    if (!modalEl || !window.bootstrap) return;
+
+    const titleEl = modalEl.querySelector('[data-operational-errors-title]');
+    const listEl = modalEl.querySelector('[data-operational-errors-list]');
+    const mensagens = Array.isArray(errors) ? errors : [errors].filter(Boolean);
+
+    if (titleEl) titleEl.textContent = title || 'Operacao bloqueada';
+    if (listEl) {
+      listEl.innerHTML = '';
+      mensagens.forEach(msg => {
+        const item = document.createElement('li');
+        item.textContent = String(msg || '').trim();
+        listEl.appendChild(item);
+      });
+    }
+
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  }
+
+  function initFromMessages() {
+    const mensagens = Array.from(document.querySelectorAll('.js-operational-error-message'))
+      .map(el => el.dataset.message)
+      .filter(Boolean);
+    if (mensagens.length) {
+      show('Nao foi possivel concluir a operacao.', mensagens);
+    }
+  }
+
+  return { show, initFromMessages };
+})();
+
+document.addEventListener('DOMContentLoaded', () => {
+  window.ErpOperationalErrors?.initFromMessages();
+});
+
 function setSidebarOpen(open) {
   document.body.classList.toggle('sidebar-open', open);
   sidebarToggle?.setAttribute('aria-expanded', open ? 'true' : 'false');

@@ -46,6 +46,7 @@ from .services.workflow_service import (
     WorkflowError,
     aprovar_relatorio,
     enviar_para_conferencia,
+    preparar_rascunho_para_salvar,
     rejeitar_relatorio,
     relatorio_bloqueado as workflow_relatorio_bloqueado,
     solicitar_ajuste,
@@ -211,6 +212,25 @@ def _formatar_data(data):
 def _formatar_moeda(valor):
     valor = valor or Decimal("0.00")
     return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _request_espera_json(request):
+    return (
+        request.headers.get("x-requested-with") == "XMLHttpRequest"
+        or "application/json" in request.headers.get("accept", "")
+    )
+
+
+def _lista_erros_operacionais(exc):
+    erros = getattr(exc, "errors", None)
+    if erros:
+        return list(erros)
+    return [str(exc)]
+
+
+def _adicionar_erros_operacionais(request, erros):
+    for erro in erros:
+        messages.error(request, erro, extra_tags="operational-error")
 
 
 def _itens_pdf_reembolso(relatorio):
@@ -734,10 +754,7 @@ def relatorio_form_view(request, pk=None):
             acao = request.POST.get("acao", "rascunho")
             relatorio = form.save(commit=False)
 
-            if acao == "rascunho":
-                relatorio.status = instance.status if instance else StatusRelatorio.RASCUNHO
-            else:
-                relatorio.status = instance.status if instance else StatusRelatorio.RASCUNHO
+            relatorio = preparar_rascunho_para_salvar(relatorio, instance)
 
             erros_extras = False
 
@@ -811,8 +828,9 @@ def relatorio_form_view(request, pk=None):
                     return redirect("relatorios:relatorio_detail", pk=relatorio.pk)
 
                 except WorkflowError as exc:
-                    messages.error(request, str(exc))
-                    resumo_erros.append(str(exc))
+                    erros = _lista_erros_operacionais(exc)
+                    _adicionar_erros_operacionais(request, erros)
+                    resumo_erros.extend(erros)
                     return render(
                         request,
                         "relatorios/relatorio_form.html",
@@ -1516,7 +1534,10 @@ def relatorio_status_view(request, pk, status):
             messages.error(request, "Status inválido.")
             return redirect("relatorios:relatorio_detail", pk=pk)
     except WorkflowError as exc:
-        messages.error(request, str(exc))
+        erros = _lista_erros_operacionais(exc)
+        if _request_espera_json(request):
+            return JsonResponse({"success": False, "errors": erros}, status=400)
+        _adicionar_erros_operacionais(request, erros)
         return redirect("relatorios:relatorio_detail", pk=pk)
     except RelatorioTecnico.DoesNotExist:
         messages.error(request, "Relatório não encontrado.")

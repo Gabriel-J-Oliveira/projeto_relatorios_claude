@@ -6,7 +6,6 @@ from django.utils import timezone
 
 from relatorios.models import (
     Adiantamento,
-    ItemDespesa,
     RelatorioTecnico,
     SequencialRelatorio,
     StatusFinanceiroItem,
@@ -15,7 +14,16 @@ from relatorios.models import (
     TipoEventoHistorico,
     TrechoKm,
 )
+from relatorios.services.autorizacao_service import (
+    usuario_pode_atuar_como_financeiro,
+    usuario_pode_enviar_relatorio,
+)
 from relatorios.services.historico_service import registrar_evento
+from relatorios.services.validacoes_operacionais import (
+    validar_relatorio_para_aprovacao,
+    validar_relatorio_para_envio,
+    validar_transicao_status,
+)
 
 
 CHAVE_SEQUENCIAL_RELATORIO = "relatorio_oficial"
@@ -23,11 +31,56 @@ ESTADOS_FINAIS = {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
 
 
 class WorkflowError(Exception):
-    pass
+    def __init__(self, errors):
+        if isinstance(errors, (list, tuple, set)):
+            self.errors = [str(erro) for erro in errors if str(erro).strip()]
+        else:
+            self.errors = [str(errors)] if str(errors).strip() else []
+        super().__init__(" ".join(self.errors))
 
 
 def relatorio_bloqueado(relatorio):
     return relatorio.status in ESTADOS_FINAIS
+
+
+def _obter_relatorio_bloqueado(relatorio_ou_id):
+    pk = getattr(relatorio_ou_id, "pk", relatorio_ou_id)
+    return RelatorioTecnico.objects.select_for_update().get(pk=pk)
+
+
+def _usuario(usuario):
+    return usuario if getattr(usuario, "is_authenticated", False) else None
+
+
+def _validar_permissao_envio(relatorio, usuario):
+    if not usuario_pode_enviar_relatorio(usuario, relatorio):
+        raise WorkflowError("Você não tem permissão para enviar este relatório.")
+
+
+def _validar_permissao_financeira(usuario):
+    if not usuario_pode_atuar_como_financeiro(usuario):
+        raise WorkflowError("Você não tem permissão para executar esta ação financeira.")
+
+
+def _aplicar_status(relatorio, novo_status, update_fields=None):
+    relatorio.status = novo_status
+    campos = ["status", "atualizado_em"]
+    if update_fields:
+        campos.extend(update_fields)
+    relatorio.save(update_fields=list(dict.fromkeys(campos)))
+    return relatorio
+
+
+def preparar_rascunho_para_salvar(relatorio, instance=None):
+    """
+    Mantem criacao/edicao de rascunho sem espalhar atribuicao de status na view.
+    Nao registra historico porque nao representa transicao operacional.
+    """
+    if instance:
+        relatorio.status = instance.status
+    elif not relatorio.status:
+        relatorio.status = StatusRelatorio.RASCUNHO
+    return relatorio
 
 
 def _formatar_moeda(valor):
@@ -106,22 +159,9 @@ def gerar_numero_oficial(relatorio):
 
 
 def validar_transicao(relatorio, novo_status):
-    if relatorio.status in ESTADOS_FINAIS:
-        raise WorkflowError("Relatório aprovado ou rejeitado está bloqueado para alterações.")
-
-    transicoes = {
-        StatusRelatorio.RASCUNHO: {StatusRelatorio.CONFERENCIA},
-        StatusRelatorio.CONFERENCIA: {
-            StatusRelatorio.AJUSTE,
-            StatusRelatorio.APROVADO,
-            StatusRelatorio.REJEITADO,
-        },
-        StatusRelatorio.AJUSTE: {StatusRelatorio.CONFERENCIA},
-    }
-    if novo_status not in transicoes.get(relatorio.status, set()):
-        raise WorkflowError(
-            f"Transição inválida de {relatorio.get_status_display()} para {novo_status}."
-        )
+    resultado = validar_transicao_status(relatorio, novo_status)
+    if not resultado.ok:
+        raise WorkflowError(resultado.errors)
 
 
 def _registrar_adiantamento_do_relatorio(relatorio):
@@ -225,6 +265,10 @@ def _salvar_valores_aprovados(post_data, relatorio, usuario, consolidar=False):
 
 
 def _validar_aprovacao_financeira(relatorio):
+    resultado = validar_relatorio_para_aprovacao(relatorio)
+    if not resultado.ok:
+        raise WorkflowError(resultado.errors)
+
     if not relatorio.despesas.exists() and not relatorio.trechos.exists():
         raise WorkflowError("Adicione pelo menos uma despesa ou trecho de KM.")
     if relatorio.total_aprovado <= 0:
@@ -237,21 +281,17 @@ def _validar_aprovacao_financeira(relatorio):
         raise WorkflowError("Não é possível aprovar relatório com todos os itens rejeitados.")
 
 
-def _usuario(usuario):
-    return usuario if getattr(usuario, "is_authenticated", False) else None
-
-
 def enviar_para_conferencia(relatorio_id, usuario=None):
     with transaction.atomic():
-        relatorio = RelatorioTecnico.objects.select_for_update().get(pk=relatorio_id)
+        relatorio = _obter_relatorio_bloqueado(relatorio_id)
+        _validar_permissao_envio(relatorio, usuario)
         validar_transicao(relatorio, StatusRelatorio.CONFERENCIA)
-        erros = relatorio.pode_enviar()
-        if erros:
-            raise WorkflowError(erros[0])
+        resultado_envio = validar_relatorio_para_envio(relatorio)
+        if not resultado_envio.ok:
+            raise WorkflowError(resultado_envio.errors)
         status_anterior = relatorio.status
         gerar_numero_oficial(relatorio)
-        relatorio.status = StatusRelatorio.CONFERENCIA
-        relatorio.save(update_fields=["status", "atualizado_em"])
+        _aplicar_status(relatorio, StatusRelatorio.CONFERENCIA)
         tipo_evento = (
             TipoEventoHistorico.REENVIADO
             if status_anterior == StatusRelatorio.AJUSTE
@@ -272,31 +312,37 @@ def solicitar_ajuste(relatorio_id, usuario=None, justificativa=""):
     if not justificativa:
         raise WorkflowError("Informe a justificativa para esta ação.")
     with transaction.atomic():
-        relatorio = RelatorioTecnico.objects.select_for_update().get(pk=relatorio_id)
+        relatorio = _obter_relatorio_bloqueado(relatorio_id)
+        _validar_permissao_financeira(usuario)
         validar_transicao(relatorio, StatusRelatorio.AJUSTE)
-        relatorio.status = StatusRelatorio.AJUSTE
+        status_anterior = relatorio.status
         relatorio.motivo_rejeicao = justificativa
-        relatorio.save(update_fields=["status", "motivo_rejeicao", "atualizado_em"])
+        _aplicar_status(relatorio, StatusRelatorio.AJUSTE, ["motivo_rejeicao"])
         registrar_evento(
             relatorio,
             _usuario(usuario),
             TipoEventoHistorico.AJUSTE_SOLICITADO,
             f"Financeiro solicitou correções: {justificativa}",
-            {"motivo": justificativa},
+            {
+                "motivo": justificativa,
+                "status_anterior": status_anterior,
+                "status_novo": relatorio.status,
+            },
         )
         return relatorio
 
 
 def aprovar_relatorio(relatorio_id, usuario=None, post_data=None):
     with transaction.atomic():
-        relatorio = RelatorioTecnico.objects.select_for_update().get(pk=relatorio_id)
+        relatorio = _obter_relatorio_bloqueado(relatorio_id)
+        _validar_permissao_financeira(usuario)
         validar_transicao(relatorio, StatusRelatorio.APROVADO)
+        status_anterior = relatorio.status
         _salvar_valores_aprovados(post_data or {}, relatorio, _usuario(usuario), consolidar=True)
         _validar_aprovacao_financeira(relatorio)
-        relatorio.status = StatusRelatorio.APROVADO
         relatorio.aprovado_em = timezone.now()
         relatorio.aprovado_por = _usuario(usuario)
-        relatorio.save(update_fields=["status", "aprovado_em", "aprovado_por", "atualizado_em"])
+        _aplicar_status(relatorio, StatusRelatorio.APROVADO, ["aprovado_em", "aprovado_por"])
         _registrar_adiantamento_do_relatorio(relatorio)
         registrar_evento(
             relatorio,
@@ -306,6 +352,8 @@ def aprovar_relatorio(relatorio_id, usuario=None, post_data=None):
             {
                 "total_aprovado": str(relatorio.total_aprovado),
                 "diferenca_removida": str(relatorio.diferenca_removida),
+                "status_anterior": status_anterior,
+                "status_novo": relatorio.status,
             },
         )
         return relatorio
@@ -316,16 +364,21 @@ def rejeitar_relatorio(relatorio_id, usuario=None, justificativa=""):
     if not justificativa:
         raise WorkflowError("Informe a justificativa para esta ação.")
     with transaction.atomic():
-        relatorio = RelatorioTecnico.objects.select_for_update().get(pk=relatorio_id)
+        relatorio = _obter_relatorio_bloqueado(relatorio_id)
+        _validar_permissao_financeira(usuario)
         validar_transicao(relatorio, StatusRelatorio.REJEITADO)
-        relatorio.status = StatusRelatorio.REJEITADO
+        status_anterior = relatorio.status
         relatorio.motivo_rejeicao = justificativa
-        relatorio.save(update_fields=["status", "motivo_rejeicao", "atualizado_em"])
+        _aplicar_status(relatorio, StatusRelatorio.REJEITADO, ["motivo_rejeicao"])
         registrar_evento(
             relatorio,
             _usuario(usuario),
             TipoEventoHistorico.REJEITADO,
             f"Relatório rejeitado definitivamente: {justificativa}",
-            {"motivo": justificativa},
+            {
+                "motivo": justificativa,
+                "status_anterior": status_anterior,
+                "status_novo": relatorio.status,
+            },
         )
         return relatorio
