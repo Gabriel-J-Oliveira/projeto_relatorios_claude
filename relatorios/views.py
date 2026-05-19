@@ -134,12 +134,24 @@ def _clientes_selecionados_do_request(request, instance=None):
 
 def _tecnicos_selecionados_do_request(request, instance=None):
     if request.method == "POST":
-        ids = normalizar_ids_clientes(request.POST.getlist("tecnicos_equipe"))
-        nomes = list(Tecnico.objects.filter(pk__in=ids).order_by("nome").values_list("nome", flat=True))
+        ids = []
+        responsavel_id = request.POST.get("tecnico_responsavel")
+        if responsavel_id:
+            ids.append(responsavel_id)
+        ids.extend(request.POST.getlist("tecnicos_equipe"))
+        ids = normalizar_ids_clientes(ids)
+        tecnicos = {
+            tecnico.pk: tecnico.nome
+            for tecnico in Tecnico.objects.filter(pk__in=ids)
+        }
+        nomes = [tecnicos[pk] for pk in ids if pk in tecnicos]
         return ids, nomes
 
     if instance:
-        tecnicos = list(instance.tecnicos_adicionais.order_by("nome"))
+        tecnicos = []
+        if instance.tecnico_responsavel_id:
+            tecnicos.append(instance.tecnico_responsavel)
+        tecnicos.extend(instance.tecnicos_adicionais.order_by("nome"))
         return [tecnico.pk for tecnico in tecnicos], [tecnico.nome for tecnico in tecnicos]
 
     return [], []

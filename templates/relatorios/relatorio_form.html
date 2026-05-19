@@ -56,6 +56,36 @@
             {% endif %}
           {% endif %}
 
+          <div id="relatorio-form-debug"
+               class="alert alert-warning border-0 shadow-sm d-none"
+               role="alert">
+            <div class="d-flex justify-content-between align-items-start gap-3">
+              <div>
+                <div class="fw-semibold">
+                  <i class="bi bi-bug me-1"></i>Diagnóstico do formulário
+                </div>
+                <div class="small">
+                  O sistema registrou um erro nesta tela. Baixe ou copie o log e envie para análise.
+                </div>
+              </div>
+              <div class="d-flex gap-2">
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        id="btn-copiar-log-form">
+                  Copiar log
+                </button>
+                <button type="button"
+                        class="btn btn-warning btn-sm"
+                        id="btn-baixar-log-form">
+                  Baixar log
+                </button>
+              </div>
+            </div>
+            <pre id="relatorio-form-debug-output"
+                 class="small bg-body border rounded p-2 mt-3 mb-0"
+                 style="max-height: 220px; overflow: auto;"></pre>
+          </div>
+
           <form method="post"
                 enctype="multipart/form-data"
                 id="form-relatorio"
@@ -204,31 +234,22 @@
                   </div>
 
                   <div class="col-md-6">
-                    <label class="form-label fw-medium small text-muted">Técnico Responsável *</label>
-                    {{ form.tecnico_responsavel }}
-                    {% if form.tecnico_responsavel.errors %}
-                      <div class="text-danger small mt-1">{{ form.tecnico_responsavel.errors.0 }}</div>
-                    {% endif %}
-                  </div>
-
-                  {# Equipe adicional #}
-                  <div class="col-12">
-                    <label class="form-label fw-medium small text-muted">
-                      Equipe Adicional
-                      <span class="fw-normal opacity-75">(opcional — Ctrl+clique para múltiplos)</span>
-                    </label>
-                    <div class="d-none">{{ form.tecnicos_equipe }}</div>
+                    <label class="form-label fw-medium small text-muted">Técnicos *</label>
+                    <div class="d-none">
+                      {{ form.tecnico_responsavel }}
+                      {{ form.tecnicos_equipe }}
+                    </div>
                     <div class="border rounded-2 bg-body-tertiary px-3 py-2 d-flex align-items-center justify-content-between gap-2">
                       <div class="min-w-0">
                         <div class="small text-muted mb-1">
                           <span id="tecnicos-equipe-contador">{{ tecnicos_selecionados_ids|length }}</span>
-                          técnico(s) de apoio selecionado(s)
+                          técnico(s) selecionado(s)
                         </div>
                         <div id="tecnicos-equipe-badges" class="d-flex flex-wrap gap-1">
                           {% for nome in tecnicos_selecionados_nomes %}
                             <span class="badge rounded-pill text-bg-secondary">{{ nome }}</span>
                           {% empty %}
-                            <span class="text-muted small">Nenhum técnico de apoio selecionado</span>
+                            <span class="text-muted small">Nenhum técnico selecionado</span>
                           {% endfor %}
                         </div>
                       </div>
@@ -239,9 +260,13 @@
                         <i class="bi bi-person-plus me-1"></i>Selecionar técnicos
                       </button>
                     </div>
+                    {% if form.tecnico_responsavel.errors %}
+                      <div class="text-danger small mt-1">{{ form.tecnico_responsavel.errors.0 }}</div>
+                    {% endif %}
                     {% if form.tecnicos_equipe.errors %}
                       <div class="text-danger small mt-1">{{ form.tecnicos_equipe.errors.0 }}</div>
                     {% endif %}
+                    <div class="invalid-feedback d-block small erro-tecnicos-relatorio"></div>
                   </div>
 
                   {# Localidade #}
@@ -349,8 +374,8 @@
 
                 <div class="p-3 bg-light border-top d-flex align-items-center justify-content-between">
                   <button type="button"
-                          class="btn btn-sm btn-primary d-flex align-items-center gap-2 px-3"
-                          onclick="adicionarLinhaDespesa()">
+                          id="btn-adicionar-despesa"
+                          class="btn btn-sm btn-primary d-flex align-items-center gap-2 px-3">
                     <i class="bi bi-plus-circle"></i> Adicionar Despesa
                   </button>
                   <span class="text-muted small italic">
@@ -411,8 +436,8 @@
 
                 <div class="p-3 bg-light border-top d-flex align-items-center justify-content-between">
                   <button type="button"
-                          class="btn btn-sm btn-primary d-flex align-items-center gap-2 px-3"
-                          onclick="adicionarLinhaKm()">
+                          id="btn-adicionar-km"
+                          class="btn btn-sm btn-primary d-flex align-items-center gap-2 px-3">
                     <i class="bi bi-plus-circle"></i> Adicionar trecho
                   </button>
 
@@ -628,7 +653,7 @@
                     <div class="modal-header bg-light">
                       <h5 class="modal-title">
                         <i class="bi bi-person-plus me-2 text-primary"></i>
-                        Selecionar técnicos de apoio
+                        Selecionar técnicos
                       </h5>
                       <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
@@ -870,6 +895,7 @@
           </style>
         {% endblock %}
         {% block extra_js %}
+          <script src="{% static 'js/relatorio_form_diagnostics.js' %}"></script>
           <script>
   /* ═══════════════════════════════════════════════════════════════
     CONTROLE DO FORMULÁRIO — Single Save sem HTMX
@@ -889,6 +915,41 @@
   const PREFIX_KM = "trechos";
   const VKM_PADRAO = "{{ valor_km_padrao }}";
   let clienteSelectorTarget = null;
+
+  function logFormEvent(evento, detalhes = {}, nivel = "info") {
+    window.RelatorioFormDiagnostics?.log(evento, detalhes, nivel);
+  }
+
+  function logFormError(evento, erro, detalhes = {}) {
+    window.RelatorioFormDiagnostics?.error(evento, erro, detalhes);
+  }
+
+  function atualizarBadgesAbasSeguro() {
+    if (typeof atualizarBadgesAbas === "function") {
+      atualizarBadgesAbas();
+      return;
+    }
+    const badgeDespesas = document.getElementById("badge-despesas");
+    const badgeKm = document.getElementById("badge-km");
+    if (badgeDespesas) badgeDespesas.textContent = contarLinhas("despesas");
+    if (badgeKm) badgeKm.textContent = contarLinhas("trechos");
+  }
+
+  function executarValidadoresGrupoSeguro() {
+    if (typeof GroupValidators !== "undefined" && typeof GroupValidators.runAll === "function") {
+      GroupValidators.runAll();
+    }
+  }
+
+  function linhaTemConteudoSeguro(linha) {
+    if (typeof linhaTemConteudo === "function") {
+      return linhaTemConteudo(linha);
+    }
+    return Array.from(linha?.querySelectorAll("input, select, textarea") || []).some(campo => {
+      if (campo.type === "hidden" || campo.type === "checkbox" || campo.name?.endsWith("-DELETE")) return false;
+      return String(campo.value || "").trim() !== "";
+    });
+  }
 
   function idsFromValue(valor) {
     return String(valor || "")
@@ -933,14 +994,31 @@
     return document.querySelector('[name="tecnicos_equipe"]');
   }
 
+  function getTecnicoResponsavelSelect() {
+    return document.querySelector('[name="tecnico_responsavel"]');
+  }
+
   function getTecnicosEquipeIds() {
+    const ids = [];
+    const responsavel = getTecnicoResponsavelSelect();
+    if (responsavel?.value) ids.push(responsavel.value);
+
     const select = getTecnicosEquipeSelect();
-    if (!select) return [];
-    return Array.from(select.selectedOptions).map(option => option.value);
+    if (select) {
+      ids.push(...Array.from(select.selectedOptions).map(option => option.value));
+    }
+    return Array.from(new Set(ids.map(String).filter(Boolean)));
   }
 
   function setTecnicosEquipe(ids) {
-    const selecionados = new Set((ids || []).map(String));
+    const valores = Array.from(new Set((ids || []).map(String).filter(Boolean)));
+    const responsavel = getTecnicoResponsavelSelect();
+    if (responsavel) {
+      responsavel.value = valores[0] || "";
+      responsavel.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    const selecionados = new Set(valores.slice(1));
     const select = getTecnicosEquipeSelect();
     if (!select) return;
     Array.from(select.options).forEach(option => {
@@ -957,7 +1035,7 @@
     if (badges) {
       badges.innerHTML = ids.length
         ? ids.map(id => `<span class="badge rounded-pill text-bg-secondary">${getNomeTecnico(id)}</span>`).join("")
-        : '<span class="text-muted small">Nenhum técnico de apoio selecionado</span>';
+        : '<span class="text-muted small">Nenhum técnico selecionado</span>';
     }
   }
 
@@ -1197,11 +1275,15 @@
       atualizarBadgesClientesRelatorio();
       atualizarBadgesClientesItens();
     }
+    const tecnicosImportados = [];
     if (document.getElementById("importar-tecnico")?.checked) {
-      definirValorCampo(campoPorNome("tecnico_responsavel"), dados.tecnico_id);
+      tecnicosImportados.push(dados.tecnico_id);
     }
     if (document.getElementById("importar-apoio")?.checked) {
-      definirMultiselect(campoPorNome("tecnicos_equipe"), dados.apoio_ids);
+      tecnicosImportados.push(...(dados.apoio_ids || []));
+    }
+    if (tecnicosImportados.length) {
+      setTecnicosEquipe(tecnicosImportados);
       atualizarBadgesTecnicosEquipe();
     }
     if (document.getElementById("importar-despesas")?.checked) {
@@ -1212,11 +1294,9 @@
     }
 
     recalcular();
-    atualizarBadgesAbas();
+    atualizarBadgesAbasSeguro();
     validarKmGlobal();
-    if (typeof GroupValidators !== "undefined") {
-      GroupValidators.runAll();
-    }
+    executarValidadoresGrupoSeguro();
 
     const modalEl = document.getElementById("modalImportarRelatorio");
     const modal = bootstrap.Modal.getInstance(modalEl);
@@ -1295,57 +1375,78 @@
     ?.addEventListener("input", atualizarFiltroTecnicosModal);
 
   async function adicionarLinhaDespesa() {
-  const idx = _idxDesp;
+    const idx = _idxDesp;
+    const url = `${URL_NOVA_LINHA_DESPESA}?idx=${idx}`;
+    logFormEvent("adicionar_despesa_inicio", { idx, url });
 
-  try {
-    const response = await fetch(`${URL_NOVA_LINHA_DESPESA}?idx=${idx}`);
+    try {
+      const corpo = document.getElementById("corpo-despesas");
+      if (!corpo) throw new Error("Tabela de despesas não encontrada no DOM.");
 
-    if (!response.ok) {
-      throw new Error("Erro ao carregar nova linha de despesa.");
+      const response = await fetch(url, {
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        credentials: "same-origin",
+      });
+      const html = await response.text();
+
+      if (!response.ok) {
+        throw new Error(`Erro HTTP ${response.status} ao carregar despesa: ${html.slice(0, 300)}`);
+      }
+      if (!html.trim()) {
+        throw new Error("Resposta vazia ao carregar nova linha de despesa.");
+      }
+
+      corpo.insertAdjacentHTML("beforeend", html);
+      const novaLinha = corpo.querySelector(".linha-despesa:last-child");
+      if (!novaLinha) throw new Error("HTML recebido não criou uma linha de despesa válida.");
+
+      _idxDesp++;
+      atualizarTotalForms(PREFIX_DESP, _idxDesp);
+      atualizarBadgesClientesItens();
+      recalcular();
+      atualizarBadgesAbasSeguro();
+      logFormEvent("adicionar_despesa_sucesso", { idx, novoTotalForms: _idxDesp });
+      return novaLinha;
+
+    } catch (error) {
+      logFormError("adicionar_despesa_erro", error, { idx, url });
+      window.ErpOperationalErrors?.show("Não foi possível adicionar a despesa.", [
+        "O erro foi registrado no painel de diagnóstico do formulário."
+      ]);
+      return null;
     }
-
-    const html = await response.text();
-
-    const corpo = document.getElementById("corpo-despesas");
-    corpo.insertAdjacentHTML("beforeend", html);
-    const novaLinha = corpo.querySelector(".linha-despesa:last-child");
-
-    _idxDesp++;
-    atualizarTotalForms(PREFIX_DESP, _idxDesp);
-    atualizarBadgesClientesItens();
-    recalcular();
-    atualizarBadgesAbas();
-    return novaLinha;
-
-  } catch (error) {
-    console.error(error);
-    return null;
   }
-}
 
 
   // ── Clonar linha de KM ─────────────────────────────────────────
 async function adicionarLinhaKm() {
   const idx = _idxKm;
+  const form = document.getElementById("form-relatorio");
+  const valorPadrao = form?.dataset?.valorKmCliente || "0";
+  const url = `${URL_NOVA_LINHA_KM}?idx=${idx}&valor_km_padrao=${encodeURIComponent(valorPadrao)}`;
+  logFormEvent("adicionar_km_inicio", { idx, url, valorPadrao });
 
   try {
-    const form = document.getElementById("form-relatorio");
-    const valorPadrao = form?.dataset?.valorKmCliente || "0";
+    const corpo = document.getElementById("corpo-trechos");
+    if (!corpo) throw new Error("Tabela de trechos KM não encontrada no DOM.");
 
-    const response = await fetch(
-      `${URL_NOVA_LINHA_KM}?idx=${idx}&valor_km_padrao=${encodeURIComponent(valorPadrao)}`
-    );
-
-    if (!response.ok) {
-      throw new Error("Erro ao carregar nova linha KM.");
-    }
-
+    const response = await fetch(url, {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+      credentials: "same-origin",
+    });
     const html = await response.text();
 
-    const corpo = document.getElementById("corpo-trechos");
+    if (!response.ok) {
+      throw new Error(`Erro HTTP ${response.status} ao carregar trecho KM: ${html.slice(0, 300)}`);
+    }
+    if (!html.trim()) {
+      throw new Error("Resposta vazia ao carregar nova linha KM.");
+    }
+
     corpo.insertAdjacentHTML("beforeend", html);
 
     const novaLinha = corpo.querySelector(".linha-trecho:last-child");
+    if (!novaLinha) throw new Error("HTML recebido não criou uma linha de trecho KM válida.");
     const campoVkm = novaLinha?.querySelector('input[name$="-valor_km"]');
 
     if (campoVkm && !campoVkm.value) {
@@ -1360,11 +1461,15 @@ async function adicionarLinhaKm() {
     atualizarTotalForms(PREFIX_KM, _idxKm);
     atualizarBadgesClientesItens();
     recalcular();
-    atualizarBadgesAbas();
+    atualizarBadgesAbasSeguro();
+    logFormEvent("adicionar_km_sucesso", { idx, novoTotalForms: _idxKm });
     return novaLinha;
 
   } catch (error) {
-    console.error(error);
+    logFormError("adicionar_km_erro", error, { idx, url, valorPadrao });
+    window.ErpOperationalErrors?.show("Não foi possível adicionar o trecho.", [
+      "O erro foi registrado no painel de diagnóstico do formulário."
+    ]);
     return null;
   }
 
@@ -1389,11 +1494,11 @@ async function adicionarLinhaKm() {
   }
 
   recalcular();
-  atualizarBadgesAbas();
+  atualizarBadgesAbasSeguro();
 
   // 🔥🔥🔥 ESSA É A PARTE CRÍTICA
   setTimeout(() => {
-    GroupValidators.runAll();
+    executarValidadoresGrupoSeguro();
   }, 0);
 }
 
@@ -1613,6 +1718,16 @@ document.addEventListener("blur", function (e) {
   });
 
   document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("btn-adicionar-despesa")
+      ?.addEventListener("click", event => {
+        event.preventDefault();
+        adicionarLinhaDespesa();
+      });
+    document.getElementById("btn-adicionar-km")
+      ?.addEventListener("click", event => {
+        event.preventDefault();
+        adicionarLinhaKm();
+      });
     atualizarBadgesClientesRelatorio();
     atualizarBadgesClientesItens();
     atualizarBadgesTecnicosEquipe();
@@ -1640,13 +1755,20 @@ document.addEventListener("blur", function (e) {
       let invalido = false;
       const clientesRelatorio = getClientesRelatorioIds();
       const erroRelatorio = document.querySelector(".erro-clientes-relatorio");
+      const tecnicosRelatorio = getTecnicosEquipeIds();
+      const erroTecnicos = document.querySelector(".erro-tecnicos-relatorio");
       if (erroRelatorio) erroRelatorio.textContent = "";
+      if (erroTecnicos) erroTecnicos.textContent = "";
       if (!clientesRelatorio.length) {
         invalido = true;
         if (erroRelatorio) erroRelatorio.textContent = "Selecione ao menos um cliente.";
       }
+      if (!tecnicosRelatorio.length) {
+        invalido = true;
+        if (erroTecnicos) erroTecnicos.textContent = "Selecione ao menos um técnico.";
+      }
       document.querySelectorAll(".linha-despesa, .linha-trecho").forEach(linha => {
-        if (linhaEstaRemovida(linha) || !linhaTemConteudo(linha)) return;
+        if (linhaEstaRemovida(linha) || !linhaTemConteudoSeguro(linha)) return;
         const input = linha.querySelector(".clientes-item-input");
         const erro = linha.querySelector(".erro-clientes-item");
         if (erro) erro.textContent = "";
@@ -1657,8 +1779,12 @@ document.addEventListener("blur", function (e) {
       });
       if (invalido) {
         event.preventDefault();
+        logFormEvent("submit_bloqueado_validacao_frontend", {
+          clientes: clientesRelatorio,
+          tecnicos: tecnicosRelatorio,
+        }, "warning");
         window.ErpOperationalErrors?.show("Não foi possível salvar o relatório.", [
-          "Selecione os clientes do relatório e dos itens preenchidos."
+          "Selecione os clientes, técnicos e clientes dos itens preenchidos."
         ]);
       }
     });
