@@ -217,7 +217,28 @@
                       Equipe Adicional
                       <span class="fw-normal opacity-75">(opcional — Ctrl+clique para múltiplos)</span>
                     </label>
-                    {{ form.tecnicos_equipe }}
+                    <div class="d-none">{{ form.tecnicos_equipe }}</div>
+                    <div class="border rounded-2 bg-body-tertiary px-3 py-2 d-flex align-items-center justify-content-between gap-2">
+                      <div class="min-w-0">
+                        <div class="small text-muted mb-1">
+                          <span id="tecnicos-equipe-contador">{{ tecnicos_selecionados_ids|length }}</span>
+                          técnico(s) de apoio selecionado(s)
+                        </div>
+                        <div id="tecnicos-equipe-badges" class="d-flex flex-wrap gap-1">
+                          {% for nome in tecnicos_selecionados_nomes %}
+                            <span class="badge rounded-pill text-bg-secondary">{{ nome }}</span>
+                          {% empty %}
+                            <span class="text-muted small">Nenhum técnico de apoio selecionado</span>
+                          {% endfor %}
+                        </div>
+                      </div>
+                      <button type="button"
+                              class="btn btn-outline-secondary btn-sm text-nowrap"
+                              data-bs-toggle="modal"
+                              data-bs-target="#modalSelecionarTecnicos">
+                        <i class="bi bi-person-plus me-1"></i>Selecionar técnicos
+                      </button>
+                    </div>
                     {% if form.tecnicos_equipe.errors %}
                       <div class="text-danger small mt-1">{{ form.tecnicos_equipe.errors.0 }}</div>
                     {% endif %}
@@ -559,21 +580,116 @@
                         </div>
                       </div>
 
-                      <div class="d-flex flex-wrap gap-2" id="clientes-opcoes">
-                        {% for cliente in clientes_importacao %}
-                          <button type="button"
-                                  class="btn btn-outline-secondary btn-sm cliente-opcao"
-                                  data-cliente-id="{{ cliente.pk }}"
-                                  data-cliente-nome="{{ cliente.nome }}"
+                      <div class="table-responsive border rounded mb-3">
+                        <table class="table table-hover align-middle mb-0">
+                          <thead class="table-light">
+                            <tr>
+                              <th class="small text-muted">Cliente</th>
+                              <th class="small text-muted">Cidade</th>
+                              <th class="small text-muted">Documento</th>
+                              <th class="small text-muted text-end">Seleção</th>
+                            </tr>
+                          </thead>
+                          <tbody id="clientes-opcoes">
+                            {% for cliente in clientes_importacao %}
+                              <tr class="cliente-opcao-linha"
                                   data-cliente-search="{{ cliente.nome }} {{ cliente.cidade|default:'' }} {{ cliente.cnpj_cpf|default:'' }}">
-                            <i class="bi bi-building me-1"></i>{{ cliente.nome }}
-                          </button>
-                        {% endfor %}
+                                <td class="small">{{ cliente.nome }}</td>
+                                <td class="small text-muted">{{ cliente.cidade_uf|default:"-" }}</td>
+                                <td class="small text-muted">{{ cliente.cnpj_cpf|default:"-" }}</td>
+                                <td class="text-end">
+                                  <button type="button"
+                                          class="btn btn-outline-secondary btn-sm cliente-opcao"
+                                          data-cliente-id="{{ cliente.pk }}"
+                                          data-cliente-nome="{{ cliente.nome }}">
+                                    Selecionar
+                                  </button>
+                                </td>
+                              </tr>
+                            {% endfor %}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                     <div class="modal-footer">
                       <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
                       <button type="button" class="btn btn-primary btn-sm" id="btn-confirmar-clientes">Aplicar seleção</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="modal fade"
+                   id="modalSelecionarTecnicos"
+                   tabindex="-1"
+                   aria-hidden="true">
+                <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                  <div class="modal-content border-0 shadow">
+                    <div class="modal-header bg-light">
+                      <h5 class="modal-title">
+                        <i class="bi bi-person-plus me-2 text-primary"></i>
+                        Selecionar técnicos de apoio
+                      </h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                      <div class="row g-2 align-items-end mb-3">
+                        <div class="col-12 col-md-8">
+                          <label class="form-label small text-muted">Busca</label>
+                          <div class="input-group input-group-sm">
+                            <input type="search"
+                                   class="form-control"
+                                   id="tecnicos-filtro-busca"
+                                   placeholder="Nome, e-mail, telefone...">
+                            <button type="button"
+                                    class="btn btn-outline-primary"
+                                    id="btn-limpar-busca-tecnicos">
+                              <i class="bi bi-x-lg"></i>
+                            </button>
+                          </div>
+                        </div>
+                        <div class="col-12 col-md-4 text-md-end">
+                          <button type="button"
+                                  class="btn btn-outline-secondary btn-sm"
+                                  id="btn-limpar-tecnicos-selecao">
+                            Limpar seleção
+                          </button>
+                        </div>
+                      </div>
+                      <div class="table-responsive border rounded mb-3">
+                        <table class="table table-hover align-middle mb-0">
+                          <thead class="table-light">
+                            <tr>
+                              <th class="small text-muted">Técnico</th>
+                              <th class="small text-muted">E-mail</th>
+                              <th class="small text-muted">Telefone</th>
+                              <th class="small text-muted text-end">Seleção</th>
+                            </tr>
+                          </thead>
+                          <tbody id="tecnicos-opcoes">
+                            {% for tecnico in tecnicos_importacao %}
+                              <tr class="tecnico-opcao-linha"
+                                  data-tecnico-search="{{ tecnico.nome }} {{ tecnico.email }} {{ tecnico.telefone }}">
+                                <td class="small">{{ tecnico.nome }}</td>
+                                <td class="small text-muted">{{ tecnico.email }}</td>
+                                <td class="small text-muted">{{ tecnico.telefone|default:"-" }}</td>
+                                <td class="text-end">
+                                  <button type="button"
+                                          class="btn btn-outline-secondary btn-sm tecnico-opcao"
+                                          data-tecnico-id="{{ tecnico.pk }}"
+                                          data-tecnico-nome="{{ tecnico.nome }}">
+                                    Selecionar
+                                  </button>
+                                </td>
+                              </tr>
+                            {% endfor %}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                      <button type="button" class="btn btn-primary btn-sm" id="btn-confirmar-tecnicos">Aplicar seleção</button>
                     </div>
                   </div>
                 </div>
@@ -790,6 +906,11 @@
     return btn?.dataset.clienteNome || `Cliente ${id}`;
   }
 
+  function getNomeTecnico(id) {
+    const btn = document.querySelector(`.tecnico-opcao[data-tecnico-id="${id}"]`);
+    return btn?.dataset.tecnicoNome || `Técnico ${id}`;
+  }
+
   function setClientesInput(input, ids) {
     if (!input) return;
     input.value = Array.from(new Set(ids.map(String))).join(",");
@@ -805,6 +926,38 @@
       badges.innerHTML = ids.length
         ? ids.map(id => `<span class="badge rounded-pill text-bg-secondary">${getNomeCliente(id)}</span>`).join("")
         : '<span class="text-muted small">Nenhum cliente selecionado</span>';
+    }
+  }
+
+  function getTecnicosEquipeSelect() {
+    return document.querySelector('[name="tecnicos_equipe"]');
+  }
+
+  function getTecnicosEquipeIds() {
+    const select = getTecnicosEquipeSelect();
+    if (!select) return [];
+    return Array.from(select.selectedOptions).map(option => option.value);
+  }
+
+  function setTecnicosEquipe(ids) {
+    const selecionados = new Set((ids || []).map(String));
+    const select = getTecnicosEquipeSelect();
+    if (!select) return;
+    Array.from(select.options).forEach(option => {
+      option.selected = selecionados.has(option.value);
+    });
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  function atualizarBadgesTecnicosEquipe() {
+    const ids = getTecnicosEquipeIds();
+    const contador = document.getElementById("tecnicos-equipe-contador");
+    const badges = document.getElementById("tecnicos-equipe-badges");
+    if (contador) contador.textContent = ids.length;
+    if (badges) {
+      badges.innerHTML = ids.length
+        ? ids.map(id => `<span class="badge rounded-pill text-bg-secondary">${getNomeTecnico(id)}</span>`).join("")
+        : '<span class="text-muted small">Nenhum técnico de apoio selecionado</span>';
     }
   }
 
@@ -835,17 +988,47 @@
     const permitidos = tipo === "relatorio" ? null : new Set(getClientesRelatorioIds());
     const selecionados = new Set(idsFromValue(input?.value));
 
-    document.querySelectorAll(".cliente-opcao").forEach(opcao => {
+    document.querySelectorAll(".cliente-opcao-linha").forEach(row => {
+      const opcao = row.querySelector(".cliente-opcao");
       const permitido = !permitidos || permitidos.has(opcao.dataset.clienteId);
-      opcao.classList.toggle("d-none", !permitido);
+      row.dataset.clientePermitido = permitido ? "1" : "0";
       opcao.classList.toggle("btn-success", selecionados.has(opcao.dataset.clienteId));
       opcao.classList.toggle("btn-outline-secondary", !selecionados.has(opcao.dataset.clienteId));
+      opcao.textContent = selecionados.has(opcao.dataset.clienteId) ? "Selecionado" : "Selecionar";
+    });
+    atualizarFiltroClientesModal();
+  }
+
+  function abrirSeletorTecnicos() {
+    const selecionados = new Set(getTecnicosEquipeIds());
+    document.querySelectorAll(".tecnico-opcao").forEach(opcao => {
+      opcao.classList.toggle("btn-success", selecionados.has(opcao.dataset.tecnicoId));
+      opcao.classList.toggle("btn-outline-secondary", !selecionados.has(opcao.dataset.tecnicoId));
+      opcao.textContent = selecionados.has(opcao.dataset.tecnicoId) ? "Selecionado" : "Selecionar";
+    });
+    atualizarFiltroTecnicosModal();
+  }
+
+  function atualizarFiltroClientesModal() {
+    const termo = (document.getElementById("clientes-filtro-busca")?.value || "").toLowerCase();
+    document.querySelectorAll(".cliente-opcao-linha").forEach(row => {
+      const permitido = row.dataset.clientePermitido !== "0";
+      const texto = (row.dataset.clienteSearch || "").toLowerCase();
+      row.classList.toggle("d-none", !permitido || Boolean(termo && !texto.includes(termo)));
+    });
+  }
+
+  function atualizarFiltroTecnicosModal() {
+    const termo = (document.getElementById("tecnicos-filtro-busca")?.value || "").toLowerCase();
+    document.querySelectorAll(".tecnico-opcao-linha").forEach(row => {
+      const texto = (row.dataset.tecnicoSearch || "").toLowerCase();
+      row.classList.toggle("d-none", Boolean(termo && !texto.includes(termo)));
     });
   }
 
   function aplicarSelecaoClientes() {
     const ids = Array.from(document.querySelectorAll(".cliente-opcao.btn-success"))
-      .filter(btn => !btn.classList.contains("d-none"))
+      .filter(btn => !btn.closest("tr")?.classList.contains("d-none"))
       .map(btn => btn.dataset.clienteId);
     const tipo = clienteSelectorTarget?.dataset.clientSelector;
     const input = tipo === "relatorio"
@@ -855,6 +1038,15 @@
     atualizarBadgesClientesRelatorio();
     atualizarBadgesClientesItens();
     bootstrap.Modal.getInstance(document.getElementById("modalSelecionarClientes"))?.hide();
+  }
+
+  function aplicarSelecaoTecnicos() {
+    const ids = Array.from(document.querySelectorAll(".tecnico-opcao.btn-success"))
+      .filter(btn => !btn.closest("tr")?.classList.contains("d-none"))
+      .map(btn => btn.dataset.tecnicoId);
+    setTecnicosEquipe(ids);
+    atualizarBadgesTecnicosEquipe();
+    bootstrap.Modal.getInstance(document.getElementById("modalSelecionarTecnicos"))?.hide();
   }
 
   function linhaEstaRemovida(linha) {
@@ -1010,6 +1202,7 @@
     }
     if (document.getElementById("importar-apoio")?.checked) {
       definirMultiselect(campoPorNome("tecnicos_equipe"), dados.apoio_ids);
+      atualizarBadgesTecnicosEquipe();
     }
     if (document.getElementById("importar-despesas")?.checked) {
       await importarDespesasRelatorio(dados.despesas);
@@ -1040,17 +1233,44 @@
     if (opcaoCliente) {
       opcaoCliente.classList.toggle("btn-success");
       opcaoCliente.classList.toggle("btn-outline-secondary");
+      opcaoCliente.textContent = opcaoCliente.classList.contains("btn-success") ? "Selecionado" : "Selecionar";
+    }
+
+    if (event.target.closest('[data-bs-target="#modalSelecionarTecnicos"]')) {
+      abrirSeletorTecnicos();
+    }
+
+    const opcaoTecnico = event.target.closest(".tecnico-opcao");
+    if (opcaoTecnico) {
+      opcaoTecnico.classList.toggle("btn-success");
+      opcaoTecnico.classList.toggle("btn-outline-secondary");
+      opcaoTecnico.textContent = opcaoTecnico.classList.contains("btn-success") ? "Selecionado" : "Selecionar";
     }
   });
 
   document.getElementById("btn-confirmar-clientes")
     ?.addEventListener("click", aplicarSelecaoClientes);
 
+  document.getElementById("btn-confirmar-tecnicos")
+    ?.addEventListener("click", aplicarSelecaoTecnicos);
+
   document.getElementById("btn-limpar-clientes-selecao")
     ?.addEventListener("click", () => {
-      document.querySelectorAll(".cliente-opcao:not(.d-none)").forEach(btn => {
+      document.querySelectorAll(".cliente-opcao").forEach(btn => {
+        if (btn.closest("tr")?.classList.contains("d-none")) return;
         btn.classList.remove("btn-success");
         btn.classList.add("btn-outline-secondary");
+        btn.textContent = "Selecionar";
+      });
+    });
+
+  document.getElementById("btn-limpar-tecnicos-selecao")
+    ?.addEventListener("click", () => {
+      document.querySelectorAll(".tecnico-opcao").forEach(btn => {
+        if (btn.closest("tr")?.classList.contains("d-none")) return;
+        btn.classList.remove("btn-success");
+        btn.classList.add("btn-outline-secondary");
+        btn.textContent = "Selecionar";
       });
     });
 
@@ -1058,24 +1278,26 @@
     ?.addEventListener("click", () => {
       const busca = document.getElementById("clientes-filtro-busca");
       if (busca) busca.value = "";
-      document.querySelectorAll(".cliente-opcao").forEach(btn => btn.classList.remove("d-none"));
+      atualizarFiltroClientesModal();
+    });
+
+  document.getElementById("btn-limpar-busca-tecnicos")
+    ?.addEventListener("click", () => {
+      const busca = document.getElementById("tecnicos-filtro-busca");
+      if (busca) busca.value = "";
+      atualizarFiltroTecnicosModal();
     });
 
   document.getElementById("clientes-filtro-busca")
-    ?.addEventListener("input", event => {
-      const termo = event.target.value.toLowerCase();
-      document.querySelectorAll(".cliente-opcao").forEach(btn => {
-        const texto = (btn.dataset.clienteSearch || "").toLowerCase();
-        btn.classList.toggle("d-none", termo && !texto.includes(termo));
-      });
-    });
+    ?.addEventListener("input", atualizarFiltroClientesModal);
 
-  console.log("clicou no adicionar despesa");
+  document.getElementById("tecnicos-filtro-busca")
+    ?.addEventListener("input", atualizarFiltroTecnicosModal);
+
   async function adicionarLinhaDespesa() {
   const idx = _idxDesp;
 
   try {
-    console.log("URL:", `${URL_NOVA_LINHA_DESPESA}?idx=${idx}`);
     const response = await fetch(`${URL_NOVA_LINHA_DESPESA}?idx=${idx}`);
 
     if (!response.ok) {
@@ -1104,7 +1326,6 @@
 
   // ── Clonar linha de KM ─────────────────────────────────────────
 async function adicionarLinhaKm() {
-  console.log("ENTROU NA FUNÇÃO KM");
   const idx = _idxKm;
 
   try {
@@ -1342,6 +1563,7 @@ function validarKmGlobal() {
           ?.addEventListener("input", recalcular);
         atualizarBadgesClientesRelatorio();
         atualizarBadgesClientesItens();
+        atualizarBadgesTecnicosEquipe();
         // Recalcular ao carregar (edição)
         recalcular();
         // Recalcular totais de trechos existentes ao editar
@@ -1381,9 +1603,19 @@ document.addEventListener("blur", function (e) {
   }
 }, true);
   // Inicialização imediata (sem Alpine em modo não-defer)
+  Object.assign(window, {
+    adicionarLinhaDespesa,
+    adicionarLinhaKm,
+    removerLinha,
+    calcularTrechoKm,
+    recalcular,
+    validarKmGlobal,
+  });
+
   document.addEventListener("DOMContentLoaded", () => {
     atualizarBadgesClientesRelatorio();
     atualizarBadgesClientesItens();
+    atualizarBadgesTecnicosEquipe();
     recalcular();
     const modalImportacao = document.getElementById("modalImportarRelatorio");
     modalImportacao?.addEventListener("shown.bs.modal", buscarRelatoriosImportacao);

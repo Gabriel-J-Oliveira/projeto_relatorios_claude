@@ -132,6 +132,19 @@ def _clientes_selecionados_do_request(request, instance=None):
     return [], []
 
 
+def _tecnicos_selecionados_do_request(request, instance=None):
+    if request.method == "POST":
+        ids = normalizar_ids_clientes(request.POST.getlist("tecnicos_equipe"))
+        nomes = list(Tecnico.objects.filter(pk__in=ids).order_by("nome").values_list("nome", flat=True))
+        return ids, nomes
+
+    if instance:
+        tecnicos = list(instance.tecnicos_adicionais.order_by("nome"))
+        return [tecnico.pk for tecnico in tecnicos], [tecnico.nome for tecnico in tecnicos]
+
+    return [], []
+
+
 def _clientes_item_post(request, prefix):
     return normalizar_ids_clientes(request.POST.get(f"{prefix}-clientes"))
 
@@ -758,6 +771,10 @@ def relatorio_form_view(request, pk=None):
             request,
             instance,
         )
+        tecnicos_post_ids, tecnicos_post_nomes = _tecnicos_selecionados_do_request(
+            request,
+            instance,
+        )
         cliente_id = clientes_post_ids[0] if clientes_post_ids else request.POST.get("cliente")
         valor_km_padrao = _get_valor_km_para_cliente(cliente_id)
         logger.debug(
@@ -767,6 +784,10 @@ def relatorio_form_view(request, pk=None):
         )
     else:
         clientes_post_ids, clientes_post_nomes = _clientes_selecionados_do_request(
+            request,
+            instance,
+        )
+        tecnicos_post_ids, tecnicos_post_nomes = _tecnicos_selecionados_do_request(
             request,
             instance,
         )
@@ -953,6 +974,8 @@ def relatorio_form_view(request, pk=None):
                             "resumo_erros": resumo_erros,
                             "clientes_selecionados_ids": clientes_post_ids,
                             "clientes_selecionados_nomes": clientes_post_nomes,
+                            "tecnicos_selecionados_ids": tecnicos_post_ids,
+                            "tecnicos_selecionados_nomes": tecnicos_post_nomes,
                         },
                     )
                 except Exception as exc:
@@ -986,6 +1009,8 @@ def relatorio_form_view(request, pk=None):
                             "resumo_erros": [],
                             "clientes_selecionados_ids": clientes_post_ids,
                             "clientes_selecionados_nomes": clientes_post_nomes,
+                            "tecnicos_selecionados_ids": tecnicos_post_ids,
+                            "tecnicos_selecionados_nomes": tecnicos_post_nomes,
                         },
                     )
 
@@ -1040,6 +1065,8 @@ def relatorio_form_view(request, pk=None):
             "resumo_erros": resumo_erros,
             "clientes_selecionados_ids": clientes_post_ids,
             "clientes_selecionados_nomes": clientes_post_nomes,
+            "tecnicos_selecionados_ids": tecnicos_post_ids,
+            "tecnicos_selecionados_nomes": tecnicos_post_nomes,
         },
     )
 
