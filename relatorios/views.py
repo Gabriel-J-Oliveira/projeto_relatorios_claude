@@ -288,12 +288,24 @@ def _relatorio_filtro_form(user, data=None):
         )
     return form
 
-
 class AcessoErpMixin(LoginRequiredMixin):
     def dispatch(self, request, *args, **kwargs):
+
+        print("DEBUG USER:", request.user)
+        print("DEBUG AUTH:", request.user.is_authenticated)
+
+        # deixa o LoginRequiredMixin agir primeiro
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+
+        print("DEBUG GROUPS:", list(request.user.groups.values_list("name", flat=True)))
+        print("DEBUG SUPERUSER:", request.user.is_superuser)
+        print("DEBUG ERP:", usuario_pode_acessar_erp(request.user))
+
         if not usuario_pode_acessar_erp(request.user):
-            messages.error(request, "Seu usuÃ¡rio nÃ£o possui perfil de acesso ao ERP.")
-            raise PermissionDenied("UsuÃ¡rio sem grupo ERP.")
+            messages.error(request, "Seu usuário não possui perfil de acesso ao ERP.")
+            raise PermissionDenied("Usuário sem grupo ERP.")
+
         return super().dispatch(request, *args, **kwargs)
 
 

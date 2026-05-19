@@ -9,3 +9,1523 @@ Traceback (most recent call last):
   File "C:\Users\gabriel.oliveira\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\django\http\request.py", line 206, in get_host
     raise DisallowedHost(msg)
 django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: 'testserver'. You may need to add 'testserver' to ALLOWED_HOSTS.
+ERROR 2026-05-18 14:36:50,963 django.request 35415 139852400551808 Internal Server Error: /login/
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 100, in connect
+    attempts = conninfo_attempts(params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/_conninfo_attempts.py", line 55, in conninfo_attempts
+    raise last_exc
+psycopg.OperationalError: failed to resolve host 'hostname': [Errno -2] Name or service not known
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 198, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 106, in view
+    return self.dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 48, in _wrapper
+    return bound_method(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 143, in sensitive_post_parameters_wrapper
+    return view(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 192, in _view_wrapper
+    result = _process_exception(request, e)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 190, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/cache.py", line 80, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/views.py", line 89, in dispatch
+    return super().dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 145, in dispatch
+    return handler(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/edit.py", line 150, in post
+    if form.is_valid():
+       ~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 206, in is_valid
+    return self.is_bound and not self.errors
+                                 ^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 201, in errors
+    self.full_clean()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 338, in full_clean
+    self._clean_form()
+    ~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 354, in _clean_form
+    cleaned_data = self.clean()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/forms.py", line 349, in clean
+    self.user_cache = authenticate(
+                      ~~~~~~~~~~~~^
+        self.request, username=username, password=password
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/__init__.py", line 114, in authenticate
+    user = backend.authenticate(request, **credentials)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/backends.py", line 65, in authenticate
+    user = UserModel._default_manager.get_by_natural_key(username)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/base_user.py", line 37, in get_by_natural_key
+    return self.get(**{self.model.USERNAME_FIELD: username})
+           ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 635, in get
+    num = len(clone)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 372, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 2000, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 95, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/sql/compiler.py", line 1622, in execute_sql
+    cursor = self.connection.cursor()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 320, in cursor
+    return self._cursor()
+           ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 296, in _cursor
+    self.ensure_connection()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 278, in ensure_connection
+    with self.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 100, in connect
+    attempts = conninfo_attempts(params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/_conninfo_attempts.py", line 55, in conninfo_attempts
+    raise last_exc
+django.db.utils.OperationalError: failed to resolve host 'hostname': [Errno -2] Name or service not known
+ERROR 2026-05-18 14:36:56,726 django.request 35414 139852400551808 Internal Server Error: /login/
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 100, in connect
+    attempts = conninfo_attempts(params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/_conninfo_attempts.py", line 55, in conninfo_attempts
+    raise last_exc
+psycopg.OperationalError: failed to resolve host 'hostname': [Errno -2] Name or service not known
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 198, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 106, in view
+    return self.dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 48, in _wrapper
+    return bound_method(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 143, in sensitive_post_parameters_wrapper
+    return view(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 192, in _view_wrapper
+    result = _process_exception(request, e)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 190, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/cache.py", line 80, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/views.py", line 89, in dispatch
+    return super().dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 145, in dispatch
+    return handler(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/edit.py", line 150, in post
+    if form.is_valid():
+       ~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 206, in is_valid
+    return self.is_bound and not self.errors
+                                 ^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 201, in errors
+    self.full_clean()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 338, in full_clean
+    self._clean_form()
+    ~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 354, in _clean_form
+    cleaned_data = self.clean()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/forms.py", line 349, in clean
+    self.user_cache = authenticate(
+                      ~~~~~~~~~~~~^
+        self.request, username=username, password=password
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/__init__.py", line 114, in authenticate
+    user = backend.authenticate(request, **credentials)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/backends.py", line 65, in authenticate
+    user = UserModel._default_manager.get_by_natural_key(username)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/base_user.py", line 37, in get_by_natural_key
+    return self.get(**{self.model.USERNAME_FIELD: username})
+           ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 635, in get
+    num = len(clone)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 372, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 2000, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 95, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/sql/compiler.py", line 1622, in execute_sql
+    cursor = self.connection.cursor()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 320, in cursor
+    return self._cursor()
+           ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 296, in _cursor
+    self.ensure_connection()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 278, in ensure_connection
+    with self.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 100, in connect
+    attempts = conninfo_attempts(params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/_conninfo_attempts.py", line 55, in conninfo_attempts
+    raise last_exc
+django.db.utils.OperationalError: failed to resolve host 'hostname': [Errno -2] Name or service not known
+ERROR 2026-05-18 14:37:11,970 django.request 35413 139852400551808 Internal Server Error: /login/
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 100, in connect
+    attempts = conninfo_attempts(params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/_conninfo_attempts.py", line 55, in conninfo_attempts
+    raise last_exc
+psycopg.OperationalError: failed to resolve host 'hostname': [Errno -2] Name or service not known
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 198, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 106, in view
+    return self.dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 48, in _wrapper
+    return bound_method(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 143, in sensitive_post_parameters_wrapper
+    return view(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 192, in _view_wrapper
+    result = _process_exception(request, e)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 190, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/cache.py", line 80, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/views.py", line 89, in dispatch
+    return super().dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 145, in dispatch
+    return handler(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/edit.py", line 150, in post
+    if form.is_valid():
+       ~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 206, in is_valid
+    return self.is_bound and not self.errors
+                                 ^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 201, in errors
+    self.full_clean()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 338, in full_clean
+    self._clean_form()
+    ~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 354, in _clean_form
+    cleaned_data = self.clean()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/forms.py", line 349, in clean
+    self.user_cache = authenticate(
+                      ~~~~~~~~~~~~^
+        self.request, username=username, password=password
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/__init__.py", line 114, in authenticate
+    user = backend.authenticate(request, **credentials)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/backends.py", line 65, in authenticate
+    user = UserModel._default_manager.get_by_natural_key(username)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/base_user.py", line 37, in get_by_natural_key
+    return self.get(**{self.model.USERNAME_FIELD: username})
+           ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 635, in get
+    num = len(clone)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 372, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 2000, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 95, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/sql/compiler.py", line 1622, in execute_sql
+    cursor = self.connection.cursor()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 320, in cursor
+    return self._cursor()
+           ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 296, in _cursor
+    self.ensure_connection()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 278, in ensure_connection
+    with self.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 100, in connect
+    attempts = conninfo_attempts(params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/_conninfo_attempts.py", line 55, in conninfo_attempts
+    raise last_exc
+django.db.utils.OperationalError: failed to resolve host 'hostname': [Errno -2] Name or service not known
+ERROR 2026-05-18 14:40:35,670 django.request 35415 139852400551808 Internal Server Error: /login/
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 100, in connect
+    attempts = conninfo_attempts(params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/_conninfo_attempts.py", line 55, in conninfo_attempts
+    raise last_exc
+psycopg.OperationalError: failed to resolve host 'hostname': [Errno -2] Name or service not known
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 198, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 106, in view
+    return self.dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 48, in _wrapper
+    return bound_method(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 143, in sensitive_post_parameters_wrapper
+    return view(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 192, in _view_wrapper
+    result = _process_exception(request, e)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 190, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/cache.py", line 80, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/views.py", line 89, in dispatch
+    return super().dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 145, in dispatch
+    return handler(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/edit.py", line 150, in post
+    if form.is_valid():
+       ~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 206, in is_valid
+    return self.is_bound and not self.errors
+                                 ^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 201, in errors
+    self.full_clean()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 338, in full_clean
+    self._clean_form()
+    ~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 354, in _clean_form
+    cleaned_data = self.clean()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/forms.py", line 349, in clean
+    self.user_cache = authenticate(
+                      ~~~~~~~~~~~~^
+        self.request, username=username, password=password
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/__init__.py", line 114, in authenticate
+    user = backend.authenticate(request, **credentials)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/backends.py", line 65, in authenticate
+    user = UserModel._default_manager.get_by_natural_key(username)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/base_user.py", line 37, in get_by_natural_key
+    return self.get(**{self.model.USERNAME_FIELD: username})
+           ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 635, in get
+    num = len(clone)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 372, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 2000, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 95, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/sql/compiler.py", line 1622, in execute_sql
+    cursor = self.connection.cursor()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 320, in cursor
+    return self._cursor()
+           ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 296, in _cursor
+    self.ensure_connection()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 278, in ensure_connection
+    with self.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 100, in connect
+    attempts = conninfo_attempts(params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/_conninfo_attempts.py", line 55, in conninfo_attempts
+    raise last_exc
+django.db.utils.OperationalError: failed to resolve host 'hostname': [Errno -2] Name or service not known
+ERROR 2026-05-18 14:40:41,374 django.request 35415 139852400551808 Internal Server Error: /login/
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 100, in connect
+    attempts = conninfo_attempts(params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/_conninfo_attempts.py", line 55, in conninfo_attempts
+    raise last_exc
+psycopg.OperationalError: failed to resolve host 'hostname': [Errno -2] Name or service not known
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 198, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 106, in view
+    return self.dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 48, in _wrapper
+    return bound_method(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 143, in sensitive_post_parameters_wrapper
+    return view(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 192, in _view_wrapper
+    result = _process_exception(request, e)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 190, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/cache.py", line 80, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/views.py", line 89, in dispatch
+    return super().dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 145, in dispatch
+    return handler(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/edit.py", line 150, in post
+    if form.is_valid():
+       ~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 206, in is_valid
+    return self.is_bound and not self.errors
+                                 ^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 201, in errors
+    self.full_clean()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 338, in full_clean
+    self._clean_form()
+    ~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 354, in _clean_form
+    cleaned_data = self.clean()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/forms.py", line 349, in clean
+    self.user_cache = authenticate(
+                      ~~~~~~~~~~~~^
+        self.request, username=username, password=password
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/__init__.py", line 114, in authenticate
+    user = backend.authenticate(request, **credentials)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/backends.py", line 65, in authenticate
+    user = UserModel._default_manager.get_by_natural_key(username)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/base_user.py", line 37, in get_by_natural_key
+    return self.get(**{self.model.USERNAME_FIELD: username})
+           ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 635, in get
+    num = len(clone)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 372, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 2000, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 95, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/sql/compiler.py", line 1622, in execute_sql
+    cursor = self.connection.cursor()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 320, in cursor
+    return self._cursor()
+           ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 296, in _cursor
+    self.ensure_connection()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 278, in ensure_connection
+    with self.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 100, in connect
+    attempts = conninfo_attempts(params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/_conninfo_attempts.py", line 55, in conninfo_attempts
+    raise last_exc
+django.db.utils.OperationalError: failed to resolve host 'hostname': [Errno -2] Name or service not known
+ERROR 2026-05-18 14:40:44,947 django.request 35413 139852400551808 Internal Server Error: /login/
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 100, in connect
+    attempts = conninfo_attempts(params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/_conninfo_attempts.py", line 55, in conninfo_attempts
+    raise last_exc
+psycopg.OperationalError: failed to resolve host 'hostname': [Errno -2] Name or service not known
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 198, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 106, in view
+    return self.dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 48, in _wrapper
+    return bound_method(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 143, in sensitive_post_parameters_wrapper
+    return view(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 192, in _view_wrapper
+    result = _process_exception(request, e)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 190, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/cache.py", line 80, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/views.py", line 89, in dispatch
+    return super().dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 145, in dispatch
+    return handler(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/edit.py", line 150, in post
+    if form.is_valid():
+       ~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 206, in is_valid
+    return self.is_bound and not self.errors
+                                 ^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 201, in errors
+    self.full_clean()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 338, in full_clean
+    self._clean_form()
+    ~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 354, in _clean_form
+    cleaned_data = self.clean()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/forms.py", line 349, in clean
+    self.user_cache = authenticate(
+                      ~~~~~~~~~~~~^
+        self.request, username=username, password=password
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/__init__.py", line 114, in authenticate
+    user = backend.authenticate(request, **credentials)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/backends.py", line 65, in authenticate
+    user = UserModel._default_manager.get_by_natural_key(username)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/base_user.py", line 37, in get_by_natural_key
+    return self.get(**{self.model.USERNAME_FIELD: username})
+           ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 635, in get
+    num = len(clone)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 372, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 2000, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 95, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/sql/compiler.py", line 1622, in execute_sql
+    cursor = self.connection.cursor()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 320, in cursor
+    return self._cursor()
+           ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 296, in _cursor
+    self.ensure_connection()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 278, in ensure_connection
+    with self.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 100, in connect
+    attempts = conninfo_attempts(params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/_conninfo_attempts.py", line 55, in conninfo_attempts
+    raise last_exc
+django.db.utils.OperationalError: failed to resolve host 'hostname': [Errno -2] Name or service not known
+ERROR 2026-05-18 14:47:06,174 django.request 35477 140513258813312 Internal Server Error: /login/
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.InsufficientPrivilege: permission denied for table auth_user
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 198, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 106, in view
+    return self.dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 48, in _wrapper
+    return bound_method(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 143, in sensitive_post_parameters_wrapper
+    return view(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 192, in _view_wrapper
+    result = _process_exception(request, e)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 190, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/cache.py", line 80, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/views.py", line 89, in dispatch
+    return super().dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 145, in dispatch
+    return handler(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/edit.py", line 150, in post
+    if form.is_valid():
+       ~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 206, in is_valid
+    return self.is_bound and not self.errors
+                                 ^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 201, in errors
+    self.full_clean()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 338, in full_clean
+    self._clean_form()
+    ~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 354, in _clean_form
+    cleaned_data = self.clean()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/forms.py", line 349, in clean
+    self.user_cache = authenticate(
+                      ~~~~~~~~~~~~^
+        self.request, username=username, password=password
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/__init__.py", line 114, in authenticate
+    user = backend.authenticate(request, **credentials)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/backends.py", line 65, in authenticate
+    user = UserModel._default_manager.get_by_natural_key(username)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/base_user.py", line 37, in get_by_natural_key
+    return self.get(**{self.model.USERNAME_FIELD: username})
+           ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 635, in get
+    num = len(clone)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 372, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 2000, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 95, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/sql/compiler.py", line 1624, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: permission denied for table auth_user
+ERROR 2026-05-18 14:48:57,275 django.request 35478 140513258813312 Internal Server Error: /login/
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.InsufficientPrivilege: permission denied for table auth_user
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 198, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 106, in view
+    return self.dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 48, in _wrapper
+    return bound_method(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 143, in sensitive_post_parameters_wrapper
+    return view(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 192, in _view_wrapper
+    result = _process_exception(request, e)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 190, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/cache.py", line 80, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/views.py", line 89, in dispatch
+    return super().dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 145, in dispatch
+    return handler(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/edit.py", line 150, in post
+    if form.is_valid():
+       ~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 206, in is_valid
+    return self.is_bound and not self.errors
+                                 ^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 201, in errors
+    self.full_clean()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 338, in full_clean
+    self._clean_form()
+    ~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 354, in _clean_form
+    cleaned_data = self.clean()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/forms.py", line 349, in clean
+    self.user_cache = authenticate(
+                      ~~~~~~~~~~~~^
+        self.request, username=username, password=password
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/__init__.py", line 114, in authenticate
+    user = backend.authenticate(request, **credentials)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/backends.py", line 65, in authenticate
+    user = UserModel._default_manager.get_by_natural_key(username)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/base_user.py", line 37, in get_by_natural_key
+    return self.get(**{self.model.USERNAME_FIELD: username})
+           ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 635, in get
+    num = len(clone)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 372, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 2000, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 95, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/sql/compiler.py", line 1624, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: permission denied for table auth_user
+ERROR 2026-05-19 11:01:15,359 django.request 35479 140513258813312 Internal Server Error: /dashboard/
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/sessions/backends/base.py", line 246, in _get_session
+    return self._session_cache
+           ^^^^^^^^^^^^^^^^^^^
+AttributeError: 'SessionStore' object has no attribute '_session_cache'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 130, in connect
+    raise new_ex.with_traceback(None)
+psycopg.OperationalError: connection failed: connection to server at "127.0.0.1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+Multiple connection attempts failed. All failures were:
+- host: 'localhost', port: '5432', hostaddr: '::1': connection failed: connection to server at "::1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+- host: 'localhost', port: '5432', hostaddr: '127.0.0.1': connection failed: connection to server at "127.0.0.1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 198, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 106, in view
+    return self.dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/mixins.py", line 72, in dispatch
+    if not request.user.is_authenticated:
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/functional.py", line 251, in inner
+    self._setup()
+    ~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/functional.py", line 404, in _setup
+    self._wrapped = self._setupfunc()
+                    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/middleware.py", line 40, in <lambda>
+    request.user = SimpleLazyObject(lambda: get_user(request))
+                                            ~~~~~~~~^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/middleware.py", line 20, in get_user
+    request._cached_user = auth.get_user(request)
+                           ~~~~~~~~~~~~~^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/__init__.py", line 321, in get_user
+    user_id = _get_user_session_key(request)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/__init__.py", line 95, in _get_user_session_key
+    return get_user_model()._meta.pk.to_python(request.session[SESSION_KEY])
+                                               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/sessions/backends/base.py", line 55, in __getitem__
+    return self._session[key]
+           ^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/sessions/backends/base.py", line 251, in _get_session
+    self._session_cache = self.load()
+                          ~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/sessions/backends/db.py", line 55, in load
+    s = self._get_session_from_db()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/sessions/backends/db.py", line 34, in _get_session_from_db
+    return self.model.objects.get(
+           ~~~~~~~~~~~~~~~~~~~~~~^
+        session_key=self.session_key, expire_date__gt=timezone.now()
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 635, in get
+    num = len(clone)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 372, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 2000, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 95, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/sql/compiler.py", line 1622, in execute_sql
+    cursor = self.connection.cursor()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 320, in cursor
+    return self._cursor()
+           ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 296, in _cursor
+    self.ensure_connection()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 278, in ensure_connection
+    with self.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 130, in connect
+    raise new_ex.with_traceback(None)
+django.db.utils.OperationalError: connection failed: connection to server at "127.0.0.1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+Multiple connection attempts failed. All failures were:
+- host: 'localhost', port: '5432', hostaddr: '::1': connection failed: connection to server at "::1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+- host: 'localhost', port: '5432', hostaddr: '127.0.0.1': connection failed: connection to server at "127.0.0.1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+ERROR 2026-05-19 11:09:09,752 django.request 41365 139936386258816 Internal Server Error: /login/
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 130, in connect
+    raise new_ex.with_traceback(None)
+psycopg.OperationalError: connection failed: connection to server at "127.0.0.1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+Multiple connection attempts failed. All failures were:
+- host: 'localhost', port: '5432', hostaddr: '::1': connection failed: connection to server at "::1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+- host: 'localhost', port: '5432', hostaddr: '127.0.0.1': connection failed: connection to server at "127.0.0.1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 198, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 106, in view
+    return self.dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 48, in _wrapper
+    return bound_method(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 143, in sensitive_post_parameters_wrapper
+    return view(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 192, in _view_wrapper
+    result = _process_exception(request, e)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 190, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/cache.py", line 80, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/views.py", line 89, in dispatch
+    return super().dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 145, in dispatch
+    return handler(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/edit.py", line 150, in post
+    if form.is_valid():
+       ~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 206, in is_valid
+    return self.is_bound and not self.errors
+                                 ^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 201, in errors
+    self.full_clean()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 338, in full_clean
+    self._clean_form()
+    ~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 354, in _clean_form
+    cleaned_data = self.clean()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/forms.py", line 349, in clean
+    self.user_cache = authenticate(
+                      ~~~~~~~~~~~~^
+        self.request, username=username, password=password
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/__init__.py", line 114, in authenticate
+    user = backend.authenticate(request, **credentials)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/backends.py", line 65, in authenticate
+    user = UserModel._default_manager.get_by_natural_key(username)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/base_user.py", line 37, in get_by_natural_key
+    return self.get(**{self.model.USERNAME_FIELD: username})
+           ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 635, in get
+    num = len(clone)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 372, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 2000, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 95, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/sql/compiler.py", line 1622, in execute_sql
+    cursor = self.connection.cursor()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 320, in cursor
+    return self._cursor()
+           ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 296, in _cursor
+    self.ensure_connection()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 278, in ensure_connection
+    with self.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 130, in connect
+    raise new_ex.with_traceback(None)
+django.db.utils.OperationalError: connection failed: connection to server at "127.0.0.1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+Multiple connection attempts failed. All failures were:
+- host: 'localhost', port: '5432', hostaddr: '::1': connection failed: connection to server at "::1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+- host: 'localhost', port: '5432', hostaddr: '127.0.0.1': connection failed: connection to server at "127.0.0.1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+ERROR 2026-05-19 11:09:17,106 django.request 41366 139936386258816 Internal Server Error: /login/
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 130, in connect
+    raise new_ex.with_traceback(None)
+psycopg.OperationalError: connection failed: connection to server at "127.0.0.1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+Multiple connection attempts failed. All failures were:
+- host: 'localhost', port: '5432', hostaddr: '::1': connection failed: connection to server at "::1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+- host: 'localhost', port: '5432', hostaddr: '127.0.0.1': connection failed: connection to server at "127.0.0.1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 198, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 106, in view
+    return self.dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 48, in _wrapper
+    return bound_method(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 143, in sensitive_post_parameters_wrapper
+    return view(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 192, in _view_wrapper
+    result = _process_exception(request, e)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 190, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/cache.py", line 80, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/views.py", line 89, in dispatch
+    return super().dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 145, in dispatch
+    return handler(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/edit.py", line 150, in post
+    if form.is_valid():
+       ~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 206, in is_valid
+    return self.is_bound and not self.errors
+                                 ^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 201, in errors
+    self.full_clean()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 338, in full_clean
+    self._clean_form()
+    ~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 354, in _clean_form
+    cleaned_data = self.clean()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/forms.py", line 349, in clean
+    self.user_cache = authenticate(
+                      ~~~~~~~~~~~~^
+        self.request, username=username, password=password
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/__init__.py", line 114, in authenticate
+    user = backend.authenticate(request, **credentials)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/backends.py", line 65, in authenticate
+    user = UserModel._default_manager.get_by_natural_key(username)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/base_user.py", line 37, in get_by_natural_key
+    return self.get(**{self.model.USERNAME_FIELD: username})
+           ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 635, in get
+    num = len(clone)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 372, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 2000, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 95, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/sql/compiler.py", line 1622, in execute_sql
+    cursor = self.connection.cursor()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 320, in cursor
+    return self._cursor()
+           ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 296, in _cursor
+    self.ensure_connection()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 278, in ensure_connection
+    with self.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 130, in connect
+    raise new_ex.with_traceback(None)
+django.db.utils.OperationalError: connection failed: connection to server at "127.0.0.1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+Multiple connection attempts failed. All failures were:
+- host: 'localhost', port: '5432', hostaddr: '::1': connection failed: connection to server at "::1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+- host: 'localhost', port: '5432', hostaddr: '127.0.0.1': connection failed: connection to server at "127.0.0.1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+INFO 2026-05-19 11:11:17,602 django.utils.autoreload 41391 140671166138240 Watching for file changes with StatReloader
+ERROR 2026-05-19 11:16:51,458 django.request 41433 140686669170560 Internal Server Error: /login/
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 130, in connect
+    raise new_ex.with_traceback(None)
+psycopg.OperationalError: connection failed: connection to server at "127.0.0.1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+Multiple connection attempts failed. All failures were:
+- host: 'localhost', port: '5432', hostaddr: '::1': connection failed: connection to server at "::1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+- host: 'localhost', port: '5432', hostaddr: '127.0.0.1': connection failed: connection to server at "127.0.0.1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/base.py", line 198, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 106, in view
+    return self.dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 48, in _wrapper
+    return bound_method(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 143, in sensitive_post_parameters_wrapper
+    return view(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 192, in _view_wrapper
+    result = _process_exception(request, e)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/decorators.py", line 190, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/cache.py", line 80, in _view_wrapper
+    response = view_func(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/views.py", line 89, in dispatch
+    return super().dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/base.py", line 145, in dispatch
+    return handler(request, *args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/generic/edit.py", line 150, in post
+    if form.is_valid():
+       ~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 206, in is_valid
+    return self.is_bound and not self.errors
+                                 ^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 201, in errors
+    self.full_clean()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 338, in full_clean
+    self._clean_form()
+    ~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/forms/forms.py", line 354, in _clean_form
+    cleaned_data = self.clean()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/forms.py", line 349, in clean
+    self.user_cache = authenticate(
+                      ~~~~~~~~~~~~^
+        self.request, username=username, password=password
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/views/decorators/debug.py", line 75, in sensitive_variables_wrapper
+    return func(*func_args, **func_kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/__init__.py", line 114, in authenticate
+    user = backend.authenticate(request, **credentials)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/backends.py", line 65, in authenticate
+    user = UserModel._default_manager.get_by_natural_key(username)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/contrib/auth/base_user.py", line 37, in get_by_natural_key
+    return self.get(**{self.model.USERNAME_FIELD: username})
+           ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 635, in get
+    num = len(clone)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 372, in __len__
+    self._fetch_all()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 2000, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/query.py", line 95, in __iter__
+    results = compiler.execute_sql(
+        chunked_fetch=self.chunked_fetch, chunk_size=self.chunk_size
+    )
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/models/sql/compiler.py", line 1622, in execute_sql
+    cursor = self.connection.cursor()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 320, in cursor
+    return self._cursor()
+           ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 296, in _cursor
+    self.ensure_connection()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 278, in ensure_connection
+    with self.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/db/backends/postgresql/base.py", line 333, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/psycopg/connection.py", line 130, in connect
+    raise new_ex.with_traceback(None)
+django.db.utils.OperationalError: connection failed: connection to server at "127.0.0.1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+Multiple connection attempts failed. All failures were:
+- host: 'localhost', port: '5432', hostaddr: '::1': connection failed: connection to server at "::1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+- host: 'localhost', port: '5432', hostaddr: '127.0.0.1': connection failed: connection to server at "127.0.0.1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+INFO 2026-05-19 12:25:11,135 django.utils.autoreload 41853 140712641992576 Watching for file changes with StatReloader
+ERROR 2026-05-19 12:26:12,031 django.security.DisallowedHost 41853 140712543774400 Invalid HTTP_HOST header: 'relatorios.control.local'. You may need to add 'relatorios.control.local' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/deprecation.py", line 308, in __call__
+    response = self.process_request(request)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/middleware/common.py", line 48, in process_request
+    host = request.get_host()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/http/request.py", line 206, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: 'relatorios.control.local'. You may need to add 'relatorios.control.local' to ALLOWED_HOSTS.
+ERROR 2026-05-19 12:27:43,433 django.security.DisallowedHost 41853 140712543774400 Invalid HTTP_HOST header: 'relatorios.control.local'. You may need to add 'relatorios.control.local' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/utils/deprecation.py", line 308, in __call__
+    response = self.process_request(request)
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/middleware/common.py", line 48, in process_request
+    host = request.get_host()
+  File "/opt/app_relatorios/projeto_relatorios_claude/venv/lib/python3.13/site-packages/django/http/request.py", line 206, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: 'relatorios.control.local'. You may need to add 'relatorios.control.local' to ALLOWED_HOSTS.

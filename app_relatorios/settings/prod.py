@@ -18,7 +18,7 @@ STATIC_ROOT.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_HOSTS = config(
     "ALLOWED_HOSTS",
-    default="localhost,127.0.0.1",
+    default="localhost,127.0.0.1,relatorios.control.local",
     cast=lambda v: [host.strip() for host in v.split(",") if host.strip()],
 )
 
