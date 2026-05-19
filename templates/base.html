@@ -17,13 +17,14 @@
 </head>
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 
-<div class="d-flex" id="app-wrapper">
+<div class="app-shell d-flex" id="app-wrapper">
   {% include "partials/_sidebar.html" %}
+  <div class="sidebar-backdrop" id="sidebar-backdrop" aria-hidden="true"></div>
 
   <div class="flex-grow-1 d-flex flex-column" id="main-content">
     {% include "partials/_navbar.html" %}
 
-    <main class="flex-grow-1 p-4 bg-body-secondary">
+    <main class="app-main flex-grow-1 bg-body-secondary">
 
       {% if messages %}
         <div class="mb-3">
@@ -36,8 +37,8 @@
         </div>
       {% endif %}
 
-      <div class="d-flex align-items-center justify-content-between mb-4">
-        <div>
+      <div class="page-heading d-flex align-items-start justify-content-between gap-3 mb-4">
+        <div class="min-w-0">
           <h4 class="fw-semibold mb-0 text-body-emphasis">
             {% block page_title %}{% endblock %}
           </h4>
@@ -51,15 +52,15 @@
             </ol>
           </nav>
         </div>
-        <div>{% block page_actions %}{% endblock %}</div>
+        <div class="page-actions">{% block page_actions %}{% endblock %}</div>
       </div>
 
       {% block content %}{% endblock %}
 
     </main>
 
-    <footer class="py-3 px-4 border-top bg-body text-muted small">
-      <div class="d-flex justify-content-between">
+    <footer class="app-footer py-3 px-4 border-top bg-body text-muted small">
+      <div class="d-flex flex-wrap gap-2 justify-content-between">
         <span>© 2026 Gabriel Oliveira</span>
         <span>v2.0</span>
       </div>
