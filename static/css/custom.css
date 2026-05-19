@@ -2,6 +2,54 @@
 body {
   font-family: 'Inter', sans-serif;
   font-size: .9rem;
+  overflow-x: hidden;
+}
+
+img,
+svg {
+  max-width: 100%;
+}
+
+.min-w-0 {
+  min-width: 0;
+}
+
+.app-shell {
+  min-height: 100vh;
+  width: 100%;
+}
+
+#main-content {
+  min-width: 0;
+}
+
+.app-main {
+  min-height: calc(100vh - 58px);
+  padding: clamp(1rem, 1.5vw, 2rem) clamp(1.5rem, 2vw, 2.5rem);
+}
+
+.page-heading {
+  flex-wrap: wrap;
+}
+
+.page-heading h4 {
+  overflow-wrap: anywhere;
+}
+
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  justify-content: flex-end;
+}
+
+.page-actions > * {
+  flex-shrink: 0;
+}
+
+.page-actions > .d-flex {
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .table thead th {
@@ -11,6 +59,13 @@ body {
 
 /* ── SIDEBAR ── */
 #sidebar {
+  width: 260px;
+  min-height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
+  position: sticky;
+  top: 0;
+  z-index: 1030;
   transition: width 0.25s ease;
 }
 
@@ -83,11 +138,57 @@ body {
 /* ── NAVBAR ── */
 header.navbar {
   min-height: 58px;
+  z-index: 1020;
+}
+
+.navbar-content {
+  min-width: 0;
 }
 
 /* ── UTILITÁRIOS ── */
 .bg-body-secondary {
   min-height: calc(100vh - 58px);
+}
+
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table {
+  vertical-align: middle;
+}
+
+.table td,
+.table th {
+  white-space: nowrap;
+}
+
+.table td .text-wrap,
+.table td p,
+.table td small,
+.table td div {
+  white-space: normal;
+}
+
+.card-body,
+.card-header,
+.modal-body {
+  min-width: 0;
+}
+
+.form-control,
+.form-select,
+.btn {
+  min-height: 36px;
+}
+
+textarea.form-control {
+  min-height: 96px;
+}
+
+.sidebar-backdrop {
+  display: none;
 }
 
 /* ── SCROLLBAR FINA ── */
@@ -130,4 +231,147 @@ header.navbar {
   --bs-alert-color: #8a3d05;
   --bs-alert-bg: #fff3e8;
   --bs-alert-border-color: #ffc38a;
+}
+
+@media (min-width: 1600px) {
+  body {
+    font-size: .94rem;
+  }
+
+  #sidebar {
+    width: 280px;
+  }
+
+  .sidebar-brand-logo {
+    max-width: 190px;
+    max-height: 44px;
+  }
+
+  .app-main {
+    padding: 2rem 2.75rem;
+  }
+}
+
+@media (max-width: 1399.98px) {
+  #sidebar {
+    width: 236px;
+  }
+
+  .sidebar-brand-logo {
+    max-width: 162px;
+  }
+
+  .app-main {
+    padding: 1.25rem 1.5rem;
+  }
+
+  .card-header {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+@media (max-width: 1199.98px) {
+  #sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: min(82vw, 300px);
+    transform: translateX(-100%);
+    box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, .18);
+    transition: transform .2s ease;
+  }
+
+  body.sidebar-open #sidebar {
+    transform: translateX(0);
+  }
+
+  .sidebar-backdrop {
+    background: rgba(15, 23, 42, .42);
+    bottom: 0;
+    display: none;
+    left: 0;
+    position: fixed;
+    right: 0;
+    top: 0;
+    z-index: 1025;
+  }
+
+  body.sidebar-open .sidebar-backdrop {
+    display: block;
+  }
+
+  .page-heading {
+    align-items: stretch !important;
+    flex-direction: column;
+  }
+
+  .page-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .page-actions > .d-flex {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .page-actions .btn,
+  .page-actions form,
+  .page-actions form .btn {
+    width: auto;
+  }
+}
+
+@media (max-width: 767.98px) {
+  body {
+    font-size: .875rem;
+  }
+
+  .app-main {
+    padding: .875rem;
+  }
+
+  header.navbar {
+    padding-left: .875rem !important;
+    padding-right: .875rem !important;
+  }
+
+  .page-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .page-actions .btn,
+  .page-actions form,
+  .page-actions form .btn,
+  .page-actions > .d-flex > * {
+    width: 100%;
+  }
+
+  .card {
+    border-radius: .625rem;
+  }
+
+  .card-body {
+    padding: 1rem;
+  }
+
+  .table {
+    font-size: .82rem;
+  }
+
+  .table td,
+  .table th {
+    padding: .55rem .65rem;
+  }
+
+  .breadcrumb {
+    overflow-wrap: anywhere;
+  }
+
+  .app-footer {
+    padding-left: .875rem !important;
+    padding-right: .875rem !important;
+  }
 }

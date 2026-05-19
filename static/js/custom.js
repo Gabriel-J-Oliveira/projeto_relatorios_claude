@@ -1,4 +1,28 @@
-console.log("JS carregou");
+const sidebarToggle = document.getElementById('sidebar-toggle');
+const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+
+function setSidebarOpen(open) {
+  document.body.classList.toggle('sidebar-open', open);
+  sidebarToggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+sidebarToggle?.addEventListener('click', () => {
+  setSidebarOpen(!document.body.classList.contains('sidebar-open'));
+});
+
+sidebarBackdrop?.addEventListener('click', () => setSidebarOpen(false));
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') setSidebarOpen(false);
+});
+
+document.querySelectorAll('#sidebar a').forEach(link => {
+  link.addEventListener('click', () => {
+    if (window.matchMedia('(max-width: 1199.98px)').matches) {
+      setSidebarOpen(false);
+    }
+  });
+});
 // ── DATA NO NAVBAR ──
 const el = document.getElementById('current-date');
 if (el) {
