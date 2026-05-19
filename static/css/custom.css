@@ -23,6 +23,7 @@ body {
   max-width: 172px;
   max-height: 38px;
   object-fit: contain;
+  transition: filter .15s ease;
 }
 
 .sidebar-brand-title {
@@ -30,6 +31,10 @@ body {
   font-size: .78rem;
   font-weight: 600;
   line-height: 1.1;
+}
+
+[data-bs-theme="dark"] .sidebar-brand-logo {
+  filter: brightness(0) invert(1);
 }
 
 #sidebar .nav-link {
