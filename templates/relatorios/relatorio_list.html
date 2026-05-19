@@ -126,10 +126,12 @@
                      class="btn btn-sm btn-outline-primary" title="Editar">
                     <i class="bi bi-pencil"></i>
                   </a>
-                  <a href="{% url 'relatorios:relatorio_delete' r.pk %}"
-                     class="btn btn-sm btn-outline-danger" title="Excluir">
-                    <i class="bi bi-trash"></i>
-                  </a>
+                {% endif %}
+                {% if permissoes_erp.exclui_relatorios %}
+                <a href="{% url 'relatorios:relatorio_delete' r.pk %}"
+                   class="btn btn-sm btn-outline-danger" title="Excluir">
+                  <i class="bi bi-trash"></i>
+                </a>
                 {% endif %}
               </div>
             </td>

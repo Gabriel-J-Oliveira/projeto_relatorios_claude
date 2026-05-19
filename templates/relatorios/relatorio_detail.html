@@ -15,12 +15,14 @@
 
 {% block page_actions %}
 <div class="d-flex gap-2">
+  {% if pode_atuar_financeiro %}
   <a href="{% url 'relatorios:relatorio_pdf_interno' relatorio.pk %}"
      target="_blank"
      rel="noopener"
      class="btn btn-outline-dark btn-sm">
     <i class="bi bi-file-earmark-text me-1"></i>Gerar PDF interno
   </a>
+  {% endif %}
   {% if relatorio.status == 'aprovado' %}
   <a href="{% url 'relatorios:relatorio_reembolso_pdf' relatorio.pk %}"
      target="_blank"
@@ -34,14 +36,14 @@
     <i class="bi bi-pencil me-1"></i>Editar
   </a>
   {% endif %}
-  {% if relatorio.status == 'rascunho' %}
+  {% if relatorio.status == 'rascunho' and pode_enviar_relatorio %}
   <form method="post" action="{% url 'relatorios:relatorio_status' relatorio.pk 'conferencia_pendente' %}">
     {% csrf_token %}
     <button class="btn btn-warning btn-sm">
       <i class="bi bi-send me-1"></i>Enviar p/ Aprovação
     </button>
   </form>
-  {% elif relatorio.status == 'conferencia_pendente' %}
+  {% elif relatorio.status == 'conferencia_pendente' and pode_atuar_financeiro %}
   <button type="submit"
           form="form-valores-aprovados-financeiro"
           formmethod="post"
@@ -62,7 +64,7 @@
     <i class="bi bi-x-lg me-1"></i>Rejeitar relatório
   </button>
   {% endif %}
-  {% if pode_editar_relatorio %}
+  {% if pode_excluir_relatorio %}
   <a href="{% url 'relatorios:relatorio_delete' relatorio.pk %}" class="btn btn-outline-danger btn-sm">
     <i class="bi bi-trash me-1"></i>Excluir
   </a>
@@ -258,7 +260,7 @@
                          class="form-control form-control-sm campo-aprovado-despesa"
                          data-valor-original="{{ d.valor }}"
                          data-status-financeiro="{% if d.rejeitado %}rejeitado{% else %}{{ d.status_financeiro }}{% endif %}"
-                         {% if relatorio.status == 'aprovado' or relatorio.status == 'rejeitado' or d.rejeitado or d.status_financeiro == 'rejeitado' %}disabled{% endif %}>
+                         {% if not superadmin_django %}{% if not pode_atuar_financeiro or relatorio.status == 'aprovado' or relatorio.status == 'rejeitado' or d.rejeitado or d.status_financeiro == 'rejeitado' %}disabled{% endif %}{% endif %}>
                   <div class="small text-muted mt-1">Final: R$ {{ d.valor_final|floatformat:2 }}</div>
                 </td>
                 <td class="small">
@@ -279,7 +281,7 @@
                   {% endif %}
                 </td>
                 <td class="text-end pe-3">
-                  {% if relatorio.status != 'aprovado' and relatorio.status != 'rejeitado' %}
+                  {% if pode_alterar_itens_financeiros %}
                     {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
                     <button type="submit"
                             form="form-restaurar-despesa-{{ d.pk }}"
@@ -365,7 +367,7 @@
                          data-km="{{ t.km }}"
                          data-valor-km-original="{{ t.valor_km }}"
                          data-status-financeiro="{% if t.rejeitado %}rejeitado{% else %}{{ t.status_financeiro }}{% endif %}"
-                         {% if relatorio.status == 'aprovado' or relatorio.status == 'rejeitado' or t.rejeitado or t.status_financeiro == 'rejeitado' %}disabled{% endif %}>
+                         {% if not superadmin_django %}{% if not pode_atuar_financeiro or relatorio.status == 'aprovado' or relatorio.status == 'rejeitado' or t.rejeitado or t.status_financeiro == 'rejeitado' %}disabled{% endif %}{% endif %}>
                 </td>
                 <td class="small fw-semibold text-success">R$ {{ t.valor_calculado|floatformat:2 }}</td>
                 <td class="small fw-semibold text-success total-aprovado-km-linha">R$ {{ t.valor_final|floatformat:2 }}</td>
@@ -385,7 +387,7 @@
                   {% endif %}
                 </td>
                 <td class="text-end pe-3">
-                  {% if relatorio.status != 'aprovado' and relatorio.status != 'rejeitado' %}
+                  {% if pode_alterar_itens_financeiros %}
                     {% if t.rejeitado or t.status_financeiro == 'rejeitado' %}
                     <button type="submit"
                             form="form-restaurar-trecho-{{ t.pk }}"
@@ -582,7 +584,7 @@
 
 </form>
 
-{% if relatorio.status != 'aprovado' and relatorio.status != 'rejeitado' %}
+{% if pode_alterar_itens_financeiros %}
   {% for d in relatorio.despesas.all %}
     {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
     <form id="form-restaurar-despesa-{{ d.pk }}"
@@ -666,7 +668,7 @@
   {% endfor %}
 {% endif %}
 
-{% if relatorio.status == 'conferencia_pendente' %}
+{% if pode_atuar_financeiro and relatorio.status == 'conferencia_pendente' %}
 <div class="modal fade" id="modalSolicitarAjuste" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow">

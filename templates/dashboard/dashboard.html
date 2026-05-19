@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block titulo %}Dashboard{% endblock %}
-{% block page_title %}Dashboard{% endblock %}
+{% block page_title %}{% if dashboard_global %}Dashboard Global{% else %}Meu Dashboard{% endif %}{% endblock %}
 {% block breadcrumb %}<li class="breadcrumb-item active">Dashboard</li>{% endblock %}
 {% block content %}
   <div class="row g-3 mb-4">
@@ -178,10 +178,13 @@
               class="btn btn-outline-primary d-flex align-items-center gap-2">
             <i class="bi bi-plus-lg"></i> Novo Relatório
           </a>
+          {% if permissoes_erp.visualiza_adiantamentos %}
           <a href="{% url 'relatorios:adiantamento_create' %}"
              class="btn btn-outline-success d-flex align-items-center gap-2">
             <i class="bi bi-cash-stack"></i> Lançar Adiantamento
           </a>
+          {% endif %}
+          {% if permissoes_erp.visualiza_cadastros %}
           <a href="{% url 'relatorios:tecnico_create' %}"
              class="btn btn-outline-secondary d-flex align-items-center gap-2">
             <i class="bi bi-person-plus"></i> Cadastrar Técnico
@@ -190,6 +193,7 @@
              class="btn btn-outline-secondary d-flex align-items-center gap-2">
             <i class="bi bi-building-add"></i> Cadastrar Cliente
           </a>
+          {% endif %}
         </div>
       </div>
     </div>

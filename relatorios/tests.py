@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.exceptions import PermissionDenied
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
@@ -32,6 +33,7 @@ from .services.identidade.ldap_utils import (
     conta_ad_desativada,
     conta_ad_expirada,
     construir_snapshot_ldap,
+    extrair_grupos_ad,
     normalizar_username_ad,
     usuario_ad_ativo,
 )
@@ -1486,7 +1488,7 @@ class IdentidadeAdPreparacaoTests(TestCase):
         )
         self.assertTrue(usuario.has_usable_password())
 
-        sincronizar_usuario_externo(
+        resultado = sincronizar_usuario_externo(
             UsuarioExternoSnapshot(
                 username="usuario.ldap",
                 grupos_ad=("ERP-Financeiro",),
@@ -1498,6 +1500,18 @@ class IdentidadeAdPreparacaoTests(TestCase):
         usuario.refresh_from_db()
         self.assertFalse(usuario.has_usable_password())
         self.assertTrue(usuario.groups.filter(name="Financeiro").exists())
+        self.assertTrue(resultado.usuario_local_migrado)
+
+    def test_backend_bloqueia_fallback_local_quando_usuario_existe_no_ad(self):
+        backend = ActiveDirectoryBackend()
+
+        with (
+            override_settings(LDAP_AUTH_ENABLED=True),
+            patch.object(backend, "_usuario_existe_no_ad", return_value=True),
+            patch.object(backend, "_autenticar_em_dcs", return_value=None),
+        ):
+            with self.assertRaises(PermissionDenied):
+                backend.authenticate(None, username="usuario.ad", password="senha-errada")
 
 
 class IdentidadeAdUtilitariosTests(SimpleTestCase):
@@ -1524,6 +1538,11 @@ class IdentidadeAdUtilitariosTests(SimpleTestCase):
         self.assertFalse(conta_ad_bloqueada(attrs))
         self.assertFalse(conta_ad_expirada(attrs))
         self.assertTrue(usuario_ad_ativo(attrs))
+
+    def test_extrai_domain_users_quando_grupo_primario_do_ad(self):
+        grupos = extrair_grupos_ad(attrs={"primaryGroupID": [b"513"]})
+
+        self.assertIn("Domain Users", grupos)
 
     @override_settings(LDAP_SERVER_URIS=["ldap://dc01", "ldap://dc02"])
     def test_backend_usa_lista_de_dcs_configurada(self):

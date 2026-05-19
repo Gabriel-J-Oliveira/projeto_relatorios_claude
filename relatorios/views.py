@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Q, Sum
 from django.http import HttpResponse, JsonResponse
@@ -28,9 +29,18 @@ from .models import (
 )
 from .services.historico_service import registrar_evento
 from .services.autorizacao_service import (
+    exigir_acesso_erp,
+    exigir_administrativo,
     exigir_financeiro,
+    queryset_relatorios_visiveis,
+    usuario_eh_administrativo,
+    usuario_pode_acessar_erp,
     usuario_pode_atuar_como_financeiro,
     usuario_pode_editar_relatorio,
+    usuario_pode_enviar_relatorio,
+    usuario_pode_excluir_relatorio,
+    usuario_pode_visualizar_relatorio,
+    usuario_eh_superadmin,
 )
 from .services.workflow_service import (
     WorkflowError,
@@ -129,6 +139,7 @@ def _duplicar_relatorio(original, usuario=None):
         valor_adiantamento=Decimal("0.00"),
         observacoes=original.observacoes,
         status=StatusRelatorio.RASCUNHO,
+        criado_por=usuario,
     )
     novo.save()
     registrar_evento(
@@ -253,6 +264,45 @@ def _relatorio_bloqueado(relatorio):
 
 def _relatorio_editavel_por_usuario(relatorio, user):
     return usuario_pode_editar_relatorio(user, relatorio)
+
+
+def _relatorios_visiveis(user, queryset=None):
+    queryset = queryset if queryset is not None else RelatorioTecnico.objects.all()
+    return queryset_relatorios_visiveis(user, queryset)
+
+
+def _usuario_pode_ver_relatorio_ou_403(user, relatorio):
+    if not usuario_pode_visualizar_relatorio(user, relatorio):
+        raise RelatorioTecnico.DoesNotExist
+
+
+def _relatorio_filtro_form(user, data=None):
+    form = RelatorioFiltroForm(data)
+    if not usuario_eh_administrativo(user):
+        relatorios = _relatorios_visiveis(user, RelatorioTecnico.objects.all())
+        form.fields["tecnico"].queryset = Tecnico.objects.filter(
+            pk__in=relatorios.values("tecnico_responsavel_id")
+        )
+        form.fields["cliente"].queryset = Cliente.objects.filter(
+            pk__in=relatorios.values("cliente_id")
+        )
+    return form
+
+
+class AcessoErpMixin(LoginRequiredMixin):
+    def dispatch(self, request, *args, **kwargs):
+        if not usuario_pode_acessar_erp(request.user):
+            messages.error(request, "Seu usuÃ¡rio nÃ£o possui perfil de acesso ao ERP.")
+            raise PermissionDenied("UsuÃ¡rio sem grupo ERP.")
+        return super().dispatch(request, *args, **kwargs)
+
+
+class AdministrativoMixin(AcessoErpMixin):
+    def dispatch(self, request, *args, **kwargs):
+        if not usuario_eh_administrativo(request.user):
+            messages.error(request, "VocÃª nÃ£o tem permissÃ£o para acessar esta Ã¡rea.")
+            return redirect("relatorios:dashboard")
+        return super().dispatch(request, *args, **kwargs)
 
 
 def _avisos_financeiro(relatorio):
@@ -396,34 +446,38 @@ def _avisos_financeiro(relatorio):
     return avisos
 
 
-class DashboardView(LoginRequiredMixin, TemplateView):
+class DashboardView(AcessoErpMixin, TemplateView):
     template_name = "dashboard/dashboard.html"
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
 
-        total_relatorios = RelatorioTecnico.objects.count()
+        administrativo = usuario_eh_administrativo(self.request.user)
+        qs_relatorios = _relatorios_visiveis(self.request.user, RelatorioTecnico.objects.all())
+        total_relatorios = qs_relatorios.count()
         total_base = total_relatorios or 1
 
-        total_conferencia = RelatorioTecnico.objects.filter(
+        total_conferencia = qs_relatorios.filter(
             status=StatusRelatorio.CONFERENCIA
         ).count()
 
-        total_adiantamentos = Adiantamento.objects.aggregate(total=Sum("valor"))[
+        total_adiantamentos = (
+            Adiantamento.objects.aggregate(total=Sum("valor"))["total"]
+            if administrativo
+            else Decimal("0.00")
+        ) or Decimal("0.00")
+
+        total_itens = qs_relatorios.aggregate(total=Sum("despesas__valor"))[
             "total"
         ] or Decimal("0.00")
 
-        total_itens = RelatorioTecnico.objects.aggregate(total=Sum("despesas__valor"))[
-            "total"
-        ] or Decimal("0.00")
-
-        total_km_valor = RelatorioTecnico.objects.aggregate(
+        total_km_valor = qs_relatorios.aggregate(
             total=Sum("trechos__valor_calculado")
         )["total"] or Decimal("0.00")
 
         total_despesas_valor = total_itens + total_km_valor
-        total_tecnicos = Tecnico.objects.filter(ativo=True).count()
-        total_clientes = Cliente.objects.filter(ativo=True).count()
+        total_tecnicos = Tecnico.objects.filter(ativo=True).count() if administrativo else 0
+        total_clientes = Cliente.objects.filter(ativo=True).count() if administrativo else 0
 
         model_fields = {field.name for field in RelatorioTecnico._meta.get_fields()}
         select_related_fields = ["cliente"]
@@ -432,7 +486,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         elif "tecnico_responsavel" in model_fields:
             select_related_fields.append("tecnico_responsavel")
 
-        relatorios_recentes = RelatorioTecnico.objects.select_related(
+        relatorios_recentes = qs_relatorios.select_related(
             *select_related_fields
         ).order_by("-criado_em")[:8]
 
@@ -447,7 +501,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         percentuais = {
             status: (
                 round(
-                    RelatorioTecnico.objects.filter(status=status).count()
+                    qs_relatorios.filter(status=status).count()
                     / total_base
                     * 100
                 )
@@ -465,6 +519,8 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         ctx.update(
             {
                 "titulo_pagina": "Dashboard",
+                "dashboard_global": administrativo,
+                "dashboard_individual": not administrativo,
                 "total_relatorios": total_relatorios,
                 "total_pendentes": total_conferencia,
                 "total_conferencia": total_conferencia,
@@ -522,15 +578,18 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 # ─────────────────────────────────────────────
 
 
-class RelatorioListView(LoginRequiredMixin, ListView):
+class RelatorioListView(AcessoErpMixin, ListView):
     model = RelatorioTecnico
     template_name = "relatorios/relatorio_list.html"
     context_object_name = "relatorios"
     paginate_by = 15
 
     def get_queryset(self):
-        qs = RelatorioTecnico.objects.select_related("cliente", "tecnico_responsavel")
-        form = RelatorioFiltroForm(self.request.GET)
+        qs = _relatorios_visiveis(
+            self.request.user,
+            RelatorioTecnico.objects.select_related("cliente", "tecnico_responsavel"),
+        )
+        form = _relatorio_filtro_form(self.request.user, self.request.GET)
         if form.is_valid():
             cd = form.cleaned_data
             if cd.get("tecnico"):
@@ -555,7 +614,7 @@ class RelatorioListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["form_filtro"] = RelatorioFiltroForm(self.request.GET)
+        ctx["form_filtro"] = _relatorio_filtro_form(self.request.user, self.request.GET)
         ctx["titulo_pagina"] = "Relatórios Técnicos"
         ctx["total"] = self.get_queryset().count()
         return ctx
@@ -567,6 +626,7 @@ class RelatorioListView(LoginRequiredMixin, ListView):
 
 
 @login_required
+@exigir_acesso_erp
 def relatorio_form_view(request, pk=None):
     """
     View única para criar e editar relatórios.
@@ -577,7 +637,14 @@ def relatorio_form_view(request, pk=None):
                           via kwargs, e ao template para exibição/JS.
                           NUNCA é gravada no banco diretamente.
     """
-    instance = get_object_or_404(RelatorioTecnico, pk=pk) if pk else None
+    instance = (
+        get_object_or_404(
+            _relatorios_visiveis(request.user, RelatorioTecnico.objects.all()),
+            pk=pk,
+        )
+        if pk
+        else None
+    )
     if instance and not _relatorio_editavel_por_usuario(instance, request.user):
         if instance.status == StatusRelatorio.AJUSTE:
             messages.error(request, "Relatório em ajuste deve ser editado pelo técnico.")
@@ -671,6 +738,8 @@ def relatorio_form_view(request, pk=None):
                 try:
                     with transaction.atomic():
                         relatorio_novo = instance is None
+                        if relatorio_novo:
+                            relatorio.criado_por = request.user
                         relatorio.save()
                         form.save_m2m()
 
@@ -855,6 +924,7 @@ def relatorio_update(request, pk):
 
 
 @login_required
+@exigir_acesso_erp
 def nova_linha_despesa(request):
     """
     Retorna o HTML de uma nova linha de despesa vazia.
@@ -884,6 +954,7 @@ def nova_linha_despesa(request):
 
 
 @login_required
+@exigir_acesso_erp
 def nova_linha_km(request):
     """
     Retorna o HTML de uma nova linha de trecho KM.
@@ -934,11 +1005,15 @@ def nova_linha_km(request):
 
 
 @login_required
+@exigir_acesso_erp
 def relatorio_detail_view(request, pk):
     relatorio = get_object_or_404(
-        RelatorioTecnico.objects.select_related(
-            "cliente", "tecnico_responsavel"
-        ).prefetch_related("despesas", "trechos", "equipe__tecnico", "historicos__usuario"),
+        _relatorios_visiveis(
+            request.user,
+            RelatorioTecnico.objects.select_related(
+                "cliente", "tecnico_responsavel"
+            ).prefetch_related("despesas", "trechos", "equipe__tecnico", "historicos__usuario"),
+        ),
         pk=pk,
     )
 
@@ -947,10 +1022,25 @@ def relatorio_detail_view(request, pk):
         "relatorios/relatorio_detail.html",
         {
             "relatorio": relatorio,
-            "avisos_financeiro": _avisos_financeiro(relatorio),
+            "avisos_financeiro": (
+                _avisos_financeiro(relatorio)
+                if usuario_pode_atuar_como_financeiro(request.user)
+                else []
+            ),
             "pode_editar_relatorio": _relatorio_editavel_por_usuario(
                 relatorio, request.user
             ),
+            "pode_atuar_financeiro": usuario_pode_atuar_como_financeiro(request.user),
+            "pode_alterar_itens_financeiros": (
+                usuario_eh_superadmin(request.user)
+                or (
+                    usuario_pode_atuar_como_financeiro(request.user)
+                    and relatorio.status not in {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
+                )
+            ),
+            "superadmin_django": usuario_eh_superadmin(request.user),
+            "pode_enviar_relatorio": usuario_pode_enviar_relatorio(request.user, relatorio),
+            "pode_excluir_relatorio": usuario_pode_excluir_relatorio(request.user, relatorio),
             "titulo_pagina": f"Relatório {relatorio.identificador}",
         },
     )
@@ -962,14 +1052,18 @@ def relatorio_detail_view(request, pk):
 
 
 @login_required
+@exigir_acesso_erp
 def relatorio_reembolso_pdf_view(request, pk):
     relatorio = get_object_or_404(
-        RelatorioTecnico.objects.select_related(
-            "cliente",
-            "tecnico_responsavel",
-        ).prefetch_related(
-            "despesas",
-            "trechos",
+        _relatorios_visiveis(
+            request.user,
+            RelatorioTecnico.objects.select_related(
+                "cliente",
+                "tecnico_responsavel",
+            ).prefetch_related(
+                "despesas",
+                "trechos",
+            ),
         ),
         pk=pk,
     )
@@ -1073,7 +1167,29 @@ def relatorio_pdf_interno_view(request, pk):
 
 
 @login_required
+@exigir_acesso_erp
 def relatorio_delete_view(request, pk):
+    relatorio = get_object_or_404(
+        _relatorios_visiveis(request.user, RelatorioTecnico.objects.all()),
+        pk=pk,
+    )
+    if usuario_pode_excluir_relatorio(request.user, relatorio):
+        if request.method == "POST":
+            numero = relatorio.identificador
+            relatorio.delete()
+            messages.success(request, f"RelatÃ³rio {numero} excluÃ­do.")
+            return redirect("relatorios:relatorio_list")
+        return render(
+            request,
+            "relatorios/relatorio_confirm_delete.html",
+            {
+                "object": relatorio,
+                "titulo_pagina": "Excluir RelatÃ³rio",
+            },
+        )
+    messages.error(request, "ExclusÃ£o de relatÃ³rios estÃ¡ bloqueada por polÃ­tica operacional.")
+    return redirect("relatorios:relatorio_detail", pk=relatorio.pk)
+
     relatorio = get_object_or_404(RelatorioTecnico, pk=pk)
     if _relatorio_bloqueado(relatorio):
         messages.error(request, "Relatório aprovado ou rejeitado não pode ser excluído.")
@@ -1101,10 +1217,14 @@ def relatorio_delete_view(request, pk):
 
 @require_GET
 @login_required
+@exigir_acesso_erp
 def relatorio_import_list_json(request):
-    qs = RelatorioTecnico.objects.select_related(
-        "cliente",
-        "tecnico_responsavel",
+    qs = _relatorios_visiveis(
+        request.user,
+        RelatorioTecnico.objects.select_related(
+            "cliente",
+            "tecnico_responsavel",
+        ),
     ).order_by("-data_inicio", "-criado_em")
 
     cliente_id = request.GET.get("cliente")
@@ -1150,15 +1270,19 @@ def relatorio_import_list_json(request):
 
 @require_GET
 @login_required
+@exigir_acesso_erp
 def relatorio_import_detail_json(request, pk):
     relatorio = get_object_or_404(
-        RelatorioTecnico.objects.select_related(
-            "cliente",
-            "tecnico_responsavel",
-        ).prefetch_related(
-            "equipe__tecnico",
-            "despesas",
-            "trechos",
+        _relatorios_visiveis(
+            request.user,
+            RelatorioTecnico.objects.select_related(
+                "cliente",
+                "tecnico_responsavel",
+            ).prefetch_related(
+                "equipe__tecnico",
+                "despesas",
+                "trechos",
+            ),
         ),
         pk=pk,
     )
@@ -1194,15 +1318,19 @@ def relatorio_import_detail_json(request, pk):
 
 @require_POST
 @login_required
+@exigir_acesso_erp
 def relatorio_duplicate_view(request, pk):
     original = get_object_or_404(
-        RelatorioTecnico.objects.select_related(
-            "cliente",
-            "tecnico_responsavel",
-        ).prefetch_related(
-            "equipe__tecnico",
-            "despesas",
-            "trechos",
+        _relatorios_visiveis(
+            request.user,
+            RelatorioTecnico.objects.select_related(
+                "cliente",
+                "tecnico_responsavel",
+            ).prefetch_related(
+                "equipe__tecnico",
+                "despesas",
+                "trechos",
+            ),
         ),
         pk=pk,
     )
@@ -1338,10 +1466,18 @@ def relatorio_item_financeiro_view(request, pk, tipo, item_pk, acao):
 
 @require_POST
 @login_required
+@exigir_acesso_erp
 def relatorio_status_view(request, pk, status):
     try:
         usuario_historico = request.user if request.user.is_authenticated else None
+        relatorio_atual = get_object_or_404(
+            _relatorios_visiveis(request.user, RelatorioTecnico.objects.all()),
+            pk=pk,
+        )
         if status == StatusRelatorio.CONFERENCIA:
+            if not usuario_pode_enviar_relatorio(request.user, relatorio_atual):
+                messages.error(request, "VocÃª nÃ£o tem permissÃ£o para enviar este relatÃ³rio.")
+                return redirect("relatorios:relatorio_detail", pk=pk)
             relatorio = enviar_para_conferencia(pk, usuario_historico)
         elif status in {
             StatusRelatorio.AJUSTE,
@@ -1390,7 +1526,7 @@ def relatorio_status_view(request, pk, status):
 # ─────────────────────────────────────────────
 
 
-class TecnicoListView(LoginRequiredMixin, ListView):
+class TecnicoListView(AdministrativoMixin, ListView):
     model = Tecnico
     template_name = "tecnicos/tecnico_list.html"
     context_object_name = "tecnicos"
@@ -1411,6 +1547,7 @@ class TecnicoListView(LoginRequiredMixin, ListView):
 
 
 @login_required
+@exigir_administrativo
 def tecnico_form_view(request, pk=None):
     instance = get_object_or_404(Tecnico, pk=pk) if pk else None
     form = TecnicoForm(request.POST or None, instance=instance)
@@ -1432,6 +1569,7 @@ def tecnico_form_view(request, pk=None):
 
 
 @login_required
+@exigir_administrativo
 def tecnico_delete_view(request, pk):
     tecnico = get_object_or_404(Tecnico, pk=pk)
     if request.method == "POST":
@@ -1453,7 +1591,7 @@ def tecnico_delete_view(request, pk):
 # ─────────────────────────────────────────────
 
 
-class ClienteListView(LoginRequiredMixin, ListView):
+class ClienteListView(AdministrativoMixin, ListView):
     model = Cliente
     template_name = "clientes/cliente_list.html"
     context_object_name = "clientes"
@@ -1478,6 +1616,7 @@ class ClienteListView(LoginRequiredMixin, ListView):
 
 
 @login_required
+@exigir_administrativo
 def cliente_form_view(request, pk=None):
     instance = get_object_or_404(Cliente, pk=pk) if pk else None
     form = ClienteForm(request.POST or None, instance=instance)
@@ -1499,6 +1638,7 @@ def cliente_form_view(request, pk=None):
 
 
 @login_required
+@exigir_administrativo
 def cliente_delete_view(request, pk):
     cliente = get_object_or_404(Cliente, pk=pk)
     if request.method == "POST":
@@ -1520,7 +1660,7 @@ def cliente_delete_view(request, pk):
 # ─────────────────────────────────────────────
 
 
-class AdiantamentoListView(LoginRequiredMixin, ListView):
+class AdiantamentoListView(AdministrativoMixin, ListView):
     model = Adiantamento
     template_name = "adiantamentos/adiantamento_list.html"
     context_object_name = "adiantamentos"
@@ -1545,6 +1685,7 @@ class AdiantamentoListView(LoginRequiredMixin, ListView):
 
 
 @login_required
+@exigir_administrativo
 def adiantamento_form_view(request, pk=None):
     instance = get_object_or_404(Adiantamento, pk=pk) if pk else None
     form = AdiantamentoForm(request.POST or None, instance=instance)
@@ -1566,6 +1707,7 @@ def adiantamento_form_view(request, pk=None):
 
 
 @login_required
+@exigir_administrativo
 def adiantamento_delete_view(request, pk):
     obj = get_object_or_404(Adiantamento, pk=pk)
     if request.method == "POST":

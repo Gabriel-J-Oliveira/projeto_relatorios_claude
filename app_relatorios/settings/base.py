@@ -76,6 +76,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "django.template.context_processors.media",
+                "relatorios.context_processors.permissoes_erp",
             ],
         },
     },
@@ -210,6 +211,20 @@ if LDAP_AUTH_ENABLED:
         "last_name": "sn",
         "email": "mail",
     }
+    AUTH_LDAP_USER_ATTRLIST = [
+        "sAMAccountName",
+        "userPrincipalName",
+        "givenName",
+        "sn",
+        "displayName",
+        "mail",
+        "distinguishedName",
+        "memberOf",
+        "primaryGroupID",
+        "userAccountControl",
+        "lockoutTime",
+        "accountExpires",
+    ]
     AUTH_LDAP_MIRROR_GROUPS = False
     AUTH_LDAP_FIND_GROUP_PERMS = False
     AUTH_LDAP_START_TLS = LDAP_START_TLS

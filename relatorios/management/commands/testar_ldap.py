@@ -181,6 +181,7 @@ class Command(BaseCommand):
             "mail",
             "distinguishedName",
             "memberOf",
+            "primaryGroupID",
             "userAccountControl",
             "lockoutTime",
             "accountExpires",

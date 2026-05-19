@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass, field
 
 from django.contrib.auth import get_user_model
@@ -12,6 +13,9 @@ from relatorios.services.identidade.grupo_mapping_service import (
     garantir_grupos_erp,
     mapear_grupos_ad_para_django,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -41,6 +45,7 @@ class ResultadoSincronizacaoUsuario:
     grupos_django: tuple[str, ...]
     grupos_adicionados: tuple[str, ...]
     grupos_removidos: tuple[str, ...]
+    usuario_local_migrado: bool = False
 
 
 def _normalizar_snapshot(snapshot):
@@ -82,6 +87,9 @@ def sincronizar_usuario_externo(
     User = get_user_model()
     usuario = User.objects.filter(username=snapshot.username).first()
     criado = usuario is None
+    usuario_local_migrado = bool(
+        usuario and marcar_senha_inutilizavel and usuario.has_usable_password()
+    )
 
     if criado and not criar_usuario:
         raise User.DoesNotExist(f"Usuario {snapshot.username} nao existe.")
@@ -119,6 +127,7 @@ def sincronizar_usuario_externo(
         grupos_django=grupos_django,
         grupos_adicionados=grupos_adicionados,
         grupos_removidos=grupos_removidos,
+        usuario_local_migrado=usuario_local_migrado,
     )
 
     if dry_run:
@@ -138,8 +147,13 @@ def sincronizar_usuario_externo(
         if usuario is None:
             usuario = User(username=snapshot.username)
             usuario.set_unusable_password()
+            logger.info("Usuario Django %s criado a partir da identidade externa.", snapshot.username)
         elif marcar_senha_inutilizavel and usuario.has_usable_password():
             usuario.set_unusable_password()
+            logger.warning(
+                "Usuario local %s migrado para identidade externa; senha local inutilizada.",
+                snapshot.username,
+            )
 
         if atualizar_dados:
             usuario.email = snapshot.email
@@ -148,11 +162,20 @@ def sincronizar_usuario_externo(
             usuario.is_active = snapshot.is_active
 
         usuario.save()
+        if atualizado and not criado:
+            logger.info("Usuario Django %s atualizado a partir da identidade externa.", snapshot.username)
 
         if atualizar_grupos:
             grupos_preservados = usuario.groups.exclude(name__in=GRUPOS_ERP)
             grupos_mapeados = Group.objects.filter(name__in=grupos_django)
             usuario.groups.set([*grupos_preservados, *grupos_mapeados])
+            logger.info(
+                "Grupos ERP sincronizados para %s: adicionados=%s removidos=%s atuais=%s",
+                snapshot.username,
+                grupos_adicionados,
+                grupos_removidos,
+                grupos_django,
+            )
 
         registrar_evento_identidade(
             "sincronizacao_usuario",

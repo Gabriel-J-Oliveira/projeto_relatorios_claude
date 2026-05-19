@@ -3,6 +3,7 @@ from relatorios.services.identidade.sincronizacao_service import UsuarioExternoS
 
 
 UF_ACCOUNTDISABLE = 0x0002
+PRIMARY_GROUP_DOMAIN_USERS = 513
 WINDOWS_FILETIME_EPOCH_OFFSET = 116444736000000000
 WINDOWS_FILETIME_TICKS_PER_SECOND = 10000000
 ACCOUNT_EXPIRES_NEVER = {
@@ -101,7 +102,10 @@ def extrair_grupos_ad(ldap_user=None, attrs=None):
     if group_dns:
         grupos.update(_normalizar_valor_ldap(grupo) for grupo in group_dns)
 
-    grupos.update(listar_atributo(attrs or getattr(ldap_user, "attrs", {}), "memberOf"))
+    attrs = attrs or getattr(ldap_user, "attrs", {})
+    grupos.update(listar_atributo(attrs, "memberOf"))
+    if inteiro_atributo(attrs, "primaryGroupID") == PRIMARY_GROUP_DOMAIN_USERS:
+        grupos.add("Domain Users")
     return tuple(sorted(grupo for grupo in grupos if grupo))
 
 

@@ -2,6 +2,7 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.exceptions import PermissionDenied
 from django.test import override_settings
 
 from relatorios.services.identidade.auditoria_identidade_service import (
@@ -56,14 +57,25 @@ class ActiveDirectoryBackend:
             if getattr(settings, "LDAP_NORMALIZE_USERNAME", True)
             else username
         )
+        usuario_existe_no_ad = self._usuario_existe_no_ad(username_ldap)
         user = self._autenticar_em_dcs(request, username, username_ldap, password, **kwargs)
 
         if user is None:
             logger.info("Autenticacao LDAP recusada para usuario %s.", username)
             registrar_evento_identidade(
                 "ldap_login_falha",
-                dados={"username": username_ldap, "motivo": "recusado"},
+                dados={
+                    "username": username_ldap,
+                    "motivo": "recusado",
+                    "usuario_existe_no_ad": usuario_existe_no_ad,
+                },
             )
+            if usuario_existe_no_ad is True:
+                logger.warning(
+                    "Fallback local bloqueado para %s porque o usuario existe no AD.",
+                    username_ldap,
+                )
+                raise PermissionDenied("Usuario AD deve autenticar pelo Active Directory.")
             return None
 
         try:
@@ -121,6 +133,75 @@ class ActiveDirectoryBackend:
             logger.warning("Todos os DCs LDAP falharam para usuario %s.", username_original)
         return None
 
+    def _usuario_existe_no_ad(self, username_ldap):
+        try:
+            import ldap
+            from ldap.filter import escape_filter_chars
+        except ImportError:
+            return None
+
+        filtro = getattr(settings, "LDAP_USER_SEARCH_FILTER", "(sAMAccountName=%(user)s)") % {
+            "user": escape_filter_chars(username_ldap)
+        }
+        atributos = ["sAMAccountName"]
+        ultimo_erro = None
+
+        for uri in _ldap_server_uris():
+            try:
+                for opcao, valor in getattr(settings, "AUTH_LDAP_GLOBAL_OPTIONS", {}).items():
+                    ldap.set_option(opcao, valor)
+                conexao = ldap.initialize(uri)
+                for opcao, valor in getattr(settings, "AUTH_LDAP_CONNECTION_OPTIONS", {}).items():
+                    conexao.set_option(opcao, valor)
+                if getattr(settings, "AUTH_LDAP_START_TLS", False):
+                    conexao.start_tls_s()
+                conexao.simple_bind_s(
+                    getattr(settings, "AUTH_LDAP_BIND_DN", ""),
+                    getattr(settings, "AUTH_LDAP_BIND_PASSWORD", ""),
+                )
+                resultados = conexao.search_s(
+                    getattr(settings, "LDAP_USER_SEARCH_BASE_DN", ""),
+                    ldap.SCOPE_SUBTREE,
+                    filtro,
+                    atributos,
+                )
+                existe = any(dn and isinstance(attrs, dict) for dn, attrs in resultados)
+                logger.info(
+                    "Busca preventiva AD para usuario %s em %s: %s.",
+                    username_ldap,
+                    uri,
+                    "encontrado" if existe else "nao_encontrado",
+                )
+                return existe
+            except (ldap.TIMEOUT, ldap.SERVER_DOWN, ldap.CONNECT_ERROR) as exc:
+                ultimo_erro = exc
+                logger.warning(
+                    "Falha temporaria na busca preventiva AD de %s em %s: %s.",
+                    username_ldap,
+                    uri,
+                    exc.__class__.__name__,
+                )
+                continue
+            except ldap.INVALID_CREDENTIALS:
+                logger.error("Credenciais do bind de servico LDAP invalidas na busca preventiva.")
+                return None
+            except ldap.LDAPError as exc:
+                ultimo_erro = exc
+                logger.warning(
+                    "Falha LDAP na busca preventiva AD de %s em %s: %s.",
+                    username_ldap,
+                    uri,
+                    exc.__class__.__name__,
+                )
+                continue
+
+        logger.warning(
+            "Nao foi possivel confirmar existencia AD de %s; fallback local sera preservado. ultimo_erro=%s",
+            username_ldap,
+            ultimo_erro.__class__.__name__ if ultimo_erro else "-",
+        )
+        return None
+
     def _erro_permite_failover(self, exc):
         ldap = _ldap_exception_classes()
         if not ldap:
@@ -159,6 +240,9 @@ class ActiveDirectoryBackend:
         class ERPLDAPBackend(LDAPBackend):
             def ldap_to_django_username(self, username):
                 return normalizar_username_ad(username)
+
+            def user_can_authenticate(self, user):
+                return True
 
         return ERPLDAPBackend()
 

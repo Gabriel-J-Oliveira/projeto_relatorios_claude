@@ -46,6 +46,7 @@
       </a>
     </li>
 
+    {% if permissoes_erp.visualiza_adiantamentos %}
     <!-- Adiantamentos -->
     <li class="nav-item">
       <a href="{% url 'relatorios:adiantamento_list' %}"
@@ -55,7 +56,9 @@
         <span>Adiantamentos</span>
       </a>
     </li>
+    {% endif %}
 
+    {% if permissoes_erp.visualiza_cadastros %}
     <!-- Separador Cadastros -->
     <li class="mt-2 mb-1 px-2">
       <small class="text-uppercase text-muted fw-semibold" style="font-size:.7rem;letter-spacing:.05em;">
@@ -82,6 +85,7 @@
         <span>Clientes</span>
       </a>
     </li>
+    {% endif %}
 
     <li class="flex-grow-1"></li>
 
@@ -92,6 +96,7 @@
       </small>
     </li>
 
+    {% if permissoes_erp.admin_erp %}
     <!-- Admin -->
     <li class="nav-item">
       <a href="/admin/" target="_blank"
@@ -101,6 +106,7 @@
         <i class="bi bi-box-arrow-up-right ms-auto small"></i>
       </a>
     </li>
+    {% endif %}
 
   </ul>
 
