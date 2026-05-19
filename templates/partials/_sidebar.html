@@ -4,16 +4,13 @@
 
   <!-- Logo -->
   <a href="{% url 'relatorios:dashboard' %}"
-     class="d-flex align-items-center gap-2 px-4 py-3 text-decoration-none border-bottom">
-    <div class="d-flex align-items-center justify-content-center rounded-3 bg-primary text-white"
-         style="width:36px;height:36px;font-size:1.1rem;"
-      <img
-        src="/media/Png/simbolo_negativo.png"
-        alt="Control Sul Gestão Empresarial"
-        class="brand-logo"
-      >
-    </div>
-    <span class="fw-bold fs-6 text-body-emphasis">Relatório de viagens</span>
+     class="sidebar-brand d-flex flex-column align-items-start gap-2 px-4 py-3 text-decoration-none border-bottom">
+    <img
+      src="{{ MEDIA_URL }}Png/NovaMarca_Controlsul_AFazulescuro.png"
+      alt="Control Sul Gestao Empresarial"
+      class="sidebar-brand-logo"
+    >
+    <span class="sidebar-brand-title">Relatorio de viagens</span>
   </a>
 
   <!-- Menu -->
@@ -29,20 +26,20 @@
       </a>
     </li>
 
-    <!-- Separador Operações -->
+    <!-- Separador Operacoes -->
     <li class="mt-2 mb-1 px-2">
       <small class="text-uppercase text-muted fw-semibold" style="font-size:.7rem;letter-spacing:.05em;">
-        Operações
+        Operacoes
       </small>
     </li>
 
-    <!-- Relatórios -->
+    <!-- Relatorios -->
     <li class="nav-item">
       <a href="{% url 'relatorios:relatorio_list' %}"
          class="nav-link d-flex align-items-center gap-2
                 {% if 'relatorio' in request.resolver_match.url_name %}active{% endif %}">
         <i class="bi bi-file-earmark-text fs-5"></i>
-        <span>Relatórios</span>
+        <span>Relatorios</span>
       </a>
     </li>
 
@@ -66,13 +63,13 @@
       </small>
     </li>
 
-    <!-- Técnicos -->
+    <!-- Tecnicos -->
     <li class="nav-item">
       <a href="{% url 'relatorios:tecnico_list' %}"
          class="nav-link d-flex align-items-center gap-2
                 {% if 'tecnico' in request.resolver_match.url_name %}active{% endif %}">
         <i class="bi bi-person-badge fs-5"></i>
-        <span>Técnicos</span>
+        <span>Tecnicos</span>
       </a>
     </li>
 
@@ -111,7 +108,7 @@
   </ul>
 
   <div class="px-4 py-3 border-top">
-    <small class="text-muted">v1.0.0 — Ambiente Dev</small>
+    <small class="text-muted">v1.0.0 - Ambiente Dev</small>
   </div>
 
 </nav>

@@ -14,6 +14,24 @@ body {
   transition: width 0.25s ease;
 }
 
+.sidebar-brand {
+  min-height: 74px;
+}
+
+.sidebar-brand-logo {
+  display: block;
+  max-width: 172px;
+  max-height: 38px;
+  object-fit: contain;
+}
+
+.sidebar-brand-title {
+  color: var(--bs-body-color);
+  font-size: .78rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
 #sidebar .nav-link {
   border-radius: .5rem;
   padding: .5rem .75rem;
