@@ -85,6 +85,24 @@
            placeholder="Observação"
            class="form-control form-control-sm">
   </td>
+  <td class="p-1 pt-3">
+    <input type="hidden"
+           class="clientes-item-input"
+           name="trechos-{{ idx }}-clientes"
+           id="id_trechos-{{ idx }}-clientes"
+           value="{% for vinculo in form.instance.clientes_vinculados.all %}{{ vinculo.cliente_id }}{% if not forloop.last %},{% endif %}{% endfor %}">
+    <button type="button"
+            class="btn btn-sm btn-outline-secondary w-100 clientes-item-btn"
+            data-bs-toggle="modal"
+            data-bs-target="#modalSelecionarClientes"
+            data-client-selector="item"
+            data-client-target="id_trechos-{{ idx }}-clientes">
+      <i class="bi bi-people me-1"></i>
+      <span class="clientes-item-label">Clientes envolvidos</span>
+      <span class="badge rounded-pill text-bg-secondary ms-1 clientes-item-count">0</span>
+    </button>
+    <div class="invalid-feedback d-block small erro-clientes-item"></div>
+  </td>
   <td class="p-1 text-center pe-3 pt-3">
     <button type="button"
             class="btn btn-sm btn-outline-danger"

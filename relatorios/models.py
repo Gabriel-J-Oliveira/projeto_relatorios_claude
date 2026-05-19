@@ -382,6 +382,20 @@ class RelatorioTecnico(models.Model):
     def identificador(self):
         return self.numero or f"Rascunho #{self.pk or 'novo'}"
 
+    def clientes_relacionados(self):
+        clientes = Cliente.objects.filter(relatorios_cliente__relatorio=self).order_by(
+            "relatorios_cliente__ordem",
+            "nome",
+        )
+        if clientes.exists():
+            return clientes
+        if self.cliente_id:
+            return Cliente.objects.filter(pk=self.cliente_id)
+        return Cliente.objects.none()
+
+    def tem_multiplos_clientes(self):
+        return self.clientes_relacionados().count() > 1
+
     # ── Financeiro ──────────────────────────────────────────────
 
     @property
@@ -594,6 +608,30 @@ class RelatorioTecnicoEquipe(models.Model):
         return f"{self.tecnico.nome} ({self.get_papel_display()})"
 
 
+class RelatorioCliente(models.Model):
+    relatorio = models.ForeignKey(
+        RelatorioTecnico,
+        on_delete=models.CASCADE,
+        related_name="clientes_vinculados",
+    )
+    cliente = models.ForeignKey(
+        Cliente,
+        on_delete=models.PROTECT,
+        related_name="relatorios_cliente",
+    )
+    ordem = models.PositiveSmallIntegerField("Ordem", default=0)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Cliente do Relatorio"
+        verbose_name_plural = "Clientes do Relatorio"
+        ordering = ["ordem", "cliente__nome"]
+        unique_together = [("relatorio", "cliente")]
+
+    def __str__(self):
+        return f"{self.relatorio.identificador} - {self.cliente}"
+
+
 # ─────────────────────────────────────────────────────────────────
 # ITEM DE DESPESA
 # ─────────────────────────────────────────────────────────────────
@@ -702,6 +740,27 @@ class ItemDespesa(models.Model):
                 )
         if erros:
             raise ValidationError(erros)
+
+
+class DespesaCliente(models.Model):
+    despesa = models.ForeignKey(
+        ItemDespesa,
+        on_delete=models.CASCADE,
+        related_name="clientes_vinculados",
+    )
+    cliente = models.ForeignKey(
+        Cliente,
+        on_delete=models.PROTECT,
+        related_name="despesas_cliente",
+    )
+
+    class Meta:
+        verbose_name = "Cliente da Despesa"
+        verbose_name_plural = "Clientes da Despesa"
+        unique_together = [("despesa", "cliente")]
+
+    def __str__(self):
+        return f"{self.despesa_id} - {self.cliente}"
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -823,6 +882,27 @@ class TrechoKm(models.Model):
         if valor_km_cliente is None:
             return False
         return self.valor_km != valor_km_cliente
+
+
+class TrechoKMCliente(models.Model):
+    trecho = models.ForeignKey(
+        TrechoKm,
+        on_delete=models.CASCADE,
+        related_name="clientes_vinculados",
+    )
+    cliente = models.ForeignKey(
+        Cliente,
+        on_delete=models.PROTECT,
+        related_name="trechos_km_cliente",
+    )
+
+    class Meta:
+        verbose_name = "Cliente do Trecho KM"
+        verbose_name_plural = "Clientes dos Trechos KM"
+        unique_together = [("trecho", "cliente")]
+
+    def __str__(self):
+        return f"{self.trecho_id} - {self.cliente}"
 
 
 # ─────────────────────────────────────────────────────────────────

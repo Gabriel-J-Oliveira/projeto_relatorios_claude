@@ -28,6 +28,13 @@ from .models import (
     TrechoKm,
 )
 from .services.historico_service import registrar_evento
+from .services.clientes_relatorio_service import (
+    normalizar_ids_clientes,
+    obter_clientes_relatorio,
+    sync_clientes_despesa,
+    sync_clientes_relatorio,
+    sync_clientes_trecho,
+)
 from .services.autorizacao_service import (
     exigir_acesso_erp,
     exigir_administrativo,
@@ -110,6 +117,62 @@ def _form_has_content(form) -> bool:
         if k not in {"DELETE", "id", "relatorio", "ordem", "quem_pagou"}
     ]
     return any(v not in (None, "", [], ()) for v in values)
+
+
+def _clientes_selecionados_do_request(request, instance=None):
+    if request.method == "POST":
+        ids = normalizar_ids_clientes(request.POST.get("clientes_relatorio"))
+        nomes = list(Cliente.objects.filter(pk__in=ids).order_by("nome").values_list("nome", flat=True))
+        return ids, nomes
+
+    if instance:
+        clientes = list(obter_clientes_relatorio(instance))
+        return [cliente.pk for cliente in clientes], [cliente.nome for cliente in clientes]
+
+    return [], []
+
+
+def _clientes_item_post(request, prefix):
+    return normalizar_ids_clientes(request.POST.get(f"{prefix}-clientes"))
+
+
+def _validar_clientes_formsets(request, fs_desp, fs_km, cliente_ids_relatorio):
+    erros = []
+    clientes_relatorio = set(cliente_ids_relatorio)
+
+    if not cliente_ids_relatorio:
+        erros.append("Selecione ao menos um cliente para o relatório.")
+
+    def linha_tem_conteudo(form):
+        return _form_has_content(form)
+
+    for form in fs_desp.forms:
+        if not hasattr(form, "cleaned_data") or form.cleaned_data.get("DELETE"):
+            continue
+        if not linha_tem_conteudo(form):
+            continue
+        ids = _clientes_item_post(request, form.prefix)
+        if not ids and len(clientes_relatorio) == 1:
+            continue
+        if not ids:
+            erros.append("Toda despesa deve informar os clientes envolvidos.")
+        elif set(ids) - clientes_relatorio:
+            erros.append("Despesa referencia cliente fora do relatório.")
+
+    for form in fs_km.forms:
+        if not hasattr(form, "cleaned_data") or form.cleaned_data.get("DELETE"):
+            continue
+        if not linha_tem_conteudo(form):
+            continue
+        ids = _clientes_item_post(request, form.prefix)
+        if not ids and len(clientes_relatorio) == 1:
+            continue
+        if not ids:
+            erros.append("Todo trecho de KM deve informar os clientes envolvidos.")
+        elif set(ids) - clientes_relatorio:
+            erros.append("Trecho de KM referencia cliente fora do relatório.")
+
+    return list(dict.fromkeys(erros))
 
 
 def _sync_equipe(relatorio, tecnicos_apoio):
@@ -691,7 +754,11 @@ def relatorio_form_view(request, pk=None):
     # No GET:  lê o cliente já associado ao relatório (edição) ou 0 (criação).
     # Isso garante que linhas de KM novas já recebam o valor inicial correto.
     if request.method == "POST":
-        cliente_id = request.POST.get("cliente")
+        clientes_post_ids, clientes_post_nomes = _clientes_selecionados_do_request(
+            request,
+            instance,
+        )
+        cliente_id = clientes_post_ids[0] if clientes_post_ids else request.POST.get("cliente")
         valor_km_padrao = _get_valor_km_para_cliente(cliente_id)
         logger.debug(
             "relatorio_form_view POST: cliente_id=%s, valor_km_padrao=%s",
@@ -699,6 +766,10 @@ def relatorio_form_view(request, pk=None):
             valor_km_padrao,
         )
     else:
+        clientes_post_ids, clientes_post_nomes = _clientes_selecionados_do_request(
+            request,
+            instance,
+        )
         cliente_id = getattr(instance, "cliente_id", None) if instance else None
         valor_km_padrao = _get_valor_km_para_cliente(cliente_id)
         logger.debug(
@@ -747,6 +818,20 @@ def relatorio_form_view(request, pk=None):
             logger.debug("Erros fs_km: %s", fs_km.errors)
 
         if form_ok and desp_ok and km_ok:
+            cliente_ids_relatorio = normalizar_ids_clientes(
+                request.POST.get("clientes_relatorio")
+            )
+            erros_clientes = _validar_clientes_formsets(
+                request,
+                fs_desp,
+                fs_km,
+                cliente_ids_relatorio,
+            )
+            if erros_clientes:
+                resumo_erros.extend(erros_clientes)
+                form_ok = False
+
+        if form_ok and desp_ok and km_ok:
             # ── Determinar ação ───────────────────────────────────────────────
             # "acao" vem do name/value do botão clicado:
             #   "rascunho" → botão Salvar rascunho
@@ -769,8 +854,10 @@ def relatorio_form_view(request, pk=None):
                         relatorio_novo = instance is None
                         if relatorio_novo:
                             relatorio.criado_por = request.user
+                        relatorio.cliente_id = cliente_ids_relatorio[0]
                         relatorio.save()
                         form.save_m2m()
+                        sync_clientes_relatorio(relatorio, cliente_ids_relatorio)
 
                         tecnicos_apoio = form.cleaned_data.get("tecnicos_equipe", [])
                         _sync_equipe(relatorio, tecnicos_apoio)
@@ -782,6 +869,12 @@ def relatorio_form_view(request, pk=None):
                             item = f.save(commit=False)
                             item.relatorio = relatorio
                             item.save()
+                            erros_item = sync_clientes_despesa(
+                                item,
+                                _clientes_item_post(request, f.prefix),
+                            )
+                            if erros_item:
+                                raise WorkflowError(erros_item)
                         for f in fs_desp.deleted_forms:
                             if f.instance.pk:
                                 f.instance.delete()
@@ -793,6 +886,12 @@ def relatorio_form_view(request, pk=None):
                             trecho = f.save(commit=False)
                             trecho.relatorio = relatorio
                             trecho.save()
+                            erros_trecho = sync_clientes_trecho(
+                                trecho,
+                                _clientes_item_post(request, f.prefix),
+                            )
+                            if erros_trecho:
+                                raise WorkflowError(erros_trecho)
                         for f in fs_km.deleted_forms:
                             if f.instance.pk:
                                 f.instance.delete()
@@ -852,6 +951,8 @@ def relatorio_form_view(request, pk=None):
                             ),
                             "valor_km_padrao": valor_km_padrao,
                             "resumo_erros": resumo_erros,
+                            "clientes_selecionados_ids": clientes_post_ids,
+                            "clientes_selecionados_nomes": clientes_post_nomes,
                         },
                     )
                 except Exception as exc:
@@ -883,6 +984,8 @@ def relatorio_form_view(request, pk=None):
                             ),
                             "valor_km_padrao": str(valor_km_padrao),
                             "resumo_erros": [],
+                            "clientes_selecionados_ids": clientes_post_ids,
+                            "clientes_selecionados_nomes": clientes_post_nomes,
                         },
                     )
 
@@ -935,6 +1038,8 @@ def relatorio_form_view(request, pk=None):
             # Sempre string para evitar erros de template com None.
             "valor_km_padrao": str(valor_km_padrao),
             "resumo_erros": resumo_erros,
+            "clientes_selecionados_ids": clientes_post_ids,
+            "clientes_selecionados_nomes": clientes_post_nomes,
         },
     )
 

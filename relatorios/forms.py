@@ -86,7 +86,6 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         model = RelatorioTecnico
         fields = [
             "numero",
-            "cliente",
             "tecnico_responsavel",
             "cidade_atendimento",
             "uf_atendimento",
@@ -99,16 +98,12 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
             "observacoes",
         ]
         widgets = {
-            # Instanciado SEM clientes_map — será injetado no __init__
             "numero": forms.TextInput(
                 attrs={
                     "class": "form-control form-control-sm",
                     "inputmode": "numeric",
                     "readonly": "readonly",
                 }
-            ),
-            "cliente": ClienteSelectWithData(
-                attrs={"class": "form-select form-select-sm"}
             ),
             "data_inicio": forms.DateInput(
                 attrs={"type": "date", "class": "form-control form-control-sm"},
@@ -129,13 +124,6 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         kwargs.pop("numero_sugerido", None)
         super().__init__(*args, **kwargs)
-
-        qs_clientes = Cliente.objects.filter(ativo=True).order_by("nome")
-        self.fields["cliente"].queryset = qs_clientes
-
-        # Constrói o mapa e injeta no widget APÓS o queryset estar definido
-        clientes_map = {c.pk: float(c.valor_km or 0) for c in qs_clientes}
-        self.fields["cliente"].widget.clientes_map = clientes_map
 
         self.fields["tecnico_responsavel"].queryset = Tecnico.objects.filter(
             ativo=True

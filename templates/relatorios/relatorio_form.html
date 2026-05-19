@@ -173,11 +173,34 @@
 
                   {# Cliente / Responsável #}
                   <div class="col-md-6">
-                    <label class="form-label fw-medium small text-muted">Cliente *</label>
-                    {{ form.cliente }}
-                    {% if form.cliente.errors %}
-                      <div class="text-danger small mt-1">{{ form.cliente.errors.0 }}</div>
-                    {% endif %}
+                    <label class="form-label fw-medium small text-muted">Clientes *</label>
+                    <input type="hidden"
+                           name="clientes_relatorio"
+                           id="id_clientes_relatorio"
+                           value="{{ clientes_selecionados_ids|join:',' }}">
+                    <div class="border rounded-2 bg-body-tertiary px-3 py-2 d-flex align-items-center justify-content-between gap-2">
+                      <div class="min-w-0">
+                        <div class="small text-muted mb-1">
+                          <span id="clientes-relatorio-contador">{{ clientes_selecionados_ids|length }}</span>
+                          cliente(s) selecionado(s)
+                        </div>
+                        <div id="clientes-relatorio-badges" class="d-flex flex-wrap gap-1">
+                          {% for nome in clientes_selecionados_nomes %}
+                            <span class="badge rounded-pill text-bg-secondary">{{ nome }}</span>
+                          {% empty %}
+                            <span class="text-muted small">Nenhum cliente selecionado</span>
+                          {% endfor %}
+                        </div>
+                      </div>
+                      <button type="button"
+                              class="btn btn-outline-secondary btn-sm text-nowrap"
+                              data-bs-toggle="modal"
+                              data-bs-target="#modalSelecionarClientes"
+                              data-client-selector="relatorio">
+                        <i class="bi bi-people me-1"></i>Selecionar clientes
+                      </button>
+                    </div>
+                    <div class="invalid-feedback d-block small erro-clientes-relatorio"></div>
                   </div>
 
                   <div class="col-md-6">
@@ -280,6 +303,7 @@
                         <th class="px-3 py-3 fw-semibold text-muted small">Valor R$</th>
                         <th class="px-3 py-3 fw-semibold text-muted small">Quem Pagou</th>
                         <th class="px-3 py-3 fw-semibold text-muted small text-center">Comprovante</th>
+                        <th class="px-3 py-3 fw-semibold text-muted small">Clientes</th>
                         <th class="px-3 py-3" style="width: 50px;"></th>
                       </tr>
                     </thead>
@@ -296,7 +320,7 @@
                         <td class="py-2 fw-bold small">
                           R$ <span id="total-despesas">0,00</span>
                         </td>
-                        <td colspan="3"></td>
+                        <td colspan="4"></td>
                       </tr>
                     </tfoot>
                   </table>
@@ -336,6 +360,7 @@
                         <th class="px-3 py-2 fw-semibold text-muted small" style="width: 100px;">R$/KM</th>
                         <th class="px-3 py-2 fw-semibold text-muted small" style="width: 120px;">Total R$</th>
                         <th class="px-3 py-2 fw-semibold text-muted small">Obs.</th>
+                        <th class="px-3 py-2 fw-semibold text-muted small">Clientes</th>
                         <th class="px-3 py-2" style="width: 90px;">Ações</th>
                       </tr>
                     </thead>
@@ -357,7 +382,7 @@
                         <td class="py-2 fw-bold small">
                           R$ <span id="total-km-valor">0,00</span>
                         </td>
-                        <td colspan="2"></td>
+                        <td colspan="3"></td>
                       </tr>
                     </tfoot>
                   </table>
@@ -496,6 +521,64 @@
               </div>
 
               <!-- Modal importação de relatório antigo -->
+              <div class="modal fade"
+                   id="modalSelecionarClientes"
+                   tabindex="-1"
+                   aria-hidden="true">
+                <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                  <div class="modal-content border-0 shadow">
+                    <div class="modal-header bg-light">
+                      <h5 class="modal-title">
+                        <i class="bi bi-people me-2 text-primary"></i>
+                        Selecionar clientes
+                      </h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                      <div class="row g-2 align-items-end mb-3">
+                        <div class="col-12 col-md-8">
+                          <label class="form-label small text-muted">Busca</label>
+                          <div class="input-group input-group-sm">
+                            <input type="search"
+                                   class="form-control"
+                                   id="clientes-filtro-busca"
+                                   placeholder="Nome, cidade, documento...">
+                            <button type="button"
+                                    class="btn btn-outline-primary"
+                                    id="btn-limpar-busca-clientes">
+                              <i class="bi bi-x-lg"></i>
+                            </button>
+                          </div>
+                        </div>
+                        <div class="col-12 col-md-4 text-md-end">
+                          <button type="button"
+                                  class="btn btn-outline-secondary btn-sm"
+                                  id="btn-limpar-clientes-selecao">
+                            Limpar seleção
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="d-flex flex-wrap gap-2" id="clientes-opcoes">
+                        {% for cliente in clientes_importacao %}
+                          <button type="button"
+                                  class="btn btn-outline-secondary btn-sm cliente-opcao"
+                                  data-cliente-id="{{ cliente.pk }}"
+                                  data-cliente-nome="{{ cliente.nome }}"
+                                  data-cliente-search="{{ cliente.nome }} {{ cliente.cidade|default:'' }} {{ cliente.cnpj_cpf|default:'' }}">
+                            <i class="bi bi-building me-1"></i>{{ cliente.nome }}
+                          </button>
+                        {% endfor %}
+                      </div>
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                      <button type="button" class="btn btn-primary btn-sm" id="btn-confirmar-clientes">Aplicar seleção</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div class="modal fade"
                    id="modalImportarRelatorio"
                    tabindex="-1"
@@ -689,6 +772,90 @@
   const PREFIX_DESP = "despesas";
   const PREFIX_KM = "trechos";
   const VKM_PADRAO = "{{ valor_km_padrao }}";
+  let clienteSelectorTarget = null;
+
+  function idsFromValue(valor) {
+    return String(valor || "")
+      .split(",")
+      .map(v => v.trim())
+      .filter(Boolean);
+  }
+
+  function getClientesRelatorioIds() {
+    return idsFromValue(document.getElementById("id_clientes_relatorio")?.value);
+  }
+
+  function getNomeCliente(id) {
+    const btn = document.querySelector(`.cliente-opcao[data-cliente-id="${id}"]`);
+    return btn?.dataset.clienteNome || `Cliente ${id}`;
+  }
+
+  function setClientesInput(input, ids) {
+    if (!input) return;
+    input.value = Array.from(new Set(ids.map(String))).join(",");
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  function atualizarBadgesClientesRelatorio() {
+    const ids = getClientesRelatorioIds();
+    const contador = document.getElementById("clientes-relatorio-contador");
+    const badges = document.getElementById("clientes-relatorio-badges");
+    if (contador) contador.textContent = ids.length;
+    if (badges) {
+      badges.innerHTML = ids.length
+        ? ids.map(id => `<span class="badge rounded-pill text-bg-secondary">${getNomeCliente(id)}</span>`).join("")
+        : '<span class="text-muted small">Nenhum cliente selecionado</span>';
+    }
+  }
+
+  function atualizarBadgesClientesItens() {
+    const relatorioIds = getClientesRelatorioIds();
+    document.querySelectorAll(".clientes-item-input").forEach(input => {
+      if (!input.value && relatorioIds.length === 1) {
+        input.value = relatorioIds[0];
+      }
+      const ids = idsFromValue(input.value).filter(id => relatorioIds.includes(id));
+      if (ids.join(",") !== input.value) input.value = ids.join(",");
+      const td = input.closest("td");
+      const count = td?.querySelector(".clientes-item-count");
+      const label = td?.querySelector(".clientes-item-label");
+      const erro = td?.querySelector(".erro-clientes-item");
+      if (count) count.textContent = ids.length;
+      if (label) label.textContent = ids.length ? "Clientes" : "Clientes envolvidos";
+      if (erro) erro.textContent = "";
+    });
+  }
+
+  function abrirSeletorClientes(botao) {
+    clienteSelectorTarget = botao;
+    const tipo = botao?.dataset.clientSelector;
+    const input = tipo === "relatorio"
+      ? document.getElementById("id_clientes_relatorio")
+      : document.getElementById(botao?.dataset.clientTarget);
+    const permitidos = tipo === "relatorio" ? null : new Set(getClientesRelatorioIds());
+    const selecionados = new Set(idsFromValue(input?.value));
+
+    document.querySelectorAll(".cliente-opcao").forEach(opcao => {
+      const permitido = !permitidos || permitidos.has(opcao.dataset.clienteId);
+      opcao.classList.toggle("d-none", !permitido);
+      opcao.classList.toggle("btn-success", selecionados.has(opcao.dataset.clienteId));
+      opcao.classList.toggle("btn-outline-secondary", !selecionados.has(opcao.dataset.clienteId));
+    });
+  }
+
+  function aplicarSelecaoClientes() {
+    const ids = Array.from(document.querySelectorAll(".cliente-opcao.btn-success"))
+      .filter(btn => !btn.classList.contains("d-none"))
+      .map(btn => btn.dataset.clienteId);
+    const tipo = clienteSelectorTarget?.dataset.clientSelector;
+    const input = tipo === "relatorio"
+      ? document.getElementById("id_clientes_relatorio")
+      : document.getElementById(clienteSelectorTarget?.dataset.clientTarget);
+    setClientesInput(input, ids);
+    atualizarBadgesClientesRelatorio();
+    atualizarBadgesClientesItens();
+    bootstrap.Modal.getInstance(document.getElementById("modalSelecionarClientes"))?.hide();
+  }
 
   function linhaEstaRemovida(linha) {
     return (
@@ -807,6 +974,7 @@
   async function importarDespesasRelatorio(despesas) {
     for (const despesa of despesas || []) {
       const linha = await adicionarLinhaDespesa();
+      setClientesInput(linha?.querySelector(".clientes-item-input"), getClientesRelatorioIds());
       definirCampoLinha(linha, "tipo", despesa.tipo);
       definirCampoLinha(linha, "descricao", despesa.descricao);
       definirCampoLinha(linha, "valor", despesa.valor);
@@ -818,6 +986,7 @@
   async function importarTrechosRelatorio(trechos) {
     for (const trecho of trechos || []) {
       const linha = await adicionarLinhaKm();
+      setClientesInput(linha?.querySelector(".clientes-item-input"), getClientesRelatorioIds());
       definirCampoLinha(linha, "origem", trecho.origem);
       definirCampoLinha(linha, "destino", trecho.destino);
       definirCampoLinha(linha, "km", trecho.km);
@@ -832,7 +1001,9 @@
     const dados = relatorioImportacaoSelecionado;
 
     if (document.getElementById("importar-cliente")?.checked) {
-      definirValorCampo(campoPorNome("cliente"), dados.cliente_id);
+      setClientesInput(document.getElementById("id_clientes_relatorio"), [dados.cliente_id]);
+      atualizarBadgesClientesRelatorio();
+      atualizarBadgesClientesItens();
     }
     if (document.getElementById("importar-tecnico")?.checked) {
       definirValorCampo(campoPorNome("tecnico_responsavel"), dados.tecnico_id);
@@ -861,6 +1032,44 @@
 
 
   // ── Clonar linha de DESPESA ────────────────────────────────────
+  document.addEventListener("click", event => {
+    const botaoCliente = event.target.closest("[data-client-selector]");
+    if (botaoCliente) abrirSeletorClientes(botaoCliente);
+
+    const opcaoCliente = event.target.closest(".cliente-opcao");
+    if (opcaoCliente) {
+      opcaoCliente.classList.toggle("btn-success");
+      opcaoCliente.classList.toggle("btn-outline-secondary");
+    }
+  });
+
+  document.getElementById("btn-confirmar-clientes")
+    ?.addEventListener("click", aplicarSelecaoClientes);
+
+  document.getElementById("btn-limpar-clientes-selecao")
+    ?.addEventListener("click", () => {
+      document.querySelectorAll(".cliente-opcao:not(.d-none)").forEach(btn => {
+        btn.classList.remove("btn-success");
+        btn.classList.add("btn-outline-secondary");
+      });
+    });
+
+  document.getElementById("btn-limpar-busca-clientes")
+    ?.addEventListener("click", () => {
+      const busca = document.getElementById("clientes-filtro-busca");
+      if (busca) busca.value = "";
+      document.querySelectorAll(".cliente-opcao").forEach(btn => btn.classList.remove("d-none"));
+    });
+
+  document.getElementById("clientes-filtro-busca")
+    ?.addEventListener("input", event => {
+      const termo = event.target.value.toLowerCase();
+      document.querySelectorAll(".cliente-opcao").forEach(btn => {
+        const texto = (btn.dataset.clienteSearch || "").toLowerCase();
+        btn.classList.toggle("d-none", termo && !texto.includes(termo));
+      });
+    });
+
   console.log("clicou no adicionar despesa");
   async function adicionarLinhaDespesa() {
   const idx = _idxDesp;
@@ -881,6 +1090,7 @@
 
     _idxDesp++;
     atualizarTotalForms(PREFIX_DESP, _idxDesp);
+    atualizarBadgesClientesItens();
     recalcular();
     atualizarBadgesAbas();
     return novaLinha;
@@ -927,6 +1137,7 @@ async function adicionarLinhaKm() {
 
     _idxKm++;
     atualizarTotalForms(PREFIX_KM, _idxKm);
+    atualizarBadgesClientesItens();
     recalcular();
     atualizarBadgesAbas();
     return novaLinha;
@@ -1129,6 +1340,8 @@ function validarKmGlobal() {
         // Recalcula ao mudar adiantamento
         document.querySelector("[name='valor_adiantamento']")
           ?.addEventListener("input", recalcular);
+        atualizarBadgesClientesRelatorio();
+        atualizarBadgesClientesItens();
         // Recalcular ao carregar (edição)
         recalcular();
         // Recalcular totais de trechos existentes ao editar
@@ -1169,6 +1382,8 @@ document.addEventListener("blur", function (e) {
 }, true);
   // Inicialização imediata (sem Alpine em modo não-defer)
   document.addEventListener("DOMContentLoaded", () => {
+    atualizarBadgesClientesRelatorio();
+    atualizarBadgesClientesItens();
     recalcular();
     const modalImportacao = document.getElementById("modalImportarRelatorio");
     modalImportacao?.addEventListener("shown.bs.modal", buscarRelatoriosImportacao);
@@ -1189,6 +1404,32 @@ document.addEventListener("blur", function (e) {
         if (!botao) return;
         selecionarRelatorioImportacao(botao.dataset.importarRelatorio);
       });
+    document.getElementById("form-relatorio")?.addEventListener("submit", event => {
+      let invalido = false;
+      const clientesRelatorio = getClientesRelatorioIds();
+      const erroRelatorio = document.querySelector(".erro-clientes-relatorio");
+      if (erroRelatorio) erroRelatorio.textContent = "";
+      if (!clientesRelatorio.length) {
+        invalido = true;
+        if (erroRelatorio) erroRelatorio.textContent = "Selecione ao menos um cliente.";
+      }
+      document.querySelectorAll(".linha-despesa, .linha-trecho").forEach(linha => {
+        if (linhaEstaRemovida(linha) || !linhaTemConteudo(linha)) return;
+        const input = linha.querySelector(".clientes-item-input");
+        const erro = linha.querySelector(".erro-clientes-item");
+        if (erro) erro.textContent = "";
+        if (!idsFromValue(input?.value).length) {
+          invalido = true;
+          if (erro) erro.textContent = "Selecione o cliente.";
+        }
+      });
+      if (invalido) {
+        event.preventDefault();
+        window.ErpOperationalErrors?.show("Não foi possível salvar o relatório.", [
+          "Selecione os clientes do relatório e dos itens preenchidos."
+        ]);
+      }
+    });
     document.querySelectorAll("form[method='post']").forEach(form => {
       form.addEventListener("submit", () => {
         form.querySelectorAll("button[type='submit']").forEach(button => {
