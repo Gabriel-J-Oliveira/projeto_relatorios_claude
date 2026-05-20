@@ -170,21 +170,50 @@
           <dd class="col-sm-8 fw-semibold">{{ relatorio.identificador }}</dd>
 
           <dt class="col-sm-4 text-muted fw-medium">Cliente</dt>
-          <dd class="col-sm-8">{{ relatorio.cliente.nome }}</dd>
-
-          <dt class="col-sm-4 text-muted fw-medium">Técnico Responsável</dt>
-          <dd class="col-sm-8">{{ relatorio.tecnico_responsavel.nome }}</dd>
-
-          {% if relatorio.equipe.exists %}
-          <dt class="col-sm-4 text-muted fw-medium">Equipe</dt>
           <dd class="col-sm-8">
-            {% for membro in relatorio.equipe.all %}
-            <span class="badge bg-secondary-subtle text-secondary me-1">
-              {{ membro.tecnico.nome }} ({{ membro.get_papel_display }})
-            </span>
-            {% endfor %}
+            {% with cliente_principal=relatorio.cliente_principal_exibicao clientes_secundarios=relatorio.clientes_secundarios_exibicao %}
+              {% if cliente_principal %}
+              <span class="fw-medium">{{ cliente_principal.nome }}</span>
+              {% if clientes_secundarios %}
+              <span class="badge bg-primary rounded-pill ms-1"
+                    role="button"
+                    tabindex="0"
+                    data-bs-toggle="popover"
+                    data-bs-trigger="hover focus click"
+                    data-bs-html="true"
+                    data-bs-title="Clientes do relatório"
+                    data-bs-content="<div class='popover-lista-vinculos'><div>{{ cliente_principal.nome }}</div>{% for cliente in clientes_secundarios %}<div>{{ cliente.nome }}</div>{% endfor %}</div>">
+                +{{ clientes_secundarios|length }}
+              </span>
+              {% endif %}
+              {% else %}
+              <span class="text-muted">Não informado</span>
+              {% endif %}
+            {% endwith %}
           </dd>
-          {% endif %}
+
+          <dt class="col-sm-4 text-muted fw-medium">Técnicos</dt>
+          <dd class="col-sm-8">
+            {% with tecnico_principal=relatorio.tecnico_principal_exibicao tecnicos_secundarios=relatorio.tecnicos_secundarios_exibicao %}
+              {% if tecnico_principal %}
+              <span class="fw-medium">{{ tecnico_principal.nome }}</span>
+              {% if tecnicos_secundarios %}
+              <span class="badge bg-primary rounded-pill ms-1"
+                    role="button"
+                    tabindex="0"
+                    data-bs-toggle="popover"
+                    data-bs-trigger="hover focus click"
+                    data-bs-html="true"
+                    data-bs-title="Técnicos do relatório"
+                    data-bs-content="<div class='popover-lista-vinculos'><div>{{ tecnico_principal.nome }}</div>{% for tecnico in tecnicos_secundarios %}<div>{{ tecnico.nome }}</div>{% endfor %}</div>">
+                +{{ tecnicos_secundarios|length }}
+              </span>
+              {% endif %}
+              {% else %}
+              <span class="text-muted">Não informado</span>
+              {% endif %}
+            {% endwith %}
+          </dd>
 
           <dt class="col-sm-4 text-muted fw-medium">Local</dt>
           <dd class="col-sm-8">
@@ -234,23 +263,20 @@
           <table class="table table-sm table-hover align-middle mb-0">
             <thead class="table-light">
               <tr>
-                <th class="ps-3 small fw-semibold text-muted d-none d-xxl-table-cell">Data</th>
+                <th class="ps-3 small fw-semibold text-muted">Data</th>
                 <th class="small fw-semibold text-muted">Tipo</th>
                 <th class="small fw-semibold text-muted">Descrição</th>
                 <th class="small fw-semibold text-muted">Valor Solicitado</th>
                 <th class="small fw-semibold text-muted">Valor Aprovado</th>
-                <th class="small fw-semibold text-muted d-none d-xxl-table-cell">Pago por</th>
-                <th class="small fw-semibold text-muted d-none d-xxl-table-cell">C. Custo</th>
-                <th class="small fw-semibold text-muted text-center d-none d-xxl-table-cell">Doc.</th>
                 <th class="small fw-semibold text-muted text-center">Rateio</th>
-                <th class="small fw-semibold text-muted text-end pe-3">Ação</th>
+                <th class="small fw-semibold text-muted text-end pe-3">Mais informações</th>
               </tr>
             </thead>
             <tbody>
               {% for d in relatorio.despesas.all %}
               <tr id="linha-despesa-{{ forloop.counter }}"
                   class="linha-despesa {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}table-danger opacity-75{% endif %}">
-                <td class="ps-3 small text-muted d-none d-xxl-table-cell">{{ d.data|date:"d/m/Y"|default:"A preencher" }}</td>
+                <td class="ps-3 small text-muted">{{ d.data|date:"d/m/Y"|default:"A preencher" }}</td>
                 <td>
                   <span class="badge bg-body-tertiary text-body-secondary small">
                     {{ d.get_tipo_display }}
@@ -263,11 +289,6 @@
                 </td>
                 <td class="small">
                   {{ d.descricao }}
-                  {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
-                    {% if d.motivo_rejeicao or d.motivo_recusa %}
-                    <div class="text-danger small mt-1">{{ d.motivo_rejeicao|default:d.motivo_recusa }}</div>
-                    {% endif %}
-                  {% endif %}
                 </td>
                 <td class="small fw-semibold">R$ {{ d.valor|floatformat:2 }}</td>
                 <td>
@@ -281,23 +302,6 @@
                          data-status-financeiro="{% if d.rejeitado %}rejeitado{% else %}{{ d.status_financeiro }}{% endif %}"
                          {% if not superadmin_django %}{% if not pode_atuar_financeiro or relatorio.status == 'aprovado' or relatorio.status == 'rejeitado' or d.rejeitado or d.status_financeiro == 'rejeitado' %}disabled{% endif %}{% endif %}>
                   <div class="small text-muted mt-1">Final: <span class="total-aprovado-despesa-linha">R$ {{ d.valor_final|floatformat:2 }}</span></div>
-                </td>
-                <td class="small d-none d-xxl-table-cell">
-                  {% if d.quem_pagou == 'tecnico' %}
-                  <span class="badge bg-primary-subtle text-primary">Técnico</span>
-                  {% else %}
-                  <span class="badge bg-secondary-subtle text-secondary">Empresa</span>
-                  {% endif %}
-                </td>
-                <td class="small text-muted d-none d-xxl-table-cell">{{ relatorio.centro_custo|default:"—" }}</td>
-                <td class="text-center d-none d-xxl-table-cell">
-                  {% if d.comprovante %}
-                  <a href="{{ d.comprovante.url }}" target="_blank" class="btn btn-sm btn-outline-success px-1 py-0">
-                    <i class="bi bi-file-earmark-check small"></i>
-                  </a>
-                  {% else %}
-                  <span class="text-muted small">—</span>
-                  {% endif %}
                 </td>
                 <td class="text-center">
                   <button type="button"
@@ -313,40 +317,68 @@
                 </td>
                 <td class="text-end pe-3">
                   <button type="button"
-                          class="btn btn-sm btn-outline-secondary me-1"
+                          class="btn btn-sm btn-outline-secondary"
                           data-bs-toggle="collapse"
                           data-bs-target="#detalhes-despesa-{{ d.pk }}"
                           title="Ver detalhes">
-                    <i class="bi bi-list-ul"></i>
+                    <i class="bi bi-list-ul me-1"></i>Mais informações
                   </button>
-                  {% if pode_alterar_itens_financeiros %}
-                    {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
-                    <button type="submit"
-                            form="form-restaurar-despesa-{{ d.pk }}"
-                            class="btn btn-sm btn-primary">
-                      <i class="bi bi-arrow-counterclockwise me-1"></i>Reativar item
-                    </button>
-                    {% else %}
-                    <button type="button"
-                            class="btn btn-sm btn-outline-danger"
-                            data-bs-toggle="modal"
-                            data-bs-target="#modal-rejeitar-despesa-{{ d.pk }}">
-                      <i class="bi bi-x-circle me-1"></i>Rejeitar item
-                    </button>
-                    {% endif %}
-                  {% else %}
-                  <span class="text-muted small">—</span>
-                  {% endif %}
                 </td>
               </tr>
               <tr class="collapse bg-body-tertiary" id="detalhes-despesa-{{ d.pk }}">
-                <td colspan="10" class="px-3 py-3">
+                <td colspan="7" class="px-3 py-3">
                   <div class="row g-3 small">
-                    <div class="col-md-2"><span class="text-muted">Data</span><div class="fw-semibold">{{ d.data|date:"d/m/Y"|default:"A preencher" }}</div></div>
-                    <div class="col-md-2"><span class="text-muted">Pago por</span><div class="fw-semibold">{{ d.get_quem_pagou_display }}</div></div>
+                    <div class="col-md-2">
+                      <span class="text-muted">Pago por</span>
+                      <div class="fw-semibold">{{ d.get_quem_pagou_display }}</div>
+                    </div>
                     <div class="col-md-2"><span class="text-muted">Centro de custo</span><div class="fw-semibold">{{ relatorio.centro_custo|default:"?" }}</div></div>
-                    <div class="col-md-3"><span class="text-muted">Valor final</span><div class="fw-semibold text-success">R$ {{ d.valor_final|floatformat:2 }}</div></div>
-                    <div class="col-md-3"><span class="text-muted">Documento</span><div>{% if d.comprovante %}<a href="{{ d.comprovante.url }}" target="_blank" class="btn btn-sm btn-outline-success">Abrir comprovante</a>{% else %}<span class="text-muted">Sem comprovante</span>{% endif %}</div></div>
+                    <div class="col-md-2">
+                      <span class="text-muted">Valor final</span>
+                      <div class="fw-semibold text-success total-aprovado-despesa-linha">R$ {{ d.valor_final|floatformat:2 }}</div>
+                    </div>
+                    <div class="col-md-2">
+                      <span class="text-muted">Documento</span>
+                      <div>{% if d.comprovante %}<a href="{{ d.comprovante.url }}" target="_blank" class="btn btn-sm btn-outline-success">Abrir comprovante</a>{% else %}<span class="text-muted">Sem comprovante</span>{% endif %}</div>
+                    </div>
+                    <div class="col-md-2">
+                      <span class="text-muted">Status</span>
+                      <div>
+                        {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
+                        <span class="badge bg-danger-subtle text-danger small">REJEITADO</span>
+                        {% elif d.valor_ajustado %}
+                        <span class="badge bg-warning-subtle text-warning small">Valor ajustado</span>
+                        {% else %}
+                        <span class="badge bg-success-subtle text-success small">Ativo</span>
+                        {% endif %}
+                      </div>
+                    </div>
+                    <div class="col-md-2 text-md-end">
+                      {% if pode_alterar_itens_financeiros %}
+                        {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
+                        <button type="submit"
+                                form="form-restaurar-despesa-{{ d.pk }}"
+                                class="btn btn-sm btn-primary">
+                          <i class="bi bi-arrow-counterclockwise me-1"></i>Reativar item
+                        </button>
+                        {% else %}
+                        <button type="button"
+                                class="btn btn-sm btn-outline-danger"
+                                data-bs-toggle="modal"
+                                data-bs-target="#modal-rejeitar-despesa-{{ d.pk }}">
+                          <i class="bi bi-x-circle me-1"></i>Remover do reembolso
+                        </button>
+                        {% endif %}
+                      {% endif %}
+                    </div>
+                    {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
+                    {% if d.motivo_rejeicao or d.motivo_recusa %}
+                    <div class="col-12">
+                      <span class="text-muted">Motivo da remoção</span>
+                      <div class="text-danger fw-semibold">{{ d.motivo_rejeicao|default:d.motivo_recusa }}</div>
+                    </div>
+                    {% endif %}
+                    {% endif %}
                   </div>
                 </td>
               </tr>
@@ -359,7 +391,7 @@
                   R$ {{ relatorio.total_despesas_tecnico|add:relatorio.total_despesas_empresa|floatformat:2 }}
                 </td>
                 <td class="small fw-bold text-success" id="total-aprovado-despesas">R$ {{ relatorio.total_aprovado_despesas|floatformat:2 }}</td>
-                <td colspan="5"></td>
+                <td colspan="2"></td>
               </tr>
             </tfoot>
           </table>
@@ -460,6 +492,12 @@
                       <div class="fw-semibold">{{ t.destino }}</div>
                     </div>
                     <div class="col-md-2">
+                      <span class="text-muted">Pago por</span>
+                      <div class="fw-semibold">
+                        <span class="badge bg-primary-subtle text-primary">Técnico</span>
+                      </div>
+                    </div>
+                    <div class="col-md-2">
                       <span class="text-muted">Total aprovado</span>
                       <div class="fw-semibold text-success total-aprovado-km-linha">R$ {{ t.valor_final|floatformat:2 }}</div>
                     </div>
@@ -475,7 +513,7 @@
                         {% endif %}
                       </div>
                     </div>
-                    <div class="col-md-4 text-md-end">
+                    <div class="col-md-2 text-md-end">
                       {% if pode_alterar_itens_financeiros %}
                         {% if t.rejeitado or t.status_financeiro == 'rejeitado' %}
                         <button type="submit"
@@ -1031,6 +1069,12 @@
     flex: 0 0 auto;
   }
 
+  .popover-lista-vinculos {
+    display: grid;
+    gap: .35rem;
+    min-width: min(320px, calc(100vw - 2rem));
+  }
+
   @keyframes destaqueFinanceiro {
     0% { background-color: rgba(255, 193, 7, .32); }
     100% { background-color: transparent; }
@@ -1086,8 +1130,11 @@
         const valor = inputFinanceiroAtivo(input) ? valorAprovadoInput(input, original) : 0;
         totalDespesas += valor;
         const linha = input.closest("tr");
-        const destino = linha?.querySelector(".total-aprovado-despesa-linha");
-        if (destino) destino.textContent = formatMoney(valor);
+        const destinos = [
+          ...Array.from(linha?.querySelectorAll(".total-aprovado-despesa-linha") || []),
+          ...Array.from(linha?.nextElementSibling?.querySelectorAll(".total-aprovado-despesa-linha") || []),
+        ];
+        destinos.forEach(destino => destino.textContent = formatMoney(valor));
       });
 
       document.querySelectorAll(".campo-aprovado-km").forEach(function (input) {

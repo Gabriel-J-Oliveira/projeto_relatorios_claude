@@ -93,10 +93,44 @@
               </a>
             </td>
             <td>
-              <div class="small fw-medium">{{ r.cliente.nome }}</div>
+              {% with cliente_principal=r.cliente_principal_exibicao clientes_secundarios=r.clientes_secundarios_exibicao %}
+              <div class="small fw-medium text-nowrap">
+                {{ cliente_principal.nome|default:"Não informado" }}
+                {% if clientes_secundarios %}
+                <span class="badge bg-primary rounded-pill ms-1"
+                      role="button"
+                      tabindex="0"
+                      data-bs-toggle="popover"
+                      data-bs-trigger="hover focus click"
+                      data-bs-html="true"
+                      data-bs-title="Clientes do relatório"
+                      data-bs-content="<div class='popover-lista-vinculos'><div>{{ cliente_principal.nome }}</div>{% for cliente in clientes_secundarios %}<div>{{ cliente.nome }}</div>{% endfor %}</div>">
+                  +{{ clientes_secundarios|length }}
+                </span>
+                {% endif %}
+              </div>
+              {% endwith %}
               <div class="text-muted" style="font-size:.78rem;">{{ r.cidade_atendimento }}</div>
             </td>
-            <td class="small">{{ r.tecnico_responsavel.nome }}</td>
+            <td class="small">
+              {% with tecnico_principal=r.tecnico_principal_exibicao tecnicos_secundarios=r.tecnicos_secundarios_exibicao %}
+              <span class="fw-medium text-nowrap">
+                {{ tecnico_principal.nome|default:"Não informado" }}
+                {% if tecnicos_secundarios %}
+                <span class="badge bg-primary rounded-pill ms-1"
+                      role="button"
+                      tabindex="0"
+                      data-bs-toggle="popover"
+                      data-bs-trigger="hover focus click"
+                      data-bs-html="true"
+                      data-bs-title="Técnicos do relatório"
+                      data-bs-content="<div class='popover-lista-vinculos'><div>{{ tecnico_principal.nome }}</div>{% for tecnico in tecnicos_secundarios %}<div>{{ tecnico.nome }}</div>{% endfor %}</div>">
+                  +{{ tecnicos_secundarios|length }}
+                </span>
+                {% endif %}
+              </span>
+              {% endwith %}
+            </td>
             <td class="small text-muted">
               {{ r.data_inicio|date:"d/m/Y" }}
               {% if r.data_inicio != r.data_fim %} a {{ r.data_fim|date:"d/m/Y" }}{% endif %}
@@ -182,5 +216,29 @@
     {% endif %}
   </div>
 </div>
+
+<style>
+  .popover.rateio-popover {
+    --bs-popover-max-width: 380px;
+  }
+
+  .popover-lista-vinculos {
+    display: grid;
+    gap: .35rem;
+    min-width: min(320px, calc(100vw - 2rem));
+  }
+</style>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll('[data-bs-toggle="popover"]').forEach(function (el) {
+      new bootstrap.Popover(el, {
+        sanitize: false,
+        placement: "left",
+        customClass: "rateio-popover",
+      });
+    });
+  });
+</script>
 
 {% endblock %}

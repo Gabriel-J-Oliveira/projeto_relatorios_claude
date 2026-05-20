@@ -402,6 +402,65 @@ class RelatorioTecnico(models.Model):
     def tem_multiplos_clientes(self):
         return self.clientes_relacionados().count() > 1
 
+    def clientes_exibicao(self):
+        prefetched = getattr(self, "_prefetched_objects_cache", {})
+        if "clientes_vinculados" in prefetched:
+            vinculos = sorted(
+                prefetched["clientes_vinculados"],
+                key=lambda vinculo: (vinculo.ordem, vinculo.cliente.nome),
+            )
+        else:
+            vinculos = list(
+                self.clientes_vinculados.select_related("cliente").order_by(
+                    "ordem", "cliente__nome"
+                )
+            )
+        clientes = [vinculo.cliente for vinculo in vinculos]
+        if not clientes and self.cliente_id:
+            clientes = [self.cliente]
+        return clientes
+
+    def cliente_principal_exibicao(self):
+        clientes = self.clientes_exibicao()
+        return clientes[0] if clientes else None
+
+    def clientes_secundarios_exibicao(self):
+        return self.clientes_exibicao()[1:]
+
+    def clientes_total_exibicao(self):
+        return len(self.clientes_exibicao())
+
+    def tecnicos_exibicao(self):
+        tecnicos = []
+        vistos = set()
+        if self.tecnico_responsavel_id:
+            tecnicos.append(self.tecnico_responsavel)
+            vistos.add(self.tecnico_responsavel_id)
+        prefetched = getattr(self, "_prefetched_objects_cache", {})
+        if "equipe" in prefetched:
+            equipe = sorted(
+                prefetched["equipe"],
+                key=lambda membro: membro.tecnico.nome,
+            )
+        else:
+            equipe = self.equipe.select_related("tecnico").order_by("tecnico__nome")
+        for membro in equipe:
+            if membro.tecnico_id in vistos:
+                continue
+            vistos.add(membro.tecnico_id)
+            tecnicos.append(membro.tecnico)
+        return tecnicos
+
+    def tecnico_principal_exibicao(self):
+        tecnicos = self.tecnicos_exibicao()
+        return tecnicos[0] if tecnicos else None
+
+    def tecnicos_secundarios_exibicao(self):
+        return self.tecnicos_exibicao()[1:]
+
+    def tecnicos_total_exibicao(self):
+        return len(self.tecnicos_exibicao())
+
     # ── Financeiro ──────────────────────────────────────────────
 
     @property

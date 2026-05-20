@@ -736,7 +736,12 @@ class RelatorioListView(AcessoErpMixin, ListView):
     def get_queryset(self):
         qs = _relatorios_visiveis(
             self.request.user,
-            RelatorioTecnico.objects.select_related("cliente", "tecnico_responsavel"),
+            RelatorioTecnico.objects.select_related(
+                "cliente", "tecnico_responsavel"
+            ).prefetch_related(
+                "clientes_vinculados__cliente",
+                "equipe__tecnico",
+            ),
         )
         form = _relatorio_filtro_form(self.request.user, self.request.GET)
         if form.is_valid():
