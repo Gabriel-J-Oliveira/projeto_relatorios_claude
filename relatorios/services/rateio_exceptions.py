@@ -1,0 +1,2 @@
+class RateioError(Exception):
+    pass

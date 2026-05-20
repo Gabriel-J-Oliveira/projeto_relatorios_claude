@@ -76,7 +76,10 @@
     {% if form.valor_km.errors %}{{ form.valor_km.errors.0 }}{% endif %}
   </div>
 </td>
-  <td class="p-1 px-3 pt-4 fw-bold small total-trecho text-start">R$ 0,00</td>
+  <td class="p-1 px-3 pt-4 fw-bold small total-trecho text-start">
+    R$ 0,00
+    <div class="text-warning fw-normal small aviso-km-multicliente"></div>
+  </td>
   <td class="p-1 pt-3">
     <input type="text"
            name="trechos-{{ idx }}-observacao"

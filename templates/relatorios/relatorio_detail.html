@@ -443,10 +443,15 @@
                          class="form-control form-control-sm campo-aprovado-km"
                          data-km="{{ t.km }}"
                          data-valor-km-original="{{ t.valor_km }}"
+                         data-valor-final-original="{{ t.valor_final_clientes|unlocalize }}"
+                         data-multi-cliente="{% if t.tem_multiplos_clientes %}1{% else %}0{% endif %}"
                          data-status-financeiro="{% if t.rejeitado %}rejeitado{% else %}{{ t.status_financeiro }}{% endif %}"
-                         {% if not superadmin_django %}{% if not pode_atuar_financeiro or relatorio.status == 'aprovado' or relatorio.status == 'rejeitado' or t.rejeitado or t.status_financeiro == 'rejeitado' %}disabled{% endif %}{% endif %}>
+                         {% if t.tem_multiplos_clientes %}disabled title="KM calculado automaticamente por cliente"{% elif not superadmin_django %}{% if not pode_atuar_financeiro or relatorio.status == 'aprovado' or relatorio.status == 'rejeitado' or t.rejeitado or t.status_financeiro == 'rejeitado' %}disabled{% endif %}{% endif %}>
+                  {% if t.tem_multiplos_clientes %}
+                  <div class="small text-warning mt-1">Auto por cliente</div>
+                  {% endif %}
                 </td>
-                <td class="small fw-semibold text-success">R$ {{ t.valor_calculado|floatformat:2 }}</td>
+                <td class="small fw-semibold text-success">R$ {{ t.valor_calculado_clientes|floatformat:2 }}</td>
                 <td class="text-center">
                   {% if t.comprovante %}
                   <a href="{{ t.comprovante.url }}" target="_blank" class="btn btn-sm btn-outline-success rounded-circle px-2 py-1" title="Abrir anexo">
@@ -464,8 +469,8 @@
                           data-bs-toggle="popover"
                           data-bs-trigger="hover focus"
                           data-bs-html="true"
-                          data-bs-title="Rateio do trecho KM"
-                          data-bs-content="{% for r in t.rateios.all %}<div class='rateio-popover-row'><span class='rateio-popover-cliente'>{{ r.cliente.nome }}</span><strong class='rateio-popover-valor'>R$ {{ r.valor_rateado|floatformat:2 }}</strong></div>{% empty %}<span class='text-muted'>Rateio nao gerado.</span>{% endfor %}"
+                          data-bs-title="Cálculo de KM por cliente"
+                          data-bs-content="{% for r in t.rateios.all %}<div class='rateio-popover-row'><span class='rateio-popover-cliente'>{{ r.cliente.nome }}</span><strong class='rateio-popover-valor'>R$ {{ r.valor_final|floatformat:2 }}</strong></div>{% empty %}<span class='text-muted'>Cálculo não gerado.</span>{% endfor %}"
                           data-rateio-modal="#modal-rateio-trecho-{{ t.pk }}">
                     <i class="bi bi-info-lg"></i>
                   </button>
@@ -499,7 +504,7 @@
                     </div>
                     <div class="col-md-2">
                       <span class="text-muted">Total aprovado</span>
-                      <div class="fw-semibold text-success total-aprovado-km-linha">R$ {{ t.valor_final|floatformat:2 }}</div>
+                      <div class="fw-semibold text-success total-aprovado-km-linha">R$ {{ t.valor_final_clientes|floatformat:2 }}</div>
                     </div>
                     <div class="col-md-2">
                       <span class="text-muted">Status</span>
@@ -803,15 +808,14 @@
      aria-hidden="true"
      data-rateio-tipo="trecho"
      data-rateio-item="{{ t.pk }}"
-     data-rateio-total="{{ t.valor_final|unlocalize }}"
-     data-rateio-km="{% if t.rejeitado or t.status_financeiro == 'rejeitado' %}0{% else %}{{ t.km|unlocalize }}{% endif %}"
+     data-rateio-total="{{ t.valor_final_clientes|unlocalize }}"
      data-rateio-url="{% url 'relatorios:relatorio_rateio_financeiro' relatorio.pk 'trecho' t.pk %}">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content border-0 shadow">
       <div class="modal-header bg-light">
         <div>
           <h5 class="modal-title mb-1">
-            <i class="bi bi-diagram-3 me-2 text-primary"></i>Rateio do trecho KM
+            <i class="bi bi-diagram-3 me-2 text-primary"></i>Cálculo de KM por cliente
           </h5>
           <div class="small text-muted">{{ t.origem }} → {{ t.destino }} — {{ t.km }} km</div>
         </div>
@@ -819,8 +823,8 @@
       </div>
       <div class="modal-body">
         <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-          <span class="badge text-bg-secondary">Total R$ {{ t.valor_final|floatformat:2 }}</span>
-          <span class="badge text-bg-info">Rateio por cliente</span>
+          <span class="badge text-bg-secondary">Total R$ {{ t.valor_final_clientes|floatformat:2 }}</span>
+          <span class="badge text-bg-info">KM por cliente</span>
         </div>
         <div class="table-responsive border rounded">
           <table class="table table-sm align-middle mb-0">
@@ -837,23 +841,16 @@
               {% for r in t.rateios.all %}
               <tr>
                 <td class="small">{{ r.cliente.nome }}</td>
-                <td class="small text-muted">{{ r.km_original|floatformat:1 }} km</td>
-                <td>
-                  <input type="number"
-                         step="0.1"
-                         class="form-control form-control-sm rateio-km"
-                         data-cliente-id="{{ r.cliente_id }}"
-                         data-original="{{ r.km_final|unlocalize }}"
-                         value="{{ r.km_final|unlocalize }}"
-                         {% if not pode_alterar_itens_financeiros or t.rejeitado or t.status_financeiro == 'rejeitado' %}disabled{% endif %}>
-                </td>
+                <td class="small text-muted">{{ r.km_cliente|floatformat:1 }} km</td>
+                <td class="small text-muted">R$ {{ r.valor_km|floatformat:4 }}</td>
+                <td class="small fw-semibold">R$ {{ r.valor_calculado|floatformat:2 }}</td>
                 <td>
                   <input type="number"
                          step="0.01"
                          class="form-control form-control-sm rateio-valor"
                          data-cliente-id="{{ r.cliente_id }}"
-                         data-original="{{ r.valor_rateado|unlocalize }}"
-                         value="{{ r.valor_rateado|unlocalize }}"
+                         data-original="{{ r.valor_final|unlocalize }}"
+                         value="{{ r.valor_final|unlocalize }}"
                          {% if not pode_alterar_itens_financeiros or t.rejeitado or t.status_financeiro == 'rejeitado' %}disabled{% endif %}>
                 </td>
                 <td><span class="badge text-bg-light">{{ r.get_status_display }}</span></td>
@@ -1138,6 +1135,14 @@
       });
 
       document.querySelectorAll(".campo-aprovado-km").forEach(function (input) {
+        if (input.dataset.multiCliente === "1") {
+          const valorFinalMulti = parseMoney(input.dataset.valorFinalOriginal);
+          totalKm += valorFinalMulti;
+          const detalheId = input.closest("tr")?.nextElementSibling?.id;
+          const destino = detalheId ? document.querySelector(`#${detalheId} .total-aprovado-km-linha`) : null;
+          if (destino) destino.textContent = formatMoney(valorFinalMulti);
+          return;
+        }
         const km = parseMoney(input.dataset.km);
         const valorKmOriginal = parseMoney(input.dataset.valorKmOriginal);
         const valorKmAprovado = inputFinanceiroAtivo(input)
@@ -1181,6 +1186,7 @@
 
     function validarRateioModal(modal) {
       const total = parseMoney(modal.dataset.rateioTotal);
+      const tipo = modal.dataset.rateioTipo;
       const valores = Array.from(modal.querySelectorAll(".rateio-valor"));
       const kms = Array.from(modal.querySelectorAll(".rateio-km"));
       const feedback = modal.querySelector(".rateio-feedback");
@@ -1199,14 +1205,16 @@
       const alterado = alteradoValor || alteradoKm;
       const motivo = modal.querySelector(".rateio-motivo");
       const motivoOk = !alterado || String(motivo?.value || "").trim().length > 0;
-      const somaOk = Math.abs(diferenca) < 0.009;
+      const somaOk = tipo === "trecho" || Math.abs(diferenca) < 0.009;
       const kmOk = !kms.length || Math.abs(diferencaKm) < 0.09;
       const ok = somaOk && kmOk && motivoOk;
 
       if (feedback) {
         if (ok) {
           feedback.className = "rateio-feedback small mt-3 text-success";
-          feedback.textContent = `Rateio fechado em ${formatMoney(soma)}.`;
+          feedback.textContent = tipo === "trecho"
+            ? `Total final de KM em ${formatMoney(soma)}.`
+            : `Rateio fechado em ${formatMoney(soma)}.`;
         } else if (!somaOk) {
           feedback.className = "rateio-feedback small mt-3 text-danger";
           feedback.textContent = diferenca > 0
@@ -1252,8 +1260,7 @@
               if (tipo === "despesa") {
                 item.valor_final = valor.value;
               } else {
-                item.km_final = km.value;
-                item.valor_rateado = valor.value;
+                item.valor_final = valor.value;
               }
               return item;
             }),

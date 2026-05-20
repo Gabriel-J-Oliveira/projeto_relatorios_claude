@@ -1057,7 +1057,37 @@
       if (count) count.textContent = ids.length;
       if (label) label.textContent = ids.length ? "Clientes" : "Clientes envolvidos";
       if (erro) erro.textContent = "";
+      atualizarEstadoKmMultiCliente(input.closest("tr"));
     });
+  }
+
+  function trechoTemMultiplosClientes(linha) {
+    const input = linha?.querySelector(".clientes-item-input");
+    return idsFromValue(input?.value).length > 1;
+  }
+
+  function atualizarEstadoKmMultiCliente(linha) {
+    if (!linha?.classList.contains("linha-trecho")) return;
+    const multi = trechoTemMultiplosClientes(linha);
+    const campoValorKm = linha.querySelector(".campo-vkm");
+    const total = linha.querySelector(".total-trecho");
+    const aviso = linha.querySelector(".aviso-km-multicliente");
+    if (campoValorKm) {
+      campoValorKm.readOnly = multi;
+      campoValorKm.title = multi
+        ? "Valores de KM serão calculados automaticamente por cliente após envio do relatório."
+        : "";
+    }
+    if (aviso) {
+      aviso.textContent = multi
+        ? "Valores de KM serão calculados automaticamente por cliente após envio do relatório."
+        : "";
+    }
+    if (multi && total) {
+      total.childNodes[0].textContent = "Por cliente";
+    } else if (campoValorKm) {
+      calcularTrechoKm(campoValorKm);
+    }
   }
 
   function abrirSeletorClientes(botao) {
@@ -1515,6 +1545,10 @@ async function adicionarLinhaKm() {
   // ── Cálculo do total de cada trecho KM ───────────────────────
   function calcularTrechoKm(input) {
     const tr = input.closest("tr");
+    if (trechoTemMultiplosClientes(tr)) {
+      atualizarEstadoKmMultiCliente(tr);
+      return;
+    }
     const km = normalizarNumero(tr.querySelector(".campo-km")?.value);
     const vkm = normalizarNumero(tr.querySelector(".campo-vkm")?.value);
     const cel = tr.querySelector(".total-trecho");
@@ -1541,7 +1575,9 @@ async function adicionarLinhaKm() {
       const km = normalizarNumero(tr.querySelector(".campo-km")?.value);
       const vkm = normalizarNumero(tr.querySelector(".campo-vkm")?.value);
       totalKmKm += km;
-      totalKmPx += km * vkm;
+      if (!trechoTemMultiplosClientes(tr)) {
+        totalKmPx += km * vkm;
+      }
     });
 
     const totalGeral = totalTec + totalEmp + totalKmPx;

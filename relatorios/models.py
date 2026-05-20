@@ -479,9 +479,16 @@ class RelatorioTecnico(models.Model):
 
     @property
     def total_km(self):
-        total = self.trechos.aggregate(t=models.Sum("valor_calculado"))["t"] or Decimal(
-            "0.00"
-        )
+        total = Decimal("0.00")
+        for trecho in self.trechos.all():
+            calculos = list(trecho.rateios.all())
+            if calculos:
+                total += sum(
+                    (calculo.valor_calculado for calculo in calculos),
+                    Decimal("0.00"),
+                )
+            else:
+                total += trecho.valor_calculado or Decimal("0.00")
         return _valor_monetario(total)
 
     @property
@@ -504,10 +511,16 @@ class RelatorioTecnico(models.Model):
 
     @property
     def total_aprovado_km(self):
-        total = sum(
-            (trecho.valor_final for trecho in self.trechos.all()),
-            Decimal("0.00"),
-        )
+        total = Decimal("0.00")
+        for trecho in self.trechos.all():
+            calculos = list(trecho.rateios.all())
+            if calculos:
+                total += sum(
+                    (calculo.valor_final for calculo in calculos),
+                    Decimal("0.00"),
+                )
+            else:
+                total += trecho.valor_final
         return _valor_monetario(total)
 
     @property
@@ -957,6 +970,32 @@ class TrechoKm(models.Model):
         return _valor_monetario(self.km * self.valor_km_final)
 
     @property
+    def valor_calculado_clientes(self):
+        calculos = list(self.rateios.all())
+        if not calculos:
+            return self.valor_calculado
+        total = sum(
+            (calculo.valor_calculado for calculo in calculos),
+            Decimal("0.00"),
+        )
+        return _valor_monetario(total)
+
+    @property
+    def valor_final_clientes(self):
+        calculos = list(self.rateios.all())
+        if not calculos:
+            return self.valor_final
+        total = sum(
+            (calculo.valor_final for calculo in calculos),
+            Decimal("0.00"),
+        )
+        return _valor_monetario(total)
+
+    @property
+    def tem_multiplos_clientes(self):
+        return self.clientes_vinculados.count() > 1
+
+    @property
     def valor_ajustado(self):
         return (
             not self.rejeitado
@@ -1034,6 +1073,10 @@ class TrechoRateioKM(models.Model):
     km_original = models.DecimalField(max_digits=8, decimal_places=1)
     km_final = models.DecimalField(max_digits=8, decimal_places=1)
     valor_rateado = models.DecimalField(max_digits=10, decimal_places=2)
+    km_cliente = models.DecimalField(max_digits=8, decimal_places=1, default=Decimal("0.0"))
+    valor_km = models.DecimalField(max_digits=10, decimal_places=4, default=Decimal("0.0000"))
+    valor_calculado = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    valor_final = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     status = models.CharField(
         max_length=10,
         choices=StatusRateio.choices,
@@ -1057,7 +1100,7 @@ class TrechoRateioKM(models.Model):
         unique_together = [("trecho", "cliente")]
 
     def __str__(self):
-        return f"{self.trecho_id} - {self.cliente} - R$ {self.valor_rateado}"
+        return f"{self.trecho_id} - {self.cliente} - R$ {self.valor_final}"
 
 
 class TipoAdiantamento(models.TextChoices):
