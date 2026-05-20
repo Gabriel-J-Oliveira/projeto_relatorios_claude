@@ -69,6 +69,7 @@ from .services.rateio_service import (
     salvar_rateio_trecho,
     serializar_rateio,
 )
+from .services.resumo_cliente_service import resumo_financeiro_por_cliente
 from .forms import (
     AdiantamentoForm,
     ClienteForm,
@@ -1222,7 +1223,10 @@ def relatorio_detail_view(request, pk):
             RelatorioTecnico.objects.select_related(
                 "cliente", "tecnico_responsavel"
             ).prefetch_related(
+                "clientes_vinculados__cliente",
+                "despesas__clientes_vinculados__cliente",
                 "despesas__rateios__cliente",
+                "trechos__clientes_vinculados__cliente",
                 "trechos__rateios__cliente",
                 "equipe__tecnico",
                 "historicos__usuario",
@@ -1238,13 +1242,17 @@ def relatorio_detail_view(request, pk):
     relatorio = (
         RelatorioTecnico.objects.select_related("cliente", "tecnico_responsavel")
         .prefetch_related(
+            "clientes_vinculados__cliente",
+            "despesas__clientes_vinculados__cliente",
             "despesas__rateios__cliente",
+            "trechos__clientes_vinculados__cliente",
             "trechos__rateios__cliente",
             "equipe__tecnico",
             "historicos__usuario",
         )
         .get(pk=relatorio.pk)
     )
+    distribuicao_clientes = resumo_financeiro_por_cliente(relatorio)
 
     return render(
         request,
@@ -1271,6 +1279,7 @@ def relatorio_detail_view(request, pk):
             "pode_enviar_relatorio": usuario_pode_enviar_relatorio(request.user, relatorio),
             "pode_excluir_relatorio": usuario_pode_excluir_relatorio(request.user, relatorio),
             "inconsistencias_rateio": inconsistencias_rateio,
+            "distribuicao_clientes": distribuicao_clientes,
             "titulo_pagina": f"Relatório {relatorio.identificador}",
         },
     )

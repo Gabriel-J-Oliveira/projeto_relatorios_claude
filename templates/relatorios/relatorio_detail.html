@@ -648,6 +648,101 @@
       </div>
     </div>
 
+    <!-- Distribuição por cliente -->
+    {% if distribuicao_clientes.clientes %}
+    <div class="card border-0 shadow-sm mb-3 cliente-distribuicao-card">
+      <div class="card-header bg-transparent border-bottom py-3">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-diagram-3 text-primary"></i>
+          <h6 class="mb-0 fw-semibold">Distribuição por Cliente</h6>
+        </div>
+      </div>
+      <div class="card-body">
+        {% if distribuicao_clientes.erros %}
+        <div class="alert alert-danger border-0 shadow-sm py-2 small mb-3">
+          {% for erro in distribuicao_clientes.erros %}
+          <div><i class="bi bi-exclamation-octagon-fill me-1"></i>{{ erro }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+          <button type="button"
+                  class="btn btn-sm btn-outline-secondary cliente-carousel-prev"
+                  aria-label="Cliente anterior">
+            <i class="bi bi-chevron-left"></i>
+          </button>
+          <div class="text-center min-w-0">
+            {% for resumo in distribuicao_clientes.clientes %}
+            <div class="cliente-carousel-title {% if not forloop.first %}d-none{% endif %}"
+                 data-cliente-title="{{ forloop.counter0 }}">
+              <div class="fw-bold text-truncate">{{ resumo.cliente.nome }}</div>
+              <div class="text-muted small">{{ forloop.counter }} de {{ distribuicao_clientes.total }}</div>
+            </div>
+            {% endfor %}
+          </div>
+          <button type="button"
+                  class="btn btn-sm btn-outline-secondary cliente-carousel-next"
+                  aria-label="Próximo cliente">
+            <i class="bi bi-chevron-right"></i>
+          </button>
+        </div>
+
+        <div class="cliente-carousel-slides">
+          {% for resumo in distribuicao_clientes.clientes %}
+          <div class="cliente-carousel-slide {% if not forloop.first %}d-none{% endif %}"
+               data-cliente-slide="{{ forloop.counter0 }}">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <span class="badge {% if resumo.tem_divergencia %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                {{ resumo.status_financeiro }}
+              </span>
+              {% if resumo.tem_divergencia %}
+              <span class="badge bg-danger-subtle text-danger">Divergência</span>
+              {% endif %}
+            </div>
+            <div class="table-responsive-none">
+              <table class="table table-sm mb-0 cliente-mini-table">
+                <tbody>
+                  <tr>
+                    <td class="text-muted">KM total</td>
+                    <td class="text-end fw-semibold">{{ resumo.km_total|floatformat:1 }} km</td>
+                  </tr>
+                  <tr>
+                    <td class="text-muted">Valor KM solicitado</td>
+                    <td class="text-end fw-semibold">R$ {{ resumo.valor_km_solicitado|floatformat:2 }}</td>
+                  </tr>
+                  <tr>
+                    <td class="text-muted">Despesas solicitadas</td>
+                    <td class="text-end fw-semibold">R$ {{ resumo.despesas_solicitadas|floatformat:2 }}</td>
+                  </tr>
+                  <tr>
+                    <td class="text-muted">Total solicitado</td>
+                    <td class="text-end fw-bold">R$ {{ resumo.total_solicitado|floatformat:2 }}</td>
+                  </tr>
+                  <tr>
+                    <td class="text-muted">Total aprovado</td>
+                    <td class="text-end fw-bold text-success">R$ {{ resumo.total_aprovado|floatformat:2 }}</td>
+                  </tr>
+                  <tr>
+                    <td class="text-muted">Diferença removida</td>
+                    <td class="text-end fw-semibold {% if resumo.diferenca_removida > 0 %}text-danger{% endif %}">
+                      R$ {{ resumo.diferenca_removida|floatformat:2 }}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="text-muted">Itens rejeitados</td>
+                    <td class="text-end fw-semibold">{{ resumo.itens_rejeitados }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Auditoria -->
     <div class="card border-0 shadow-sm mb-3">
       <div class="card-body small">
@@ -832,6 +927,7 @@
               <tr>
                 <th>Cliente</th>
                 <th>KM automático</th>
+                <th>Valor por KM</th>
                 <th>KM final</th>
                 <th>Valor final</th>
                 <th>Status</th>
@@ -1072,6 +1168,28 @@
     min-width: min(320px, calc(100vw - 2rem));
   }
 
+  .cliente-distribuicao-card {
+    overflow: hidden;
+  }
+
+  .cliente-carousel-slides {
+    min-height: 285px;
+  }
+
+  .cliente-mini-table tr:nth-child(odd) td {
+    background-color: var(--bs-tertiary-bg);
+  }
+
+  .cliente-mini-table td {
+    padding: .48rem .65rem;
+    border-bottom: 0;
+  }
+
+  .table-responsive-none {
+    width: 100%;
+    overflow: hidden;
+  }
+
   @keyframes destaqueFinanceiro {
     0% { background-color: rgba(255, 193, 7, .32); }
     100% { background-color: transparent; }
@@ -1183,6 +1301,28 @@
       input.addEventListener("change", atualizarTotaisFinanceiros);
     });
     atualizarTotaisFinanceiros();
+
+    const clienteSlides = Array.from(document.querySelectorAll("[data-cliente-slide]"));
+    const clienteTitles = Array.from(document.querySelectorAll("[data-cliente-title]"));
+    let clienteSlideAtual = 0;
+
+    function mostrarClienteDistribuicao(indice) {
+      if (!clienteSlides.length) return;
+      clienteSlideAtual = (indice + clienteSlides.length) % clienteSlides.length;
+      clienteSlides.forEach(function (slide, idx) {
+        slide.classList.toggle("d-none", idx !== clienteSlideAtual);
+      });
+      clienteTitles.forEach(function (title, idx) {
+        title.classList.toggle("d-none", idx !== clienteSlideAtual);
+      });
+    }
+
+    document.querySelector(".cliente-carousel-prev")?.addEventListener("click", function () {
+      mostrarClienteDistribuicao(clienteSlideAtual - 1);
+    });
+    document.querySelector(".cliente-carousel-next")?.addEventListener("click", function () {
+      mostrarClienteDistribuicao(clienteSlideAtual + 1);
+    });
 
     function validarRateioModal(modal) {
       const total = parseMoney(modal.dataset.rateioTotal);
