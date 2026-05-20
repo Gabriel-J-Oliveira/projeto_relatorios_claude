@@ -62,6 +62,8 @@ from .services.workflow_service import (
 )
 from .services.rateio_service import (
     RateioError,
+    garantir_rateio_despesa,
+    garantir_rateio_trecho,
     garantir_rateios_relatorio,
     salvar_rateio_despesa,
     salvar_rateio_trecho,
@@ -1223,7 +1225,11 @@ def relatorio_detail_view(request, pk):
         ),
         pk=pk,
     )
-    garantir_rateios_relatorio(relatorio)
+    inconsistencias_rateio = []
+    try:
+        garantir_rateios_relatorio(relatorio)
+    except RateioError as exc:
+        inconsistencias_rateio = [str(exc)]
     relatorio = (
         RelatorioTecnico.objects.select_related("cliente", "tecnico_responsavel")
         .prefetch_related(
@@ -1259,6 +1265,7 @@ def relatorio_detail_view(request, pk):
             "superadmin_django": usuario_eh_superadmin(request.user),
             "pode_enviar_relatorio": usuario_pode_enviar_relatorio(request.user, relatorio),
             "pode_excluir_relatorio": usuario_pode_excluir_relatorio(request.user, relatorio),
+            "inconsistencias_rateio": inconsistencias_rateio,
             "titulo_pagina": f"Relatório {relatorio.identificador}",
         },
     )
@@ -1627,6 +1634,10 @@ def relatorio_item_financeiro_view(request, pk, tipo, item_pk, acao):
                         "motivo_recusa",
                     ]
                 )
+                if tipo == "despesa":
+                    garantir_rateio_despesa(item)
+                else:
+                    garantir_rateio_trecho(item)
 
                 if tipo == "despesa":
                     descricao = f"Despesa rejeitada pelo financeiro: {motivo}"
@@ -1663,6 +1674,10 @@ def relatorio_item_financeiro_view(request, pk, tipo, item_pk, acao):
                         "motivo_recusa",
                     ]
                 )
+                if tipo == "despesa":
+                    garantir_rateio_despesa(item)
+                else:
+                    garantir_rateio_trecho(item)
                 registrar_evento(
                     relatorio,
                     usuario_historico,
@@ -1713,6 +1728,7 @@ def relatorio_rateio_financeiro_json(request, pk, tipo, item_pk):
         motivo = payload.get("motivo") or ""
 
         if tipo == "despesa":
+            garantir_rateio_despesa(item)
             rateios = salvar_rateio_despesa(
                 item,
                 dados_rateio,
@@ -1721,6 +1737,7 @@ def relatorio_rateio_financeiro_json(request, pk, tipo, item_pk):
                 aprovar=aprovar,
             )
         else:
+            garantir_rateio_trecho(item)
             rateios = salvar_rateio_trecho(
                 item,
                 dados_rateio,

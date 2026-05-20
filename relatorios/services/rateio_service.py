@@ -20,8 +20,11 @@ class RateioError(Exception):
 
 
 def _money(valor):
+    texto = str(valor or "0").strip()
+    if "," in texto:
+        texto = texto.replace(".", "").replace(",", ".")
     try:
-        numero = Decimal(str(valor or "0").replace(",", ".")).quantize(
+        numero = Decimal(texto).quantize(
             CENTAVO, rounding=ROUND_HALF_UP
         )
     except (InvalidOperation, ValueError):
@@ -32,8 +35,11 @@ def _money(valor):
 
 
 def _km(valor):
+    texto = str(valor or "0").strip()
+    if "," in texto:
+        texto = texto.replace(".", "").replace(",", ".")
     try:
-        numero = Decimal(str(valor or "0").replace(",", ".")).quantize(
+        numero = Decimal(texto).quantize(
             DECIMAL_KM, rounding=ROUND_HALF_UP
         )
     except (InvalidOperation, ValueError):
@@ -56,11 +62,11 @@ def _dividir_decimal(total, quantidade, casas=CENTAVO):
 
 
 def _clientes_ids_item(item):
-    ids = list(item.clientes_vinculados.values_list("cliente_id", flat=True))
+    ids = list(dict.fromkeys(item.clientes_vinculados.values_list("cliente_id", flat=True)))
     if ids:
         return ids
     relatorio = item.relatorio
-    ids = list(relatorio.clientes_vinculados.values_list("cliente_id", flat=True))
+    ids = list(dict.fromkeys(relatorio.clientes_vinculados.values_list("cliente_id", flat=True)))
     if ids:
         return ids
     return [relatorio.cliente_id] if relatorio.cliente_id else []
@@ -75,23 +81,88 @@ def _percentual(valor, total):
     )
 
 
+def _status_manual(status):
+    return status in {StatusRateio.ADJUSTED, StatusRateio.APPROVED}
+
+
+def _distribuir_respeitando_manual(total, cliente_ids, existentes, campo_valor):
+    manuais = {
+        cliente_id: rateio
+        for cliente_id, rateio in existentes.items()
+        if cliente_id in cliente_ids and _status_manual(rateio.status)
+    }
+    soma_manual = sum(
+        (getattr(rateio, campo_valor) for rateio in manuais.values()), Decimal("0.00")
+    ).quantize(CENTAVO)
+    restante = (total - soma_manual).quantize(CENTAVO)
+    automaticos = [cliente_id for cliente_id in cliente_ids if cliente_id not in manuais]
+
+    if restante < 0:
+        raise RateioError("Rateios manuais excedem o valor total do item.")
+    if restante > 0 and not automaticos:
+        raise RateioError("Rateio manual não fecha com o valor total do item.")
+
+    valores_auto = _dividir_decimal(restante, len(automaticos), CENTAVO)
+    return manuais, dict(zip(automaticos, valores_auto))
+
+
+def _distribuir_km_respeitando_manual(total_km, cliente_ids, existentes):
+    manuais = {
+        cliente_id: rateio
+        for cliente_id, rateio in existentes.items()
+        if cliente_id in cliente_ids and _status_manual(rateio.status)
+    }
+    soma_manual = sum(
+        (rateio.km_final for rateio in manuais.values()), Decimal("0.0")
+    ).quantize(DECIMAL_KM)
+    restante = (total_km - soma_manual).quantize(DECIMAL_KM)
+    automaticos = [cliente_id for cliente_id in cliente_ids if cliente_id not in manuais]
+
+    if restante < 0:
+        raise RateioError("KM manual rateado excede o KM total do trecho.")
+    if restante > 0 and not automaticos:
+        raise RateioError("Rateio manual de KM não fecha com o KM total do trecho.")
+
+    kms_auto = _dividir_decimal(restante, len(automaticos), DECIMAL_KM)
+    return dict(zip(automaticos, kms_auto))
+
+
 def garantir_rateio_despesa(despesa):
     cliente_ids = _clientes_ids_item(despesa)
     if not cliente_ids:
         return []
 
-    total = _money(despesa.valor_final)
-    valores = _dividir_decimal(total, len(cliente_ids), CENTAVO)
+    rejeitado = getattr(despesa, "rejeitado", False) or getattr(despesa, "status_financeiro", "") == "rejeitado"
+    total = Decimal("0.00") if rejeitado else _money(despesa.valor_final)
     existentes = {
         rateio.cliente_id: rateio
         for rateio in despesa.rateios.select_related("cliente")
     }
     despesa.rateios.exclude(cliente_id__in=cliente_ids).delete()
+    if rejeitado:
+        for cliente_id in cliente_ids:
+            DespesaRateio.objects.update_or_create(
+                despesa=despesa,
+                cliente_id=cliente_id,
+                defaults={
+                    "valor_original": Decimal("0.00"),
+                    "valor_final": Decimal("0.00"),
+                    "percentual": None,
+                    "status": StatusRateio.AUTO,
+                },
+            )
+        return list(despesa.rateios.select_related("cliente"))
+    _manuais, valores_por_cliente = _distribuir_respeitando_manual(
+        total, cliente_ids, existentes, "valor_final"
+    )
 
-    for cliente_id, valor in zip(cliente_ids, valores):
+    for cliente_id in cliente_ids:
+        valor = valores_por_cliente.get(cliente_id)
         rateio = existentes.get(cliente_id)
-        if rateio and rateio.status != StatusRateio.AUTO:
+        if rateio and _status_manual(rateio.status):
             continue
+        if valor is None:
+            valor = Decimal("0.00")
         DespesaRateio.objects.update_or_create(
             despesa=despesa,
             cliente_id=cliente_id,
@@ -110,20 +181,42 @@ def garantir_rateio_trecho(trecho):
     if not cliente_ids:
         return []
 
-    total_valor = _money(trecho.valor_final)
-    total_km = _km(trecho.km)
-    valores = _dividir_decimal(total_valor, len(cliente_ids), CENTAVO)
-    kms = _dividir_decimal(total_km, len(cliente_ids), DECIMAL_KM)
+    rejeitado = getattr(trecho, "rejeitado", False) or getattr(trecho, "status_financeiro", "") == "rejeitado"
+    total_valor = Decimal("0.00") if rejeitado else _money(trecho.valor_final)
+    total_km = Decimal("0.0") if rejeitado else _km(trecho.km)
     existentes = {
         rateio.cliente_id: rateio
         for rateio in trecho.rateios.select_related("cliente")
     }
     trecho.rateios.exclude(cliente_id__in=cliente_ids).delete()
+    if rejeitado:
+        for cliente_id in cliente_ids:
+            TrechoRateioKM.objects.update_or_create(
+                trecho=trecho,
+                cliente_id=cliente_id,
+                defaults={
+                    "km_original": Decimal("0.0"),
+                    "km_final": Decimal("0.0"),
+                    "valor_rateado": Decimal("0.00"),
+                    "status": StatusRateio.AUTO,
+                },
+            )
+        return list(trecho.rateios.select_related("cliente"))
+    _manuais, valores_por_cliente = _distribuir_respeitando_manual(
+        total_valor, cliente_ids, existentes, "valor_rateado"
+    )
+    kms_por_cliente = _distribuir_km_respeitando_manual(total_km, cliente_ids, existentes)
 
-    for cliente_id, valor, km in zip(cliente_ids, valores, kms):
+    for cliente_id in cliente_ids:
+        valor = valores_por_cliente.get(cliente_id)
+        km = kms_por_cliente.get(cliente_id)
         rateio = existentes.get(cliente_id)
-        if rateio and rateio.status != StatusRateio.AUTO:
+        if rateio and _status_manual(rateio.status):
             continue
+        if valor is None:
+            valor = Decimal("0.00")
+        if km is None:
+            km = Decimal("0.0")
         TrechoRateioKM.objects.update_or_create(
             trecho=trecho,
             cliente_id=cliente_id,
@@ -160,7 +253,10 @@ def salvar_rateio_despesa(despesa, dados_rateio, usuario, motivo="", aprovar=Fal
     _validar_soma(total, valores, "O rateio da despesa precisa fechar exatamente.")
 
     atuais_pre = {rateio.cliente_id: rateio for rateio in despesa.rateios.all()}
-    payload_clientes = {int(item["cliente_id"]) for item in dados_rateio}
+    try:
+        payload_clientes = {int(item["cliente_id"]) for item in dados_rateio}
+    except (KeyError, TypeError, ValueError):
+        raise RateioError("Payload de rateio inválido.")
     if payload_clientes != set(atuais_pre):
         raise RateioError("O rateio enviado não corresponde aos clientes da despesa.")
     houve_alteracao = any(
@@ -223,16 +319,24 @@ def salvar_rateio_trecho(trecho, dados_rateio, usuario, motivo="", aprovar=False
     _validar_soma(total, valores, "O rateio do trecho precisa fechar exatamente.")
     kms = [_km(item.get("km_final")) for item in dados_rateio]
     soma_km = sum(kms, Decimal("0.0")).quantize(DECIMAL_KM)
-    if soma_km != _km(trecho.km):
+    trecho_rejeitado = trecho.rejeitado or trecho.status_financeiro == "rejeitado"
+    km_esperado = Decimal("0.0") if trecho_rejeitado else _km(trecho.km)
+    if soma_km != km_esperado:
         raise RateioError("A soma dos KM rateados precisa fechar exatamente o KM total do trecho.")
 
     atuais_pre = {rateio.cliente_id: rateio for rateio in trecho.rateios.all()}
-    payload_clientes = {int(item["cliente_id"]) for item in dados_rateio}
+    try:
+        payload_clientes = {int(item["cliente_id"]) for item in dados_rateio}
+    except (KeyError, TypeError, ValueError):
+        raise RateioError("Payload de rateio inválido.")
     if payload_clientes != set(atuais_pre):
         raise RateioError("O rateio enviado não corresponde aos clientes do trecho.")
     houve_alteracao = any(
         atuais_pre.get(int(item["cliente_id"]))
-        and atuais_pre[int(item["cliente_id"])].valor_rateado != _money(item.get("valor_rateado"))
+        and (
+            atuais_pre[int(item["cliente_id"])].valor_rateado != _money(item.get("valor_rateado"))
+            or atuais_pre[int(item["cliente_id"])].km_final != _km(item.get("km_final"))
+        )
         for item in dados_rateio
     )
     if houve_alteracao and not motivo:
@@ -249,22 +353,25 @@ def salvar_rateio_trecho(trecho, dados_rateio, usuario, motivo="", aprovar=False
                 raise RateioError("Cliente inválido para o rateio deste trecho.")
             rateio = atuais[cliente_id]
             valor_anterior = rateio.valor_rateado
+            km_anterior = rateio.km_final
             status = StatusRateio.APPROVED if aprovar else (
                 StatusRateio.ADJUSTED if valor_anterior != valor_novo or rateio.km_final != km_novo else rateio.status
             )
             rateio.valor_rateado = valor_novo
             rateio.km_final = km_novo
             rateio.status = status
-            if valor_anterior != valor_novo or aprovar:
+            if valor_anterior != valor_novo or km_anterior != km_novo or aprovar:
                 rateio.alterado_por = usuario
                 if motivo:
                     rateio.motivo_ajuste = motivo
             rateio.save()
-            if valor_anterior != valor_novo:
+            if valor_anterior != valor_novo or km_anterior != km_novo:
                 alteracoes.append({
                     "cliente_id": cliente_id,
                     "valor_anterior": str(valor_anterior),
                     "valor_novo": str(valor_novo),
+                    "km_anterior": str(km_anterior),
+                    "km_novo": str(km_novo),
                 })
 
         if alteracoes or aprovar:
@@ -309,19 +416,43 @@ def serializar_rateio(rateio):
 def validar_rateios_relatorio(relatorio):
     erros = []
     for despesa in relatorio.despesas.all():
-        garantir_rateio_despesa(despesa)
+        try:
+            garantir_rateio_despesa(despesa)
+        except RateioError as exc:
+            erros.append(f"Despesa {despesa.pk}: {exc}")
+            continue
         soma = sum((r.valor_final for r in despesa.rateios.all()), Decimal("0.00")).quantize(CENTAVO)
         total = _money(despesa.valor_final)
+        despesa_rejeitada = despesa.rejeitado or despesa.status_financeiro == "rejeitado"
+        if despesa_rejeitada and soma != Decimal("0.00"):
+            erros.append(f"Despesa {despesa.pk} rejeitada possui rateio maior que zero.")
+        if total > 0 and not despesa.rateios.exists():
+            erros.append(f"Despesa {despesa.pk} não possui rateio.")
         if soma != total:
             erros.append(
                 f"Rateio da despesa {despesa.pk} não fecha: soma R$ {soma}, total R$ {total}."
             )
     for trecho in relatorio.trechos.all():
-        garantir_rateio_trecho(trecho)
+        try:
+            garantir_rateio_trecho(trecho)
+        except RateioError as exc:
+            erros.append(f"Trecho {trecho.pk}: {exc}")
+            continue
         soma = sum((r.valor_rateado for r in trecho.rateios.all()), Decimal("0.00")).quantize(CENTAVO)
         total = _money(trecho.valor_final)
+        soma_km = sum((r.km_final for r in trecho.rateios.all()), Decimal("0.0")).quantize(DECIMAL_KM)
+        trecho_rejeitado = trecho.rejeitado or trecho.status_financeiro == "rejeitado"
+        if trecho_rejeitado and soma != Decimal("0.00"):
+            erros.append(f"Trecho {trecho.pk} rejeitado possui rateio maior que zero.")
+        if total > 0 and not trecho.rateios.exists():
+            erros.append(f"Trecho {trecho.pk} não possui rateio.")
         if soma != total:
             erros.append(
                 f"Rateio do trecho {trecho.pk} não fecha: soma R$ {soma}, total R$ {total}."
+            )
+        total_km_esperado = Decimal("0.0") if trecho_rejeitado else _km(trecho.km)
+        if soma_km != total_km_esperado:
+            erros.append(
+                f"Rateio de KM do trecho {trecho.pk} não fecha: soma {soma_km} km, total {total_km_esperado} km."
             )
     return erros

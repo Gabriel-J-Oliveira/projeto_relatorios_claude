@@ -1,3 +1,5 @@
+from django.db import transaction
+
 from relatorios.models import (
     Cliente,
     DespesaCliente,
@@ -46,6 +48,7 @@ def clientes_trecho(trecho):
     return obter_clientes_relatorio(trecho.relatorio)
 
 
+@transaction.atomic
 def sync_clientes_relatorio(relatorio, cliente_ids):
     cliente_ids = normalizar_ids_clientes(cliente_ids)
     clientes_validos = list(
@@ -67,6 +70,23 @@ def sync_clientes_relatorio(relatorio, cliente_ids):
     if ids_validos and relatorio.cliente_id != ids_validos[0]:
         relatorio.cliente_id = ids_validos[0]
         relatorio.save(update_fields=["cliente", "atualizado_em"])
+
+    DespesaCliente.objects.filter(despesa__relatorio=relatorio).exclude(
+        cliente_id__in=ids_validos
+    ).delete()
+    TrechoKMCliente.objects.filter(trecho__relatorio=relatorio).exclude(
+        cliente_id__in=ids_validos
+    ).delete()
+
+    from relatorios.services.rateio_service import (
+        garantir_rateio_despesa,
+        garantir_rateio_trecho,
+    )
+
+    for despesa in relatorio.despesas.all():
+        garantir_rateio_despesa(despesa)
+    for trecho in relatorio.trechos.all():
+        garantir_rateio_trecho(trecho)
 
     return ids_validos
 
@@ -94,6 +114,7 @@ def _cliente_ids_item(cliente_ids, relatorio):
     return cliente_ids
 
 
+@transaction.atomic
 def sync_clientes_despesa(despesa, cliente_ids):
     cliente_ids = _cliente_ids_item(cliente_ids, despesa.relatorio)
     erros = validar_clientes_item_no_relatorio(despesa.relatorio, cliente_ids)
@@ -110,6 +131,7 @@ def sync_clientes_despesa(despesa, cliente_ids):
     return []
 
 
+@transaction.atomic
 def sync_clientes_trecho(trecho, cliente_ids):
     cliente_ids = _cliente_ids_item(cliente_ids, trecho.relatorio)
     erros = validar_clientes_item_no_relatorio(trecho.relatorio, cliente_ids)

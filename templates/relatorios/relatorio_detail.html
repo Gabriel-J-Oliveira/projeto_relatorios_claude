@@ -133,6 +133,20 @@
 </div>
 {% endif %}
 
+{% if inconsistencias_rateio %}
+<div class="alert alert-danger border-0 shadow-sm mb-4">
+  <div class="d-flex align-items-center mb-2">
+    <i class="bi bi-exclamation-octagon-fill me-2"></i>
+    <strong>Inconsistência no rateio</strong>
+  </div>
+  <ul class="small mb-0 ps-3">
+    {% for erro in inconsistencias_rateio %}
+    <li>{{ erro }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
 <form method="post" id="form-valores-aprovados-financeiro">
   {% csrf_token %}
 
@@ -217,14 +231,14 @@
           <table class="table table-sm table-hover align-middle mb-0">
             <thead class="table-light">
               <tr>
-                <th class="ps-3 small fw-semibold text-muted">Data</th>
+                <th class="ps-3 small fw-semibold text-muted d-none d-xxl-table-cell">Data</th>
                 <th class="small fw-semibold text-muted">Tipo</th>
                 <th class="small fw-semibold text-muted">Descrição</th>
                 <th class="small fw-semibold text-muted">Valor Solicitado</th>
                 <th class="small fw-semibold text-muted">Valor Aprovado</th>
-                <th class="small fw-semibold text-muted">Pago por</th>
-                <th class="small fw-semibold text-muted">C. Custo</th>
-                <th class="small fw-semibold text-muted text-center">Doc.</th>
+                <th class="small fw-semibold text-muted d-none d-xxl-table-cell">Pago por</th>
+                <th class="small fw-semibold text-muted d-none d-xxl-table-cell">C. Custo</th>
+                <th class="small fw-semibold text-muted text-center d-none d-xxl-table-cell">Doc.</th>
                 <th class="small fw-semibold text-muted text-center">Rateio</th>
                 <th class="small fw-semibold text-muted text-end pe-3">Ação</th>
               </tr>
@@ -233,7 +247,7 @@
               {% for d in relatorio.despesas.all %}
               <tr id="linha-despesa-{{ forloop.counter }}"
                   class="linha-despesa {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}table-danger opacity-75{% endif %}">
-                <td class="ps-3 small text-muted">{{ d.data|date:"d/m/Y"|default:"A preencher" }}</td>
+                <td class="ps-3 small text-muted d-none d-xxl-table-cell">{{ d.data|date:"d/m/Y"|default:"A preencher" }}</td>
                 <td>
                   <span class="badge bg-body-tertiary text-body-secondary small">
                     {{ d.get_tipo_display }}
@@ -265,15 +279,15 @@
                          {% if not superadmin_django %}{% if not pode_atuar_financeiro or relatorio.status == 'aprovado' or relatorio.status == 'rejeitado' or d.rejeitado or d.status_financeiro == 'rejeitado' %}disabled{% endif %}{% endif %}>
                   <div class="small text-muted mt-1">Final: R$ {{ d.valor_final|floatformat:2 }}</div>
                 </td>
-                <td class="small">
+                <td class="small d-none d-xxl-table-cell">
                   {% if d.quem_pagou == 'tecnico' %}
                   <span class="badge bg-primary-subtle text-primary">Técnico</span>
                   {% else %}
                   <span class="badge bg-secondary-subtle text-secondary">Empresa</span>
                   {% endif %}
                 </td>
-                <td class="small text-muted">{{ relatorio.centro_custo|default:"—" }}</td>
-                <td class="text-center">
+                <td class="small text-muted d-none d-xxl-table-cell">{{ relatorio.centro_custo|default:"—" }}</td>
+                <td class="text-center d-none d-xxl-table-cell">
                   {% if d.comprovante %}
                   <a href="{{ d.comprovante.url }}" target="_blank" class="btn btn-sm btn-outline-success px-1 py-0">
                     <i class="bi bi-file-earmark-check small"></i>
@@ -295,6 +309,13 @@
                   </button>
                 </td>
                 <td class="text-end pe-3">
+                  <button type="button"
+                          class="btn btn-sm btn-outline-secondary me-1"
+                          data-bs-toggle="collapse"
+                          data-bs-target="#detalhes-despesa-{{ d.pk }}"
+                          title="Ver detalhes">
+                    <i class="bi bi-list-ul"></i>
+                  </button>
                   {% if pode_alterar_itens_financeiros %}
                     {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
                     <button type="submit"
@@ -313,6 +334,17 @@
                   {% else %}
                   <span class="text-muted small">—</span>
                   {% endif %}
+                </td>
+              </tr>
+              <tr class="collapse bg-body-tertiary" id="detalhes-despesa-{{ d.pk }}">
+                <td colspan="10" class="px-3 py-3">
+                  <div class="row g-3 small">
+                    <div class="col-md-2"><span class="text-muted">Data</span><div class="fw-semibold">{{ d.data|date:"d/m/Y"|default:"A preencher" }}</div></div>
+                    <div class="col-md-2"><span class="text-muted">Pago por</span><div class="fw-semibold">{{ d.get_quem_pagou_display }}</div></div>
+                    <div class="col-md-2"><span class="text-muted">Centro de custo</span><div class="fw-semibold">{{ relatorio.centro_custo|default:"?" }}</div></div>
+                    <div class="col-md-3"><span class="text-muted">Valor final</span><div class="fw-semibold text-success">R$ {{ d.valor_final|floatformat:2 }}</div></div>
+                    <div class="col-md-3"><span class="text-muted">Documento</span><div>{% if d.comprovante %}<a href="{{ d.comprovante.url }}" target="_blank" class="btn btn-sm btn-outline-success">Abrir comprovante</a>{% else %}<span class="text-muted">Sem comprovante</span>{% endif %}</div></div>
+                  </div>
                 </td>
               </tr>
               {% endfor %}
@@ -350,15 +382,15 @@
           <table class="table table-sm table-hover align-middle mb-0">
             <thead class="table-light">
               <tr>
-                <th class="ps-3 small fw-semibold text-muted">Data</th>
+                <th class="ps-3 small fw-semibold text-muted d-none d-xxl-table-cell">Data</th>
                 <th class="small fw-semibold text-muted">Origem</th>
                 <th class="small fw-semibold text-muted">Destino</th>
                 <th class="small fw-semibold text-muted">KM</th>
-                <th class="small fw-semibold text-muted">R$/KM Solicitado</th>
+                <th class="small fw-semibold text-muted d-none d-xxl-table-cell">R$/KM Solicitado</th>
                 <th class="small fw-semibold text-muted">R$/KM Aprovado</th>
-                <th class="small fw-semibold text-muted">Total Solicitado</th>
+                <th class="small fw-semibold text-muted d-none d-xxl-table-cell">Total Solicitado</th>
                 <th class="small fw-semibold text-muted">Total Aprovado</th>
-                <th class="small fw-semibold text-muted">Obs.</th>
+                <th class="small fw-semibold text-muted d-none d-xxl-table-cell">Obs.</th>
                 <th class="small fw-semibold text-muted text-center">Rateio</th>
                 <th class="small fw-semibold text-muted text-end pe-3">Ação</th>
               </tr>
@@ -367,11 +399,11 @@
               {% for t in relatorio.trechos.all %}
               <tr id="linha-trecho-{{ forloop.counter }}"
                   class="linha-trecho {% if t.rejeitado or t.status_financeiro == 'rejeitado' %}table-danger opacity-75{% endif %}">
-                <td class="ps-3 small text-muted">{{ t.data|date:"d/m/Y"|default:"A preencher" }}</td>
+                <td class="ps-3 small text-muted d-none d-xxl-table-cell">{{ t.data|date:"d/m/Y"|default:"A preencher" }}</td>
                 <td class="small">{{ t.origem }}</td>
                 <td class="small">{{ t.destino }}</td>
                 <td class="small">{{ t.km }} km</td>
-                <td class="small text-muted">R$ {{ t.valor_km|floatformat:2 }}</td>
+                <td class="small text-muted d-none d-xxl-table-cell">R$ {{ t.valor_km|floatformat:2 }}</td>
                 <td>
                   <input type="text"
                          inputmode="decimal"
@@ -384,9 +416,9 @@
                          data-status-financeiro="{% if t.rejeitado %}rejeitado{% else %}{{ t.status_financeiro }}{% endif %}"
                          {% if not superadmin_django %}{% if not pode_atuar_financeiro or relatorio.status == 'aprovado' or relatorio.status == 'rejeitado' or t.rejeitado or t.status_financeiro == 'rejeitado' %}disabled{% endif %}{% endif %}>
                 </td>
-                <td class="small fw-semibold text-success">R$ {{ t.valor_calculado|floatformat:2 }}</td>
+                <td class="small fw-semibold text-success d-none d-xxl-table-cell">R$ {{ t.valor_calculado|floatformat:2 }}</td>
                 <td class="small fw-semibold text-success total-aprovado-km-linha">R$ {{ t.valor_final|floatformat:2 }}</td>
-                <td class="small text-muted">
+                <td class="small text-muted d-none d-xxl-table-cell">
                   {{ t.observacao|default:"—" }}
                   {% if t.rejeitado or t.status_financeiro == 'rejeitado' %}
                   <div class="mt-1">
@@ -414,6 +446,13 @@
                   </button>
                 </td>
                 <td class="text-end pe-3">
+                  <button type="button"
+                          class="btn btn-sm btn-outline-secondary me-1"
+                          data-bs-toggle="collapse"
+                          data-bs-target="#detalhes-trecho-{{ t.pk }}"
+                          title="Ver detalhes">
+                    <i class="bi bi-list-ul"></i>
+                  </button>
                   {% if pode_alterar_itens_financeiros %}
                     {% if t.rejeitado or t.status_financeiro == 'rejeitado' %}
                     <button type="submit"
@@ -434,6 +473,37 @@
                   {% endif %}
                 </td>
               </tr>
+              <tr class="collapse bg-body-tertiary" id="detalhes-trecho-{{ t.pk }}">
+                <td colspan="11" class="px-3 py-3">
+                  <div class="row g-3 small">
+                    <div class="col-md-2">
+                      <span class="text-muted">Data</span>
+                      <div class="fw-semibold">{{ t.data|date:"d/m/Y"|default:"A preencher" }}</div>
+                    </div>
+                    <div class="col-md-2">
+                      <span class="text-muted">R$/KM solicitado</span>
+                      <div class="fw-semibold">R$ {{ t.valor_km|floatformat:2 }}</div>
+                    </div>
+                    <div class="col-md-2">
+                      <span class="text-muted">Total solicitado</span>
+                      <div class="fw-semibold">R$ {{ t.valor_calculado|floatformat:2 }}</div>
+                    </div>
+                    <div class="col-md-2">
+                      <span class="text-muted">Total aprovado</span>
+                      <div class="fw-semibold text-success">R$ {{ t.valor_final|floatformat:2 }}</div>
+                    </div>
+                    <div class="col-md-4">
+                      <span class="text-muted">Observações</span>
+                      <div class="fw-semibold">{{ t.observacao|default:"Sem observações" }}</div>
+                      {% if t.rejeitado or t.status_financeiro == 'rejeitado' %}
+                      {% if t.motivo_rejeicao or t.motivo_recusa %}
+                      <div class="text-danger small mt-1">{{ t.motivo_rejeicao|default:t.motivo_recusa }}</div>
+                      {% endif %}
+                      {% endif %}
+                    </div>
+                  </div>
+                </td>
+              </tr>
               {% endfor %}
             </tbody>
             <tfoot class="table-light fw-semibold">
@@ -444,6 +514,7 @@
                 <td></td>
                 <td class="small fw-bold text-success">R$ {{ relatorio.total_km|floatformat:2 }}</td>
                 <td class="small fw-bold text-success" id="total-aprovado-km">R$ {{ relatorio.total_aprovado_km|floatformat:2 }}</td>
+                <td></td>
                 <td></td>
               </tr>
             </tfoot>
@@ -656,9 +727,9 @@
                          step="0.01"
                          class="form-control form-control-sm rateio-valor"
                          data-cliente-id="{{ r.cliente_id }}"
-                         data-original="{{ r.valor_original|unlocalize }}"
+                         data-original="{{ r.valor_final|unlocalize }}"
                          value="{{ r.valor_final|unlocalize }}"
-                         {% if not pode_alterar_itens_financeiros %}disabled{% endif %}>
+                         {% if not pode_alterar_itens_financeiros or d.rejeitado or d.status_financeiro == 'rejeitado' %}disabled{% endif %}>
                 </td>
                 <td><span class="badge text-bg-light">{{ r.get_status_display }}</span></td>
               </tr>
@@ -672,12 +743,12 @@
           <textarea class="form-control form-control-sm rateio-motivo"
                     rows="3"
                     placeholder="Obrigatório se houver alteração manual"
-                    {% if not pode_alterar_itens_financeiros %}disabled{% endif %}></textarea>
+                    {% if not pode_alterar_itens_financeiros or d.rejeitado or d.status_financeiro == 'rejeitado' %}disabled{% endif %}></textarea>
         </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
-        {% if pode_alterar_itens_financeiros %}
+        {% if pode_alterar_itens_financeiros and not d.rejeitado and d.status_financeiro != 'rejeitado' %}
         <button type="button" class="btn btn-outline-primary btn-sm rateio-salvar" data-rateio-acao="salvar">Salvar ajustes</button>
         <button type="button" class="btn btn-success btn-sm rateio-salvar" data-rateio-acao="aprovar">Aprovar rateio</button>
         {% endif %}
@@ -695,6 +766,7 @@
      data-rateio-tipo="trecho"
      data-rateio-item="{{ t.pk }}"
      data-rateio-total="{{ t.valor_final|unlocalize }}"
+     data-rateio-km="{% if t.rejeitado or t.status_financeiro == 'rejeitado' %}0{% else %}{{ t.km|unlocalize }}{% endif %}"
      data-rateio-url="{% url 'relatorios:relatorio_rateio_financeiro' relatorio.pk 'trecho' t.pk %}">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content border-0 shadow">
@@ -733,8 +805,9 @@
                          step="0.1"
                          class="form-control form-control-sm rateio-km"
                          data-cliente-id="{{ r.cliente_id }}"
+                         data-original="{{ r.km_final|unlocalize }}"
                          value="{{ r.km_final|unlocalize }}"
-                         {% if not pode_alterar_itens_financeiros %}disabled{% endif %}>
+                         {% if not pode_alterar_itens_financeiros or t.rejeitado or t.status_financeiro == 'rejeitado' %}disabled{% endif %}>
                 </td>
                 <td>
                   <input type="number"
@@ -743,7 +816,7 @@
                          data-cliente-id="{{ r.cliente_id }}"
                          data-original="{{ r.valor_rateado|unlocalize }}"
                          value="{{ r.valor_rateado|unlocalize }}"
-                         {% if not pode_alterar_itens_financeiros %}disabled{% endif %}>
+                         {% if not pode_alterar_itens_financeiros or t.rejeitado or t.status_financeiro == 'rejeitado' %}disabled{% endif %}>
                 </td>
                 <td><span class="badge text-bg-light">{{ r.get_status_display }}</span></td>
               </tr>
@@ -757,12 +830,12 @@
           <textarea class="form-control form-control-sm rateio-motivo"
                     rows="3"
                     placeholder="Obrigatório se houver alteração manual"
-                    {% if not pode_alterar_itens_financeiros %}disabled{% endif %}></textarea>
+                    {% if not pode_alterar_itens_financeiros or t.rejeitado or t.status_financeiro == 'rejeitado' %}disabled{% endif %}></textarea>
         </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
-        {% if pode_alterar_itens_financeiros %}
+        {% if pode_alterar_itens_financeiros and not t.rejeitado and t.status_financeiro != 'rejeitado' %}
         <button type="button" class="btn btn-outline-primary btn-sm rateio-salvar" data-rateio-acao="salvar">Salvar ajustes</button>
         <button type="button" class="btn btn-success btn-sm rateio-salvar" data-rateio-acao="aprovar">Aprovar rateio</button>
         {% endif %}
@@ -974,17 +1047,26 @@
     function validarRateioModal(modal) {
       const total = parseMoney(modal.dataset.rateioTotal);
       const valores = Array.from(modal.querySelectorAll(".rateio-valor"));
+      const kms = Array.from(modal.querySelectorAll(".rateio-km"));
       const feedback = modal.querySelector(".rateio-feedback");
       const botoes = modal.querySelectorAll(".rateio-salvar");
       const soma = valores.reduce((acc, input) => acc + parseMoney(input.value), 0);
       const diferenca = Math.round((total - soma) * 100) / 100;
-      const alterado = valores.some(input => {
+      const somaKm = kms.reduce((acc, input) => acc + parseMoney(input.value), 0);
+      const totalKm = parseMoney(modal.dataset.rateioKm || "0");
+      const diferencaKm = Math.round((totalKm - somaKm) * 10) / 10;
+      const alteradoValor = valores.some(input => {
         return Math.abs(parseMoney(input.value) - parseMoney(input.dataset.original)) > 0.009;
       });
+      const alteradoKm = kms.some(input => {
+        return Math.abs(parseMoney(input.value) - parseMoney(input.dataset.original)) > 0.09;
+      });
+      const alterado = alteradoValor || alteradoKm;
       const motivo = modal.querySelector(".rateio-motivo");
       const motivoOk = !alterado || String(motivo?.value || "").trim().length > 0;
       const somaOk = Math.abs(diferenca) < 0.009;
-      const ok = somaOk && motivoOk;
+      const kmOk = !kms.length || Math.abs(diferencaKm) < 0.09;
+      const ok = somaOk && kmOk && motivoOk;
 
       if (feedback) {
         if (ok) {
@@ -995,6 +1077,11 @@
           feedback.textContent = diferenca > 0
             ? `Faltam ${formatMoney(diferenca)} para fechar o rateio.`
             : `Excesso de ${formatMoney(Math.abs(diferenca))} no rateio.`;
+        } else if (!kmOk) {
+          feedback.className = "rateio-feedback small mt-3 text-danger";
+          feedback.textContent = diferencaKm > 0
+            ? `Faltam ${diferencaKm.toLocaleString("pt-BR")} km para fechar o rateio.`
+            : `Excesso de ${Math.abs(diferencaKm).toLocaleString("pt-BR")} km no rateio.`;
         } else {
           feedback.className = "rateio-feedback small mt-3 text-danger";
           feedback.textContent = "Informe o motivo da alteração manual.";
