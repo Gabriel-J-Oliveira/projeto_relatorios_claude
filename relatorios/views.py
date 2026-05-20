@@ -8,6 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.db.utils import OperationalError, ProgrammingError
 from django.db.models import Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -206,6 +207,24 @@ def _validar_clientes_formsets(request, fs_desp, fs_km, cliente_ids_relatorio):
             erros.append("Trecho de KM referencia cliente fora do relatório.")
 
     return list(dict.fromkeys(erros))
+
+
+def _diagnostico_exception_salvamento(exc):
+    mensagem = str(exc)
+    if "relatorios_despesarateio" in mensagem or "relatorios_trechorateiokm" in mensagem:
+        return {
+            "tipo": exc.__class__.__name__,
+            "codigo": "RATEIO_MIGRATION_PENDENTE",
+            "mensagem": (
+                "As tabelas de rateio ainda não existem no banco. "
+                "Execute python manage.py migrate no ambiente."
+            ),
+        }
+    return {
+        "tipo": exc.__class__.__name__,
+        "codigo": "ERRO_INTERNO_SALVAMENTO",
+        "mensagem": "Erro interno ao salvar relatório. Verifique o log do servidor.",
+    }
 
 
 def _sync_equipe(relatorio, tecnicos_apoio):
@@ -1026,7 +1045,8 @@ def relatorio_form_view(request, pk=None):
                                 "Salvar alterações" if instance else "Criar Relatório"
                             ),
                             "valor_km_padrao": str(valor_km_padrao),
-                            "resumo_erros": [],
+                            "resumo_erros": [diagnostico_backend["mensagem"]],
+                            "diagnostico_backend": diagnostico_backend,
                             "clientes_selecionados_ids": clientes_post_ids,
                             "clientes_selecionados_nomes": clientes_post_nomes,
                             "tecnicos_selecionados_ids": tecnicos_post_ids,

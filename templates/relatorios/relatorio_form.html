@@ -874,6 +874,9 @@
               </div>
             </div>
           </form>
+          {% if diagnostico_backend %}
+            {{ diagnostico_backend|json_script:"diagnostico-backend-relatorio" }}
+          {% endif %}
         </div>
       </div>
     </div>
@@ -1718,6 +1721,18 @@ document.addEventListener("blur", function (e) {
   });
 
   document.addEventListener("DOMContentLoaded", () => {
+    const diagnosticoBackend = document.getElementById("diagnostico-backend-relatorio");
+    if (diagnosticoBackend) {
+      try {
+        logFormEvent(
+          "erro_backend_salvamento",
+          JSON.parse(diagnosticoBackend.textContent || "{}"),
+          "error"
+        );
+      } catch (error) {
+        logFormError("erro_backend_salvamento_parse", error);
+      }
+    }
     document.getElementById("btn-adicionar-despesa")
       ?.addEventListener("click", event => {
         event.preventDefault();
