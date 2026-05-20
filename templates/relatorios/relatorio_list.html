@@ -70,7 +70,7 @@
   <div class="card-body p-0">
     {% if relatorios %}
     <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0">
+      <table class="table table-hover align-middle mb-0 relatorios-list-table">
         <thead class="table-light">
           <tr>
             <th class="ps-4 py-3 fw-semibold text-muted small">Número</th>
@@ -86,13 +86,13 @@
         <tbody>
           {% for r in relatorios %}
           <tr>
-            <td class="ps-4">
+            <td class="ps-4" data-label="Número">
               <a href="{% url 'relatorios:relatorio_detail' r.pk %}"
                  class="fw-semibold text-primary text-decoration-none">
                 {{ r.identificador }}
               </a>
             </td>
-            <td>
+            <td data-label="Cliente">
               {% with cliente_principal=r.cliente_principal_exibicao clientes_secundarios=r.clientes_secundarios_exibicao %}
               <div class="small fw-medium text-nowrap">
                 {{ cliente_principal.nome|default:"Não informado" }}
@@ -112,7 +112,7 @@
               {% endwith %}
               <div class="text-muted" style="font-size:.78rem;">{{ r.cidade_atendimento }}</div>
             </td>
-            <td class="small">
+            <td class="small" data-label="Técnico">
               {% with tecnico_principal=r.tecnico_principal_exibicao tecnicos_secundarios=r.tecnicos_secundarios_exibicao %}
               <span class="fw-medium text-nowrap">
                 {{ tecnico_principal.nome|default:"Não informado" }}
@@ -131,18 +131,18 @@
               </span>
               {% endwith %}
             </td>
-            <td class="small text-muted">
+            <td class="small text-muted" data-label="Período">
               {{ r.data_inicio|date:"d/m/Y" }}
               {% if r.data_inicio != r.data_fim %} a {{ r.data_fim|date:"d/m/Y" }}{% endif %}
             </td>
-            <td class="small">{{ r.total_km_percorrido }} km</td>
-            <td class="small">R$ {{ r.total_despesas|floatformat:2 }}</td>
-            <td>
+            <td class="small" data-label="KM">{{ r.total_km_percorrido }} km</td>
+            <td class="small" data-label="Total">R$ {{ r.total_despesas|floatformat:2 }}</td>
+            <td data-label="Status">
               <span class="badge bg-{{ r.status_badge_cor }}-subtle text-{{ r.status_badge_cor }} rounded-pill px-3">
                 {{ r.get_status_display }}
               </span>
             </td>
-            <td class="text-end pe-4">
+            <td class="text-end pe-4" data-label="Ações">
               <div class="d-flex gap-1 justify-content-end">
                 <a href="{% url 'relatorios:relatorio_detail' r.pk %}"
                    class="btn btn-sm btn-outline-secondary" title="Ver">
@@ -226,6 +226,59 @@
     display: grid;
     gap: .35rem;
     min-width: min(320px, calc(100vw - 2rem));
+  }
+
+  @media (max-width: 1400px) {
+    .relatorios-list-table {
+      border-collapse: separate;
+      border-spacing: 0 .75rem;
+      padding: .75rem;
+    }
+
+    .relatorios-list-table thead {
+      display: none;
+    }
+
+    .relatorios-list-table tbody,
+    .relatorios-list-table tr,
+    .relatorios-list-table td {
+      display: block;
+      width: 100%;
+    }
+
+    .relatorios-list-table tr {
+      border: 1px solid var(--bs-border-color);
+      border-radius: .75rem;
+      box-shadow: 0 .25rem .8rem rgba(15, 23, 42, .05);
+      overflow: hidden;
+      background: var(--bs-body-bg);
+    }
+
+    .relatorios-list-table td {
+      border-bottom: 1px solid var(--bs-border-color-translucent);
+      padding: .65rem 1rem !important;
+      text-align: left !important;
+    }
+
+    .relatorios-list-table td:last-child {
+      border-bottom: 0;
+    }
+
+    .relatorios-list-table td::before {
+      content: attr(data-label);
+      display: block;
+      margin-bottom: .2rem;
+      color: var(--bs-secondary-color);
+      font-size: .72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .02em;
+    }
+
+    .relatorios-list-table td[data-label="Ações"] .d-flex {
+      justify-content: flex-start !important;
+      flex-wrap: wrap;
+    }
   }
 </style>
 

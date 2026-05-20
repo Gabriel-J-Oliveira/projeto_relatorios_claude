@@ -338,8 +338,22 @@
                       <div class="fw-semibold text-success total-aprovado-despesa-linha">R$ {{ d.valor_final|floatformat:2 }}</div>
                     </div>
                     <div class="col-md-2">
-                      <span class="text-muted">Documento</span>
-                      <div>{% if d.comprovante %}<a href="{{ d.comprovante.url }}" target="_blank" class="btn btn-sm btn-outline-success">Abrir comprovante</a>{% else %}<span class="text-muted">Sem comprovante</span>{% endif %}</div>
+                      <span class="text-muted">Comprovante</span>
+                      <div>
+                        {% if d.comprovante %}
+                        <a href="{{ d.comprovante.url }}"
+                           target="_blank"
+                           class="btn btn-sm btn-outline-success rounded-circle px-2 py-1"
+                           title="Abrir comprovante">
+                          <i class="bi bi-paperclip"></i>
+                        </a>
+                        {% else %}
+                        <span class="btn btn-sm btn-outline-secondary rounded-circle px-2 py-1 disabled opacity-50"
+                              title="Sem comprovante">
+                          <i class="bi bi-paperclip"></i>
+                        </span>
+                        {% endif %}
+                      </div>
                     </div>
                     <div class="col-md-2">
                       <span class="text-muted">Status</span>
@@ -927,8 +941,8 @@
               <tr>
                 <th>Cliente</th>
                 <th>KM automático</th>
-                <th>Valor por KM</th>
-                <th>KM final</th>
+                <th>Valor/KM aprovado</th>
+                <th>Valor automático</th>
                 <th>Valor final</th>
                 <th>Status</th>
               </tr>
@@ -938,16 +952,23 @@
               <tr>
                 <td class="small">{{ r.cliente.nome }}</td>
                 <td class="small text-muted">{{ r.km_cliente|floatformat:1 }} km</td>
-                <td class="small text-muted">R$ {{ r.valor_km|floatformat:4 }}</td>
-                <td class="small fw-semibold">R$ {{ r.valor_calculado|floatformat:2 }}</td>
                 <td>
                   <input type="number"
-                         step="0.01"
-                         class="form-control form-control-sm rateio-valor"
+                         step="0.0001"
+                         min="0"
+                         class="form-control form-control-sm rateio-valor-km"
                          data-cliente-id="{{ r.cliente_id }}"
-                         data-original="{{ r.valor_final|unlocalize }}"
-                         value="{{ r.valor_final|unlocalize }}"
+                         data-original="{{ r.valor_km|unlocalize }}"
+                         data-km="{{ r.km_cliente|unlocalize }}"
+                         value="{{ r.valor_km|unlocalize }}"
                          {% if not pode_alterar_itens_financeiros or t.rejeitado or t.status_financeiro == 'rejeitado' %}disabled{% endif %}>
+                </td>
+                <td class="small text-muted">R$ {{ r.valor_calculado|floatformat:2 }}</td>
+                <td>
+                  <span class="fw-semibold rateio-valor-final-linha"
+                        data-original="{{ r.valor_final|unlocalize }}">
+                    R$ {{ r.valor_final|floatformat:2 }}
+                  </span>
                 </td>
                 <td><span class="badge text-bg-light">{{ r.get_status_display }}</span></td>
               </tr>
@@ -1328,10 +1349,21 @@
       const total = parseMoney(modal.dataset.rateioTotal);
       const tipo = modal.dataset.rateioTipo;
       const valores = Array.from(modal.querySelectorAll(".rateio-valor"));
+      const valoresKm = Array.from(modal.querySelectorAll(".rateio-valor-km"));
       const kms = Array.from(modal.querySelectorAll(".rateio-km"));
       const feedback = modal.querySelector(".rateio-feedback");
       const botoes = modal.querySelectorAll(".rateio-salvar");
-      const soma = valores.reduce((acc, input) => acc + parseMoney(input.value), 0);
+      const somaValoresKm = valoresKm.reduce((acc, input) => {
+        const valorLinha = parseMoney(input.value) * parseMoney(input.dataset.km || "0");
+        const valorArredondado = Math.round(valorLinha * 100) / 100;
+        const linha = input.closest("tr");
+        const finalLinha = linha?.querySelector(".rateio-valor-final-linha");
+        if (finalLinha) finalLinha.textContent = formatMoney(valorArredondado);
+        return acc + valorArredondado;
+      }, 0);
+      const soma = tipo === "trecho"
+        ? somaValoresKm
+        : valores.reduce((acc, input) => acc + parseMoney(input.value), 0);
       const diferenca = Math.round((total - soma) * 100) / 100;
       const somaKm = kms.reduce((acc, input) => acc + parseMoney(input.value), 0);
       const totalKm = parseMoney(modal.dataset.rateioKm || "0");
@@ -1339,10 +1371,13 @@
       const alteradoValor = valores.some(input => {
         return Math.abs(parseMoney(input.value) - parseMoney(input.dataset.original)) > 0.009;
       });
+      const alteradoValorKm = valoresKm.some(input => {
+        return Math.abs(parseMoney(input.value) - parseMoney(input.dataset.original)) > 0.00009;
+      });
       const alteradoKm = kms.some(input => {
         return Math.abs(parseMoney(input.value) - parseMoney(input.dataset.original)) > 0.09;
       });
-      const alterado = alteradoValor || alteradoKm;
+      const alterado = alteradoValor || alteradoValorKm || alteradoKm;
       const motivo = modal.querySelector(".rateio-motivo");
       const motivoOk = !alterado || String(motivo?.value || "").trim().length > 0;
       const somaOk = tipo === "trecho" || Math.abs(diferenca) < 0.009;
@@ -1353,7 +1388,7 @@
         if (ok) {
           feedback.className = "rateio-feedback small mt-3 text-success";
           feedback.textContent = tipo === "trecho"
-            ? `Total final de KM em ${formatMoney(soma)}.`
+            ? `Total final recalculado em ${formatMoney(soma)}.`
             : `Rateio fechado em ${formatMoney(soma)}.`;
         } else if (!somaOk) {
           feedback.className = "rateio-feedback small mt-3 text-danger";
@@ -1379,7 +1414,7 @@
       modal.addEventListener("shown.bs.modal", function () {
         validarRateioModal(modal);
       });
-      modal.querySelectorAll(".rateio-valor, .rateio-km, .rateio-motivo").forEach(function (input) {
+      modal.querySelectorAll(".rateio-valor, .rateio-valor-km, .rateio-km, .rateio-motivo").forEach(function (input) {
         input.addEventListener("input", function () {
           validarRateioModal(modal);
         });
@@ -1393,14 +1428,15 @@
             motivo: modal.querySelector(".rateio-motivo")?.value || "",
             rateios: Array.from(modal.querySelectorAll("tbody tr")).map(row => {
               const valor = row.querySelector(".rateio-valor");
+              const valorKm = row.querySelector(".rateio-valor-km");
               const km = row.querySelector(".rateio-km");
               const item = {
-                cliente_id: valor?.dataset.clienteId || km?.dataset.clienteId,
+                cliente_id: valor?.dataset.clienteId || valorKm?.dataset.clienteId || km?.dataset.clienteId,
               };
               if (tipo === "despesa") {
                 item.valor_final = valor.value;
               } else {
-                item.valor_final = valor.value;
+                item.valor_km = valorKm.value;
               }
               return item;
             }),
