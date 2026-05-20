@@ -114,7 +114,7 @@
            class="clientes-item-input"
            name="despesas-{{ idx }}-clientes"
            id="id_despesas-{{ idx }}-clientes"
-           value="{% for vinculo in form.instance.clientes_vinculados.all %}{{ vinculo.cliente_id }}{% if not forloop.last %},{% endif %}{% endfor %}">
+           value="{% if form.instance.pk %}{% for vinculo in form.instance.clientes_vinculados.all %}{{ vinculo.cliente_id }}{% if not forloop.last %},{% endif %}{% endfor %}{% endif %}">
     <button type="button"
             class="btn btn-sm btn-outline-secondary w-100 clientes-item-btn"
             data-bs-toggle="modal"
