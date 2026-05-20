@@ -19,6 +19,11 @@ from relatorios.services.autorizacao_service import (
     usuario_pode_enviar_relatorio,
 )
 from relatorios.services.historico_service import registrar_evento
+from relatorios.services.rateio_service import (
+    garantir_rateio_despesa,
+    garantir_rateio_trecho,
+    validar_rateios_relatorio,
+)
 from relatorios.services.validacoes_operacionais import (
     validar_relatorio_para_aprovacao,
     validar_relatorio_para_envio,
@@ -226,6 +231,7 @@ def _salvar_valores_aprovados(post_data, relatorio, usuario, consolidar=False):
             valor_anterior = despesa.valor_aprovado
             despesa.valor_aprovado = valor_aprovado
             despesa.save(update_fields=["valor_aprovado"])
+            garantir_rateio_despesa(despesa)
             registrar_evento(
                 relatorio,
                 usuario,
@@ -247,6 +253,7 @@ def _salvar_valores_aprovados(post_data, relatorio, usuario, consolidar=False):
             valor_anterior = trecho.valor_km_aprovado
             trecho.valor_km_aprovado = valor_km_aprovado
             trecho.save(update_fields=["valor_km_aprovado"])
+            garantir_rateio_trecho(trecho)
             registrar_evento(
                 relatorio,
                 usuario,
@@ -278,7 +285,10 @@ def _validar_aprovacao_financeira(relatorio):
         for item in list(relatorio.despesas.all()) + list(relatorio.trechos.all())
     )
     if not itens_ativos:
-        raise WorkflowError("Não é possível aprovar relatório com todos os itens rejeitados.")
+        raise WorkflowError("N?o ? poss?vel aprovar relat?rio com todos os itens rejeitados.")
+    erros_rateio = validar_rateios_relatorio(relatorio)
+    if erros_rateio:
+        raise WorkflowError(erros_rateio)
 
 
 def enviar_para_conferencia(relatorio_id, usuario=None):

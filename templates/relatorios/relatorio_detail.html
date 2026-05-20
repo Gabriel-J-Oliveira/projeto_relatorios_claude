@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load l10n %}
 
 {% block titulo %}{{ relatorio.identificador }}{% endblock %}
 {% block page_title %}Relatório {{ relatorio.identificador }}{% endblock %}
@@ -224,6 +225,7 @@
                 <th class="small fw-semibold text-muted">Pago por</th>
                 <th class="small fw-semibold text-muted">C. Custo</th>
                 <th class="small fw-semibold text-muted text-center">Doc.</th>
+                <th class="small fw-semibold text-muted text-center">Rateio</th>
                 <th class="small fw-semibold text-muted text-end pe-3">Ação</th>
               </tr>
             </thead>
@@ -280,6 +282,18 @@
                   <span class="text-muted small">—</span>
                   {% endif %}
                 </td>
+                <td class="text-center">
+                  <button type="button"
+                          class="btn btn-sm btn-outline-info rounded-circle rateio-info-btn"
+                          data-bs-toggle="popover"
+                          data-bs-trigger="hover focus"
+                          data-bs-html="true"
+                          data-bs-title="Rateio da despesa"
+                          data-bs-content="{% for r in d.rateios.all %}<div class='d-flex justify-content-between gap-3'><span>{{ r.cliente.nome }}</span><strong>R$ {{ r.valor_final|floatformat:2 }}</strong></div>{% empty %}<span class='text-muted'>Rateio nao gerado.</span>{% endfor %}"
+                          data-rateio-modal="#modal-rateio-despesa-{{ d.pk }}">
+                    <i class="bi bi-info-lg"></i>
+                  </button>
+                </td>
                 <td class="text-end pe-3">
                   {% if pode_alterar_itens_financeiros %}
                     {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
@@ -310,7 +324,7 @@
                   R$ {{ relatorio.total_despesas_tecnico|add:relatorio.total_despesas_empresa|floatformat:2 }}
                 </td>
                 <td class="small fw-bold text-success" id="total-aprovado-despesas">R$ {{ relatorio.total_aprovado_despesas|floatformat:2 }}</td>
-                <td colspan="4"></td>
+                <td colspan="5"></td>
               </tr>
             </tfoot>
           </table>
@@ -345,6 +359,7 @@
                 <th class="small fw-semibold text-muted">Total Solicitado</th>
                 <th class="small fw-semibold text-muted">Total Aprovado</th>
                 <th class="small fw-semibold text-muted">Obs.</th>
+                <th class="small fw-semibold text-muted text-center">Rateio</th>
                 <th class="small fw-semibold text-muted text-end pe-3">Ação</th>
               </tr>
             </thead>
@@ -385,6 +400,18 @@
                     <span class="badge bg-warning-subtle text-warning small">Valor ajustado</span>
                   </div>
                   {% endif %}
+                </td>
+                <td class="text-center">
+                  <button type="button"
+                          class="btn btn-sm btn-outline-info rounded-circle rateio-info-btn"
+                          data-bs-toggle="popover"
+                          data-bs-trigger="hover focus"
+                          data-bs-html="true"
+                          data-bs-title="Rateio do trecho KM"
+                          data-bs-content="{% for r in t.rateios.all %}<div class='d-flex justify-content-between gap-3'><span>{{ r.cliente.nome }}</span><strong>R$ {{ r.valor_rateado|floatformat:2 }}</strong></div>{% empty %}<span class='text-muted'>Rateio nao gerado.</span>{% endfor %}"
+                          data-rateio-modal="#modal-rateio-trecho-{{ t.pk }}">
+                    <i class="bi bi-info-lg"></i>
+                  </button>
                 </td>
                 <td class="text-end pe-3">
                   {% if pode_alterar_itens_financeiros %}
@@ -584,6 +611,167 @@
 
 </form>
 
+{% for d in relatorio.despesas.all %}
+<div class="modal fade rateio-modal"
+     id="modal-rateio-despesa-{{ d.pk }}"
+     tabindex="-1"
+     aria-hidden="true"
+     data-rateio-tipo="despesa"
+     data-rateio-item="{{ d.pk }}"
+     data-rateio-total="{{ d.valor_final|unlocalize }}"
+     data-rateio-url="{% url 'relatorios:relatorio_rateio_financeiro' relatorio.pk 'despesa' d.pk %}">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light">
+        <div>
+          <h5 class="modal-title mb-1">
+            <i class="bi bi-diagram-3 me-2 text-primary"></i>Rateio da despesa
+          </h5>
+          <div class="small text-muted">{{ d.get_tipo_display }} — {{ d.descricao }}</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+          <span class="badge text-bg-secondary">Total R$ {{ d.valor_final|floatformat:2 }}</span>
+          <span class="badge text-bg-info">Rateio por cliente</span>
+        </div>
+        <div class="table-responsive border rounded">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Cliente</th>
+                <th>Valor automático</th>
+                <th>Valor final</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in d.rateios.all %}
+              <tr>
+                <td class="small">{{ r.cliente.nome }}</td>
+                <td class="small text-muted">R$ {{ r.valor_original|floatformat:2 }}</td>
+                <td>
+                  <input type="number"
+                         step="0.01"
+                         class="form-control form-control-sm rateio-valor"
+                         data-cliente-id="{{ r.cliente_id }}"
+                         data-original="{{ r.valor_original|unlocalize }}"
+                         value="{{ r.valor_final|unlocalize }}"
+                         {% if not pode_alterar_itens_financeiros %}disabled{% endif %}>
+                </td>
+                <td><span class="badge text-bg-light">{{ r.get_status_display }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="rateio-feedback small mt-3"></div>
+        <div class="mt-3">
+          <label class="form-label small fw-semibold">Motivo da alteração</label>
+          <textarea class="form-control form-control-sm rateio-motivo"
+                    rows="3"
+                    placeholder="Obrigatório se houver alteração manual"
+                    {% if not pode_alterar_itens_financeiros %}disabled{% endif %}></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        {% if pode_alterar_itens_financeiros %}
+        <button type="button" class="btn btn-outline-primary btn-sm rateio-salvar" data-rateio-acao="salvar">Salvar ajustes</button>
+        <button type="button" class="btn btn-success btn-sm rateio-salvar" data-rateio-acao="aprovar">Aprovar rateio</button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{% for t in relatorio.trechos.all %}
+<div class="modal fade rateio-modal"
+     id="modal-rateio-trecho-{{ t.pk }}"
+     tabindex="-1"
+     aria-hidden="true"
+     data-rateio-tipo="trecho"
+     data-rateio-item="{{ t.pk }}"
+     data-rateio-total="{{ t.valor_final|unlocalize }}"
+     data-rateio-url="{% url 'relatorios:relatorio_rateio_financeiro' relatorio.pk 'trecho' t.pk %}">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light">
+        <div>
+          <h5 class="modal-title mb-1">
+            <i class="bi bi-diagram-3 me-2 text-primary"></i>Rateio do trecho KM
+          </h5>
+          <div class="small text-muted">{{ t.origem }} → {{ t.destino }} — {{ t.km }} km</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+          <span class="badge text-bg-secondary">Total R$ {{ t.valor_final|floatformat:2 }}</span>
+          <span class="badge text-bg-info">Rateio por cliente</span>
+        </div>
+        <div class="table-responsive border rounded">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Cliente</th>
+                <th>KM automático</th>
+                <th>KM final</th>
+                <th>Valor final</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in t.rateios.all %}
+              <tr>
+                <td class="small">{{ r.cliente.nome }}</td>
+                <td class="small text-muted">{{ r.km_original|floatformat:1 }} km</td>
+                <td>
+                  <input type="number"
+                         step="0.1"
+                         class="form-control form-control-sm rateio-km"
+                         data-cliente-id="{{ r.cliente_id }}"
+                         value="{{ r.km_final|unlocalize }}"
+                         {% if not pode_alterar_itens_financeiros %}disabled{% endif %}>
+                </td>
+                <td>
+                  <input type="number"
+                         step="0.01"
+                         class="form-control form-control-sm rateio-valor"
+                         data-cliente-id="{{ r.cliente_id }}"
+                         data-original="{{ r.valor_rateado|unlocalize }}"
+                         value="{{ r.valor_rateado|unlocalize }}"
+                         {% if not pode_alterar_itens_financeiros %}disabled{% endif %}>
+                </td>
+                <td><span class="badge text-bg-light">{{ r.get_status_display }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="rateio-feedback small mt-3"></div>
+        <div class="mt-3">
+          <label class="form-label small fw-semibold">Motivo da alteração</label>
+          <textarea class="form-control form-control-sm rateio-motivo"
+                    rows="3"
+                    placeholder="Obrigatório se houver alteração manual"
+                    {% if not pode_alterar_itens_financeiros %}disabled{% endif %}></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        {% if pode_alterar_itens_financeiros %}
+        <button type="button" class="btn btn-outline-primary btn-sm rateio-salvar" data-rateio-acao="salvar">Salvar ajustes</button>
+        <button type="button" class="btn btn-success btn-sm rateio-salvar" data-rateio-acao="aprovar">Aprovar rateio</button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
 {% if pode_alterar_itens_financeiros %}
   {% for d in relatorio.despesas.all %}
     {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
@@ -755,6 +943,131 @@
 
 <script>
   document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll('[data-bs-toggle="popover"]').forEach(function (el) {
+      new bootstrap.Popover(el, { sanitize: false, placement: "left" });
+    });
+
+    document.querySelectorAll(".rateio-info-btn").forEach(function (button) {
+      button.addEventListener("click", function () {
+        const modalId = button.dataset.rateioModal;
+        const modalEl = modalId ? document.querySelector(modalId) : null;
+        if (modalEl) {
+          bootstrap.Popover.getInstance(button)?.hide();
+          bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+      });
+    });
+
+    function parseMoney(value) {
+      const texto = String(value || "0").trim();
+      const normalizado = texto.includes(",")
+        ? texto.replace(/\./g, "").replace(",", ".")
+        : texto;
+      const numero = Number.parseFloat(normalizado);
+      return Number.isFinite(numero) ? numero : 0;
+    }
+
+    function formatMoney(value) {
+      return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    }
+
+    function validarRateioModal(modal) {
+      const total = parseMoney(modal.dataset.rateioTotal);
+      const valores = Array.from(modal.querySelectorAll(".rateio-valor"));
+      const feedback = modal.querySelector(".rateio-feedback");
+      const botoes = modal.querySelectorAll(".rateio-salvar");
+      const soma = valores.reduce((acc, input) => acc + parseMoney(input.value), 0);
+      const diferenca = Math.round((total - soma) * 100) / 100;
+      const alterado = valores.some(input => {
+        return Math.abs(parseMoney(input.value) - parseMoney(input.dataset.original)) > 0.009;
+      });
+      const motivo = modal.querySelector(".rateio-motivo");
+      const motivoOk = !alterado || String(motivo?.value || "").trim().length > 0;
+      const somaOk = Math.abs(diferenca) < 0.009;
+      const ok = somaOk && motivoOk;
+
+      if (feedback) {
+        if (ok) {
+          feedback.className = "rateio-feedback small mt-3 text-success";
+          feedback.textContent = `Rateio fechado em ${formatMoney(soma)}.`;
+        } else if (!somaOk) {
+          feedback.className = "rateio-feedback small mt-3 text-danger";
+          feedback.textContent = diferenca > 0
+            ? `Faltam ${formatMoney(diferenca)} para fechar o rateio.`
+            : `Excesso de ${formatMoney(Math.abs(diferenca))} no rateio.`;
+        } else {
+          feedback.className = "rateio-feedback small mt-3 text-danger";
+          feedback.textContent = "Informe o motivo da alteração manual.";
+        }
+      }
+
+      botoes.forEach(btn => btn.disabled = !ok);
+      return ok;
+    }
+
+    document.querySelectorAll(".rateio-modal").forEach(function (modal) {
+      modal.addEventListener("shown.bs.modal", function () {
+        validarRateioModal(modal);
+      });
+      modal.querySelectorAll(".rateio-valor, .rateio-km, .rateio-motivo").forEach(function (input) {
+        input.addEventListener("input", function () {
+          validarRateioModal(modal);
+        });
+      });
+      modal.querySelectorAll(".rateio-salvar").forEach(function (button) {
+        button.addEventListener("click", async function () {
+          if (!validarRateioModal(modal)) return;
+          const tipo = modal.dataset.rateioTipo;
+          const payload = {
+            acao: button.dataset.rateioAcao || "salvar",
+            motivo: modal.querySelector(".rateio-motivo")?.value || "",
+            rateios: Array.from(modal.querySelectorAll("tbody tr")).map(row => {
+              const valor = row.querySelector(".rateio-valor");
+              const km = row.querySelector(".rateio-km");
+              const item = {
+                cliente_id: valor?.dataset.clienteId || km?.dataset.clienteId,
+              };
+              if (tipo === "despesa") {
+                item.valor_final = valor.value;
+              } else {
+                item.km_final = km.value;
+                item.valor_rateado = valor.value;
+              }
+              return item;
+            }),
+          };
+
+          button.disabled = true;
+          try {
+            const response = await fetch(modal.dataset.rateioUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]")?.value || "",
+                "X-Requested-With": "XMLHttpRequest",
+              },
+              credentials: "same-origin",
+              body: JSON.stringify(payload),
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+              throw new Error((data.errors || ["Erro ao salvar rateio."]).join(" "));
+            }
+            bootstrap.Modal.getInstance(modal)?.hide();
+            window.location.reload();
+          } catch (error) {
+            const feedback = modal.querySelector(".rateio-feedback");
+            if (feedback) {
+              feedback.className = "rateio-feedback small mt-3 text-danger";
+              feedback.textContent = error.message;
+            }
+          } finally {
+            button.disabled = false;
+          }
+        });
+      });
+    });
+
     document.querySelectorAll(".aviso-financeiro").forEach(function (item) {
       item.addEventListener("click", function () {
         const targetIds = (item.dataset.targetLinhas || item.dataset.targetLinha || "")

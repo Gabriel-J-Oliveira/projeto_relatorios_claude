@@ -1,4 +1,5 @@
 import logging
+import json
 from decimal import Decimal
 
 from django.contrib import messages
@@ -57,6 +58,13 @@ from .services.workflow_service import (
     rejeitar_relatorio,
     relatorio_bloqueado as workflow_relatorio_bloqueado,
     solicitar_ajuste,
+)
+from .services.rateio_service import (
+    RateioError,
+    garantir_rateios_relatorio,
+    salvar_rateio_despesa,
+    salvar_rateio_trecho,
+    serializar_rateio,
 )
 from .forms import (
     AdiantamentoForm,
@@ -1186,9 +1194,25 @@ def relatorio_detail_view(request, pk):
             request.user,
             RelatorioTecnico.objects.select_related(
                 "cliente", "tecnico_responsavel"
-            ).prefetch_related("despesas", "trechos", "equipe__tecnico", "historicos__usuario"),
+            ).prefetch_related(
+                "despesas__rateios__cliente",
+                "trechos__rateios__cliente",
+                "equipe__tecnico",
+                "historicos__usuario",
+            ),
         ),
         pk=pk,
+    )
+    garantir_rateios_relatorio(relatorio)
+    relatorio = (
+        RelatorioTecnico.objects.select_related("cliente", "tecnico_responsavel")
+        .prefetch_related(
+            "despesas__rateios__cliente",
+            "trechos__rateios__cliente",
+            "equipe__tecnico",
+            "historicos__usuario",
+        )
+        .get(pk=relatorio.pk)
     )
 
     return render(
@@ -1636,6 +1660,70 @@ def relatorio_item_financeiro_view(request, pk, tipo, item_pk, acao):
         messages.error(request, "Erro interno ao alterar item. Tente novamente.")
 
     return redirect("relatorios:relatorio_detail", pk=pk)
+
+
+@require_POST
+@login_required
+@exigir_financeiro
+def relatorio_rateio_financeiro_json(request, pk, tipo, item_pk):
+    if tipo not in {"despesa", "trecho"}:
+        return JsonResponse({"success": False, "errors": ["Tipo de item inválido."]}, status=400)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"success": False, "errors": ["JSON inválido."]}, status=400)
+
+    try:
+        relatorio = get_object_or_404(
+            _relatorios_visiveis(request.user, RelatorioTecnico.objects.all()),
+            pk=pk,
+        )
+        if _relatorio_bloqueado(relatorio):
+            return JsonResponse(
+                {"success": False, "errors": ["Relatório aprovado ou rejeitado está bloqueado."]},
+                status=400,
+            )
+
+        modelo = ItemDespesa if tipo == "despesa" else TrechoKm
+        item = get_object_or_404(modelo, pk=item_pk, relatorio=relatorio)
+        acao = payload.get("acao") or "salvar"
+        aprovar = acao == "aprovar"
+        dados_rateio = payload.get("rateios") or []
+        motivo = payload.get("motivo") or ""
+
+        if tipo == "despesa":
+            rateios = salvar_rateio_despesa(
+                item,
+                dados_rateio,
+                request.user,
+                motivo=motivo,
+                aprovar=aprovar,
+            )
+        else:
+            rateios = salvar_rateio_trecho(
+                item,
+                dados_rateio,
+                request.user,
+                motivo=motivo,
+                aprovar=aprovar,
+            )
+
+        return JsonResponse(
+            {
+                "success": True,
+                "rateios": [serializar_rateio(rateio) for rateio in rateios],
+                "message": "Rateio salvo com sucesso.",
+            }
+        )
+    except RateioError as exc:
+        return JsonResponse({"success": False, "errors": [str(exc)]}, status=400)
+    except Exception as exc:
+        logger.exception("Erro ao salvar rateio do relatório %s: %s", pk, exc)
+        return JsonResponse(
+            {"success": False, "errors": ["Erro interno ao salvar rateio."]},
+            status=500,
+        )
 
 
 @require_POST

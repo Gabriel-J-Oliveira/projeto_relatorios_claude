@@ -35,6 +35,12 @@ class StatusFinanceiroItem(models.TextChoices):
     REJEITADO = "rejeitado", "Rejeitado"
 
 
+class StatusRateio(models.TextChoices):
+    AUTO = "auto", "Automático"
+    ADJUSTED = "adjusted", "Ajustado"
+    APPROVED = "approved", "Aprovado"
+
+
 class TipoEventoHistorico(models.TextChoices):
     CRIADO = "criado", "Relatório criado"
     ENVIADO = "enviado", "Relatório enviado para conferência"
@@ -768,6 +774,51 @@ class DespesaCliente(models.Model):
 # ─────────────────────────────────────────────────────────────────
 
 
+class DespesaRateio(models.Model):
+    despesa = models.ForeignKey(
+        ItemDespesa,
+        on_delete=models.CASCADE,
+        related_name="rateios",
+    )
+    cliente = models.ForeignKey(
+        Cliente,
+        on_delete=models.PROTECT,
+        related_name="rateios_despesas",
+    )
+    valor_original = models.DecimalField(max_digits=10, decimal_places=2)
+    valor_final = models.DecimalField(max_digits=10, decimal_places=2)
+    percentual = models.DecimalField(
+        max_digits=7,
+        decimal_places=4,
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=StatusRateio.choices,
+        default=StatusRateio.AUTO,
+    )
+    alterado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="rateios_despesa_alterados",
+    )
+    motivo_ajuste = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Rateio da Despesa"
+        verbose_name_plural = "Rateios das Despesas"
+        ordering = ["cliente__nome"]
+        unique_together = [("despesa", "cliente")]
+
+    def __str__(self):
+        return f"{self.despesa_id} - {self.cliente} - R$ {self.valor_final}"
+
+
 class TrechoKm(models.Model):
     relatorio = models.ForeignKey(
         RelatorioTecnico,
@@ -908,6 +959,46 @@ class TrechoKMCliente(models.Model):
 # ─────────────────────────────────────────────────────────────────
 # ADIANTAMENTO
 # ─────────────────────────────────────────────────────────────────
+
+
+class TrechoRateioKM(models.Model):
+    trecho = models.ForeignKey(
+        TrechoKm,
+        on_delete=models.CASCADE,
+        related_name="rateios",
+    )
+    cliente = models.ForeignKey(
+        Cliente,
+        on_delete=models.PROTECT,
+        related_name="rateios_trechos_km",
+    )
+    km_original = models.DecimalField(max_digits=8, decimal_places=1)
+    km_final = models.DecimalField(max_digits=8, decimal_places=1)
+    valor_rateado = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(
+        max_length=10,
+        choices=StatusRateio.choices,
+        default=StatusRateio.AUTO,
+    )
+    alterado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="rateios_km_alterados",
+    )
+    motivo_ajuste = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Rateio do Trecho KM"
+        verbose_name_plural = "Rateios dos Trechos KM"
+        ordering = ["cliente__nome"]
+        unique_together = [("trecho", "cliente")]
+
+    def __str__(self):
+        return f"{self.trecho_id} - {self.cliente} - R$ {self.valor_rateado}"
 
 
 class TipoAdiantamento(models.TextChoices):

@@ -21,6 +21,11 @@ urlpatterns = [
         views.relatorio_item_financeiro_view,
         name="relatorio_item_financeiro",
     ),
+    path(
+        "relatorios/<int:pk>/rateio/<str:tipo>/<int:item_pk>/",
+        views.relatorio_rateio_financeiro_json,
+        name="relatorio_rateio_financeiro",
+    ),
     path("relatorios/importar/listar/", views.relatorio_import_list_json, name="relatorio_import_list"),
     path("relatorios/importar/<int:pk>/", views.relatorio_import_detail_json, name="relatorio_import_detail"),
 

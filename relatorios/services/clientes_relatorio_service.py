@@ -104,6 +104,9 @@ def sync_clientes_despesa(despesa, cliente_ids):
     ).delete()
     for cliente_id in cliente_ids:
         DespesaCliente.objects.get_or_create(despesa=despesa, cliente_id=cliente_id)
+    from relatorios.services.rateio_service import garantir_rateio_despesa
+
+    garantir_rateio_despesa(despesa)
     return []
 
 
@@ -117,4 +120,7 @@ def sync_clientes_trecho(trecho, cliente_ids):
     ).delete()
     for cliente_id in cliente_ids:
         TrechoKMCliente.objects.get_or_create(trecho=trecho, cliente_id=cliente_id)
+    from relatorios.services.rateio_service import garantir_rateio_trecho
+
+    garantir_rateio_trecho(trecho)
     return []
