@@ -10,6 +10,7 @@ from django.db import models
 from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 from decimal import Decimal
 
 
@@ -366,6 +367,19 @@ class RelatorioTecnico(models.Model):
         default=Decimal("0.00"),
         validators=[MinValueValidator(Decimal("0.00"))],
     )
+    km_excedente_interno = models.DecimalField(
+        "KM excedente / deslocamento interno",
+        max_digits=8,
+        decimal_places=2,
+        blank=True,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    observacao_km_excedente = models.CharField(
+        "Observação do KM excedente",
+        max_length=255,
+        blank=True,
+    )
 
     observacoes = models.TextField("Observações gerais", blank=True)
     motivo_rejeicao = models.TextField("Justificativa financeira", blank=True)
@@ -502,7 +516,42 @@ class RelatorioTecnico(models.Model):
                 )
             else:
                 total += trecho.valor_calculado or Decimal("0.00")
+        total += self.total_km_excedente
         return _valor_monetario(total)
+
+    def rateio_km_excedente_clientes(self):
+        km_total = self.km_excedente_interno or Decimal("0.00")
+        clientes = list(self.clientes_exibicao())
+        if km_total <= 0 or not clientes:
+            return []
+
+        base = (km_total / Decimal(len(clientes))).quantize(Decimal("0.01"))
+        linhas = []
+        acumulado = Decimal("0.00")
+        for idx, cliente in enumerate(clientes):
+            km_cliente = base
+            if idx == len(clientes) - 1:
+                km_cliente = (km_total - acumulado).quantize(Decimal("0.01"))
+            acumulado += km_cliente
+            valor_km = cliente.valor_km or Decimal("0.00")
+            linhas.append(
+                {
+                    "cliente": cliente,
+                    "km": km_cliente,
+                    "valor_km": valor_km,
+                    "valor_calculado": _valor_monetario(km_cliente * valor_km),
+                }
+            )
+        return linhas
+
+    @property
+    def total_km_excedente(self):
+        return _valor_monetario(
+            sum(
+                (linha["valor_calculado"] for linha in self.rateio_km_excedente_clientes()),
+                Decimal("0.00"),
+            )
+        )
 
     @property
     def total_despesas(self):
@@ -534,6 +583,7 @@ class RelatorioTecnico(models.Model):
                 )
             else:
                 total += trecho.valor_final
+        total += self.total_km_excedente
         return _valor_monetario(total)
 
     @property
@@ -568,7 +618,8 @@ class RelatorioTecnico(models.Model):
 
     @property
     def total_km_percorrido(self):
-        return self.trechos.aggregate(t=models.Sum("km"))["t"] or Decimal("0.00")
+        total = self.trechos.aggregate(t=models.Sum("km"))["t"] or Decimal("0.00")
+        return total + (self.km_excedente_interno or Decimal("0.00"))
 
     @property
     def status_badge_cor(self):
@@ -587,9 +638,18 @@ class RelatorioTecnico(models.Model):
                     {"data_fim": "Data fim não pode ser anterior à data início."}
                 )
 
+        if self.km_excedente_interno is not None and self.km_excedente_interno < 0:
+            raise ValidationError(
+                {"km_excedente_interno": "KM excedente nao pode ser negativo."}
+            )
+
     def pode_enviar(self):
         erros = []
-        if not self.despesas.exists() and not self.trechos.exists():
+        if (
+            not self.despesas.exists()
+            and not self.trechos.exists()
+            and (self.km_excedente_interno or Decimal("0.00")) <= 0
+        ):
             erros.append("Adicione pelo menos uma despesa ou trecho de KM.")
         return erros
 
@@ -954,6 +1014,11 @@ class TrechoKm(models.Model):
     ordem = models.PositiveSmallIntegerField("Ordem", default=0)
     data = models.DateField("Data", null=True, blank=True)
     origem = models.CharField("Origem", max_length=150)
+    origem_endereco_completo = models.CharField(
+        "Endereço completo da origem",
+        max_length=255,
+        blank=True,
+    )
     origem_lat = models.DecimalField(
         "Latitude origem",
         max_digits=10,
@@ -969,6 +1034,11 @@ class TrechoKm(models.Model):
         blank=True,
     )
     destino = models.CharField("Destino", max_length=150)
+    destino_endereco_completo = models.CharField(
+        "Endereço completo do destino",
+        max_length=255,
+        blank=True,
+    )
     destino_lat = models.DecimalField(
         "Latitude destino",
         max_digits=10,
@@ -989,6 +1059,35 @@ class TrechoKm(models.Model):
         decimal_places=2,
         validators=[MinValueValidator(Decimal("0.01"))],
     )
+    km_calculado_api = models.DecimalField(
+        "KM calculado pela API",
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    km_informado = models.DecimalField(
+        "KM informado",
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    diferenca_km_percentual = models.DecimalField(
+        "Diferença KM (%)",
+        max_digits=7,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    fonte_calculo_rota = models.CharField(
+        "Fonte do cálculo da rota",
+        max_length=30,
+        blank=True,
+        default="",
+    )
+    calculado_em = models.DateTimeField("Calculado em", null=True, blank=True)
+    rota_geojson = models.JSONField("Geometria da rota", default=dict, blank=True)
     valor_km = models.DecimalField(
         "Valor por km (R$)",
         max_digits=6,
@@ -1086,13 +1185,42 @@ class TrechoKm(models.Model):
             and self.valor_km_aprovado != self.valor_km
         )
 
+    @property
+    def km_divergente_rota(self):
+        return (
+            self.diferenca_km_percentual is not None
+            and self.diferenca_km_percentual > Decimal("15.00")
+        )
+
+    def atualizar_dados_geograficos(self):
+        self.km_informado = self.km
+        if not self.km_calculado_api or self.km_calculado_api <= 0:
+            self.diferenca_km_percentual = None
+            if not self.fonte_calculo_rota:
+                self.fonte_calculo_rota = "manual"
+            return
+
+        diferenca = abs(self.km_informado - self.km_calculado_api)
+        self.diferenca_km_percentual = (
+            (diferenca / self.km_calculado_api) * Decimal("100")
+        ).quantize(Decimal("0.01"))
+        if not self.fonte_calculo_rota:
+            self.fonte_calculo_rota = "OSRM"
+        if not self.calculado_em:
+            self.calculado_em = timezone.now()
+
     def save(self, *args, **kwargs):
         if not self.valor_km and self.data:
             self.valor_km = PoliticaValor.valor_km_vigente(self.data)
+        self.atualizar_dados_geograficos()
         self.valor_calculado = (self.km * self.valor_km).quantize(Decimal("0.01"))
         super().save(*args, **kwargs)
 
     def clean(self):
+        if self.km_calculado_api is not None and self.km_calculado_api < 0:
+            raise ValidationError({"km_calculado_api": "KM calculado não pode ser negativo."})
+        if self.km_informado is not None and self.km_informado < 0:
+            raise ValidationError({"km_informado": "KM informado não pode ser negativo."})
         if self.relatorio_id and self.data:
             rel = self.relatorio
             if self.data < rel.data_inicio or self.data > rel.data_fim:

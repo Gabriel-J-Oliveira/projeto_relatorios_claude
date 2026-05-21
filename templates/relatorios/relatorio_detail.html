@@ -132,6 +132,33 @@
 </div>
 {% endif %}
 
+{{ mapa_trechos_json|json_script:"mapa-trechos-detail-data" }}
+
+<section class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center">
+    <div>
+      <h6 class="mb-0 fw-semibold">
+        <i class="bi bi-map text-primary me-2"></i>Mapa dos trechos KM
+      </h6>
+      <small class="text-muted">Rotas calculadas a partir dos endereÃ§os salvos</small>
+    </div>
+    <span class="badge rounded-pill text-bg-light border">{{ mapa_trechos_json|length }} rota(s)</span>
+  </div>
+  <div class="card-body">
+    <div id="mapa-trechos-detail" class="mapa-trechos-km"></div>
+    <div id="mapa-trechos-detail-vazio" class="text-muted small d-none">
+      Nenhum trecho com coordenadas disponÃ­veis para exibiÃ§Ã£o no mapa.
+    </div>
+    {% if relatorio.km_excedente_interno > 0 %}
+    <div class="alert alert-info border-0 shadow-sm mt-3 mb-0 py-2 small">
+      <i class="bi bi-signpost-split me-1"></i>
+      KM excedente / deslocamento interno informado separadamente:
+      <strong>{{ relatorio.km_excedente_interno|floatformat:2 }} km</strong>.
+    </div>
+    {% endif %}
+  </div>
+</section>
+
 <form method="post"
       id="form-valores-aprovados-financeiro"
       data-total-solicitado="{{ relatorio.total_solicitado|unlocalize }}"
@@ -327,7 +354,7 @@
                 </td>
               </tr>
               <tr class="collapse bg-body-tertiary" id="detalhes-despesa-{{ d.pk }}">
-                <td colspan="8" class="px-3 py-3">
+                <td colspan="9" class="px-3 py-3">
                   <div class="row g-3 small">
                     <div class="col-md-2">
                       <span class="text-muted">Pago por</span>
@@ -494,6 +521,24 @@
                       <div class="fw-semibold">{{ t.destino }}</div>
                     </div>
                     <div class="col-md-2">
+                      <span class="text-muted">KM rota</span>
+                      {% if t.km_calculado_api %}
+                      <div class="fw-semibold">{{ t.km_calculado_api|floatformat:2 }} km</div>
+                      <div class="text-muted">Fonte: {{ t.fonte_calculo_rota|default:"OSRM" }}</div>
+                      {% else %}
+                      <div class="fw-semibold text-muted">KM informado manualmente.</div>
+                      {% endif %}
+                    </div>
+                    <div class="col-md-2">
+                      <span class="text-muted">KM informado</span>
+                      <div class="fw-semibold">{{ t.km_informado|default:t.km|floatformat:2 }} km</div>
+                      {% if t.diferenca_km_percentual is not None %}
+                      <div class="{% if t.km_divergente_rota %}text-warning fw-semibold{% else %}text-muted{% endif %}">
+                        Diferença: {{ t.diferenca_km_percentual|floatformat:2 }}%
+                      </div>
+                      {% endif %}
+                    </div>
+                    <div class="col-md-2">
                       <span class="text-muted">Pago por</span>
                       <div class="fw-semibold">
                         <span class="badge bg-primary-subtle text-primary">Técnico</span>
@@ -512,6 +557,13 @@
                         <span class="badge bg-warning-subtle text-warning small">Valor ajustado</span>
                         {% else %}
                         <span class="badge bg-success-subtle text-success small">Ativo</span>
+                        {% endif %}
+                        {% if t.km_divergente_rota %}
+                        <div class="mt-1">
+                          <span class="badge bg-warning-subtle text-warning small">
+                            KM informado difere mais de 15% da rota calculada
+                          </span>
+                        </div>
                         {% endif %}
                       </div>
                     </div>
@@ -561,6 +613,53 @@
         </div>
       </div>
     </div>
+
+    {% if relatorio.km_excedente_interno > 0 %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center gap-2">
+        <i class="bi bi-signpost-split text-info"></i>
+        <h6 class="mb-0 fw-semibold">KM excedente / deslocamento interno</h6>
+      </div>
+      <div class="card-body">
+        <div class="row g-3 mb-3">
+          <div class="col-md-3">
+            <span class="text-muted small d-block">KM total excedente</span>
+            <strong>{{ relatorio.km_excedente_interno|floatformat:2 }} km</strong>
+          </div>
+          <div class="col-md-3">
+            <span class="text-muted small d-block">Total financeiro</span>
+            <strong class="text-success">R$ {{ relatorio.total_km_excedente|floatformat:2 }}</strong>
+          </div>
+          <div class="col-md-6">
+            <span class="text-muted small d-block">ObservaÃ§Ã£o</span>
+            <span>{{ relatorio.observacao_km_excedente|default:"Sem observaÃ§Ã£o" }}</span>
+          </div>
+        </div>
+        <div class="table-responsive border rounded">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Cliente</th>
+                <th class="text-end">KM rateado</th>
+                <th class="text-end">Valor/KM</th>
+                <th class="text-end pe-3">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in relatorio.rateio_km_excedente_clientes %}
+              <tr>
+                <td>{{ item.cliente.nome }}</td>
+                <td class="text-end">{{ item.km|floatformat:2 }} km</td>
+                <td class="text-end">R$ {{ item.valor_km|floatformat:2 }}</td>
+                <td class="text-end pe-3 fw-semibold">R$ {{ item.valor_calculado|floatformat:2 }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
     {% endif %}
 
   </div><!-- /col principal -->
@@ -1127,6 +1226,7 @@
 </div>
 {% endif %}
 
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
   .linha-alerta-financeiro {
     animation: destaqueFinanceiro 1.2s ease-in-out;
@@ -1193,14 +1293,126 @@
     overflow: hidden;
   }
 
+  .mapa-trechos-km {
+    min-height: 340px;
+    border: 1px solid var(--bs-border-color);
+    border-radius: .9rem;
+    overflow: hidden;
+    background: var(--bs-tertiary-bg);
+  }
+
+  .mapa-pin {
+    display: grid;
+    place-items: center;
+    width: 1.65rem;
+    height: 1.65rem;
+    border-radius: 999px;
+    color: #fff;
+    background: var(--bs-primary);
+    border: 2px solid #fff;
+    box-shadow: 0 .35rem .85rem rgba(15, 23, 42, .25);
+    font-size: .75rem;
+    font-weight: 700;
+  }
+
+  .mapa-pin.divergente {
+    background: var(--bs-warning);
+    color: #332701;
+  }
+
   @keyframes destaqueFinanceiro {
     0% { background-color: rgba(255, 193, 7, .32); }
     100% { background-color: transparent; }
   }
 </style>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
   document.addEventListener("DOMContentLoaded", function () {
+    function escapeHtml(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function initMapaTrechos(containerId, scriptId, vazioId) {
+      const container = document.getElementById(containerId);
+      const vazio = document.getElementById(vazioId);
+      const script = document.getElementById(scriptId);
+      if (!container || !script || typeof L === "undefined") return;
+
+      let trechos = [];
+      try {
+        trechos = JSON.parse(script.textContent || "[]");
+      } catch (error) {
+        trechos = [];
+      }
+
+      if (!trechos.length) {
+        container.classList.add("d-none");
+        vazio?.classList.remove("d-none");
+        return;
+      }
+
+      const mapa = L.map(container, { scrollWheelZoom: false });
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap",
+      }).addTo(mapa);
+
+      const bounds = [];
+      trechos.forEach(function (trecho) {
+        const origem = [Number(trecho.origem_lat), Number(trecho.origem_lon)];
+        const destino = [Number(trecho.destino_lat), Number(trecho.destino_lon)];
+        if (!Number.isFinite(origem[0]) || !Number.isFinite(origem[1]) ||
+            !Number.isFinite(destino[0]) || !Number.isFinite(destino[1])) return;
+
+        const cor = trecho.divergente ? "#f59f00" : "#0d6efd";
+        const popup = `
+          <div class="small">
+            <div class="fw-semibold mb-1">Trecho ${escapeHtml(trecho.ordem)}</div>
+            <div><span class="text-muted">Origem:</span> ${escapeHtml(trecho.origem)}</div>
+            <div><span class="text-muted">Destino:</span> ${escapeHtml(trecho.destino)}</div>
+            <div><span class="text-muted">KM calculado:</span> ${escapeHtml(trecho.km_calculado || "-")}</div>
+            <div><span class="text-muted">KM informado:</span> ${escapeHtml(trecho.km_informado || "-")}</div>
+            <div><span class="text-muted">DiferenÃ§a:</span> ${escapeHtml(trecho.diferenca_percentual || "0")}%</div>
+            <div><span class="text-muted">Clientes:</span> ${escapeHtml((trecho.clientes || []).join(", ") || "-")}</div>
+            ${trecho.divergente ? '<div class="badge text-bg-warning mt-2">DivergÃªncia acima de 15%</div>' : ""}
+          </div>`;
+        const iconClass = trecho.divergente ? "mapa-pin divergente" : "mapa-pin";
+        const icon = L.divIcon({
+          className: "",
+          html: `<span class="${iconClass}">${escapeHtml(trecho.ordem)}</span>`,
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
+        });
+
+        L.marker(origem, { icon }).bindPopup(popup).addTo(mapa);
+        L.marker(destino, { icon }).bindPopup(popup).addTo(mapa);
+
+        if (trecho.rota_geojson && trecho.rota_geojson.coordinates) {
+          L.geoJSON(trecho.rota_geojson, {
+            style: { color: cor, weight: 4, opacity: .82 },
+          }).bindPopup(popup).addTo(mapa);
+        } else {
+          L.polyline([origem, destino], { color: cor, weight: 4, opacity: .72, dashArray: "6,6" })
+            .bindPopup(popup)
+            .addTo(mapa);
+        }
+        bounds.push(origem, destino);
+      });
+
+      if (bounds.length) {
+        mapa.fitBounds(bounds, { padding: [28, 28] });
+        setTimeout(function () { mapa.invalidateSize(); }, 150);
+      }
+    }
+
+    initMapaTrechos("mapa-trechos-detail", "mapa-trechos-detail-data", "mapa-trechos-detail-vazio");
+
     document.querySelectorAll('[data-bs-toggle="popover"]').forEach(function (el) {
       new bootstrap.Popover(el, { sanitize: false, placement: "left", customClass: "rateio-popover" });
     });

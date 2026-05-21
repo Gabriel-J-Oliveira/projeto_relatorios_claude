@@ -169,9 +169,22 @@ def _trecho_payload(trecho):
         "ordem": trecho.ordem,
         "data": _date(trecho.data),
         "origem": trecho.origem,
+        "origem_endereco_completo": trecho.origem_endereco_completo,
+        "origem_lat": _decimal(trecho.origem_lat),
+        "origem_lon": _decimal(trecho.origem_lon),
         "destino": trecho.destino,
+        "destino_endereco_completo": trecho.destino_endereco_completo,
+        "destino_lat": _decimal(trecho.destino_lat),
+        "destino_lon": _decimal(trecho.destino_lon),
         "descricao": f"{trecho.origem} -> {trecho.destino}",
         "km": _decimal(trecho.km),
+        "km_calculado_api": _decimal(trecho.km_calculado_api),
+        "km_informado": _decimal(trecho.km_informado),
+        "diferenca_km_percentual": _decimal(trecho.diferenca_km_percentual),
+        "fonte_calculo_rota": trecho.fonte_calculo_rota,
+        "calculado_em": _datetime(trecho.calculado_em),
+        "rota_geojson": trecho.rota_geojson or {},
+        "km_divergente_rota": trecho.km_divergente_rota,
         "valor_km": _decimal(trecho.valor_km),
         "valor_km_aprovado": _decimal(trecho.valor_km_aprovado),
         "valor_km_final": _decimal(trecho.valor_km_final),
@@ -191,6 +204,29 @@ def _trecho_payload(trecho):
             for vinculo in trecho.clientes_vinculados.all()
         ],
         "rateios": [_rateio_km_payload(rateio) for rateio in trecho.rateios.all()],
+    }
+
+
+def _km_excedente_payload(relatorio):
+    rateios = []
+    for linha in relatorio.rateio_km_excedente_clientes():
+        cliente = linha["cliente"]
+        rateios.append(
+            {
+                "cliente": _cliente_payload(cliente),
+                "cliente_id": cliente.pk,
+                "cliente_nome": cliente.nome,
+                "km": _decimal(linha["km"]),
+                "valor_km": _decimal(linha["valor_km"]),
+                "valor_calculado": _decimal(linha["valor_calculado"]),
+                "valor_final": _decimal(linha["valor_calculado"]),
+            }
+        )
+    return {
+        "km_total": _decimal(relatorio.km_excedente_interno or Decimal("0.00")),
+        "observacao": relatorio.observacao_km_excedente or "",
+        "rateios": rateios,
+        "total": _decimal(relatorio.total_km_excedente),
     }
 
 
@@ -248,6 +284,7 @@ def construir_snapshot_financeiro(relatorio, usuario=None):
 
     despesas = [_despesa_payload(despesa) for despesa in relatorio.despesas.all()]
     trechos = [_trecho_payload(trecho) for trecho in relatorio.trechos.all()]
+    km_excedente = _km_excedente_payload(relatorio)
     anexos = []
     for despesa in despesas:
         if despesa["comprovante"]:
@@ -319,6 +356,7 @@ def construir_snapshot_financeiro(relatorio, usuario=None):
         "tecnicos": tecnicos,
         "despesas": despesas,
         "trechos_km": trechos,
+        "km_excedente": km_excedente,
         "distribuicao_clientes": _distribuicao_payload(relatorio),
         "totais": {
             "total_despesas_tecnico": _decimal(relatorio.total_despesas_tecnico),
@@ -338,6 +376,7 @@ def construir_snapshot_financeiro(relatorio, usuario=None):
         "contagens": {
             "despesas": len(despesas),
             "trechos_km": len(trechos),
+            "km_excedente": 1 if Decimal(str(km_excedente.get("km_total") or "0.00")) > 0 else 0,
             "itens_rejeitados": sum(1 for item in despesas + trechos if item["rejeitado"]),
         },
         "observacoes": observacoes,
@@ -384,6 +423,19 @@ def validar_snapshot_payload(payload):
             )
         else:
             soma_aprovada += _money(Decimal(str(trecho.get("valor_final") or "0.00")))
+
+    km_excedente = payload.get("km_excedente") or {}
+    rateios_excedente = km_excedente.get("rateios") or []
+    if rateios_excedente:
+        total_excedente = sum(
+            (_money(Decimal(str(rateio.get("valor_calculado") or "0.00"))) for rateio in rateios_excedente),
+            Decimal("0.00"),
+        )
+        soma_solicitada += total_excedente
+        soma_aprovada += sum(
+            (_money(Decimal(str(rateio.get("valor_final") or "0.00"))) for rateio in rateios_excedente),
+            Decimal("0.00"),
+        )
 
     if _money(soma_solicitada) != _money(total_solicitado):
         erros.append("Snapshot financeiro nao fecha com o total solicitado.")

@@ -134,6 +134,74 @@
   </div>
 </section>
 
+{{ mapa_trechos_json|json_script:"mapa-trechos-consulta-data" }}
+
+<section class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center">
+    <div>
+      <h6 class="mb-0 fw-semibold">
+        <i class="bi bi-map text-primary me-2"></i>Mapa dos trechos KM
+      </h6>
+      <small class="text-muted">Rotas congeladas no relatÃ³rio final quando disponÃ­veis</small>
+    </div>
+    <span class="badge rounded-pill text-bg-light border">{{ mapa_trechos_json|length }} rota(s)</span>
+  </div>
+  <div class="card-body">
+    <div id="mapa-trechos-consulta" class="mapa-trechos-km"></div>
+    <div id="mapa-trechos-consulta-vazio" class="text-muted small d-none">
+      Nenhum trecho com coordenadas disponÃ­veis para exibiÃ§Ã£o no mapa.
+    </div>
+  </div>
+</section>
+
+{% if consulta.km_excedente.km_total > 0 %}
+<section class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-transparent border-bottom">
+    <h6 class="mb-0 fw-semibold">
+      <i class="bi bi-signpost-split text-info me-2"></i>KM excedente / deslocamento interno
+    </h6>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 mb-3">
+      <div class="col-md-3">
+        <span class="text-muted small d-block">KM excedente</span>
+        <strong>{{ consulta.km_excedente.km_total|floatformat:2 }} km</strong>
+      </div>
+      <div class="col-md-3">
+        <span class="text-muted small d-block">Total aprovado</span>
+        <strong class="text-success">R$ {{ consulta.km_excedente.total|floatformat:2 }}</strong>
+      </div>
+      <div class="col-md-6">
+        <span class="text-muted small d-block">ObservaÃ§Ã£o</span>
+        <span>{{ consulta.km_excedente.observacao|default:"Sem observaÃ§Ã£o" }}</span>
+      </div>
+    </div>
+    <div class="table-responsive consulta-table-wrap">
+      <table class="table table-sm table-striped align-middle mb-0 consulta-table">
+        <thead class="table-light">
+          <tr>
+            <th>Cliente</th>
+            <th class="text-end">KM</th>
+            <th class="text-end">Valor/KM</th>
+            <th class="text-end">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in consulta.km_excedente.rateios %}
+          <tr>
+            <td data-label="Cliente">{{ item.cliente_nome }}</td>
+            <td class="text-end" data-label="KM">{{ item.km|floatformat:2 }} km</td>
+            <td class="text-end" data-label="Valor/KM">R$ {{ item.valor_km|floatformat:2 }}</td>
+            <td class="text-end fw-semibold" data-label="Total">R$ {{ item.valor_final|floatformat:2 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endif %}
+
 <div class="row g-4 mb-4">
   <div class="col-12 col-xl-5">
     <section class="card border-0 shadow-sm h-100">
@@ -302,6 +370,7 @@
 {% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
   .consulta-hero {
     padding: clamp(1.25rem, 2vw, 2rem);
@@ -465,6 +534,33 @@
     color: var(--bs-secondary-color);
   }
 
+  .mapa-trechos-km {
+    min-height: 340px;
+    border: 1px solid var(--bs-border-color);
+    border-radius: .9rem;
+    overflow: hidden;
+    background: var(--bs-tertiary-bg);
+  }
+
+  .mapa-pin {
+    display: grid;
+    place-items: center;
+    width: 1.65rem;
+    height: 1.65rem;
+    border-radius: 999px;
+    color: #fff;
+    background: var(--bs-primary);
+    border: 2px solid #fff;
+    box-shadow: 0 .35rem .85rem rgba(15, 23, 42, .25);
+    font-size: .75rem;
+    font-weight: 700;
+  }
+
+  .mapa-pin.divergente {
+    color: #332701;
+    background: var(--bs-warning);
+  }
+
   @media (max-width: 991.98px) {
     .consulta-meta-grid {
       grid-template-columns: 1fr;
@@ -506,8 +602,91 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
   document.addEventListener("DOMContentLoaded", function () {
+    function escapeHtml(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function initMapaTrechos(containerId, scriptId, vazioId) {
+      const container = document.getElementById(containerId);
+      const vazio = document.getElementById(vazioId);
+      const script = document.getElementById(scriptId);
+      if (!container || !script || typeof L === "undefined") return;
+
+      let trechos = [];
+      try {
+        trechos = JSON.parse(script.textContent || "[]");
+      } catch (error) {
+        trechos = [];
+      }
+
+      if (!trechos.length) {
+        container.classList.add("d-none");
+        vazio?.classList.remove("d-none");
+        return;
+      }
+
+      const mapa = L.map(container, { scrollWheelZoom: false });
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap",
+      }).addTo(mapa);
+
+      const bounds = [];
+      trechos.forEach(function (trecho) {
+        const origem = [Number(trecho.origem_lat), Number(trecho.origem_lon)];
+        const destino = [Number(trecho.destino_lat), Number(trecho.destino_lon)];
+        if (!Number.isFinite(origem[0]) || !Number.isFinite(origem[1]) ||
+            !Number.isFinite(destino[0]) || !Number.isFinite(destino[1])) return;
+
+        const cor = trecho.divergente ? "#f59f00" : "#0d6efd";
+        const popup = `
+          <div class="small">
+            <div class="fw-semibold mb-1">Trecho ${escapeHtml(trecho.ordem)}</div>
+            <div><span class="text-muted">Origem:</span> ${escapeHtml(trecho.origem)}</div>
+            <div><span class="text-muted">Destino:</span> ${escapeHtml(trecho.destino)}</div>
+            <div><span class="text-muted">KM calculado:</span> ${escapeHtml(trecho.km_calculado || "-")}</div>
+            <div><span class="text-muted">KM informado:</span> ${escapeHtml(trecho.km_informado || "-")}</div>
+            <div><span class="text-muted">DiferenÃ§a:</span> ${escapeHtml(trecho.diferenca_percentual || "0")}%</div>
+            <div><span class="text-muted">Clientes:</span> ${escapeHtml((trecho.clientes || []).join(", ") || "-")}</div>
+            ${trecho.divergente ? '<div class="badge text-bg-warning mt-2">DivergÃªncia acima de 15%</div>' : ""}
+          </div>`;
+        const icon = L.divIcon({
+          className: "",
+          html: `<span class="mapa-pin ${trecho.divergente ? "divergente" : ""}">${escapeHtml(trecho.ordem)}</span>`,
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
+        });
+
+        L.marker(origem, { icon }).bindPopup(popup).addTo(mapa);
+        L.marker(destino, { icon }).bindPopup(popup).addTo(mapa);
+        if (trecho.rota_geojson && trecho.rota_geojson.coordinates) {
+          L.geoJSON(trecho.rota_geojson, {
+            style: { color: cor, weight: 4, opacity: .82 },
+          }).bindPopup(popup).addTo(mapa);
+        } else {
+          L.polyline([origem, destino], { color: cor, weight: 4, opacity: .72, dashArray: "6,6" })
+            .bindPopup(popup)
+            .addTo(mapa);
+        }
+        bounds.push(origem, destino);
+      });
+
+      if (bounds.length) {
+        mapa.fitBounds(bounds, { padding: [28, 28] });
+        setTimeout(function () { mapa.invalidateSize(); }, 150);
+      }
+    }
+
+    initMapaTrechos("mapa-trechos-consulta", "mapa-trechos-consulta-data", "mapa-trechos-consulta-vazio");
+
     const slides = Array.from(document.querySelectorAll("[data-cliente-slide]"));
     let atual = 0;
 

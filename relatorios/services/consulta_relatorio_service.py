@@ -173,6 +173,63 @@ def _historicos_snapshot(payload):
     return historicos
 
 
+def _km_excedente_snapshot(payload):
+    km_excedente = payload.get("km_excedente") or {}
+    return _ns(
+        km_total=_decimal(km_excedente.get("km_total")),
+        observacao=km_excedente.get("observacao") or "",
+        total=_decimal(km_excedente.get("total")),
+        rateios=[
+            _ns(
+                cliente_nome=rateio.get("cliente_nome") or "Nao informado",
+                km=_decimal(rateio.get("km")),
+                valor_km=_decimal(rateio.get("valor_km")),
+                valor_calculado=_decimal(rateio.get("valor_calculado")),
+                valor_final=_decimal(rateio.get("valor_final")),
+            )
+            for rateio in km_excedente.get("rateios") or []
+        ],
+    )
+
+
+def _mapa_trechos_snapshot(payload):
+    dados = []
+    for ordem, trecho in enumerate(payload.get("trechos_km") or [], start=1):
+        origem_lat = trecho.get("origem_lat")
+        origem_lon = trecho.get("origem_lon")
+        destino_lat = trecho.get("destino_lat")
+        destino_lon = trecho.get("destino_lon")
+        if not all([origem_lat, origem_lon, destino_lat, destino_lon]):
+            continue
+        clientes = [
+            rateio.get("cliente_nome")
+            for rateio in trecho.get("rateios") or []
+            if rateio.get("cliente_nome")
+        ] or [
+            cliente.get("nome")
+            for cliente in trecho.get("clientes") or []
+            if cliente.get("nome")
+        ]
+        dados.append(
+            {
+                "ordem": ordem,
+                "origem": trecho.get("origem_endereco_completo") or trecho.get("origem") or "",
+                "destino": trecho.get("destino_endereco_completo") or trecho.get("destino") or "",
+                "origem_lat": origem_lat,
+                "origem_lon": origem_lon,
+                "destino_lat": destino_lat,
+                "destino_lon": destino_lon,
+                "rota_geojson": trecho.get("rota_geojson") or {},
+                "km_calculado": trecho.get("km_calculado_api") or "",
+                "km_informado": trecho.get("km_informado") or trecho.get("km") or "",
+                "diferenca_percentual": trecho.get("diferenca_km_percentual") or "",
+                "divergente": bool(trecho.get("km_divergente_rota")),
+                "clientes": clientes,
+            }
+        )
+    return dados
+
+
 def _itens_snapshot(payload):
     itens = []
     for despesa in payload.get("despesas") or []:
@@ -256,6 +313,21 @@ def _itens_snapshot(payload):
                 )
             )
 
+    km_excedente = payload.get("km_excedente") or {}
+    for rateio in km_excedente.get("rateios") or []:
+        itens.append(
+            ItemConsultaRelatorioDTO(
+                tipo="KM excedente",
+                cliente=rateio.get("cliente_nome") or "Nao informado",
+                descricao=km_excedente.get("observacao") or "Deslocamento interno",
+                valor_solicitado=_money(rateio.get("valor_calculado")),
+                valor_aprovado=_money(rateio.get("valor_final")),
+                status="Aprovado",
+                badge="success",
+                data=None,
+            )
+        )
+
     return sorted(itens, key=lambda item: (item.data is None, item.data, item.tipo, item.cliente))
 
 
@@ -300,6 +372,8 @@ def _montar_consulta_snapshot(snapshot):
             itens_rejeitados=contagens.get("itens_rejeitados") or 0,
         ),
         "distribuicao_clientes": _snapshot_distribuicao(payload),
+        "km_excedente": _km_excedente_snapshot(payload),
+        "mapa_trechos": _mapa_trechos_snapshot(payload),
         "historicos": _historicos_snapshot(payload),
         "itens": _itens_snapshot(payload),
         "anexos": [
@@ -317,6 +391,56 @@ def _montar_consulta_snapshot(snapshot):
         ],
         "total_itens_rejeitados": contagens.get("itens_rejeitados") or 0,
     }
+
+
+def _km_excedente_vivo(relatorio):
+    return _ns(
+        km_total=relatorio.km_excedente_interno or Decimal("0.00"),
+        observacao=relatorio.observacao_km_excedente or "",
+        total=relatorio.total_km_excedente,
+        rateios=[
+            _ns(
+                cliente_nome=linha["cliente"].nome,
+                km=linha["km"],
+                valor_km=linha["valor_km"],
+                valor_calculado=linha["valor_calculado"],
+                valor_final=linha["valor_calculado"],
+            )
+            for linha in relatorio.rateio_km_excedente_clientes()
+        ],
+    )
+
+
+def _mapa_trechos_vivo(relatorio):
+    dados = []
+    for ordem, trecho in enumerate(relatorio.trechos.all(), start=1):
+        if not all([trecho.origem_lat, trecho.origem_lon, trecho.destino_lat, trecho.destino_lon]):
+            continue
+        clientes = [
+            rateio.cliente.nome
+            for rateio in trecho.rateios.all()
+        ] or [
+            vinculo.cliente.nome
+            for vinculo in trecho.clientes_vinculados.all()
+        ]
+        dados.append(
+            {
+                "ordem": ordem,
+                "origem": trecho.origem_endereco_completo or trecho.origem,
+                "destino": trecho.destino_endereco_completo or trecho.destino,
+                "origem_lat": str(trecho.origem_lat),
+                "origem_lon": str(trecho.origem_lon),
+                "destino_lat": str(trecho.destino_lat),
+                "destino_lon": str(trecho.destino_lon),
+                "rota_geojson": trecho.rota_geojson or {},
+                "km_calculado": str(trecho.km_calculado_api or ""),
+                "km_informado": str(trecho.km_informado or trecho.km or ""),
+                "diferenca_percentual": str(trecho.diferenca_km_percentual or ""),
+                "divergente": trecho.km_divergente_rota,
+                "clientes": clientes,
+            }
+        )
+    return dados
 
 
 def _montar_consulta_viva(relatorio):
@@ -410,6 +534,20 @@ def _montar_consulta_viva(relatorio):
                 )
             )
 
+    for linha in relatorio.rateio_km_excedente_clientes():
+        itens.append(
+            ItemConsultaRelatorioDTO(
+                tipo="KM excedente",
+                cliente=_cliente_nome(linha["cliente"]),
+                descricao=relatorio.observacao_km_excedente or "Deslocamento interno",
+                valor_solicitado=_money(linha["valor_calculado"]),
+                valor_aprovado=_money(linha["valor_calculado"]),
+                status="Aprovado",
+                badge="success",
+                data=None,
+            )
+        )
+
     itens.sort(key=lambda item: (item.data is None, item.data, item.tipo, item.cliente))
 
     observacoes = []
@@ -457,6 +595,8 @@ def _montar_consulta_viva(relatorio):
             itens_rejeitados=sum(1 for item in itens if item.badge == "danger"),
         ),
         "distribuicao_clientes": resumo_financeiro_por_cliente(relatorio),
+        "km_excedente": _km_excedente_vivo(relatorio),
+        "mapa_trechos": _mapa_trechos_vivo(relatorio),
         "historicos": [
             _ns(
                 acao=historico.acao,

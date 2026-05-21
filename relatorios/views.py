@@ -267,6 +267,8 @@ def _duplicar_relatorio(original, usuario=None):
         centro_custo=original.centro_custo,
         tipo_relatorio=original.tipo_relatorio,
         valor_adiantamento=original.valor_adiantamento or Decimal("0.00"),
+        km_excedente_interno=original.km_excedente_interno or Decimal("0.00"),
+        observacao_km_excedente=original.observacao_km_excedente,
         observacoes=original.observacoes,
         status=StatusRelatorio.RASCUNHO,
         criado_por=usuario,
@@ -311,12 +313,20 @@ def _duplicar_relatorio(original, usuario=None):
             ordem=trecho.ordem,
             data=None,
             origem=trecho.origem,
+            origem_endereco_completo=trecho.origem_endereco_completo,
             origem_lat=trecho.origem_lat,
             origem_lon=trecho.origem_lon,
             destino=trecho.destino,
+            destino_endereco_completo=trecho.destino_endereco_completo,
             destino_lat=trecho.destino_lat,
             destino_lon=trecho.destino_lon,
             km=trecho.km,
+            km_calculado_api=trecho.km_calculado_api,
+            km_informado=trecho.km_informado,
+            diferenca_km_percentual=trecho.diferenca_km_percentual,
+            fonte_calculo_rota=trecho.fonte_calculo_rota,
+            calculado_em=trecho.calculado_em,
+            rota_geojson=trecho.rota_geojson or {},
             valor_km=trecho.valor_km,
             valor_km_aprovado=None,
             observacao=trecho.observacao,
@@ -331,6 +341,152 @@ def _duplicar_relatorio(original, usuario=None):
         TrechoKm.objects.bulk_create(trechos)
 
     return novo
+
+
+def _snapshot_geo_trecho(trecho):
+    if not trecho:
+        return None
+    return {
+        "km": trecho.km,
+        "km_calculado_api": trecho.km_calculado_api,
+        "km_informado": trecho.km_informado,
+        "diferenca_km_percentual": trecho.diferenca_km_percentual,
+        "fonte_calculo_rota": trecho.fonte_calculo_rota,
+        "rota_geojson": trecho.rota_geojson or {},
+    }
+
+
+def _snapshot_km_excedente(relatorio):
+    if not relatorio:
+        return None
+    return {
+        "km": relatorio.km_excedente_interno or Decimal("0.00"),
+        "observacao": relatorio.observacao_km_excedente or "",
+    }
+
+
+def _registrar_auditoria_km_excedente(relatorio, usuario, anterior=None):
+    anterior = anterior or {"km": Decimal("0.00"), "observacao": ""}
+    km_anterior = anterior.get("km") or Decimal("0.00")
+    km_atual = relatorio.km_excedente_interno or Decimal("0.00")
+    obs_anterior = anterior.get("observacao") or ""
+    obs_atual = relatorio.observacao_km_excedente or ""
+
+    if km_anterior == km_atual and obs_anterior == obs_atual:
+        return
+
+    if km_anterior <= 0 and km_atual > 0:
+        descricao = "KM excedente / deslocamento interno criado."
+    elif km_anterior > 0 and km_atual <= 0:
+        descricao = "KM excedente / deslocamento interno removido."
+    else:
+        descricao = "KM excedente / deslocamento interno alterado."
+
+    registrar_evento(
+        relatorio,
+        usuario,
+        TipoEventoHistorico.VALOR_ALTERADO,
+        descricao,
+        {
+            "valor_anterior": str(km_anterior),
+            "valor_novo": str(km_atual),
+            "observacao_anterior": obs_anterior,
+            "observacao_nova": obs_atual,
+            "clientes_impactados": [
+                {
+                    "cliente_id": linha["cliente"].pk,
+                    "cliente_nome": linha["cliente"].nome,
+                    "km": str(linha["km"]),
+                    "valor_km": str(linha["valor_km"]),
+                    "valor_calculado": str(linha["valor_calculado"]),
+                }
+                for linha in relatorio.rateio_km_excedente_clientes()
+            ],
+        },
+    )
+
+
+def _registrar_auditoria_geografica_trecho(relatorio, usuario, trecho, anterior=None):
+    dados = {
+        "trecho_id": trecho.pk,
+        "origem": trecho.origem,
+        "destino": trecho.destino,
+        "origem_endereco_completo": trecho.origem_endereco_completo,
+        "destino_endereco_completo": trecho.destino_endereco_completo,
+        "km_calculado_api": str(trecho.km_calculado_api or ""),
+        "km_informado": str(trecho.km_informado or trecho.km or ""),
+        "diferenca_km_percentual": str(trecho.diferenca_km_percentual or ""),
+        "fonte_calculo_rota": trecho.fonte_calculo_rota or "",
+        "anterior": {
+            chave: str(valor or "")
+            for chave, valor in (anterior or {}).items()
+        },
+    }
+    diferenca_anterior = (anterior or {}).get("diferenca_km_percentual") or Decimal("0.00")
+
+    if trecho.km_calculado_api and not (anterior or {}).get("km_calculado_api"):
+        registrar_evento(
+            relatorio,
+            usuario,
+            TipoEventoHistorico.VALOR_ALTERADO,
+            "Rota de KM calculada automaticamente.",
+            dados,
+        )
+
+    if trecho.km_calculado_api and anterior and anterior.get("km") != trecho.km:
+        registrar_evento(
+            relatorio,
+            usuario,
+            TipoEventoHistorico.VALOR_ALTERADO,
+            "KM informado alterado manualmente após cálculo de rota.",
+            dados,
+        )
+
+    if trecho.km_divergente_rota and diferenca_anterior <= Decimal("15.00"):
+        registrar_evento(
+            relatorio,
+            usuario,
+            TipoEventoHistorico.VALOR_ALTERADO,
+            "KM informado difere mais de 15% da rota calculada.",
+            dados,
+        )
+
+    if not trecho.km_calculado_api and trecho.km and not anterior:
+        registrar_evento(
+            relatorio,
+            usuario,
+            TipoEventoHistorico.VALOR_ALTERADO,
+            "KM informado manualmente sem rota calculada.",
+            dados,
+        )
+
+
+def _mapa_trechos_relatorio(relatorio):
+    dados = []
+    for ordem, trecho in enumerate(relatorio.trechos.all(), start=1):
+        if not all([trecho.origem_lat, trecho.origem_lon, trecho.destino_lat, trecho.destino_lon]):
+            continue
+        clientes = [rateio.cliente.nome for rateio in trecho.rateios.all()] or [
+            vinculo.cliente.nome for vinculo in trecho.clientes_vinculados.all()
+        ]
+        dados.append(
+            {
+                "ordem": ordem,
+                "origem": trecho.origem_endereco_completo or trecho.origem,
+                "destino": trecho.destino_endereco_completo or trecho.destino,
+                "origem_lat": str(trecho.origem_lat),
+                "origem_lon": str(trecho.origem_lon),
+                "destino_lat": str(trecho.destino_lat),
+                "destino_lon": str(trecho.destino_lon),
+                "rota_geojson": trecho.rota_geojson or {},
+                "km_calculado": str(trecho.km_calculado_api or ""),
+                "km_informado": str(trecho.km_informado or trecho.km or ""),
+                "diferenca_percentual": str(trecho.diferenca_km_percentual or ""),
+                "divergente": trecho.km_divergente_rota,
+                "clientes": clientes,
+            }
+        )
+    return dados
 
 
 # ─────────────────────────────────────────────
@@ -567,6 +723,7 @@ def _avisos_financeiro(relatorio):
 
     trechos_por_data = {}
     trechos_valor_km_divergente = []
+    trechos_km_rota_divergente = []
     valor_km_padrao = relatorio.cliente.valor_km if relatorio.cliente_id else None
 
     for idx, trecho in enumerate(trechos, start=1):
@@ -577,6 +734,8 @@ def _avisos_financeiro(relatorio):
 
         if valor_km_padrao and trecho.valor_km != valor_km_padrao:
             trechos_valor_km_divergente.append((idx, trecho))
+        if trecho.km_divergente_rota:
+            trechos_km_rota_divergente.append((idx, trecho))
 
     if trechos_valor_km_divergente:
         linha_ids = [
@@ -591,6 +750,22 @@ def _avisos_financeiro(relatorio):
                     "linha_id": linha_id,
                     "linha_ids": linha_ids,
                     "icone": "bi-speedometer2",
+                }
+            )
+
+    if trechos_km_rota_divergente:
+        linha_ids = [
+            f"linha-trecho-{idx}" for idx, _trecho in trechos_km_rota_divergente
+        ]
+        for idx, _trecho in trechos_km_rota_divergente:
+            linha_id = f"linha-trecho-{idx}"
+            avisos.append(
+                {
+                    "tipo": "km_rota_divergente",
+                    "mensagem": "KM informado difere mais de 15% da rota calculada.",
+                    "linha_id": linha_id,
+                    "linha_ids": linha_ids,
+                    "icone": "bi-signpost-split",
                 }
             )
 
@@ -943,7 +1118,10 @@ def relatorio_form_view(request, pk=None):
                                 raise WorkflowError(
                                     "Este relatório foi alterado por outro usuário e não pode mais ser editado."
                                 )
+                            km_excedente_anterior = _snapshot_km_excedente(relatorio_atual)
                             relatorio.status = relatorio_atual.status
+                        else:
+                            km_excedente_anterior = _snapshot_km_excedente(None)
                         if relatorio_novo:
                             relatorio.criado_por = request.user
                         relatorio.cliente_id = cliente_ids_relatorio[0]
@@ -953,6 +1131,14 @@ def relatorio_form_view(request, pk=None):
 
                         tecnicos_apoio = form.cleaned_data.get("tecnicos_equipe", [])
                         _sync_equipe(relatorio, tecnicos_apoio)
+                        usuario_historico = (
+                            request.user if request.user.is_authenticated else None
+                        )
+                        _registrar_auditoria_km_excedente(
+                            relatorio,
+                            usuario_historico,
+                            km_excedente_anterior,
+                        )
 
                         fs_desp.instance = relatorio
                         for f in fs_desp.forms:
@@ -975,9 +1161,22 @@ def relatorio_form_view(request, pk=None):
                         for f in fs_km.forms:
                             if not _form_has_content(f):
                                 continue
+                            trecho_anterior = (
+                                _snapshot_geo_trecho(
+                                    TrechoKm.objects.select_for_update().get(pk=f.instance.pk)
+                                )
+                                if f.instance.pk
+                                else None
+                            )
                             trecho = f.save(commit=False)
                             trecho.relatorio = relatorio
                             trecho.save()
+                            _registrar_auditoria_geografica_trecho(
+                                relatorio,
+                                usuario_historico,
+                                trecho,
+                                trecho_anterior,
+                            )
                             erros_trecho = sync_clientes_trecho(
                                 trecho,
                                 _clientes_item_post(request, f.prefix),
@@ -994,9 +1193,6 @@ def relatorio_form_view(request, pk=None):
                         if erros_integridade:
                             raise WorkflowError(erros_integridade)
 
-                        usuario_historico = (
-                            request.user if request.user.is_authenticated else None
-                        )
                         if relatorio_novo:
                             registrar_evento(
                                 relatorio,
@@ -1312,6 +1508,7 @@ def relatorio_detail_view(request, pk):
             "pode_enviar_relatorio": usuario_pode_enviar_relatorio(request.user, relatorio),
             "inconsistencias_rateio": inconsistencias_rateio,
             "distribuicao_clientes": distribuicao_clientes,
+            "mapa_trechos_json": _mapa_trechos_relatorio(relatorio),
             "titulo_pagina": f"Relatório {relatorio.identificador}",
         },
     )
@@ -1356,6 +1553,7 @@ def relatorio_consulta_view(request, pk):
             "relatorio": relatorio,
             "consulta": consulta,
             "distribuicao_clientes": consulta["distribuicao_clientes"],
+            "mapa_trechos_json": consulta.get("mapa_trechos", []),
             "pode_gerar_pdf_interno": usuario_pode_atuar_como_financeiro(request.user),
             "titulo_pagina": f"Consulta {consulta['relatorio'].identificador}",
         },
@@ -1674,6 +1872,8 @@ def relatorio_import_detail_json(request, pk):
             "tecnico_id": relatorio.tecnico_responsavel_id,
             "apoio_ids": list(relatorio.equipe.values_list("tecnico_id", flat=True)),
             "valor_adiantamento": str(relatorio.valor_adiantamento or Decimal("0.00")),
+            "km_excedente_interno": str(relatorio.km_excedente_interno or Decimal("0.00")),
+            "observacao_km_excedente": relatorio.observacao_km_excedente or "",
             "despesas": [
                 {
                     "tipo": despesa.tipo,
@@ -1686,12 +1886,19 @@ def relatorio_import_detail_json(request, pk):
             "trechos": [
                 {
                     "origem": trecho.origem,
+                    "origem_endereco_completo": trecho.origem_endereco_completo,
                     "origem_lat": str(trecho.origem_lat or ""),
                     "origem_lon": str(trecho.origem_lon or ""),
                     "destino": trecho.destino,
+                    "destino_endereco_completo": trecho.destino_endereco_completo,
                     "destino_lat": str(trecho.destino_lat or ""),
                     "destino_lon": str(trecho.destino_lon or ""),
                     "km": str(trecho.km),
+                    "km_calculado_api": str(trecho.km_calculado_api or ""),
+                    "km_informado": str(trecho.km_informado or trecho.km or ""),
+                    "diferenca_km_percentual": str(trecho.diferenca_km_percentual or ""),
+                    "fonte_calculo_rota": trecho.fonte_calculo_rota or "",
+                    "rota_geojson": trecho.rota_geojson or {},
                     "valor_km": str(trecho.valor_km),
                 }
                 for trecho in relatorio.trechos.all()

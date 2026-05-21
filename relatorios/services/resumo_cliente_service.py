@@ -137,6 +137,16 @@ def resumo_financeiro_por_cliente(relatorio):
             if trecho.rejeitado or trecho.status_financeiro == "rejeitado":
                 resumo.itens_rejeitados += 1
 
+    for linha in relatorio.rateio_km_excedente_clientes():
+        cliente = linha["cliente"]
+        resumo = resumos.get(cliente.pk)
+        if not resumo:
+            resumo = ClienteResumoFinanceiroDTO(cliente=cliente)
+            resumos[cliente.pk] = resumo
+        resumo.km_total += linha["km"]
+        resumo.valor_km_solicitado += _money(linha["valor_calculado"])
+        resumo.total_aprovado += _money(linha["valor_calculado"])
+
     for resumo in resumos.values():
         resumo.km_total = Decimal(resumo.km_total or "0").quantize(Decimal("0.01"))
         resumo.despesas_solicitadas = _money(resumo.despesas_solicitadas)

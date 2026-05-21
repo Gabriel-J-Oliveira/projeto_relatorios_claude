@@ -38,6 +38,11 @@
            class="form-control form-control-sm campo-endereco-mapa {% if form.origem.errors %}is-invalid{% endif %}"
            data-map-role="origem">
     <input type="hidden"
+           class="mapa-endereco-completo"
+           data-map-role="origem"
+           name="trechos-{{ idx }}-origem_endereco_completo"
+           value="{{ form.origem_endereco_completo.value|default:'' }}">
+    <input type="hidden"
            class="mapa-lat"
            data-map-role="origem"
            name="trechos-{{ idx }}-origem_lat"
@@ -62,6 +67,11 @@
            autocomplete="off"
            class="form-control form-control-sm campo-endereco-mapa {% if form.destino.errors %}is-invalid{% endif %}"
            data-map-role="destino">
+    <input type="hidden"
+           class="mapa-endereco-completo"
+           data-map-role="destino"
+           name="trechos-{{ idx }}-destino_endereco_completo"
+           value="{{ form.destino_endereco_completo.value|default:'' }}">
     <input type="hidden"
            class="mapa-lat"
            data-map-role="destino"
@@ -90,6 +100,23 @@
       {% if form.km.errors %}{{ form.km.errors.0 }}{% endif %}
     </div>
     <div class="small mapa-rota-feedback mt-1"></div>
+    <input type="hidden"
+           class="mapa-km-calculado"
+           name="trechos-{{ idx }}-km_calculado_api"
+           value="{{ form.km_calculado_api.value|default:''|unlocalize }}">
+    <input type="hidden"
+           class="mapa-km-informado"
+           name="trechos-{{ idx }}-km_informado"
+           value="{{ form.km_informado.value|default:''|unlocalize }}">
+    <input type="hidden"
+           class="mapa-km-diferenca"
+           name="trechos-{{ idx }}-diferenca_km_percentual"
+           value="{{ form.diferenca_km_percentual.value|default:''|unlocalize }}">
+    <input type="hidden"
+           class="mapa-fonte-rota"
+           name="trechos-{{ idx }}-fonte_calculo_rota"
+           value="{{ form.fonte_calculo_rota.value|default:'' }}">
+    {{ form.rota_geojson }}
   </td>
   <td class="p-1 pt-3">
   <input type="text"

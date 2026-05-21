@@ -154,8 +154,8 @@ def calcular_rota(origem_lat, origem_lon, destino_lat, destino_lon):
 
     url = f"{_config('MAPS_OSRM_ROUTE_URL', OSRM_ROUTE_URL)}/{quote(origem)};{quote(destino)}"
     params = {
-        "overview": "simplified",
-        "geometries": "polyline",
+        "overview": "full",
+        "geometries": "geojson",
         "alternatives": "false",
         "steps": "false",
     }
@@ -188,7 +188,8 @@ def calcular_rota(origem_lat, origem_lon, destino_lat, destino_lon):
         "distancia_km": str(_distancia_km(distancia_metros)),
         "duracao_segundos": str(duracao_segundos),
         "duracao_texto": _duracao_texto(duracao_segundos),
-        "geometria": rota.get("geometry", ""),
+        "geometria": rota.get("geometry") or {},
+        "rota_geojson": rota.get("geometry") or {},
     }
 
     cache.set(cache_key, resultado, _cache_ttl())

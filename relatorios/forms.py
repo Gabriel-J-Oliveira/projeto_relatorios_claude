@@ -96,6 +96,8 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
             "centro_custo",
             "tipo_relatorio",
             "valor_adiantamento",
+            "km_excedente_interno",
+            "observacao_km_excedente",
             "observacoes",
         ]
         widgets = {
@@ -116,6 +118,7 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
             ),
             "motivo": forms.Textarea(attrs={"rows": 4}),
             "observacoes": forms.Textarea(attrs={"rows": 3}),
+            "observacao_km_excedente": forms.Textarea(attrs={"rows": 2}),
         }
         labels = {
             "centro_custo": "Centro de Custo / Classificacao",
@@ -139,6 +142,8 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         self.fields["numero"].widget.attrs["placeholder"] = "Gerado no envio"
         self.fields["numero"].help_text = "Gerado automaticamente ao enviar para conferência."
         self.fields["valor_adiantamento"].required = False
+        self.fields["km_excedente_interno"].required = False
+        self.fields["observacao_km_excedente"].required = False
         if self.instance and self.instance.pk and not self.instance.numero:
             self.fields["numero"].initial = "Rascunho"
         self.fields["centro_custo"].widget.attrs[
@@ -152,6 +157,19 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
                 "inputmode": "decimal",
                 "class": "form-control form-control-sm campo-moeda",
                 "placeholder": "0,00",
+            }
+        )
+        self.fields["km_excedente_interno"].widget.attrs.update(
+            {
+                "inputmode": "decimal",
+                "class": "form-control form-control-sm campo-km",
+                "placeholder": "0,00",
+            }
+        )
+        self.fields["observacao_km_excedente"].widget.attrs.update(
+            {
+                "class": "form-control form-control-sm",
+                "placeholder": "Cliente → hotel, hotel → evento, evento → restaurante...",
             }
         )
 
@@ -188,6 +206,13 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
             )
         if cd.get("valor_adiantamento") is None:
             cd["valor_adiantamento"] = 0
+        if cd.get("km_excedente_interno") is None:
+            cd["km_excedente_interno"] = 0
+        if cd.get("km_excedente_interno", 0) > 0 and not cd.get("observacao_km_excedente"):
+            self.add_error(
+                "observacao_km_excedente",
+                "Informe uma observação para o KM excedente/deslocamento interno.",
+            )
         return cd
 
     def save(self, commit=True):
@@ -342,12 +367,19 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
             "ordem",
             "data",
             "origem",
+            "origem_endereco_completo",
             "origem_lat",
             "origem_lon",
             "destino",
+            "destino_endereco_completo",
             "destino_lat",
             "destino_lon",
             "km",
+            "km_calculado_api",
+            "km_informado",
+            "diferenca_km_percentual",
+            "fonte_calculo_rota",
+            "rota_geojson",
             "valor_km",
             "observacao",
         ]
@@ -360,10 +392,17 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
                 format="%Y-%m-%d",
             ),
             "ordem": forms.HiddenInput(),
+            "origem_endereco_completo": forms.HiddenInput(),
             "origem_lat": forms.HiddenInput(),
             "origem_lon": forms.HiddenInput(),
+            "destino_endereco_completo": forms.HiddenInput(),
             "destino_lat": forms.HiddenInput(),
             "destino_lon": forms.HiddenInput(),
+            "km_calculado_api": forms.HiddenInput(),
+            "km_informado": forms.HiddenInput(),
+            "diferenca_km_percentual": forms.HiddenInput(),
+            "fonte_calculo_rota": forms.HiddenInput(),
+            "rota_geojson": forms.HiddenInput(attrs={"class": "mapa-rota-geojson"}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -373,12 +412,19 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
         for name in [
             "data",
             "origem",
+            "origem_endereco_completo",
             "origem_lat",
             "origem_lon",
             "destino",
+            "destino_endereco_completo",
             "destino_lat",
             "destino_lon",
             "km",
+            "km_calculado_api",
+            "km_informado",
+            "diferenca_km_percentual",
+            "fonte_calculo_rota",
+            "rota_geojson",
             "valor_km",
             "observacao",
         ]:

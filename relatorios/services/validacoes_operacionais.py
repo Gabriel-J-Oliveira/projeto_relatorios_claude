@@ -48,7 +48,11 @@ def _trecho_ativo(trecho):
 
 
 def relatorio_tem_itens_validos(relatorio):
-    return relatorio.despesas.exists() or relatorio.trechos.exists()
+    return (
+        relatorio.despesas.exists()
+        or relatorio.trechos.exists()
+        or (relatorio.km_excedente_interno or Decimal("0.00")) > 0
+    )
 
 
 def relatorio_tem_itens_ativos(relatorio):
@@ -58,7 +62,11 @@ def relatorio_tem_itens_ativos(relatorio):
     trechos_ativos = relatorio.trechos.filter(
         rejeitado=False,
     ).exclude(status_financeiro=StatusFinanceiroItem.REJEITADO)
-    return despesas_ativas.exists() or trechos_ativos.exists()
+    return (
+        despesas_ativas.exists()
+        or trechos_ativos.exists()
+        or (relatorio.km_excedente_interno or Decimal("0.00")) > 0
+    )
 
 
 def validar_valores_negativos(relatorio):
@@ -77,6 +85,9 @@ def validar_valores_negativos(relatorio):
             erros.append(f"Trecho KM {trecho.pk} possui valor por KM negativo.")
         if trecho.valor_km_aprovado is not None and trecho.valor_km_aprovado < 0:
             erros.append(f"Trecho KM {trecho.pk} possui valor por KM aprovado negativo.")
+
+    if relatorio.km_excedente_interno is not None and relatorio.km_excedente_interno < 0:
+        erros.append("KM excedente / deslocamento interno nao pode ser negativo.")
 
     return erros
 

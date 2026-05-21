@@ -290,7 +290,11 @@ def _validar_aprovacao_financeira(relatorio):
     if not resultado.ok:
         raise WorkflowError(resultado.errors)
 
-    if not relatorio.despesas.exists() and not relatorio.trechos.exists():
+    if (
+        not relatorio.despesas.exists()
+        and not relatorio.trechos.exists()
+        and (relatorio.km_excedente_interno or Decimal("0.00")) <= 0
+    ):
         raise WorkflowError("Adicione pelo menos uma despesa ou trecho de KM.")
     if relatorio.total_aprovado <= 0:
         raise WorkflowError("Não é possível aprovar relatório com total aprovado zerado.")
@@ -298,7 +302,7 @@ def _validar_aprovacao_financeira(relatorio):
         not item.rejeitado and item.status_financeiro != StatusFinanceiroItem.REJEITADO
         for item in list(relatorio.despesas.all()) + list(relatorio.trechos.all())
     )
-    if not itens_ativos:
+    if not itens_ativos and (relatorio.km_excedente_interno or Decimal("0.00")) <= 0:
         raise WorkflowError("N?o ? poss?vel aprovar relat?rio com todos os itens rejeitados.")
     erros_rateio = validar_rateios_relatorio(relatorio)
     if erros_rateio:
