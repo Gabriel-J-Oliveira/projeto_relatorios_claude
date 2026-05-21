@@ -442,15 +442,38 @@
                   </table>
                 </div>
 
-                <div id="mapa-km-container"
-                     class="border-top bg-body-tertiary px-3 py-2 small text-muted">
-                  <i class="bi bi-map me-1"></i>
-                  Mapa preparado para visualização de rotas. A rota desenhada será adicionada na próxima fase.
+                <div class="border-top bg-body px-3 py-3">
+                  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                    <div>
+                      <h6 class="mb-0 fw-semibold">
+                        <i class="bi bi-map text-primary me-2"></i>Mapa dos deslocamentos
+                      </h6>
+                      <small class="text-muted">Atualizado automaticamente conforme as rotas são calculadas.</small>
+                    </div>
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            id="btn-atualizar-mapa-km">
+                      <i class="bi bi-arrow-clockwise me-1"></i>Atualizar mapa
+                    </button>
+                  </div>
+                  <div id="mapa-km-formulario" class="mapa-formulario-km"></div>
+                  <div id="mapa-km-formulario-vazio"
+                       class="text-muted small mt-2 d-none">
+                    Preencha origem e destino para visualizar a rota.
+                  </div>
+                  <div id="mapa-km-container"
+                       class="small text-muted mt-2">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Linhas sem coordenadas são ignoradas no mapa, sem bloquear o preenchimento.
+                  </div>
+                  <div id="mapa-km-excedente-resumo"
+                       class="alert alert-info border-0 shadow-sm mt-3 mb-0 py-2 small d-none"></div>
                 </div>
 
                 <div class="border-top px-3 py-3 bg-body">
-                  <div class="row g-3 align-items-start">
-                    <div class="col-md-3">
+                  <div class="row g-3 justify-content-end">
+                    <div class="col-12 col-md-4">
+                      <div class="mb-3">
                       <label class="form-label fw-medium small text-muted">
                         KM excedente / deslocamento interno
                       </label>
@@ -461,14 +484,15 @@
                       <div class="form-text small">
                         Use para deslocamentos internos, como cliente → hotel, hotel → evento, evento → restaurante.
                       </div>
-                    </div>
-                    <div class="col-md-9">
+                      </div>
+                      <div>
                       <label class="form-label fw-medium small text-muted">Observação do KM excedente</label>
                       {{ form.observacao_km_excedente }}
                       {% if form.observacao_km_excedente.errors %}
                         <div class="text-danger small mt-1">{{ form.observacao_km_excedente.errors.0 }}</div>
                       {% endif %}
                       <div class="text-warning small mt-1" id="aviso-km-excedente"></div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -971,6 +995,7 @@
           {# /x-data #}
         {% endblock %}
         {% block extra_css %}
+          <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
           <style>
     .col-data, .col-data-input { min-width: 105px; }
     .col-tipo { min-width: 145px; }
@@ -1001,10 +1026,38 @@
     .linha-trecho.km-divergente {
       box-shadow: inset 3px 0 0 var(--bs-warning);
     }
+    .linha-trecho.km-divergente > td {
+      background-color: rgba(var(--bs-warning-rgb), .08) !important;
+    }
+    .mapa-formulario-km {
+      min-height: 320px;
+      border: 1px solid var(--bs-border-color);
+      border-radius: .85rem;
+      overflow: hidden;
+      background: var(--bs-tertiary-bg);
+    }
+    .mapa-formulario-pin {
+      display: grid;
+      place-items: center;
+      width: 1.65rem;
+      height: 1.65rem;
+      border-radius: 999px;
+      color: #fff;
+      background: var(--bs-primary);
+      border: 2px solid #fff;
+      box-shadow: 0 .35rem .85rem rgba(15, 23, 42, .25);
+      font-size: .75rem;
+      font-weight: 700;
+    }
+    .mapa-formulario-pin.divergente {
+      color: #332701;
+      background: var(--bs-warning);
+    }
           </style>
         {% endblock %}
         {% block extra_js %}
           <script src="{% static 'js/relatorio_form_diagnostics.js' %}"></script>
+          <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
           <script>
   /* ═══════════════════════════════════════════════════════════════
     CONTROLE DO FORMULÁRIO — Single Save sem HTMX
@@ -1022,6 +1075,8 @@
   let _idxKm = {{ fs_km.total_form_count }};
   const enderecoTimers = new WeakMap();
   const enderecoSugestoesCache = new WeakMap();
+  let mapaFormularioKm = null;
+  let mapaFormularioKmLayers = null;
 
   // Prefixos Django
   const PREFIX_DESP = "despesas";
@@ -1169,6 +1224,7 @@
       if (erro) erro.textContent = "";
       atualizarEstadoKmMultiCliente(input.closest("tr"));
     });
+    atualizarMapaFormulario();
   }
 
   function trechoTemMultiplosClientes(linha) {
@@ -1299,6 +1355,149 @@
     campo.value = valor.toFixed(casas).replace(".", ",");
   }
 
+  function escapeHtmlMapa(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function inicializarMapaFormulario() {
+    const container = document.getElementById("mapa-km-formulario");
+    if (!container || typeof L === "undefined") return null;
+    if (mapaFormularioKm) return mapaFormularioKm;
+
+    mapaFormularioKm = L.map(container, { scrollWheelZoom: false });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap",
+    }).addTo(mapaFormularioKm);
+    mapaFormularioKmLayers = L.layerGroup().addTo(mapaFormularioKm);
+    setTimeout(() => mapaFormularioKm.invalidateSize(), 150);
+    return mapaFormularioKm;
+  }
+
+  function limparCamadasMapa() {
+    if (mapaFormularioKmLayers) {
+      mapaFormularioKmLayers.clearLayers();
+    }
+  }
+
+  function parseRotaGeojson(valor) {
+    if (!valor) return {};
+    try {
+      const geojson = JSON.parse(valor);
+      return geojson && typeof geojson === "object" ? geojson : {};
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function coletarTrechosMapaFormulario() {
+    return linhasAtivasFormulario(".linha-trecho").map((linha, index) => {
+      const origemLat = normalizarNumero(campoCoordenada(linha, "origem", "lat")?.value);
+      const origemLon = normalizarNumero(campoCoordenada(linha, "origem", "lon")?.value);
+      const destinoLat = normalizarNumero(campoCoordenada(linha, "destino", "lat")?.value);
+      const destinoLon = normalizarNumero(campoCoordenada(linha, "destino", "lon")?.value);
+      if (!origemLat || !origemLon || !destinoLat || !destinoLon) return null;
+
+      const clientes = idsFromValue(linha.querySelector(".clientes-item-input")?.value)
+        .map(getNomeCliente);
+      return {
+        ordem: index + 1,
+        origem: campoEndereco(linha, "origem")?.value || "",
+        destino: campoEndereco(linha, "destino")?.value || "",
+        origemLat,
+        origemLon,
+        destinoLat,
+        destinoLon,
+        rotaGeojson: parseRotaGeojson(linha.querySelector(".mapa-rota-geojson")?.value),
+        kmCalculado: linha.querySelector(".mapa-km-calculado")?.value || "",
+        kmInformado: linha.querySelector(".mapa-km-informado")?.value || linha.querySelector(".campo-km")?.value || "",
+        diferenca: linha.querySelector(".mapa-km-diferenca")?.value || "",
+        divergente: linha.classList.contains("km-divergente"),
+        clientes,
+      };
+    }).filter(Boolean);
+  }
+
+  function desenharTrechoNoMapa(trecho, bounds) {
+    if (!mapaFormularioKmLayers) return;
+    const origem = [trecho.origemLat, trecho.origemLon];
+    const destino = [trecho.destinoLat, trecho.destinoLon];
+    const cor = trecho.divergente ? "#f59f00" : "#0d6efd";
+    const popup = `
+      <div class="small">
+        <div class="fw-semibold mb-1">Trecho ${escapeHtmlMapa(trecho.ordem)}</div>
+        <div><span class="text-muted">Origem:</span> ${escapeHtmlMapa(trecho.origem)}</div>
+        <div><span class="text-muted">Destino:</span> ${escapeHtmlMapa(trecho.destino)}</div>
+        <div><span class="text-muted">KM calculado:</span> ${escapeHtmlMapa(trecho.kmCalculado || "-")}</div>
+        <div><span class="text-muted">KM informado:</span> ${escapeHtmlMapa(trecho.kmInformado || "-")}</div>
+        <div><span class="text-muted">Diferença:</span> ${escapeHtmlMapa(trecho.diferenca || "0")}%</div>
+        <div><span class="text-muted">Clientes:</span> ${escapeHtmlMapa(trecho.clientes.join(", ") || "-")}</div>
+        ${trecho.divergente ? '<div class="badge text-bg-warning mt-2">Divergência acima de 15%</div>' : ""}
+      </div>`;
+    const icon = L.divIcon({
+      className: "",
+      html: `<span class="mapa-formulario-pin ${trecho.divergente ? "divergente" : ""}">${escapeHtmlMapa(trecho.ordem)}</span>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    });
+    L.marker(origem, { icon }).bindPopup(popup).addTo(mapaFormularioKmLayers);
+    L.marker(destino, { icon }).bindPopup(popup).addTo(mapaFormularioKmLayers);
+
+    if (trecho.rotaGeojson && trecho.rotaGeojson.coordinates) {
+      L.geoJSON(trecho.rotaGeojson, {
+        style: { color: cor, weight: 4, opacity: .82 },
+      }).bindPopup(popup).addTo(mapaFormularioKmLayers);
+    } else {
+      L.polyline([origem, destino], { color: cor, weight: 4, opacity: .72, dashArray: "6,6" })
+        .bindPopup(popup)
+        .addTo(mapaFormularioKmLayers);
+    }
+    bounds.push(origem, destino);
+  }
+
+  function atualizarResumoKmExcedenteMapa() {
+    const resumo = document.getElementById("mapa-km-excedente-resumo");
+    if (!resumo) return;
+    const km = normalizarNumero(document.querySelector("[name='km_excedente_interno']")?.value);
+    if (km > 0) {
+      resumo.classList.remove("d-none");
+      resumo.innerHTML = `<i class="bi bi-signpost-split me-1"></i>KM excedente interno: <strong>${km.toFixed(2).replace(".", ",")} km</strong>. Esse valor não é desenhado como rota.`;
+    } else {
+      resumo.classList.add("d-none");
+      resumo.innerHTML = "";
+    }
+  }
+
+  function ajustarBoundsMapa(bounds) {
+    if (mapaFormularioKm && bounds.length) {
+      mapaFormularioKm.fitBounds(bounds, { padding: [28, 28] });
+      setTimeout(() => mapaFormularioKm.invalidateSize(), 150);
+    }
+  }
+
+  function atualizarMapaFormulario() {
+    const mapa = inicializarMapaFormulario();
+    if (!mapa) return;
+    const vazio = document.getElementById("mapa-km-formulario-vazio");
+    const trechos = coletarTrechosMapaFormulario();
+    limparCamadasMapa();
+    atualizarResumoKmExcedenteMapa();
+
+    if (!trechos.length) {
+      vazio?.classList.remove("d-none");
+      return;
+    }
+    vazio?.classList.add("d-none");
+    const bounds = [];
+    trechos.forEach(trecho => desenharTrechoNoMapa(trecho, bounds));
+    ajustarBoundsMapa(bounds);
+  }
+
   function prepararDecimalParaSubmit(campo) {
     if (!campo || !String(campo.value || "").trim()) return;
     campo.value = String(campo.value).replace(/\./g, "").replace(",", ".");
@@ -1344,6 +1543,9 @@
 
   function limparCoordenadasEndereco(input) {
     setCoordenadasEndereco(input, null);
+    const rotaGeojson = input?.closest(".linha-trecho")?.querySelector(".mapa-rota-geojson");
+    if (rotaGeojson) rotaGeojson.value = "{}";
+    atualizarMapaFormulario();
   }
 
   function setAvisoEndereco(input, mensagem = "", tipo = "warning") {
@@ -1522,6 +1724,7 @@
     if (mapa) {
       mapa.innerHTML = `<i class="bi bi-map me-1"></i>Última rota calculada: ${km.toFixed(2).replace(".", ",")} km. O desenho no mapa será adicionado na próxima fase.`;
     }
+    atualizarMapaFormulario();
   }
 
   function validarDivergenciaKm(linha) {
@@ -1534,6 +1737,7 @@
     if (divergente) {
       setFeedbackRota(linha, "KM informado difere mais de 15% da rota calculada.", "warning");
     }
+    atualizarMapaFormulario();
     return divergente;
   }
 
@@ -1700,6 +1904,7 @@
     }
 
     recalcular();
+    atualizarMapaFormulario();
     atualizarBadgesAbasSeguro();
     validarKmGlobal();
     executarValidadoresGrupoSeguro();
@@ -1870,6 +2075,7 @@ async function adicionarLinhaKm() {
     prepararLinhaMapaKm(novaLinha);
     atualizarBadgesClientesItens();
     recalcular();
+    atualizarMapaFormulario();
     atualizarBadgesAbasSeguro();
     logFormEvent("adicionar_km_sucesso", { idx, novoTotalForms: _idxKm });
     return novaLinha;
@@ -1903,6 +2109,7 @@ async function adicionarLinhaKm() {
   }
 
   recalcular();
+  atualizarMapaFormulario();
   atualizarBadgesAbasSeguro();
 
   // 🔥🔥🔥 ESSA É A PARTE CRÍTICA
@@ -2130,17 +2337,22 @@ function validarKmGlobal() {
         document.querySelector("[name='valor_adiantamento']")
           ?.addEventListener("input", recalcular);
         document.querySelector("[name='km_excedente_interno']")
-          ?.addEventListener("input", recalcular);
+          ?.addEventListener("input", () => {
+            recalcular();
+            atualizarMapaFormulario();
+          });
         document.querySelector("[name='km_excedente_interno']")
           ?.addEventListener("blur", event => {
             formatarDecimalCampo(event.target, 2);
             recalcular();
+            atualizarMapaFormulario();
           });
         atualizarBadgesClientesRelatorio();
         atualizarBadgesClientesItens();
         atualizarBadgesTecnicosEquipe();
         // Recalcular ao carregar (edição)
         recalcular();
+        atualizarMapaFormulario();
         // Recalcular totais de trechos existentes ao editar
         linhasAtivasFormulario(".linha-trecho").forEach(tr => {
           const km = normalizarNumero(tr.querySelector(".campo-km")?.value);
@@ -2265,12 +2477,21 @@ document.addEventListener("blur", function (e) {
         event.preventDefault();
         adicionarLinhaKm();
       });
+    document.getElementById("btn-atualizar-mapa-km")
+      ?.addEventListener("click", event => {
+        event.preventDefault();
+        atualizarMapaFormulario();
+      });
     document.querySelector("[name='km_excedente_interno']")
-      ?.addEventListener("input", recalcular);
+      ?.addEventListener("input", () => {
+        recalcular();
+        atualizarMapaFormulario();
+      });
     document.querySelector("[name='km_excedente_interno']")
       ?.addEventListener("blur", event => {
         formatarDecimalCampo(event.target, 2);
         recalcular();
+        atualizarMapaFormulario();
       });
     atualizarBadgesClientesRelatorio();
     atualizarBadgesClientesItens();
@@ -2278,6 +2499,7 @@ document.addEventListener("blur", function (e) {
     linhasAtivasFormulario(".linha-trecho").forEach(prepararLinhaMapaKm);
     aplicarMascarasNumericas();
     recalcular();
+    atualizarMapaFormulario();
     const modalImportacao = document.getElementById("modalImportarRelatorio");
     modalImportacao?.addEventListener("shown.bs.modal", buscarRelatoriosImportacao);
     document.getElementById("btn-buscar-importacao")
