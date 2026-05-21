@@ -954,7 +954,35 @@ class TrechoKm(models.Model):
     ordem = models.PositiveSmallIntegerField("Ordem", default=0)
     data = models.DateField("Data", null=True, blank=True)
     origem = models.CharField("Origem", max_length=150)
+    origem_lat = models.DecimalField(
+        "Latitude origem",
+        max_digits=10,
+        decimal_places=7,
+        null=True,
+        blank=True,
+    )
+    origem_lon = models.DecimalField(
+        "Longitude origem",
+        max_digits=10,
+        decimal_places=7,
+        null=True,
+        blank=True,
+    )
     destino = models.CharField("Destino", max_length=150)
+    destino_lat = models.DecimalField(
+        "Latitude destino",
+        max_digits=10,
+        decimal_places=7,
+        null=True,
+        blank=True,
+    )
+    destino_lon = models.DecimalField(
+        "Longitude destino",
+        max_digits=10,
+        decimal_places=7,
+        null=True,
+        blank=True,
+    )
     km = models.DecimalField(
         "Quilômetros",
         max_digits=8,

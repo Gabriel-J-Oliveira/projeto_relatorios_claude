@@ -28,24 +28,52 @@
     </div>
     <div class="text-warning small aviso-deslocamento"></div>
   </td>
-  <td class="p-1 pt-3">
+  <td class="p-1 pt-3 position-relative">
     <input type="text"
            name="trechos-{{ idx }}-origem"
            id="id_trechos-{{ idx }}-origem"
            value="{{ form.origem.value|default:'' }}"
            placeholder="Cidade origem"
-           class="form-control form-control-sm {% if form.origem.errors %}is-invalid{% endif %}">
+           autocomplete="off"
+           class="form-control form-control-sm campo-endereco-mapa {% if form.origem.errors %}is-invalid{% endif %}"
+           data-map-role="origem">
+    <input type="hidden"
+           class="mapa-lat"
+           data-map-role="origem"
+           name="trechos-{{ idx }}-origem_lat"
+           value="{{ form.origem_lat.value|default:''|unlocalize }}">
+    <input type="hidden"
+           class="mapa-lon"
+           data-map-role="origem"
+           name="trechos-{{ idx }}-origem_lon"
+           value="{{ form.origem_lon.value|default:''|unlocalize }}">
+    <div class="endereco-sugestoes shadow-sm border rounded bg-body d-none"></div>
+    <div class="text-warning small mapa-aviso"></div>
     <div class="invalid-feedback d-block small erro-inline">
       {% if form.origem.errors %}{{ form.origem.errors.0 }}{% endif %}
     </div>
   </td>
-  <td class="p-1 pt-3">
+  <td class="p-1 pt-3 position-relative">
     <input type="text"
            name="trechos-{{ idx }}-destino"
            id="id_trechos-{{ idx }}-destino"
            value="{{ form.destino.value|default:'' }}"
            placeholder="Cidade destino"
-           class="form-control form-control-sm {% if form.destino.errors %}is-invalid{% endif %}">
+           autocomplete="off"
+           class="form-control form-control-sm campo-endereco-mapa {% if form.destino.errors %}is-invalid{% endif %}"
+           data-map-role="destino">
+    <input type="hidden"
+           class="mapa-lat"
+           data-map-role="destino"
+           name="trechos-{{ idx }}-destino_lat"
+           value="{{ form.destino_lat.value|default:''|unlocalize }}">
+    <input type="hidden"
+           class="mapa-lon"
+           data-map-role="destino"
+           name="trechos-{{ idx }}-destino_lon"
+           value="{{ form.destino_lon.value|default:''|unlocalize }}">
+    <div class="endereco-sugestoes shadow-sm border rounded bg-body d-none"></div>
+    <div class="text-warning small mapa-aviso"></div>
     <div class="invalid-feedback d-block small erro-inline">
       {% if form.destino.errors %}{{ form.destino.errors.0 }}{% endif %}
     </div>
@@ -61,6 +89,7 @@
     <div class="invalid-feedback d-block small erro-inline">
       {% if form.km.errors %}{{ form.km.errors.0 }}{% endif %}
     </div>
+    <div class="small mapa-rota-feedback mt-1"></div>
   </td>
   <td class="p-1 pt-3">
   <input type="text"

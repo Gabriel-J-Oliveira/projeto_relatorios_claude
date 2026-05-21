@@ -79,6 +79,7 @@ from .services.pdf_cliente_service import (
     nome_arquivo_pdf_cliente,
 )
 from .services.pdf_interno_service import montar_contexto_pdf_interno
+from .services.maps_service import MapsServiceError, buscar_endereco, calcular_rota
 from .forms import (
     AdiantamentoForm,
     ClienteForm,
@@ -310,7 +311,11 @@ def _duplicar_relatorio(original, usuario=None):
             ordem=trecho.ordem,
             data=None,
             origem=trecho.origem,
+            origem_lat=trecho.origem_lat,
+            origem_lon=trecho.origem_lon,
             destino=trecho.destino,
+            destino_lat=trecho.destino_lat,
+            destino_lon=trecho.destino_lon,
             km=trecho.km,
             valor_km=trecho.valor_km,
             valor_km_aprovado=None,
@@ -1681,7 +1686,11 @@ def relatorio_import_detail_json(request, pk):
             "trechos": [
                 {
                     "origem": trecho.origem,
+                    "origem_lat": str(trecho.origem_lat or ""),
+                    "origem_lon": str(trecho.origem_lon or ""),
                     "destino": trecho.destino,
+                    "destino_lat": str(trecho.destino_lat or ""),
+                    "destino_lon": str(trecho.destino_lon or ""),
                     "km": str(trecho.km),
                     "valor_km": str(trecho.valor_km),
                 }
@@ -1689,6 +1698,63 @@ def relatorio_import_detail_json(request, pk):
             ],
         }
     )
+
+
+@login_required
+@require_GET
+def mapa_buscar_endereco_json(request):
+    query = (request.GET.get("q") or "").strip()
+    if not query:
+        return JsonResponse(
+            {"success": False, "error": "Informe um endereço para buscar."},
+            status=400,
+        )
+
+    try:
+        resultados = buscar_endereco(query)
+    except MapsServiceError as exc:
+        return JsonResponse({"success": False, "error": str(exc)}, status=400)
+    except Exception as exc:
+        logger.exception("Erro inesperado ao buscar endereço: %s", exc)
+        return JsonResponse(
+            {"success": False, "error": "Erro interno ao buscar endereço."},
+            status=500,
+        )
+
+    return JsonResponse({"success": True, "data": resultados})
+
+
+@login_required
+@require_GET
+def mapa_calcular_rota_json(request):
+    campos = ("origem_lat", "origem_lon", "destino_lat", "destino_lon")
+    parametros = {campo: request.GET.get(campo) for campo in campos}
+    faltando = [
+        campo
+        for campo, valor in parametros.items()
+        if not str(valor or "").strip()
+    ]
+    if faltando:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Informe origem e destino completos para calcular a rota.",
+            },
+            status=400,
+        )
+
+    try:
+        rota = calcular_rota(**parametros)
+    except MapsServiceError as exc:
+        return JsonResponse({"success": False, "error": str(exc)}, status=400)
+    except Exception as exc:
+        logger.exception("Erro inesperado ao calcular rota: %s", exc)
+        return JsonResponse(
+            {"success": False, "error": "Erro interno ao calcular rota."},
+            status=500,
+        )
+
+    return JsonResponse({"success": True, "data": rota})
 
 
 @require_POST

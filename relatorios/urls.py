@@ -30,6 +30,8 @@ urlpatterns = [
     ),
     path("relatorios/importar/listar/", views.relatorio_import_list_json, name="relatorio_import_list"),
     path("relatorios/importar/<int:pk>/", views.relatorio_import_detail_json, name="relatorio_import_detail"),
+    path("mapas/buscar-endereco/", views.mapa_buscar_endereco_json, name="mapa_buscar_endereco"),
+    path("mapas/calcular-rota/", views.mapa_calcular_rota_json, name="mapa_calcular_rota"),
 
     # Técnicos
     path("tecnicos/", views.TecnicoListView.as_view(), name="tecnico_list"),

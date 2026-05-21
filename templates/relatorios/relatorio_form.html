@@ -442,6 +442,12 @@
                   </table>
                 </div>
 
+                <div id="mapa-km-container"
+                     class="border-top bg-body-tertiary px-3 py-2 small text-muted">
+                  <i class="bi bi-map me-1"></i>
+                  Mapa preparado para visualização de rotas. A rota desenhada será adicionada na próxima fase.
+                </div>
+
                 <div class="p-3 bg-light border-top d-flex align-items-center justify-content-between">
                   <button type="button"
                           id="btn-adicionar-km"
@@ -949,6 +955,26 @@
     .col-vkm { min-width: 100px; }
     .col-obs { min-width: 140px; }
     .col-action { width: 40px; }
+    .endereco-sugestoes {
+      left: 0;
+      max-height: 220px;
+      overflow-y: auto;
+      position: absolute;
+      right: 0;
+      top: calc(100% - 0.5rem);
+      z-index: 1060;
+    }
+    .endereco-sugestao {
+      cursor: pointer;
+      line-height: 1.25;
+      padding: 0.45rem 0.6rem;
+    }
+    .endereco-sugestao:hover {
+      background: var(--bs-tertiary-bg);
+    }
+    .linha-trecho.km-divergente {
+      box-shadow: inset 3px 0 0 var(--bs-warning);
+    }
           </style>
         {% endblock %}
         {% block extra_js %}
@@ -961,11 +987,15 @@
   const URL_NOVA_LINHA_KM = "{% url 'relatorios:nova_linha_km' %}";
   const URL_IMPORTAR_RELATORIOS = "{% url 'relatorios:relatorio_import_list' %}";
   const URL_IMPORTAR_DETALHE_BASE = "{% url 'relatorios:relatorio_import_detail' 0 %}";
+  const URL_MAPAS_BUSCAR_ENDERECO = "{% url 'relatorios:mapa_buscar_endereco' %}";
+  const URL_MAPAS_CALCULAR_ROTA = "{% url 'relatorios:mapa_calcular_rota' %}";
   const RELATORIO_ATUAL_ID = "{{ instance.pk|default:'' }}";
 
   // ── Contadores de índice (nunca reutilizados) ──────────────────
   let _idxDesp = {{ fs_desp.total_form_count }};
   let _idxKm = {{ fs_km.total_form_count }};
+  const enderecoTimers = new WeakMap();
+  const enderecoSugestoesCache = new WeakMap();
 
   // Prefixos Django
   const PREFIX_DESP = "despesas";
@@ -1263,6 +1293,191 @@
     document.querySelectorAll(".campo-moeda, .campo-km").forEach(prepararDecimalParaSubmit);
   }
 
+  function campoEndereco(linha, papel) {
+    return linha?.querySelector(`.campo-endereco-mapa[data-map-role="${papel}"]`);
+  }
+
+  function campoCoordenada(linha, papel, tipo) {
+    return linha?.querySelector(`.mapa-${tipo}[data-map-role="${papel}"]`);
+  }
+
+  function setCoordenadasEndereco(input, resultado) {
+    const linha = input?.closest(".linha-trecho");
+    const papel = input?.dataset.mapRole;
+    const lat = campoCoordenada(linha, papel, "lat");
+    const lon = campoCoordenada(linha, papel, "lon");
+    if (lat) lat.value = resultado?.lat || "";
+    if (lon) lon.value = resultado?.lon || "";
+  }
+
+  function limparCoordenadasEndereco(input) {
+    setCoordenadasEndereco(input, null);
+  }
+
+  function setAvisoEndereco(input, mensagem = "", tipo = "warning") {
+    const aviso = input?.closest("td")?.querySelector(".mapa-aviso");
+    if (!aviso) return;
+    aviso.className = `small mapa-aviso text-${tipo}`;
+    aviso.textContent = mensagem;
+  }
+
+  function setFeedbackRota(linha, mensagem = "", tipo = "muted") {
+    const feedback = linha?.querySelector(".mapa-rota-feedback");
+    if (!feedback) return;
+    feedback.className = `small mapa-rota-feedback mt-1 text-${tipo}`;
+    feedback.textContent = mensagem;
+  }
+
+  function esconderSugestoesEndereco(input) {
+    const box = input?.closest("td")?.querySelector(".endereco-sugestoes");
+    if (!box) return;
+    box.innerHTML = "";
+    box.classList.add("d-none");
+  }
+
+  async function buscarSugestoesEndereco(input) {
+    const query = String(input?.value || "").trim();
+    if (query.length < 4) {
+      esconderSugestoesEndereco(input);
+      return [];
+    }
+    const params = new URLSearchParams({ q: query });
+    const response = await fetch(`${URL_MAPAS_BUSCAR_ENDERECO}?${params.toString()}`, {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+      credentials: "same-origin",
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || "Erro ao buscar endereço.");
+    }
+    enderecoSugestoesCache.set(input, payload.data || []);
+    return payload.data || [];
+  }
+
+  function renderizarSugestoesEndereco(input, resultados) {
+    const box = input?.closest("td")?.querySelector(".endereco-sugestoes");
+    if (!box) return;
+    if (!resultados.length) {
+      esconderSugestoesEndereco(input);
+      return;
+    }
+    box.innerHTML = resultados.slice(0, 5).map((item, index) => `
+      <button type="button"
+              class="dropdown-item endereco-sugestao small text-wrap"
+              data-endereco-index="${index}">
+        ${item.display_name}
+      </button>
+    `).join("");
+    box.classList.remove("d-none");
+  }
+
+  async function geocodificarTextoLivre(input, { silencioso = false } = {}) {
+    const query = String(input?.value || "").trim();
+    if (!query) {
+      limparCoordenadasEndereco(input);
+      setAvisoEndereco(input, "");
+      return null;
+    }
+    try {
+      const resultados = await buscarSugestoesEndereco(input);
+      const escolhido = resultados[0] || null;
+      if (!escolhido) {
+        limparCoordenadasEndereco(input);
+        setAvisoEndereco(input, "Não foi possível localizar este endereço. Informe o KM manualmente.");
+        return null;
+      }
+      setCoordenadasEndereco(input, escolhido);
+      setAvisoEndereco(input, silencioso ? "" : "Endereço localizado automaticamente.", "success");
+      return escolhido;
+    } catch (error) {
+      limparCoordenadasEndereco(input);
+      setAvisoEndereco(input, "Não foi possível localizar este endereço. Informe o KM manualmente.");
+      logFormError("geocodificar_endereco_erro", error, { query });
+      return null;
+    }
+  }
+
+  function selecionarSugestaoEndereco(input, index) {
+    const sugestoes = enderecoSugestoesCache.get(input) || [];
+    const selecionado = sugestoes[Number(index)];
+    if (!selecionado) return;
+    input.value = selecionado.display_name;
+    setCoordenadasEndereco(input, selecionado);
+    setAvisoEndereco(input, "");
+    esconderSugestoesEndereco(input);
+    tentarCalcularRotaLinha(input.closest(".linha-trecho"));
+  }
+
+  async function tentarCalcularRotaLinha(linha) {
+    if (!linha || linhaEstaRemovida(linha)) return;
+    const origem = campoEndereco(linha, "origem");
+    const destino = campoEndereco(linha, "destino");
+    if (!origem?.value || !destino?.value) return;
+
+    if (!campoCoordenada(linha, "origem", "lat")?.value) {
+      await geocodificarTextoLivre(origem, { silencioso: true });
+    }
+    if (!campoCoordenada(linha, "destino", "lat")?.value) {
+      await geocodificarTextoLivre(destino, { silencioso: true });
+    }
+
+    const params = new URLSearchParams({
+      origem_lat: campoCoordenada(linha, "origem", "lat")?.value || "",
+      origem_lon: campoCoordenada(linha, "origem", "lon")?.value || "",
+      destino_lat: campoCoordenada(linha, "destino", "lat")?.value || "",
+      destino_lon: campoCoordenada(linha, "destino", "lon")?.value || "",
+    });
+    if (Array.from(params.values()).some(valor => !valor)) return;
+
+    setFeedbackRota(linha, "Calculando rota...", "muted");
+    try {
+      const response = await fetch(`${URL_MAPAS_CALCULAR_ROTA}?${params.toString()}`, {
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        credentials: "same-origin",
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error || "Erro ao calcular rota.");
+      }
+      aplicarResultadoRota(linha, payload.data);
+    } catch (error) {
+      setFeedbackRota(linha, "Não foi possível calcular a rota. Informe o KM manualmente.", "warning");
+      logFormError("calcular_rota_erro", error, {
+        origem: origem.value,
+        destino: destino.value,
+      });
+    }
+  }
+
+  function aplicarResultadoRota(linha, resultado) {
+    const km = normalizarNumero(resultado?.distancia_km);
+    const campoKm = linha?.querySelector(".campo-km");
+    if (!campoKm || !km) return;
+    linha.dataset.kmCalculado = String(km);
+    campoKm.value = km.toFixed(2).replace(".", ",");
+    campoKm.dispatchEvent(new Event("input", { bubbles: true }));
+    calcularTrechoKm(campoKm);
+    recalcular();
+    validarDivergenciaKm(linha);
+    setFeedbackRota(linha, `Rota calculada automaticamente: ${km.toFixed(2).replace(".", ",")} km`, "success");
+    const mapa = document.getElementById("mapa-km-container");
+    if (mapa) {
+      mapa.innerHTML = `<i class="bi bi-map me-1"></i>Última rota calculada: ${km.toFixed(2).replace(".", ",")} km. O desenho no mapa será adicionado na próxima fase.`;
+    }
+  }
+
+  function validarDivergenciaKm(linha) {
+    const kmCalculado = normalizarNumero(linha?.dataset.kmCalculado);
+    const campoKm = linha?.querySelector(".campo-km");
+    const kmInformado = normalizarNumero(campoKm?.value);
+    const divergente = Boolean(kmCalculado && kmInformado && Math.abs(kmInformado - kmCalculado) / kmCalculado > 0.15);
+    linha?.classList.toggle("km-divergente", divergente);
+    if (divergente) {
+      setFeedbackRota(linha, "KM informado difere mais de 15% da rota calculada.", "warning");
+    }
+    return divergente;
+  }
+
   let relatorioImportacaoSelecionado = null;
 
   function urlDetalheImportacao(id) {
@@ -1371,7 +1586,11 @@
       const linha = await adicionarLinhaKm();
       setClientesInput(linha?.querySelector(".clientes-item-input"), getClientesRelatorioIds());
       definirCampoLinha(linha, "origem", trecho.origem);
+      definirCampoLinha(linha, "origem_lat", trecho.origem_lat);
+      definirCampoLinha(linha, "origem_lon", trecho.origem_lon);
       definirCampoLinha(linha, "destino", trecho.destino);
+      definirCampoLinha(linha, "destino_lat", trecho.destino_lat);
+      definirCampoLinha(linha, "destino_lon", trecho.destino_lon);
       definirCampoLinha(linha, "km", trecho.km);
       definirCampoLinha(linha, "valor_km", trecho.valor_km);
       const campoCalculo = linha?.querySelector(".campo-km") || linha?.querySelector(".campo-vkm");
@@ -1577,6 +1796,7 @@ async function adicionarLinhaKm() {
     _idxKm++;
     atualizarTotalForms(PREFIX_KM, _idxKm);
     aplicarMascarasNumericas(novaLinha);
+    prepararLinhaMapaKm(novaLinha);
     atualizarBadgesClientesItens();
     recalcular();
     atualizarBadgesAbasSeguro();
@@ -1638,6 +1858,13 @@ async function adicionarLinhaKm() {
     const vkm = normalizarNumero(tr.querySelector(".campo-vkm")?.value);
     const cel = tr.querySelector(".total-trecho");
     if (cel) cel.textContent = "R$ " + (km * vkm).toFixed(2).replace(".", ",");
+    if (input.matches(".campo-km")) validarDivergenciaKm(tr);
+  }
+
+  function prepararLinhaMapaKm(linha) {
+    linha?.querySelectorAll(".campo-endereco-mapa").forEach(input => {
+      input.setAttribute("autocomplete", "off");
+    });
   }
 
 
@@ -1832,6 +2059,56 @@ document.addEventListener("blur", function (e) {
   }
 }, true);
   // Inicialização imediata (sem Alpine em modo não-defer)
+  document.addEventListener("input", function (event) {
+    const endereco = event.target.closest(".campo-endereco-mapa");
+    if (endereco) {
+      limparCoordenadasEndereco(endereco);
+      setAvisoEndereco(endereco, "");
+      setFeedbackRota(endereco.closest(".linha-trecho"), "");
+      clearTimeout(enderecoTimers.get(endereco));
+      enderecoTimers.set(endereco, setTimeout(async () => {
+        try {
+          const resultados = await buscarSugestoesEndereco(endereco);
+          renderizarSugestoesEndereco(endereco, resultados);
+        } catch (error) {
+          esconderSugestoesEndereco(endereco);
+          logFormError("buscar_sugestoes_endereco_erro", error, { query: endereco.value });
+        }
+      }, 450));
+    }
+
+    const km = event.target.closest(".campo-km");
+    if (km) {
+      validarDivergenciaKm(km.closest(".linha-trecho"));
+    }
+  });
+
+  document.addEventListener("click", function (event) {
+    const sugestao = event.target.closest(".endereco-sugestao");
+    if (sugestao) {
+      const input = sugestao.closest("td")?.querySelector(".campo-endereco-mapa");
+      selecionarSugestaoEndereco(input, sugestao.dataset.enderecoIndex);
+      return;
+    }
+
+    if (!event.target.closest(".endereco-sugestoes") && !event.target.closest(".campo-endereco-mapa")) {
+      document.querySelectorAll(".endereco-sugestoes").forEach(box => {
+        box.innerHTML = "";
+        box.classList.add("d-none");
+      });
+    }
+  });
+
+  document.addEventListener("blur", function (event) {
+    const endereco = event.target.closest(".campo-endereco-mapa");
+    if (!endereco) return;
+    setTimeout(async () => {
+      esconderSugestoesEndereco(endereco);
+      await geocodificarTextoLivre(endereco, { silencioso: true });
+      await tentarCalcularRotaLinha(endereco.closest(".linha-trecho"));
+    }, 200);
+  }, true);
+
   Object.assign(window, {
     adicionarLinhaDespesa,
     adicionarLinhaKm,
@@ -1839,6 +2116,11 @@ document.addEventListener("blur", function (e) {
     calcularTrechoKm,
     recalcular,
     validarKmGlobal,
+    buscarSugestoesEndereco,
+    geocodificarTextoLivre,
+    tentarCalcularRotaLinha,
+    aplicarResultadoRota,
+    validarDivergenciaKm,
   });
 
   document.addEventListener("DOMContentLoaded", () => {
@@ -1867,6 +2149,7 @@ document.addEventListener("blur", function (e) {
     atualizarBadgesClientesRelatorio();
     atualizarBadgesClientesItens();
     atualizarBadgesTecnicosEquipe();
+    linhasAtivasFormulario(".linha-trecho").forEach(prepararLinhaMapaKm);
     aplicarMascarasNumericas();
     recalcular();
     const modalImportacao = document.getElementById("modalImportarRelatorio");

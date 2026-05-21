@@ -342,7 +342,11 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
             "ordem",
             "data",
             "origem",
+            "origem_lat",
+            "origem_lon",
             "destino",
+            "destino_lat",
+            "destino_lon",
             "km",
             "valor_km",
             "observacao",
@@ -356,13 +360,28 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
                 format="%Y-%m-%d",
             ),
             "ordem": forms.HiddenInput(),
+            "origem_lat": forms.HiddenInput(),
+            "origem_lon": forms.HiddenInput(),
+            "destino_lat": forms.HiddenInput(),
+            "destino_lon": forms.HiddenInput(),
         }
 
     def __init__(self, *args, **kwargs):
         valor_km_padrao = kwargs.pop("valor_km_padrao", None)
         super().__init__(*args, **kwargs)
         self.fields["data"].input_formats = ["%Y-%m-%d", "%d/%m/%Y"]
-        for name in ["data", "origem", "destino", "km", "valor_km", "observacao"]:
+        for name in [
+            "data",
+            "origem",
+            "origem_lat",
+            "origem_lon",
+            "destino",
+            "destino_lat",
+            "destino_lon",
+            "km",
+            "valor_km",
+            "observacao",
+        ]:
             self.fields[name].required = False
 
         self.fields["origem"].widget.attrs.update(
