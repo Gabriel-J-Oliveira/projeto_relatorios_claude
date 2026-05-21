@@ -78,6 +78,7 @@ from .services.pdf_cliente_service import (
     listar_clientes_pdf,
     nome_arquivo_pdf_cliente,
 )
+from .services.pdf_interno_service import montar_contexto_pdf_interno
 from .forms import (
     AdiantamentoForm,
     ClienteForm,
@@ -459,7 +460,7 @@ class AcessoErpMixin(LoginRequiredMixin):
 class AdministrativoMixin(AcessoErpMixin):
     def dispatch(self, request, *args, **kwargs):
         if not usuario_eh_administrativo(request.user):
-            messages.error(request, "VocÃª nÃ£o tem permissÃ£o para acessar esta Ã¡rea.")
+            messages.error(request, "Você não tem permissão para acessar esta área.")
             return redirect("relatorios:dashboard")
         return super().dispatch(request, *args, **kwargs)
 
@@ -709,7 +710,7 @@ class DashboardView(AcessoErpMixin, TemplateView):
                         "valor": total_conferencia,
                         "icone": "bi-hourglass-split",
                         "cor": "warning",
-                        "rodape": "aguardando conferÃªncia",
+                        "rodape": "aguardando conferência",
                     },
                     {
                         "titulo": "Total de Despesas",
@@ -1430,7 +1431,6 @@ def _relatorio_pdf_cliente_or_404(request, pk):
         pk=pk,
     )
 
-
 def _redirect_pdf_cliente_error(relatorio):
     if relatorio.status in {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}:
         return redirect("relatorios:relatorio_consulta", pk=relatorio.pk)
@@ -1523,9 +1523,13 @@ def relatorio_pdf_interno_view(request, pk):
             "cliente",
             "tecnico_responsavel",
             "aprovado_por",
+            "snapshot_financeiro",
         ).prefetch_related(
-            "despesas",
-            "trechos",
+            "clientes_vinculados__cliente",
+            "despesas__clientes_vinculados__cliente",
+            "despesas__rateios__cliente",
+            "trechos__clientes_vinculados__cliente",
+            "trechos__rateios__cliente",
             "equipe__tecnico",
             "historicos__usuario",
         ),
@@ -1540,19 +1544,20 @@ def relatorio_pdf_interno_view(request, pk):
 
     emitido_em = timezone.localtime(timezone.now())
     usuario_gerador = request.user if request.user.is_authenticated else None
-    historicos_resumidos = relatorio.historicos.all()[:10]
-    anexos = [despesa for despesa in relatorio.despesas.all() if despesa.comprovante]
+    pdf_contexto = montar_contexto_pdf_interno(
+        relatorio,
+        emitido_em,
+        usuario_gerador=usuario_gerador,
+        avisos_financeiro=_avisos_financeiro(relatorio),
+    )
 
     html = render_to_string(
         "relatorios/pdf/interno.html",
         {
-            "relatorio": relatorio,
+            "pdf": pdf_contexto,
             "empresa": "CONTROL SUL GESTÃO EMPRESARIAL",
             "emitido_em": emitido_em,
             "usuario_gerador": usuario_gerador,
-            "avisos_financeiro": _avisos_financeiro(relatorio),
-            "historicos_resumidos": historicos_resumidos,
-            "anexos": anexos,
         },
         request=request,
     )
@@ -1710,8 +1715,8 @@ def relatorio_duplicate_view(request, pk):
             usuario_historico = request.user if request.user.is_authenticated else None
             novo = _duplicar_relatorio(original, usuario_historico)
     except Exception as exc:
-        logger.exception("Erro ao duplicar relatÃ³rio %s: %s", pk, exc)
-        messages.error(request, "Erro interno ao duplicar relatÃ³rio. Tente novamente.")
+        logger.exception("Erro ao duplicar relatório %s: %s", pk, exc)
+        messages.error(request, "Erro interno ao duplicar relatório. Tente novamente.")
         return redirect("relatorios:relatorio_list")
 
     messages.success(
@@ -1934,7 +1939,7 @@ def relatorio_status_view(request, pk, status):
         )
         if status == StatusRelatorio.CONFERENCIA:
             if not usuario_pode_enviar_relatorio(request.user, relatorio_atual):
-                messages.error(request, "VocÃª nÃ£o tem permissÃ£o para enviar este relatÃ³rio.")
+                messages.error(request, "Você não tem permissão para enviar este relatório.")
                 return redirect("relatorios:relatorio_detail", pk=pk)
             relatorio = enviar_para_conferencia(pk, usuario_historico)
         elif status in {

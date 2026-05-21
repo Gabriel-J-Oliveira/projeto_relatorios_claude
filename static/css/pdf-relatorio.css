@@ -138,6 +138,14 @@ h2 {
   font-size: 11px;
 }
 
+.meta-grid small {
+  color: #6b7280;
+  display: block;
+  font-size: 8px;
+  line-height: 1.35;
+  margin-top: 3px;
+}
+
 .summary-card {
   background: #f9fafb;
   border: 1px solid #e5e7eb;
@@ -185,6 +193,14 @@ h2 {
 
 .data-table tr {
   page-break-inside: avoid;
+}
+
+.data-table thead {
+  display: table-header-group;
+}
+
+.data-table td {
+  overflow-wrap: anywhere;
 }
 
 .data-table.compact th,
