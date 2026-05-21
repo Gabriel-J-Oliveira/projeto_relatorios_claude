@@ -1,0 +1,525 @@
+{% extends "base.html" %}
+
+{% block titulo %}Consulta {{ relatorio.identificador }}{% endblock %}
+{% block page_title %}Consulta final do relatório{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'relatorios:relatorio_list' %}" class="text-decoration-none">Relatórios</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'relatorios:relatorio_detail' relatorio.pk %}" class="text-decoration-none">
+    {{ relatorio.identificador }}
+  </a>
+</li>
+<li class="breadcrumb-item active">Consulta</li>
+{% endblock %}
+
+{% block page_actions %}
+<div class="d-flex flex-wrap gap-2">
+  <a href="{% url 'relatorios:relatorio_detail' relatorio.pk %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-tools me-1"></i>Tela operacional
+  </a>
+  <button class="btn btn-outline-dark btn-sm" disabled>
+    <i class="bi bi-file-earmark-pdf me-1"></i>PDF interno
+  </button>
+  <button class="btn btn-outline-dark btn-sm" disabled>
+    <i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel
+  </button>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<section class="consulta-hero mb-4">
+  <div class="d-flex flex-column flex-xl-row justify-content-between gap-4">
+    <div>
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <span class="badge rounded-pill text-bg-light border">
+          <i class="bi bi-hash me-1"></i>{{ relatorio.identificador }}
+        </span>
+        <span class="badge rounded-pill bg-{{ relatorio.status_badge_cor }}-subtle text-{{ relatorio.status_badge_cor }} border border-{{ relatorio.status_badge_cor }}-subtle">
+          {{ relatorio.get_status_display }}
+        </span>
+      </div>
+      <h2 class="consulta-title mb-3">Relatório final de prestação</h2>
+      <div class="consulta-meta-grid">
+        <div>
+          <span>Técnicos</span>
+          <strong>
+            {% for tecnico in relatorio.tecnicos_exibicao %}
+              {{ tecnico.nome }}{% if not forloop.last %}, {% endif %}
+            {% empty %}
+              Não informado
+            {% endfor %}
+          </strong>
+        </div>
+        <div>
+          <span>Clientes</span>
+          <strong>
+            {% for cliente in relatorio.clientes_exibicao %}
+              {{ cliente.nome }}{% if not forloop.last %}, {% endif %}
+            {% empty %}
+              Não informado
+            {% endfor %}
+          </strong>
+        </div>
+        <div>
+          <span>Período</span>
+          <strong>
+            {{ relatorio.data_inicio|date:"d/m/Y" }}
+            {% if relatorio.data_inicio != relatorio.data_fim %}
+              a {{ relatorio.data_fim|date:"d/m/Y" }}
+            {% endif %}
+          </strong>
+        </div>
+        <div>
+          <span>Finalização</span>
+          <strong>{{ relatorio.aprovado_em|date:"d/m/Y H:i"|default:"Não finalizado" }}</strong>
+        </div>
+      </div>
+    </div>
+    <div class="consulta-status-panel">
+      <span class="text-muted small">Resultado financeiro</span>
+      <strong>R$ {{ relatorio.total_aprovado|floatformat:2 }}</strong>
+      <small class="text-muted">Total aprovado para reembolso/prestação</small>
+    </div>
+  </div>
+</section>
+
+<section class="row g-3 mb-4">
+  <div class="col-12 col-sm-6 col-xl-2">
+    <div class="consulta-kpi">
+      <span>Total solicitado</span>
+      <strong>R$ {{ relatorio.total_solicitado|floatformat:2 }}</strong>
+    </div>
+  </div>
+  <div class="col-12 col-sm-6 col-xl-2">
+    <div class="consulta-kpi success">
+      <span>Total aprovado</span>
+      <strong>R$ {{ relatorio.total_aprovado|floatformat:2 }}</strong>
+    </div>
+  </div>
+  <div class="col-12 col-sm-6 col-xl-2">
+    <div class="consulta-kpi warning">
+      <span>Diferença removida</span>
+      <strong>R$ {{ relatorio.diferenca_removida|floatformat:2 }}</strong>
+    </div>
+  </div>
+  <div class="col-12 col-sm-6 col-xl-2">
+    <div class="consulta-kpi">
+      <span>KM total</span>
+      <strong>{{ relatorio.total_km_percorrido|floatformat:1 }} km</strong>
+    </div>
+  </div>
+  <div class="col-12 col-sm-6 col-xl-2">
+    <div class="consulta-kpi">
+      <span>Despesas</span>
+      <strong>{{ relatorio.despesas.count }}</strong>
+    </div>
+  </div>
+  <div class="col-12 col-sm-6 col-xl-2">
+    <div class="consulta-kpi">
+      <span>Trechos KM</span>
+      <strong>{{ relatorio.trechos.count }}</strong>
+    </div>
+  </div>
+</section>
+
+<div class="row g-4 mb-4">
+  <div class="col-12 col-xl-5">
+    <section class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center">
+        <div>
+          <h6 class="mb-0 fw-semibold">Distribuição por cliente</h6>
+          <small class="text-muted">Consolidado financeiro por participante</small>
+        </div>
+        {% if distribuicao_clientes.clientes|length > 1 %}
+        <div class="btn-group btn-group-sm">
+          <button type="button" class="btn btn-outline-secondary js-cliente-prev" aria-label="Cliente anterior">
+            <i class="bi bi-chevron-left"></i>
+          </button>
+          <button type="button" class="btn btn-outline-secondary js-cliente-next" aria-label="Próximo cliente">
+            <i class="bi bi-chevron-right"></i>
+          </button>
+        </div>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        {% if distribuicao_clientes.clientes %}
+          {% for resumo in distribuicao_clientes.clientes %}
+          <article class="cliente-slide {% if not forloop.first %}d-none{% endif %}" data-cliente-slide>
+            <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+              <div>
+                <h5 class="mb-1 fw-semibold">{{ resumo.cliente.nome }}</h5>
+                <span class="text-muted small">{{ forloop.counter }} de {{ distribuicao_clientes.total }}</span>
+              </div>
+              <span class="badge rounded-pill {% if resumo.tem_divergencia %}text-bg-warning{% else %}text-bg-success{% endif %}">
+                {{ resumo.status_financeiro }}
+              </span>
+            </div>
+            <div class="cliente-resumo-list">
+              <div><span>KM</span><strong>{{ resumo.km_total|floatformat:1 }} km</strong></div>
+              <div><span>Despesas</span><strong>R$ {{ resumo.despesas_solicitadas|floatformat:2 }}</strong></div>
+              <div><span>Solicitado</span><strong>R$ {{ resumo.total_solicitado|floatformat:2 }}</strong></div>
+              <div><span>Aprovado</span><strong>R$ {{ resumo.total_aprovado|floatformat:2 }}</strong></div>
+              <div><span>Diferença</span><strong>R$ {{ resumo.diferenca_removida|floatformat:2 }}</strong></div>
+              <div><span>Itens rejeitados</span><strong>{{ resumo.itens_rejeitados }}</strong></div>
+            </div>
+          </article>
+          {% endfor %}
+        {% else %}
+          <p class="text-muted small mb-0">Nenhum cliente consolidado para este relatório.</p>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <div class="col-12 col-xl-7">
+    <section class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-transparent border-bottom">
+        <h6 class="mb-0 fw-semibold">Histórico do relatório</h6>
+      </div>
+      <div class="card-body">
+        <div class="consulta-timeline">
+          {% for historico in relatorio.historicos.all %}
+          <div class="timeline-item">
+            <span class="timeline-dot text-bg-{{ historico.badge_cor }}"></span>
+            <div>
+              <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                <strong>{{ historico.acao }}</strong>
+                <span class="badge text-bg-{{ historico.badge_cor }}">{{ historico.get_tipo_evento_display }}</span>
+              </div>
+              <p class="small text-muted mb-1">{{ historico.descricao }}</p>
+              <span class="small text-muted">
+                {{ historico.data_hora|date:"d/m/Y H:i" }}
+                {% if historico.usuario %}por {{ historico.usuario.get_full_name|default:historico.usuario.username }}{% endif %}
+              </span>
+            </div>
+          </div>
+          {% empty %}
+          <p class="text-muted small mb-0">Nenhuma movimentação registrada.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<section class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-transparent border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div>
+      <h6 class="mb-0 fw-semibold">Resultado final consolidado</h6>
+      <small class="text-muted">Itens finais sem edição ou ações operacionais</small>
+    </div>
+    <span class="badge rounded-pill text-bg-light border">{{ consulta.itens|length }} lançamento(s)</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive consulta-table-wrap">
+      <table class="table table-sm table-striped align-middle mb-0 consulta-table">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">Tipo</th>
+            <th>Cliente</th>
+            <th>Descrição</th>
+            <th class="text-end">Solicitado</th>
+            <th class="text-end">Aprovado</th>
+            <th class="text-end pe-4">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in consulta.itens %}
+          <tr>
+            <td class="ps-4" data-label="Tipo">{{ item.tipo }}</td>
+            <td data-label="Cliente">{{ item.cliente }}</td>
+            <td data-label="Descrição">{{ item.descricao }}</td>
+            <td class="text-end" data-label="Solicitado">R$ {{ item.valor_solicitado|floatformat:2 }}</td>
+            <td class="text-end fw-semibold" data-label="Aprovado">R$ {{ item.valor_aprovado|floatformat:2 }}</td>
+            <td class="text-end pe-4" data-label="Status">
+              <span class="badge rounded-pill text-bg-{{ item.badge }}">{{ item.status }}</span>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center text-muted py-4">Nenhum item encontrado.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<div class="row g-4">
+  <div class="col-12 col-xl-6">
+    <section class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-transparent border-bottom">
+        <h6 class="mb-0 fw-semibold">Observações e justificativas</h6>
+      </div>
+      <div class="card-body">
+        {% for titulo, texto in consulta.observacoes %}
+        <div class="consulta-note">
+          <span>{{ titulo }}</span>
+          <p>{{ texto }}</p>
+        </div>
+        {% empty %}
+        <p class="text-muted small mb-0">Nenhuma observação ou justificativa registrada.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+  <div class="col-12 col-xl-6">
+    <section class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-semibold">Anexos</h6>
+        <span class="badge rounded-pill text-bg-light border">{{ consulta.anexos|length }}</span>
+      </div>
+      <div class="card-body">
+        {% for anexo in consulta.anexos %}
+        <a href="{{ anexo.url }}" target="_blank" class="consulta-anexo">
+          <i class="bi bi-paperclip"></i>
+          <span>
+            <strong>{{ anexo.tipo }}</strong>
+            <small>{{ anexo.descricao }} · {{ anexo.nome }}</small>
+          </span>
+        </a>
+        {% empty %}
+        <p class="text-muted small mb-0">Nenhum anexo disponível para consulta.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .consulta-hero {
+    padding: clamp(1.25rem, 2vw, 2rem);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 1rem;
+    background:
+      linear-gradient(135deg, rgba(var(--bs-primary-rgb), .10), transparent 42%),
+      var(--bs-body-bg);
+    box-shadow: 0 .5rem 1.5rem rgba(15, 23, 42, .06);
+  }
+
+  .consulta-title {
+    letter-spacing: 0;
+  }
+
+  .consulta-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .9rem 1.25rem;
+  }
+
+  .consulta-meta-grid span,
+  .consulta-kpi span,
+  .cliente-resumo-list span {
+    display: block;
+    color: var(--bs-secondary-color);
+    font-size: .76rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+  }
+
+  .consulta-meta-grid strong {
+    display: block;
+    margin-top: .2rem;
+    font-size: .95rem;
+  }
+
+  .consulta-status-panel,
+  .consulta-kpi {
+    border: 1px solid var(--bs-border-color);
+    border-radius: .85rem;
+    background: var(--bs-body-bg);
+    box-shadow: 0 .35rem 1rem rgba(15, 23, 42, .05);
+  }
+
+  .consulta-status-panel {
+    min-width: min(100%, 320px);
+    padding: 1.25rem;
+  }
+
+  .consulta-status-panel strong {
+    display: block;
+    margin: .25rem 0;
+    font-size: clamp(1.8rem, 3vw, 2.6rem);
+  }
+
+  .consulta-kpi {
+    height: 100%;
+    padding: 1rem;
+  }
+
+  .consulta-kpi strong {
+    display: block;
+    margin-top: .35rem;
+    font-size: 1.18rem;
+  }
+
+  .consulta-kpi.success {
+    border-color: rgba(var(--bs-success-rgb), .35);
+  }
+
+  .consulta-kpi.warning {
+    border-color: rgba(var(--bs-warning-rgb), .45);
+  }
+
+  .cliente-resumo-list {
+    display: grid;
+    gap: .45rem;
+  }
+
+  .cliente-resumo-list > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: .6rem .75rem;
+    border-radius: .6rem;
+  }
+
+  .cliente-resumo-list > div:nth-child(odd) {
+    background: var(--bs-tertiary-bg);
+  }
+
+  .consulta-timeline {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .timeline-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1rem 1fr;
+    gap: .85rem;
+  }
+
+  .timeline-dot {
+    width: .8rem;
+    height: .8rem;
+    margin-top: .35rem;
+    border-radius: 999px;
+  }
+
+  .text-bg-orange {
+    color: #4d2a00 !important;
+    background-color: #ffb347 !important;
+  }
+
+  .consulta-note {
+    padding: .85rem 0;
+    border-bottom: 1px solid var(--bs-border-color-translucent);
+  }
+
+  .consulta-note:last-child {
+    border-bottom: 0;
+  }
+
+  .consulta-note span {
+    display: block;
+    margin-bottom: .25rem;
+    color: var(--bs-secondary-color);
+    font-size: .8rem;
+    font-weight: 600;
+  }
+
+  .consulta-note p {
+    margin: 0;
+  }
+
+  .consulta-anexo {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .75rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: .75rem;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .consulta-anexo + .consulta-anexo {
+    margin-top: .6rem;
+  }
+
+  .consulta-anexo i {
+    color: var(--bs-success);
+    font-size: 1.15rem;
+  }
+
+  .consulta-anexo small {
+    display: block;
+    color: var(--bs-secondary-color);
+  }
+
+  @media (max-width: 991.98px) {
+    .consulta-meta-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .consulta-table thead {
+      display: none;
+    }
+
+    .consulta-table tbody,
+    .consulta-table tr,
+    .consulta-table td {
+      display: block;
+      width: 100%;
+    }
+
+    .consulta-table tr {
+      padding: .75rem 0;
+      border-bottom: 1px solid var(--bs-border-color);
+    }
+
+    .consulta-table td {
+      padding: .45rem 1rem !important;
+      border: 0;
+      text-align: left !important;
+    }
+
+    .consulta-table td::before {
+      content: attr(data-label);
+      display: block;
+      margin-bottom: .15rem;
+      color: var(--bs-secondary-color);
+      font-size: .72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const slides = Array.from(document.querySelectorAll("[data-cliente-slide]"));
+    let atual = 0;
+
+    function mostrar(indice) {
+      if (!slides.length) return;
+      atual = (indice + slides.length) % slides.length;
+      slides.forEach(function (slide, idx) {
+        slide.classList.toggle("d-none", idx !== atual);
+      });
+    }
+
+    document.querySelector(".js-cliente-prev")?.addEventListener("click", function () {
+      mostrar(atual - 1);
+    });
+    document.querySelector(".js-cliente-next")?.addEventListener("click", function () {
+      mostrar(atual + 1);
+    });
+  });
+</script>
+{% endblock %}

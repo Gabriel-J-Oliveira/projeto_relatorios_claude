@@ -20,6 +20,7 @@ from relatorios.services.autorizacao_service import (
 )
 from relatorios.services.historico_service import registrar_evento
 from relatorios.services.rateio_service import (
+    RateioError,
     garantir_rateio_despesa,
     garantir_rateio_trecho,
     validar_rateios_relatorio,
@@ -231,7 +232,10 @@ def _salvar_valores_aprovados(post_data, relatorio, usuario, consolidar=False):
             valor_anterior = despesa.valor_aprovado
             despesa.valor_aprovado = valor_aprovado
             despesa.save(update_fields=["valor_aprovado"])
-            garantir_rateio_despesa(despesa)
+            try:
+                garantir_rateio_despesa(despesa)
+            except RateioError as exc:
+                raise WorkflowError(f"Despesa {despesa.pk}: {exc}") from exc
             registrar_evento(
                 relatorio,
                 usuario,
@@ -253,7 +257,10 @@ def _salvar_valores_aprovados(post_data, relatorio, usuario, consolidar=False):
             valor_anterior = trecho.valor_km_aprovado
             trecho.valor_km_aprovado = valor_km_aprovado
             trecho.save(update_fields=["valor_km_aprovado"])
-            garantir_rateio_trecho(trecho)
+            try:
+                garantir_rateio_trecho(trecho)
+            except RateioError as exc:
+                raise WorkflowError(f"Trecho KM {trecho.pk}: {exc}") from exc
             registrar_evento(
                 relatorio,
                 usuario,

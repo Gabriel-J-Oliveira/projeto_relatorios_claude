@@ -10,6 +10,7 @@ urlpatterns = [
     path("relatorios/", views.RelatorioListView.as_view(), name="relatorio_list"),
     path("relatorios/novo/", views.relatorio_form_view, name="relatorio_create"),
     path("relatorios/<int:pk>/", views.relatorio_detail_view, name="relatorio_detail"),
+    path("relatorios/<int:pk>/consulta/", views.relatorio_consulta_view, name="relatorio_consulta"),
     path("relatorios/<int:pk>/pdf-reembolso/", views.relatorio_reembolso_pdf_view, name="relatorio_reembolso_pdf"),
     path("relatorios/<int:pk>/pdf-interno/", views.relatorio_pdf_interno_view, name="relatorio_pdf_interno"),
     path("relatorios/<int:pk>/editar/", views.relatorio_form_view, name="relatorio_update"),

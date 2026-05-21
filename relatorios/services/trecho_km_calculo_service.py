@@ -51,8 +51,10 @@ def _clientes_ids_item(trecho):
             trecho.relatorio.clientes_vinculados.values_list("cliente_id", flat=True)
         )
     )
-    if ids:
+    if len(ids) == 1:
         return ids
+    if len(ids) > 1:
+        return []
     return [trecho.relatorio.cliente_id] if trecho.relatorio.cliente_id else []
 
 
@@ -72,22 +74,26 @@ class TrechoKMCalculoService:
             calculo.cliente_id: calculo
             for calculo in trecho.rateios.select_related("cliente")
         }
+        clientes_por_id = Cliente.objects.in_bulk(cliente_ids)
         trecho.rateios.exclude(cliente_id__in=cliente_ids).delete()
         total_clientes = len(cliente_ids)
 
         for cliente_id in cliente_ids:
             calculo = existentes.get(cliente_id)
             if rejeitado:
+                cliente = calculo.cliente if calculo else clientes_por_id[cliente_id]
+                valor_km = _valor_km_cliente(cliente, trecho)
+                valor_calculado = _money(trecho.km * valor_km)
                 TrechoRateioKM.objects.update_or_create(
                     trecho=trecho,
                     cliente_id=cliente_id,
                     defaults={
-                        "km_original": Decimal("0.0"),
-                        "km_final": Decimal("0.0"),
+                        "km_original": trecho.km,
+                        "km_final": trecho.km,
                         "valor_rateado": Decimal("0.00"),
-                        "km_cliente": Decimal("0.0"),
-                        "valor_km": Decimal("0.0000"),
-                        "valor_calculado": Decimal("0.00"),
+                        "km_cliente": trecho.km,
+                        "valor_km": valor_km,
+                        "valor_calculado": valor_calculado,
                         "valor_final": Decimal("0.00"),
                         "status": StatusRateio.AUTO,
                     },
@@ -111,7 +117,7 @@ class TrechoKMCalculoService:
                     calculo.save(update_fields=updates + ["updated_at"])
                 continue
 
-            cliente = Cliente.objects.get(pk=cliente_id)
+            cliente = clientes_por_id[cliente_id]
             valor_km = (
                 _valor_km(trecho.valor_km_final)
                 if total_clientes == 1

@@ -70,6 +70,7 @@ from .services.rateio_service import (
     serializar_rateio,
 )
 from .services.resumo_cliente_service import resumo_financeiro_por_cliente
+from .services.consulta_relatorio_service import montar_consulta_relatorio
 from .forms import (
     AdiantamentoForm,
     ClienteForm,
@@ -920,6 +921,15 @@ def relatorio_form_view(request, pk=None):
                 try:
                     with transaction.atomic():
                         relatorio_novo = instance is None
+                        if not relatorio_novo:
+                            relatorio_atual = RelatorioTecnico.objects.select_for_update().get(
+                                pk=instance.pk
+                            )
+                            if not _relatorio_editavel_por_usuario(relatorio_atual, request.user):
+                                raise WorkflowError(
+                                    "Este relatório foi alterado por outro usuário e não pode mais ser editado."
+                                )
+                            relatorio.status = relatorio_atual.status
                         if relatorio_novo:
                             relatorio.criado_por = request.user
                         relatorio.cliente_id = cliente_ids_relatorio[0]
@@ -1281,6 +1291,49 @@ def relatorio_detail_view(request, pk):
             "inconsistencias_rateio": inconsistencias_rateio,
             "distribuicao_clientes": distribuicao_clientes,
             "titulo_pagina": f"Relatório {relatorio.identificador}",
+        },
+    )
+
+
+@login_required
+@exigir_acesso_erp
+def relatorio_consulta_view(request, pk):
+    relatorio = get_object_or_404(
+        _relatorios_visiveis(
+            request.user,
+            RelatorioTecnico.objects.select_related(
+                "cliente",
+                "tecnico_responsavel",
+                "aprovado_por",
+                "criado_por",
+            ).prefetch_related(
+                "clientes_vinculados__cliente",
+                "despesas__clientes_vinculados__cliente",
+                "despesas__rateios__cliente",
+                "trechos__clientes_vinculados__cliente",
+                "trechos__rateios__cliente",
+                "equipe__tecnico",
+                "historicos__usuario",
+            ),
+        ),
+        pk=pk,
+    )
+    if relatorio.status not in {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}:
+        messages.error(
+            request,
+            "A consulta final fica disponível apenas para relatórios aprovados ou rejeitados.",
+        )
+        return redirect("relatorios:relatorio_detail", pk=relatorio.pk)
+    consulta = montar_consulta_relatorio(relatorio)
+
+    return render(
+        request,
+        "relatorios/relatorio_consulta.html",
+        {
+            "relatorio": relatorio,
+            "consulta": consulta,
+            "distribuicao_clientes": consulta["distribuicao_clientes"],
+            "titulo_pagina": f"Consulta {relatorio.identificador}",
         },
     )
 
@@ -1724,41 +1777,55 @@ def relatorio_rateio_financeiro_json(request, pk, tipo, item_pk):
         return JsonResponse({"success": False, "errors": ["JSON inválido."]}, status=400)
 
     try:
-        relatorio = get_object_or_404(
-            _relatorios_visiveis(request.user, RelatorioTecnico.objects.all()),
-            pk=pk,
-        )
-        if _relatorio_bloqueado(relatorio):
-            return JsonResponse(
-                {"success": False, "errors": ["Relatório aprovado ou rejeitado está bloqueado."]},
-                status=400,
+        with transaction.atomic():
+            relatorio = get_object_or_404(
+                _relatorios_visiveis(
+                    request.user,
+                    RelatorioTecnico.objects.select_for_update(),
+                ),
+                pk=pk,
             )
+            if _relatorio_bloqueado(relatorio):
+                return JsonResponse(
+                    {"success": False, "errors": ["Relatorio aprovado ou rejeitado esta bloqueado."]},
+                    status=400,
+                )
 
-        modelo = ItemDespesa if tipo == "despesa" else TrechoKm
-        item = get_object_or_404(modelo, pk=item_pk, relatorio=relatorio)
-        acao = payload.get("acao") or "salvar"
-        aprovar = acao == "aprovar"
-        dados_rateio = payload.get("rateios") or []
-        motivo = payload.get("motivo") or ""
+            modelo = ItemDespesa if tipo == "despesa" else TrechoKm
+            item = get_object_or_404(
+                modelo.objects.select_for_update(),
+                pk=item_pk,
+                relatorio=relatorio,
+            )
+            if item.rejeitado or item.status_financeiro == StatusFinanceiroItem.REJEITADO:
+                return JsonResponse(
+                    {"success": False, "errors": ["Item rejeitado nao pode ter rateio alterado."]},
+                    status=400,
+                )
 
-        if tipo == "despesa":
-            garantir_rateio_despesa(item)
-            rateios = salvar_rateio_despesa(
-                item,
-                dados_rateio,
-                request.user,
-                motivo=motivo,
-                aprovar=aprovar,
-            )
-        else:
-            garantir_rateio_trecho(item)
-            rateios = salvar_rateio_trecho(
-                item,
-                dados_rateio,
-                request.user,
-                motivo=motivo,
-                aprovar=aprovar,
-            )
+            acao = payload.get("acao") or "salvar"
+            aprovar = acao == "aprovar"
+            dados_rateio = payload.get("rateios") or []
+            motivo = payload.get("motivo") or ""
+
+            if tipo == "despesa":
+                garantir_rateio_despesa(item)
+                rateios = salvar_rateio_despesa(
+                    item,
+                    dados_rateio,
+                    request.user,
+                    motivo=motivo,
+                    aprovar=aprovar,
+                )
+            else:
+                garantir_rateio_trecho(item)
+                rateios = salvar_rateio_trecho(
+                    item,
+                    dados_rateio,
+                    request.user,
+                    motivo=motivo,
+                    aprovar=aprovar,
+                )
 
         return JsonResponse(
             {

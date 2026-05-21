@@ -7,6 +7,10 @@ from relatorios.models import (
     StatusRateio,
     TipoEventoHistorico,
 )
+from relatorios.services.financeiro_validator import (
+    validar_integridade_despesa,
+    validar_integridade_trecho,
+)
 from relatorios.services.historico_service import registrar_evento
 from relatorios.services.rateio_exceptions import RateioError
 from relatorios.services.trecho_km_calculo_service import (
@@ -54,8 +58,10 @@ def _clientes_ids_item(item):
         return ids
     relatorio = item.relatorio
     ids = list(dict.fromkeys(relatorio.clientes_vinculados.values_list("cliente_id", flat=True)))
-    if ids:
+    if len(ids) == 1:
         return ids
+    if len(ids) > 1:
+        return []
     return [relatorio.cliente_id] if relatorio.cliente_id else []
 
 
@@ -100,19 +106,21 @@ def garantir_rateio_despesa(despesa):
         return []
 
     rejeitado = getattr(despesa, "rejeitado", False) or getattr(despesa, "status_financeiro", "") == "rejeitado"
+    total_original = _money(despesa.valor)
     total = Decimal("0.00") if rejeitado else _money(despesa.valor_final)
     existentes = {
         rateio.cliente_id: rateio
         for rateio in despesa.rateios.select_related("cliente")
     }
     despesa.rateios.exclude(cliente_id__in=cliente_ids).delete()
+    valores_originais = dict(zip(cliente_ids, _dividir_decimal(total_original, len(cliente_ids), CENTAVO)))
     if rejeitado:
         for cliente_id in cliente_ids:
             DespesaRateio.objects.update_or_create(
                 despesa=despesa,
                 cliente_id=cliente_id,
                 defaults={
-                    "valor_original": Decimal("0.00"),
+                    "valor_original": valores_originais.get(cliente_id, Decimal("0.00")),
                     "valor_final": Decimal("0.00"),
                     "percentual": None,
                     "status": StatusRateio.AUTO,
@@ -127,6 +135,10 @@ def garantir_rateio_despesa(despesa):
         valor = valores_por_cliente.get(cliente_id)
         rateio = existentes.get(cliente_id)
         if rateio and _status_manual(rateio.status):
+            valor_original = valores_originais.get(cliente_id, Decimal("0.00"))
+            if rateio.valor_original != valor_original:
+                rateio.valor_original = valor_original
+                rateio.save(update_fields=["valor_original", "updated_at"])
             continue
         if valor is None:
             valor = Decimal("0.00")
@@ -134,7 +146,7 @@ def garantir_rateio_despesa(despesa):
             despesa=despesa,
             cliente_id=cliente_id,
             defaults={
-                "valor_original": valor,
+                "valor_original": valores_originais.get(cliente_id, Decimal("0.00")),
                 "valor_final": valor,
                 "percentual": _percentual(valor, total),
                 "status": StatusRateio.AUTO,
@@ -254,23 +266,21 @@ def serializar_rateio(rateio):
 
 def validar_rateios_relatorio(relatorio):
     erros = []
+    clientes_relatorio_ids = set(
+        relatorio.clientes_vinculados.values_list("cliente_id", flat=True)
+    )
+    if not clientes_relatorio_ids and relatorio.cliente_id:
+        clientes_relatorio_ids = {relatorio.cliente_id}
+
     for despesa in relatorio.despesas.all():
         try:
             garantir_rateio_despesa(despesa)
         except RateioError as exc:
             erros.append(f"Despesa {despesa.pk}: {exc}")
             continue
-        soma = sum((r.valor_final for r in despesa.rateios.all()), Decimal("0.00")).quantize(CENTAVO)
-        total = _money(despesa.valor_final)
-        despesa_rejeitada = despesa.rejeitado or despesa.status_financeiro == "rejeitado"
-        if despesa_rejeitada and soma != Decimal("0.00"):
-            erros.append(f"Despesa {despesa.pk} rejeitada possui rateio maior que zero.")
-        if total > 0 and not despesa.rateios.exists():
-            erros.append(f"Despesa {despesa.pk} não possui rateio.")
-        if soma != total:
-            erros.append(
-                f"Rateio da despesa {despesa.pk} não fecha: soma R$ {soma}, total R$ {total}."
-            )
+        erros.extend(validar_integridade_despesa(despesa, clientes_relatorio_ids))
+
     for trecho in relatorio.trechos.all():
         erros.extend(validar_calculos_trecho(trecho))
+        erros.extend(validar_integridade_trecho(trecho, clientes_relatorio_ids))
     return erros

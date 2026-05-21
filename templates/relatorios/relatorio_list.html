@@ -148,6 +148,12 @@
                    class="btn btn-sm btn-outline-secondary" title="Ver">
                   <i class="bi bi-eye"></i>
                 </a>
+                {% if r.status == 'aprovado' or r.status == 'rejeitado' %}
+                  <a href="{% url 'relatorios:relatorio_consulta' r.pk %}"
+                     class="btn btn-sm btn-outline-primary" title="Consulta final">
+                    <i class="bi bi-layout-text-window-reverse"></i>
+                  </a>
+                {% endif %}
                 <form method="post" action="{% url 'relatorios:relatorio_duplicate' r.pk %}" class="d-inline">
                   {% csrf_token %}
                   <button type="submit" class="btn btn-outline-secondary btn-sm" title="Duplicar">

@@ -2,6 +2,9 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from relatorios.models import StatusFinanceiroItem, StatusRelatorio
+from relatorios.services.financeiro_validator import (
+    validar_integridade_financeira_relatorio,
+)
 
 
 ESTADOS_FINAIS = {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
@@ -99,6 +102,7 @@ def validar_relatorio_para_envio(relatorio):
         erros.append("Adicione pelo menos uma despesa ou trecho de KM antes de enviar.")
 
     erros.extend(validar_valores_negativos(relatorio))
+    erros.extend(validar_integridade_financeira_relatorio(relatorio))
 
     return ResultadoValidacaoOperacional.falha(erros)
 
@@ -123,6 +127,7 @@ def validar_relatorio_para_aprovacao(relatorio):
         erros.append("O valor aprovado total e R$ 0,00.")
 
     erros.extend(validar_valores_negativos(relatorio))
+    erros.extend(validar_integridade_financeira_relatorio(relatorio))
 
     return ResultadoValidacaoOperacional.falha(erros)
 
