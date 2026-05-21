@@ -24,7 +24,7 @@
   </a>
   {% endif %}
   {% if consulta.relatorio.status == 'aprovado' %}
-  <a href="{% url 'relatorios:relatorio_reembolso_pdf' relatorio.pk %}"
+  <a href="{% url 'relatorios:relatorio_clientes_pdf' relatorio.pk %}"
      target="_blank"
      rel="noopener"
      class="btn btn-outline-secondary btn-sm">

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <title>Relatório de Reembolso {{ relatorio.numero }} - {{ cliente.nome }}</title>
+</head>
+<body>
+  <header class="pdf-header">
+    <div>
+      <div class="company">{{ empresa }}</div>
+      <h1>RELATÓRIO DE REEMBOLSO</h1>
+      <p class="subtitle">Via oficial do cliente</p>
+    </div>
+    <div class="report-box">
+      <span>Relatório</span>
+      <strong>{{ relatorio.numero }}</strong>
+    </div>
+  </header>
+
+  <section class="meta-grid">
+    <div>
+      <span>Cliente</span>
+      <strong>{{ cliente.nome }}</strong>
+      {% if cliente.documento %}<small>{{ cliente.documento }}</small>{% endif %}
+    </div>
+    <div>
+      <span>Técnico(s)</span>
+      <strong>
+        {% for tecnico in tecnicos %}
+          {{ tecnico }}{% if not forloop.last %}, {% endif %}
+        {% empty %}
+          Não informado
+        {% endfor %}
+      </strong>
+    </div>
+    <div>
+      <span>Período</span>
+      <strong>
+        {{ relatorio.periodo_inicio|date:"d/m/Y" }}
+        {% if relatorio.periodo_inicio != relatorio.periodo_fim %}
+          a {{ relatorio.periodo_fim|date:"d/m/Y" }}
+        {% endif %}
+      </strong>
+    </div>
+    <div>
+      <span>Data de emissão</span>
+      <strong>{{ emitido_em|date:"d/m/Y" }}</strong>
+    </div>
+  </section>
+
+  <section class="items-section">
+    <h2>Despesas e deslocamentos aprovados</h2>
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Documento</th>
+          <th>Descrição</th>
+          <th class="amount">Valor R$</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in itens %}
+        <tr>
+          <td>{{ item.data|date:"d/m/Y"|default:"-" }}</td>
+          <td>{{ item.documento }}</td>
+          <td>{{ item.descricao }}</td>
+          <td class="amount">{{ item.valor|floatformat:2 }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" class="empty">Nenhum item aprovado para este cliente.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="total-box">
+    <span>TOTAL A REEMBOLSAR</span>
+    <strong>R$ {{ total|floatformat:2 }}</strong>
+  </section>
+
+  <section class="notice">
+    Os comprovantes das despesas seguem em anexo. Eventuais dúvidas ou divergências podem ser tratadas diretamente com o departamento financeiro.
+  </section>
+
+  <footer class="signature">
+    <div class="signature-line"></div>
+    <strong>Depto. Financeiro</strong>
+    <span>{{ emitido_em|date:"d/m/Y" }}</span>
+  </footer>
+</body>
+</html>

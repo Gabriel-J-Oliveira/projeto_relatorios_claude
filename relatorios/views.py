@@ -71,6 +71,13 @@ from .services.rateio_service import (
 from .services.resumo_cliente_service import resumo_financeiro_por_cliente
 from .services.consulta_relatorio_service import montar_consulta_relatorio
 from .services.financeiro_validator import validar_integridade_financeira_relatorio
+from .services.pdf_cliente_service import (
+    PdfClienteError,
+    gerar_pdf_cliente,
+    gerar_zip_pdfs_clientes,
+    listar_clientes_pdf,
+    nome_arquivo_pdf_cliente,
+)
 from .forms import (
     AdiantamentoForm,
     ClienteForm,
@@ -1356,19 +1363,8 @@ def relatorio_consulta_view(request, pk):
 @login_required
 @exigir_acesso_erp
 def relatorio_reembolso_pdf_view(request, pk):
-    relatorio = get_object_or_404(
-        _relatorios_visiveis(
-            request.user,
-            RelatorioTecnico.objects.select_related(
-                "cliente",
-                "tecnico_responsavel",
-            ).prefetch_related(
-                "despesas",
-                "trechos",
-            ),
-        ),
-        pk=pk,
-    )
+    return relatorio_clientes_pdf_view(request, pk)
+
     if relatorio.status != StatusRelatorio.APROVADO:
         messages.error(request, "O PDF oficial só pode ser gerado após aprovação.")
         if relatorio.status == StatusRelatorio.REJEITADO:
@@ -1410,6 +1406,111 @@ def relatorio_reembolso_pdf_view(request, pk):
     filename = f"relatorio-reembolso-{relatorio.numero}.pdf"
     response = HttpResponse(pdf, content_type="application/pdf")
     response["Content-Disposition"] = f'inline; filename="{filename}"'
+    return response
+
+
+def _relatorio_pdf_cliente_or_404(request, pk):
+    return get_object_or_404(
+        _relatorios_visiveis(
+            request.user,
+            RelatorioTecnico.objects.select_related(
+                "cliente",
+                "tecnico_responsavel",
+                "snapshot_financeiro",
+            ).prefetch_related(
+                "clientes_vinculados__cliente",
+                "despesas__clientes_vinculados__cliente",
+                "despesas__rateios__cliente",
+                "trechos__clientes_vinculados__cliente",
+                "trechos__rateios__cliente",
+                "equipe__tecnico",
+            ),
+        ),
+        pk=pk,
+    )
+
+
+def _redirect_pdf_cliente_error(relatorio):
+    if relatorio.status in {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}:
+        return redirect("relatorios:relatorio_consulta", pk=relatorio.pk)
+    return redirect("relatorios:relatorio_detail", pk=relatorio.pk)
+
+
+@login_required
+@exigir_acesso_erp
+def relatorio_cliente_pdf_view(request, pk, cliente_id):
+    relatorio = _relatorio_pdf_cliente_or_404(request, pk)
+    if relatorio.status != StatusRelatorio.APROVADO:
+        messages.error(request, "O PDF do cliente só pode ser gerado após aprovação.")
+        return _redirect_pdf_cliente_error(relatorio)
+
+    try:
+        pdf, contexto = gerar_pdf_cliente(relatorio, cliente_id, request=request)
+    except PermissionDenied:
+        raise
+    except PdfClienteError as exc:
+        logger.exception(
+            "Erro ao gerar PDF do cliente %s no relatorio %s: %s",
+            cliente_id,
+            relatorio.pk,
+            exc,
+        )
+        messages.error(request, str(exc))
+        return _redirect_pdf_cliente_error(relatorio)
+
+    filename = nome_arquivo_pdf_cliente(relatorio, contexto["cliente"])
+    response = HttpResponse(pdf, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="{filename}"'
+    return response
+
+
+@login_required
+@exigir_acesso_erp
+def relatorio_clientes_pdf_view(request, pk):
+    relatorio = _relatorio_pdf_cliente_or_404(request, pk)
+    if relatorio.status != StatusRelatorio.APROVADO:
+        messages.error(request, "O PDF do cliente só pode ser gerado após aprovação.")
+        return _redirect_pdf_cliente_error(relatorio)
+
+    try:
+        clientes = listar_clientes_pdf(relatorio)
+        if len(clientes) == 1:
+            pdf, contexto = gerar_pdf_cliente(
+                relatorio,
+                clientes[0]["id"],
+                request=request,
+            )
+            filename = nome_arquivo_pdf_cliente(relatorio, contexto["cliente"])
+            response = HttpResponse(pdf, content_type="application/pdf")
+            response["Content-Disposition"] = f'inline; filename="{filename}"'
+            return response
+
+        zip_bytes, gerados, ignorados = gerar_zip_pdfs_clientes(
+            relatorio,
+            request=request,
+        )
+    except PermissionDenied:
+        raise
+    except PdfClienteError as exc:
+        logger.exception(
+            "Erro ao gerar PDFs dos clientes do relatorio %s: %s",
+            relatorio.pk,
+            exc,
+        )
+        messages.error(request, str(exc))
+        return _redirect_pdf_cliente_error(relatorio)
+
+    if ignorados:
+        logger.info(
+            "PDFs de clientes gerados para relatorio %s com %s arquivo(s) e %s cliente(s) ignorado(s).",
+            relatorio.pk,
+            len(gerados),
+            len(ignorados),
+        )
+
+    filename = f"relatorio_{relatorio.numero or relatorio.pk}_clientes.zip"
+    response = HttpResponse(zip_bytes, content_type="application/zip")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
 
 

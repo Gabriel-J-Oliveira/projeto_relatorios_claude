@@ -1,0 +1,386 @@
+import logging
+from dataclasses import dataclass
+from datetime import date, datetime
+from decimal import Decimal
+from io import BytesIO
+from zipfile import ZIP_DEFLATED, ZipFile
+
+from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
+from django.template.loader import render_to_string
+from django.utils import timezone
+from django.utils.text import slugify
+
+from relatorios.models import StatusFinanceiroItem, StatusRelatorio
+from relatorios.services.snapshot_service import SnapshotError, validar_snapshot_payload
+
+
+logger = logging.getLogger(__name__)
+
+
+EMPRESA_PADRAO = "CONTROL SUL GESTÃO EMPRESARIAL"
+
+
+class PdfClienteError(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class ItemPdfCliente:
+    data: object
+    documento: str
+    descricao: str
+    valor: Decimal
+
+
+def _money(valor):
+    return Decimal(str(valor or "0.00")).quantize(Decimal("0.01"))
+
+
+def _data(valor):
+    if not valor:
+        return None
+    if isinstance(valor, date):
+        return valor
+    try:
+        return date.fromisoformat(str(valor)[:10])
+    except ValueError:
+        return None
+
+
+def _datetime(valor):
+    if not valor:
+        return None
+    if isinstance(valor, datetime):
+        dt = valor
+    else:
+        try:
+            dt = datetime.fromisoformat(str(valor).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if timezone.is_aware(dt):
+        return timezone.localtime(dt)
+    return dt
+
+
+def _item_rejeitado(item):
+    return bool(
+        getattr(item, "rejeitado", False)
+        or getattr(item, "status_financeiro", "") == StatusFinanceiroItem.REJEITADO
+    )
+
+
+def _cliente_snapshot(payload, cliente_id):
+    cliente_id = int(cliente_id)
+    for cliente in payload.get("clientes") or []:
+        if int(cliente.get("id") or 0) == cliente_id:
+            return cliente
+    return None
+
+
+def _clientes_snapshot(payload):
+    return list(payload.get("clientes") or [])
+
+
+def _relatorio_snapshot_contexto(payload):
+    relatorio = payload.get("relatorio") or {}
+    assinatura = payload.get("assinatura_temporal") or {}
+    return {
+        "numero": relatorio.get("numero") or relatorio.get("identificador") or "",
+        "identificador": relatorio.get("identificador") or relatorio.get("numero") or "",
+        "periodo_inicio": _data(relatorio.get("data_inicio")),
+        "periodo_fim": _data(relatorio.get("data_fim")),
+        "finalizado_em": _datetime(
+            assinatura.get("aprovado_em") or assinatura.get("finalizado_em")
+        ),
+        "tecnicos": [tecnico.get("nome") for tecnico in payload.get("tecnicos") or [] if tecnico.get("nome")],
+        "usa_snapshot": True,
+    }
+
+
+def _itens_snapshot_cliente(payload, cliente_id):
+    cliente_id = int(cliente_id)
+    itens = []
+
+    for despesa in payload.get("despesas") or []:
+        if despesa.get("rejeitado"):
+            continue
+        rateios = despesa.get("rateios") or []
+        if rateios:
+            rateios_cliente = [
+                rateio
+                for rateio in rateios
+                if int(rateio.get("cliente_id") or 0) == cliente_id
+            ]
+        else:
+            clientes_despesa = despesa.get("clientes") or payload.get("clientes") or []
+            rateios_cliente = (
+                [{"valor_final": despesa.get("valor_final")}]
+                if len(clientes_despesa) == 1
+                and any(int(cliente.get("id") or 0) == cliente_id for cliente in clientes_despesa)
+                else []
+            )
+        for rateio in rateios_cliente:
+            valor = _money(rateio.get("valor_final"))
+            if valor <= 0:
+                continue
+            itens.append(
+                ItemPdfCliente(
+                    data=_data(despesa.get("data")),
+                    documento="Comprovante",
+                    descricao=despesa.get("descricao") or despesa.get("tipo_label") or "Despesa",
+                    valor=valor,
+                )
+            )
+
+    for trecho in payload.get("trechos_km") or []:
+        if trecho.get("rejeitado"):
+            continue
+        rateios = trecho.get("rateios") or []
+        if rateios:
+            rateios_cliente = [
+                rateio
+                for rateio in rateios
+                if int(rateio.get("cliente_id") or 0) == cliente_id
+            ]
+        else:
+            clientes_trecho = trecho.get("clientes") or payload.get("clientes") or []
+            rateios_cliente = (
+                [{"valor_final": trecho.get("valor_final")}]
+                if len(clientes_trecho) == 1
+                and any(int(cliente.get("id") or 0) == cliente_id for cliente in clientes_trecho)
+                else []
+            )
+        for rateio in rateios_cliente:
+            valor = _money(rateio.get("valor_final"))
+            if valor <= 0:
+                continue
+            descricao = (
+                trecho.get("descricao")
+                or f"{trecho.get('origem', '')} -> {trecho.get('destino', '')}".strip(" ->")
+                or "Deslocamento"
+            )
+            itens.append(
+                ItemPdfCliente(
+                    data=_data(trecho.get("data")),
+                    documento="Relatório KM",
+                    descricao=descricao,
+                    valor=valor,
+                )
+            )
+
+    return sorted(itens, key=lambda item: (item.data is None, item.data, item.documento, item.descricao))
+
+
+def _clientes_vivos(relatorio):
+    return [
+        {
+            "id": cliente.pk,
+            "nome": cliente.nome,
+            "documento": cliente.cnpj_cpf or "",
+            "cidade_uf": cliente.cidade_uf,
+        }
+        for cliente in relatorio.clientes_exibicao()
+    ]
+
+
+def _relatorio_vivo_contexto(relatorio):
+    logger.warning(
+        "Gerando PDF de cliente do relatorio %s com dados vivos por ausencia de snapshot.",
+        relatorio.pk,
+    )
+    return {
+        "numero": relatorio.numero or relatorio.identificador,
+        "identificador": relatorio.identificador,
+        "periodo_inicio": relatorio.data_inicio,
+        "periodo_fim": relatorio.data_fim,
+        "finalizado_em": relatorio.aprovado_em,
+        "tecnicos": [tecnico.nome for tecnico in relatorio.tecnicos_exibicao()],
+        "usa_snapshot": False,
+    }
+
+
+def _itens_vivos_cliente(relatorio, cliente_id):
+    cliente_id = int(cliente_id)
+    itens = []
+
+    for despesa in relatorio.despesas.all():
+        if _item_rejeitado(despesa):
+            continue
+        rateios = list(despesa.rateios.all())
+        if rateios:
+            valores = [rateio.valor_final for rateio in rateios if rateio.cliente_id == cliente_id]
+        else:
+            clientes = list(despesa.clientes_vinculados.all())
+            cliente_participa = (
+                len(clientes) == 1
+                and any(vinculo.cliente_id == cliente_id for vinculo in clientes)
+                if clientes
+                else relatorio.cliente_id == cliente_id
+            )
+            valores = [despesa.valor_final] if cliente_participa else []
+        for valor_rateado in valores:
+            valor = _money(valor_rateado)
+            if valor <= 0:
+                continue
+            itens.append(
+                ItemPdfCliente(
+                    data=despesa.data,
+                    documento="Comprovante",
+                    descricao=despesa.descricao,
+                    valor=valor,
+                )
+            )
+
+    for trecho in relatorio.trechos.all():
+        if _item_rejeitado(trecho):
+            continue
+        rateios = list(trecho.rateios.all())
+        if rateios:
+            valores = [rateio.valor_final for rateio in rateios if rateio.cliente_id == cliente_id]
+        else:
+            clientes = list(trecho.clientes_vinculados.all())
+            cliente_participa = (
+                len(clientes) == 1
+                and any(vinculo.cliente_id == cliente_id for vinculo in clientes)
+                if clientes
+                else relatorio.cliente_id == cliente_id
+            )
+            valores = [trecho.valor_final] if cliente_participa else []
+        for valor_rateado in valores:
+            valor = _money(valor_rateado)
+            if valor <= 0:
+                continue
+            itens.append(
+                ItemPdfCliente(
+                    data=trecho.data,
+                    documento="Relatório KM",
+                    descricao=f"{trecho.origem} -> {trecho.destino}",
+                    valor=valor,
+                )
+            )
+
+    return sorted(itens, key=lambda item: (item.data is None, item.data, item.documento, item.descricao))
+
+
+def _fonte_dados(relatorio):
+    try:
+        snapshot = relatorio.snapshot_financeiro
+    except ObjectDoesNotExist:
+        snapshot = None
+    if not snapshot:
+        return None
+    try:
+        validar_snapshot_payload(snapshot.payload or {})
+    except SnapshotError as exc:
+        logger.error(
+            "Snapshot financeiro invalido no PDF de cliente do relatorio %s. Usando fallback legado. Erros: %s",
+            relatorio.pk,
+            exc,
+        )
+        return None
+    return snapshot.payload or {}
+
+
+def listar_clientes_pdf(relatorio):
+    payload = _fonte_dados(relatorio)
+    if payload:
+        return _clientes_snapshot(payload)
+    return _clientes_vivos(relatorio)
+
+
+def montar_contexto_pdf_cliente(relatorio, cliente_id, request=None):
+    if relatorio.status != StatusRelatorio.APROVADO:
+        raise PermissionDenied("PDF de cliente disponivel apenas para relatorios aprovados.")
+
+    payload = _fonte_dados(relatorio)
+    if payload:
+        cliente = _cliente_snapshot(payload, cliente_id)
+        if not cliente:
+            raise PdfClienteError("Cliente nao pertence ao snapshot financeiro do relatorio.")
+        contexto_relatorio = _relatorio_snapshot_contexto(payload)
+        itens = _itens_snapshot_cliente(payload, cliente_id)
+    else:
+        clientes = _clientes_vivos(relatorio)
+        cliente = next(
+            (cliente for cliente in clientes if int(cliente.get("id") or 0) == int(cliente_id)),
+            None,
+        )
+        if not cliente:
+            raise PdfClienteError("Cliente nao pertence ao relatorio.")
+        contexto_relatorio = _relatorio_vivo_contexto(relatorio)
+        itens = _itens_vivos_cliente(relatorio, cliente_id)
+
+    total = sum((item.valor for item in itens), Decimal("0.00")).quantize(Decimal("0.01"))
+    if total <= 0:
+        raise PdfClienteError("Cliente sem valores aprovados para gerar PDF.")
+
+    emitido_em = timezone.localtime(timezone.now())
+    return {
+        "empresa": EMPRESA_PADRAO,
+        "relatorio": contexto_relatorio,
+        "cliente": cliente,
+        "tecnicos": contexto_relatorio["tecnicos"],
+        "itens": itens,
+        "total": total,
+        "emitido_em": emitido_em,
+        "base_url": request.build_absolute_uri("/") if request else "",
+    }
+
+
+def _render_pdf_cliente(contexto):
+    try:
+        from weasyprint import CSS, HTML
+    except Exception as exc:
+        raise PdfClienteError(
+            "WeasyPrint nao esta disponivel neste ambiente."
+        ) from exc
+
+    html = render_to_string("relatorios/pdf/cliente.html", contexto)
+    css_path = settings.BASE_DIR / "static" / "css" / "pdf_cliente.css"
+    return HTML(
+        string=html,
+        base_url=contexto.get("base_url") or "",
+    ).write_pdf(stylesheets=[CSS(filename=str(css_path))])
+
+
+def nome_arquivo_pdf_cliente(relatorio, cliente):
+    numero = slugify(str(relatorio.numero or relatorio.identificador)) or str(relatorio.pk)
+    nome_cliente = slugify(cliente.get("nome") or "cliente") or "cliente"
+    return f"relatorio_{numero}_{nome_cliente}.pdf"
+
+
+def gerar_pdf_cliente(relatorio, cliente_id, request=None):
+    contexto = montar_contexto_pdf_cliente(relatorio, cliente_id, request=request)
+    return _render_pdf_cliente(contexto), contexto
+
+
+def gerar_zip_pdfs_clientes(relatorio, request=None):
+    clientes = listar_clientes_pdf(relatorio)
+    buffer = BytesIO()
+    gerados = []
+    ignorados = []
+
+    with ZipFile(buffer, "w", ZIP_DEFLATED) as arquivo_zip:
+        for cliente in clientes:
+            cliente_id = cliente.get("id")
+            try:
+                pdf, contexto = gerar_pdf_cliente(relatorio, cliente_id, request=request)
+            except PdfClienteError as exc:
+                logger.info(
+                    "PDF de cliente ignorado no relatorio %s para cliente %s: %s",
+                    relatorio.pk,
+                    cliente_id,
+                    exc,
+                )
+                ignorados.append((cliente, str(exc)))
+                continue
+            filename = nome_arquivo_pdf_cliente(relatorio, contexto["cliente"])
+            arquivo_zip.writestr(filename, pdf)
+            gerados.append(filename)
+
+    if not gerados:
+        raise PdfClienteError("Nenhum cliente possui valores aprovados para gerar PDF.")
+
+    buffer.seek(0)
+    return buffer.getvalue(), gerados, ignorados
