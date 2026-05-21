@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block titulo %}Consulta {{ relatorio.identificador }}{% endblock %}
+{% block titulo %}Consulta {{ consulta.relatorio.identificador }}{% endblock %}
 {% block page_title %}Consulta final do relatório{% endblock %}
 
 {% block breadcrumb %}
@@ -10,14 +10,27 @@
 <li class="breadcrumb-item">
   <a href="{% url 'relatorios:relatorio_list' %}" class="text-decoration-none">Relatórios</a>
 </li>
-<li class="breadcrumb-item active">{{ relatorio.identificador }}</li>
+<li class="breadcrumb-item active">{{ consulta.relatorio.identificador }}</li>
 {% endblock %}
 
 {% block page_actions %}
 <div class="d-flex flex-wrap gap-2">
-  <button class="btn btn-outline-dark btn-sm" disabled>
-    <i class="bi bi-file-earmark-pdf me-1"></i>PDF interno
-  </button>
+  {% if pode_gerar_pdf_interno %}
+  <a href="{% url 'relatorios:relatorio_pdf_interno' relatorio.pk %}"
+     target="_blank"
+     rel="noopener"
+     class="btn btn-outline-dark btn-sm">
+    <i class="bi bi-file-earmark-text me-1"></i>Gerar PDF interno
+  </a>
+  {% endif %}
+  {% if consulta.relatorio.status == 'aprovado' %}
+  <a href="{% url 'relatorios:relatorio_reembolso_pdf' relatorio.pk %}"
+     target="_blank"
+     rel="noopener"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-file-earmark-pdf me-1"></i>Gerar PDF
+  </a>
+  {% endif %}
   <button class="btn btn-outline-dark btn-sm" disabled>
     <i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel
   </button>
@@ -31,10 +44,10 @@
     <div>
       <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
         <span class="badge rounded-pill text-bg-light border">
-          <i class="bi bi-hash me-1"></i>{{ relatorio.identificador }}
+          <i class="bi bi-hash me-1"></i>{{ consulta.relatorio.identificador }}
         </span>
-        <span class="badge rounded-pill bg-{{ relatorio.status_badge_cor }}-subtle text-{{ relatorio.status_badge_cor }} border border-{{ relatorio.status_badge_cor }}-subtle">
-          {{ relatorio.get_status_display }}
+        <span class="badge rounded-pill bg-{{ consulta.relatorio.status_badge_cor }}-subtle text-{{ consulta.relatorio.status_badge_cor }} border border-{{ consulta.relatorio.status_badge_cor }}-subtle">
+          {{ consulta.relatorio.status_label }}
         </span>
       </div>
       <h2 class="consulta-title mb-3">Relatório final de prestação</h2>

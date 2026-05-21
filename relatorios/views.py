@@ -1342,7 +1342,8 @@ def relatorio_consulta_view(request, pk):
             "relatorio": relatorio,
             "consulta": consulta,
             "distribuicao_clientes": consulta["distribuicao_clientes"],
-            "titulo_pagina": f"Consulta {relatorio.identificador}",
+            "pode_gerar_pdf_interno": usuario_pode_atuar_como_financeiro(request.user),
+            "titulo_pagina": f"Consulta {consulta['relatorio'].identificador}",
         },
     )
 
@@ -1370,6 +1371,8 @@ def relatorio_reembolso_pdf_view(request, pk):
     )
     if relatorio.status != StatusRelatorio.APROVADO:
         messages.error(request, "O PDF oficial só pode ser gerado após aprovação.")
+        if relatorio.status == StatusRelatorio.REJEITADO:
+            return redirect("relatorios:relatorio_consulta", pk=pk)
         return redirect("relatorios:relatorio_detail", pk=pk)
 
     itens = _itens_pdf_reembolso(relatorio)
@@ -1396,7 +1399,7 @@ def relatorio_reembolso_pdf_view(request, pk):
             request,
             "WeasyPrint não está disponível neste ambiente. Verifique a instalação das dependências nativas.",
         )
-        return redirect("relatorios:relatorio_detail", pk=pk)
+        return redirect("relatorios:relatorio_consulta", pk=pk)
 
     css_path = settings.BASE_DIR / "templates" / "pdf" / "relatorio_reembolso.css"
     pdf = HTML(
@@ -1426,6 +1429,13 @@ def relatorio_pdf_interno_view(request, pk):
         ),
         pk=pk,
     )
+    if relatorio.status not in {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}:
+        messages.error(
+            request,
+            "O PDF interno só pode ser gerado para relatórios finalizados.",
+        )
+        return redirect("relatorios:relatorio_detail", pk=pk)
+
     emitido_em = timezone.localtime(timezone.now())
     usuario_gerador = request.user if request.user.is_authenticated else None
     historicos_resumidos = relatorio.historicos.all()[:10]
@@ -1453,7 +1463,7 @@ def relatorio_pdf_interno_view(request, pk):
             request,
             "WeasyPrint não está disponível neste ambiente. Verifique a instalação das dependências nativas.",
         )
-        return redirect("relatorios:relatorio_detail", pk=pk)
+        return redirect("relatorios:relatorio_consulta", pk=pk)
 
     css_path = settings.BASE_DIR / "static" / "css" / "pdf-relatorio.css"
     pdf = HTML(

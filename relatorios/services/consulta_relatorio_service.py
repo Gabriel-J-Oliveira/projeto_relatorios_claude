@@ -1,13 +1,18 @@
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
+import logging
 from types import SimpleNamespace
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 
-from relatorios.models import StatusFinanceiroItem
+from relatorios.models import StatusFinanceiroItem, StatusRelatorio
 from relatorios.services.resumo_cliente_service import resumo_financeiro_por_cliente
+from relatorios.services.snapshot_service import SnapshotError, validar_snapshot_payload
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -141,6 +146,16 @@ def _badge_historico(tipo_evento):
     }.get(tipo_evento, "secondary")
 
 
+def _status_badge_cor(status):
+    return {
+        StatusRelatorio.RASCUNHO: "secondary",
+        StatusRelatorio.CONFERENCIA: "warning",
+        StatusRelatorio.AJUSTE: "orange",
+        StatusRelatorio.APROVADO: "success",
+        StatusRelatorio.REJEITADO: "danger",
+    }.get(status, "secondary")
+
+
 def _historicos_snapshot(payload):
     historicos = []
     for historico in payload.get("historico") or []:
@@ -256,6 +271,13 @@ def _montar_consulta_snapshot(snapshot):
     return {
         "usa_snapshot": True,
         "snapshot_checksum": snapshot.checksum,
+        "relatorio": _ns(
+            identificador=relatorio.get("identificador") or relatorio.get("numero") or "",
+            numero=relatorio.get("numero") or "",
+            status=relatorio.get("status") or "",
+            status_label=relatorio.get("status_label") or "",
+            status_badge_cor=_status_badge_cor(relatorio.get("status") or ""),
+        ),
         "clientes": [_ns(**cliente) for cliente in payload.get("clientes") or []],
         "tecnicos": [_ns(**tecnico) for tecnico in payload.get("tecnicos") or []],
         "periodo": _ns(
@@ -406,6 +428,13 @@ def _montar_consulta_viva(relatorio):
 
     return {
         "usa_snapshot": False,
+        "relatorio": _ns(
+            identificador=relatorio.identificador,
+            numero=relatorio.numero or "",
+            status=relatorio.status,
+            status_label=relatorio.get_status_display(),
+            status_badge_cor=relatorio.status_badge_cor,
+        ),
         "clientes": [_ns(nome=cliente.nome) for cliente in relatorio.clientes_exibicao()],
         "tecnicos": [_ns(nome=tecnico.nome) for tecnico in relatorio.tecnicos_exibicao()],
         "periodo": _ns(
@@ -456,5 +485,25 @@ def montar_consulta_relatorio(relatorio):
     except ObjectDoesNotExist:
         snapshot = None
     if snapshot:
-        return _montar_consulta_snapshot(snapshot)
+        try:
+            validar_snapshot_payload(snapshot.payload or {})
+        except SnapshotError as exc:
+            logger.error(
+                "Snapshot financeiro invalido para relatorio %s. Usando fallback legado. Erros: %s",
+                relatorio.pk,
+                exc,
+            )
+        else:
+            logger.debug(
+                "Consulta final do relatorio %s renderizada a partir do snapshot financeiro %s.",
+                relatorio.pk,
+                snapshot.pk,
+            )
+            return _montar_consulta_snapshot(snapshot)
+    elif relatorio.status in {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}:
+        logger.warning(
+            "Relatorio finalizado %s (%s) sem snapshot financeiro. Usando fallback legado para compatibilidade.",
+            relatorio.pk,
+            relatorio.status,
+        )
     return _montar_consulta_viva(relatorio)
