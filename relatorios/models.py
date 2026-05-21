@@ -362,6 +362,7 @@ class RelatorioTecnico(models.Model):
         "Adiantamento recebido (R$)",
         max_digits=10,
         decimal_places=2,
+        blank=True,
         default=Decimal("0.00"),
         validators=[MinValueValidator(Decimal("0.00"))],
     )

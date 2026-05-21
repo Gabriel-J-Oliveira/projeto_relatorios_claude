@@ -138,6 +138,7 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         self.fields["numero"].disabled = True
         self.fields["numero"].widget.attrs["placeholder"] = "Gerado no envio"
         self.fields["numero"].help_text = "Gerado automaticamente ao enviar para conferência."
+        self.fields["valor_adiantamento"].required = False
         if self.instance and self.instance.pk and not self.instance.numero:
             self.fields["numero"].initial = "Rascunho"
         self.fields["centro_custo"].widget.attrs[
@@ -185,6 +186,8 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
                 "tecnicos_equipe",
                 "O técnico responsável não deve ser adicionado à equipe adicional.",
             )
+        if cd.get("valor_adiantamento") is None:
+            cd["valor_adiantamento"] = 0
         return cd
 
     def save(self, commit=True):

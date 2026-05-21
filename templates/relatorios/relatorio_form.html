@@ -1399,6 +1399,9 @@
       setTecnicosEquipe(tecnicosImportados);
       atualizarBadgesTecnicosEquipe();
     }
+    const campoAdiantamento = campoPorNome("valor_adiantamento");
+    definirValorCampo(campoAdiantamento, dados.valor_adiantamento || "");
+    formatarDecimalCampo(campoAdiantamento, 2);
     if (document.getElementById("importar-despesas")?.checked) {
       await importarDespesasRelatorio(dados.despesas);
     }

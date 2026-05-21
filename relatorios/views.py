@@ -263,7 +263,8 @@ def _duplicar_relatorio(original, usuario=None):
         data_fim=original.data_fim,
         motivo=original.motivo,
         centro_custo=original.centro_custo,
-        valor_adiantamento=Decimal("0.00"),
+        tipo_relatorio=original.tipo_relatorio,
+        valor_adiantamento=original.valor_adiantamento or Decimal("0.00"),
         observacoes=original.observacoes,
         status=StatusRelatorio.RASCUNHO,
         criado_por=usuario,
@@ -1662,6 +1663,7 @@ def relatorio_import_detail_json(request, pk):
             "cliente_id": relatorio.cliente_id,
             "tecnico_id": relatorio.tecnico_responsavel_id,
             "apoio_ids": list(relatorio.equipe.values_list("tecnico_id", flat=True)),
+            "valor_adiantamento": str(relatorio.valor_adiantamento or Decimal("0.00")),
             "despesas": [
                 {
                     "tipo": despesa.tipo,
