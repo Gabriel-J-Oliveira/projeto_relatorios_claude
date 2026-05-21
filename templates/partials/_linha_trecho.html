@@ -124,7 +124,7 @@
         name="trechos-{{ idx }}-valor_km"
         id="id_trechos-{{ idx }}-valor_km"
         value="{{ form.valor_km.value|default:''|unlocalize }}"
-        class="form-control form-control-sm campo-vkm campo-moeda {% if form.valor_km.errors %}is-invalid{% endif %}"
+        class="form-control form-control-sm campo-vkm {% if form.valor_km.errors %}is-invalid{% endif %}"
         oninput="calcularTrechoKm(this); recalcular(); validarKmGlobal();">
   <!-- aviso -->
   <div class="text-warning small aviso-inline"></div>

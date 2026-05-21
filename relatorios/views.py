@@ -315,6 +315,18 @@ def _duplicar_relatorio(original, usuario=None):
             papel=apoio.papel,
         )
 
+    clientes_originais = list(original.clientes_vinculados.select_related("cliente").all())
+    if not clientes_originais and original.cliente_id:
+        novo.clientes_vinculados.create(cliente=original.cliente, ordem=1)
+    for vinculo in clientes_originais:
+        novo.clientes_vinculados.create(
+            cliente=vinculo.cliente,
+            ordem=vinculo.ordem,
+        )
+
+    despesas_originais = list(
+        original.despesas.prefetch_related("clientes_vinculados__cliente").all()
+    )
     despesas = [
         ItemDespesa(
             relatorio=novo,
@@ -328,11 +340,20 @@ def _duplicar_relatorio(original, usuario=None):
             comprovante=None,
             observacoes=despesa.observacoes,
         )
-        for despesa in original.despesas.all()
+        for despesa in despesas_originais
     ]
     if despesas:
-        ItemDespesa.objects.bulk_create(despesas)
+        despesas_criadas = ItemDespesa.objects.bulk_create(despesas)
+        for despesa_original, despesa_nova in zip(despesas_originais, despesas_criadas):
+            vinculos_item = list(despesa_original.clientes_vinculados.all())
+            if not vinculos_item and original.cliente_id:
+                despesa_nova.clientes_vinculados.create(cliente=original.cliente)
+            for vinculo in vinculos_item:
+                despesa_nova.clientes_vinculados.create(cliente=vinculo.cliente)
 
+    trechos_originais = list(
+        original.trechos.prefetch_related("clientes_vinculados__cliente").all()
+    )
     trechos = [
         TrechoKm(
             relatorio=novo,
@@ -357,14 +378,20 @@ def _duplicar_relatorio(original, usuario=None):
             valor_km_aprovado=None,
             observacao=trecho.observacao,
         )
-        for trecho in original.trechos.all()
+        for trecho in trechos_originais
     ]
     for trecho in trechos:
         trecho.valor_calculado = (trecho.km * trecho.valor_km).quantize(
             Decimal("0.01")
         )
     if trechos:
-        TrechoKm.objects.bulk_create(trechos)
+        trechos_criados = TrechoKm.objects.bulk_create(trechos)
+        for trecho_original, trecho_novo in zip(trechos_originais, trechos_criados):
+            vinculos_item = list(trecho_original.clientes_vinculados.all())
+            if not vinculos_item and original.cliente_id:
+                trecho_novo.clientes_vinculados.create(cliente=original.cliente)
+            for vinculo in vinculos_item:
+                trecho_novo.clientes_vinculados.create(cliente=vinculo.cliente)
 
     return novo
 
@@ -1885,18 +1912,21 @@ def relatorio_import_detail_json(request, pk):
                 "tecnico_responsavel",
             ).prefetch_related(
                 "equipe__tecnico",
-                "despesas",
-                "trechos",
+                "clientes_vinculados__cliente",
+                "despesas__clientes_vinculados__cliente",
+                "trechos__clientes_vinculados__cliente",
             ),
         ),
         pk=pk,
     )
+    clientes_relatorio = obter_clientes_relatorio(relatorio)
 
     return JsonResponse(
         {
             "id": relatorio.pk,
             "numero": relatorio.identificador,
             "cliente_id": relatorio.cliente_id,
+            "cliente_ids": [cliente.pk for cliente in clientes_relatorio],
             "tecnico_id": relatorio.tecnico_responsavel_id,
             "apoio_ids": list(relatorio.equipe.values_list("tecnico_id", flat=True)),
             "valor_adiantamento": str(relatorio.valor_adiantamento or Decimal("0.00")),
@@ -1908,6 +1938,9 @@ def relatorio_import_detail_json(request, pk):
                     "descricao": despesa.descricao,
                     "valor": str(despesa.valor),
                     "observacoes": despesa.observacoes,
+                    "cliente_ids": list(
+                        despesa.clientes_vinculados.values_list("cliente_id", flat=True)
+                    ),
                 }
                 for despesa in relatorio.despesas.all()
             ],
@@ -1928,6 +1961,9 @@ def relatorio_import_detail_json(request, pk):
                     "fonte_calculo_rota": trecho.fonte_calculo_rota or "",
                     "rota_geojson": trecho.rota_geojson or {},
                     "valor_km": str(trecho.valor_km),
+                    "cliente_ids": list(
+                        trecho.clientes_vinculados.values_list("cliente_id", flat=True)
+                    ),
                 }
                 for trecho in relatorio.trechos.all()
             ],

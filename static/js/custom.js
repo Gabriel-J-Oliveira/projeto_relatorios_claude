@@ -661,6 +661,11 @@ const FieldRules = [
 
       const campoKm = linha.querySelector('input[name$="-km"]');
       const campoVkm = linha.querySelector('input[name$="-valor_km"]');
+      const clientesKm = String(linha.querySelector(".clientes-item-input")?.value || "")
+        .split(",")
+        .map(id => id.trim())
+        .filter(Boolean);
+      const multiClienteKm = new Set(clientesKm).size > 1;
 
       const km = parseFloat(campoKm?.value);
       const vkm = parseFloat(campoVkm?.value);
@@ -681,7 +686,7 @@ const FieldRules = [
           UI.setError(campoKm, "KM deve ser no mínimo 0.1.");
         }
 
-        if (!campoVkm?.value) {
+        if (!multiClienteKm && !campoVkm?.value) {
           UI.setError(campoVkm, "Informe o valor por KM.");
         }
       }
@@ -691,6 +696,15 @@ const FieldRules = [
     test: c => c.name?.includes("-valor_km"),
 
     run(campo) {
+      const linha = campo.closest(".linha-trecho");
+      const clientesKm = String(linha?.querySelector(".clientes-item-input")?.value || "")
+        .split(",")
+        .map(id => id.trim())
+        .filter(Boolean);
+      if (new Set(clientesKm).size > 1) {
+        UI.clearWarning(campo);
+        return;
+      }
       const valor = parseFloat(campo.value) || 0;
       const padrao = getValorKmPadrao();
       // limpa antes

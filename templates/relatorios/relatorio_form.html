@@ -40,12 +40,7 @@
         </div>
 
         <div class="card-body py-4 px-4">
-          {% if form.errors %}
-            <div class="alert alert-danger">
-              {{ form.errors }}
-            </div>
-
-            {% if resumo_erros %}
+          {% if resumo_erros %}
               <div class="alert alert-warning">
                 <ul class="mb-0">
                   {% for erro in resumo_erros %}
@@ -53,38 +48,7 @@
                   {% endfor %}
                 </ul>
               </div>
-            {% endif %}
           {% endif %}
-
-          <div id="relatorio-form-debug"
-               class="alert alert-warning border-0 shadow-sm d-none"
-               role="alert">
-            <div class="d-flex justify-content-between align-items-start gap-3">
-              <div>
-                <div class="fw-semibold">
-                  <i class="bi bi-bug me-1"></i>Diagnóstico do formulário
-                </div>
-                <div class="small">
-                  O sistema registrou um erro nesta tela. Baixe ou copie o log e envie para análise.
-                </div>
-              </div>
-              <div class="d-flex gap-2">
-                <button type="button"
-                        class="btn btn-outline-secondary btn-sm"
-                        id="btn-copiar-log-form">
-                  Copiar log
-                </button>
-                <button type="button"
-                        class="btn btn-warning btn-sm"
-                        id="btn-baixar-log-form">
-                  Baixar log
-                </button>
-              </div>
-            </div>
-            <pre id="relatorio-form-debug-output"
-                 class="small bg-body border rounded p-2 mt-3 mb-0"
-                 style="max-height: 220px; overflow: auto;"></pre>
-          </div>
 
           <form method="post"
                 enctype="multipart/form-data"
@@ -1070,7 +1034,6 @@
           </style>
         {% endblock %}
         {% block extra_js %}
-          <script src="{% static 'js/relatorio_form_diagnostics.js' %}"></script>
           <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
           <script>
   /* ═══════════════════════════════════════════════════════════════
@@ -1143,6 +1106,11 @@
 
   function getClientesRelatorioIds() {
     return idsFromValue(document.getElementById("id_clientes_relatorio")?.value);
+  }
+
+  function normalizarIdsPermitidos(ids, permitidos) {
+    const permitidosSet = new Set((permitidos || []).map(String));
+    return Array.from(new Set((ids || []).map(String).filter(id => permitidosSet.has(id))));
   }
 
   function getNomeCliente(id) {
@@ -1255,6 +1223,16 @@
     const aviso = linha.querySelector(".aviso-km-multicliente");
     if (campoValorKm) {
       campoValorKm.readOnly = multi;
+      campoValorKm.classList.toggle("bg-body-tertiary", multi);
+      campoValorKm.classList.toggle("text-muted", multi);
+      campoValorKm.classList.toggle("opacity-75", multi);
+      campoValorKm.placeholder = multi ? "Por cliente" : "0,00";
+      if (multi) {
+        campoValorKm.value = "";
+      } else if (!campoValorKm.value) {
+        const valorPadrao = normalizarNumero(document.getElementById("form-relatorio")?.dataset?.valorKmCliente);
+        if (valorPadrao) campoValorKm.value = valorPadrao.toFixed(2).replace(".", ",");
+      }
       campoValorKm.title = multi
         ? "Valores de KM serão calculados automaticamente por cliente após envio do relatório."
         : "";
@@ -1410,7 +1388,7 @@
     const wrapper = document.createElement("div");
     wrapper.className = "km-mapa-excedente-grid";
     wrapper.dataset.organizado = "true";
-    wrapper.innerHTML = '<div class="row g-3 align-items-start"><div class="col-12 col-md-8 km-mapa-col"></div><div class="col-12 col-md-4 km-excedente-col"></div></div>';
+    wrapper.innerHTML = '<div class="row g-3 align-items-start justify-content-between"><div class="col-12 col-md-6 km-mapa-col"></div><div class="col-12 col-md-4 km-excedente-col"></div></div>';
     const colMapa = wrapper.querySelector(".km-mapa-col");
     const colExcedente = wrapper.querySelector(".km-excedente-col");
 
@@ -1478,8 +1456,8 @@
     if (!mapaFormularioKmLayers) return;
     const origem = [trecho.origemLat, trecho.origemLon];
     const destino = [trecho.destinoLat, trecho.destinoLon];
-    const cor = trecho.divergente ? "#f59f00" : trecho.selecionado ? "#198754" : "#0d6efd";
-    const peso = trecho.selecionado ? 6 : 4;
+    const cor = trecho.divergente ? "#f59f00" : "#0d6efd";
+    const peso = trecho.selecionado ? 5 : 4;
     const popup = `
       <div class="small">
         <div class="fw-semibold mb-1">Trecho ${escapeHtmlMapa(trecho.ordem)}</div>
@@ -1558,22 +1536,35 @@
 
   function prepararDecimalParaSubmit(campo) {
     if (!campo || !String(campo.value || "").trim()) return;
-    campo.value = String(campo.value).replace(/\./g, "").replace(",", ".");
+    const valor = normalizarNumero(campo.value);
+    campo.value = Number.isFinite(valor) ? valor.toFixed(2) : "";
   }
 
   function aplicarMascarasNumericas(root = document) {
     root.querySelectorAll(".campo-moeda").forEach(campo => {
-      formatarDecimalCampo(campo, 2);
+      if (document.activeElement !== campo) formatarDecimalCampo(campo, 2);
+      if (campo.dataset.mascaraDecimalPronta === "true") return;
+      campo.dataset.mascaraDecimalPronta = "true";
       campo.addEventListener("blur", () => formatarDecimalCampo(campo, 2));
     });
     root.querySelectorAll(".campo-km").forEach(campo => {
-      formatarDecimalCampo(campo, 2);
+      if (document.activeElement !== campo) formatarDecimalCampo(campo, 2);
+      if (campo.dataset.mascaraDecimalPronta === "true") return;
+      campo.dataset.mascaraDecimalPronta = "true";
       campo.addEventListener("blur", () => formatarDecimalCampo(campo, 2));
+    });
+    root.querySelectorAll(".campo-vkm").forEach(campo => {
+      if (document.activeElement !== campo && !campo.readOnly) formatarDecimalCampo(campo, 2);
+      if (campo.dataset.mascaraDecimalPronta === "true") return;
+      campo.dataset.mascaraDecimalPronta = "true";
+      campo.addEventListener("blur", () => {
+        if (!campo.readOnly) formatarDecimalCampo(campo, 2);
+      });
     });
   }
 
   function normalizarCamposDecimaisParaSubmit() {
-    document.querySelectorAll(".campo-moeda, .campo-km").forEach(prepararDecimalParaSubmit);
+    document.querySelectorAll(".campo-moeda, .campo-km, .campo-vkm").forEach(prepararDecimalParaSubmit);
   }
 
   function campoEndereco(linha, papel) {
@@ -1893,7 +1884,8 @@
   async function importarDespesasRelatorio(despesas) {
     for (const despesa of despesas || []) {
       const linha = await adicionarLinhaDespesa();
-      setClientesInput(linha?.querySelector(".clientes-item-input"), getClientesRelatorioIds());
+      const clientesItem = normalizarIdsPermitidos(despesa.cliente_ids || [], getClientesRelatorioIds());
+      setClientesInput(linha?.querySelector(".clientes-item-input"), clientesItem.length ? clientesItem : getClientesRelatorioIds());
       definirCampoLinha(linha, "tipo", despesa.tipo);
       definirCampoLinha(linha, "descricao", despesa.descricao);
       definirCampoLinha(linha, "valor", despesa.valor);
@@ -1905,7 +1897,8 @@
   async function importarTrechosRelatorio(trechos) {
     for (const trecho of trechos || []) {
       const linha = await adicionarLinhaKm();
-      setClientesInput(linha?.querySelector(".clientes-item-input"), getClientesRelatorioIds());
+      const clientesItem = normalizarIdsPermitidos(trecho.cliente_ids || [], getClientesRelatorioIds());
+      setClientesInput(linha?.querySelector(".clientes-item-input"), clientesItem.length ? clientesItem : getClientesRelatorioIds());
       definirCampoLinha(linha, "origem", trecho.origem);
       definirCampoLinha(linha, "origem_endereco_completo", trecho.origem_endereco_completo);
       definirCampoLinha(linha, "origem_lat", trecho.origem_lat);
@@ -1920,8 +1913,13 @@
       definirCampoLinha(linha, "diferenca_km_percentual", trecho.diferenca_km_percentual);
       definirCampoLinha(linha, "fonte_calculo_rota", trecho.fonte_calculo_rota);
       definirCampoLinha(linha, "rota_geojson", JSON.stringify(trecho.rota_geojson || {}));
-      definirCampoLinha(linha, "valor_km", trecho.valor_km);
+      if ((clientesItem.length ? clientesItem : getClientesRelatorioIds()).length <= 1) {
+        definirCampoLinha(linha, "valor_km", trecho.valor_km);
+      } else {
+        definirCampoLinha(linha, "valor_km", "");
+      }
       prepararLinhaMapaKm(linha);
+      atualizarEstadoKmMultiCliente(linha);
       const campoCalculo = linha?.querySelector(".campo-km") || linha?.querySelector(".campo-vkm");
       if (campoCalculo) calcularTrechoKm(campoCalculo);
     }
@@ -1932,7 +1930,8 @@
     const dados = relatorioImportacaoSelecionado;
 
     if (document.getElementById("importar-cliente")?.checked) {
-      setClientesInput(document.getElementById("id_clientes_relatorio"), [dados.cliente_id]);
+      const clientesRelatorio = dados.cliente_ids?.length ? dados.cliente_ids : [dados.cliente_id];
+      setClientesInput(document.getElementById("id_clientes_relatorio"), clientesRelatorio);
       atualizarBadgesClientesRelatorio();
       atualizarBadgesClientesItens();
     }
@@ -2081,7 +2080,7 @@
     } catch (error) {
       logFormError("adicionar_despesa_erro", error, { idx, url });
       window.ErpOperationalErrors?.show("Não foi possível adicionar a despesa.", [
-        "O erro foi registrado no painel de diagnóstico do formulário."
+        "Tente novamente. Se o problema continuar, informe o suporte."
       ]);
       return null;
     }
@@ -2141,7 +2140,7 @@ async function adicionarLinhaKm() {
   } catch (error) {
     logFormError("adicionar_km_erro", error, { idx, url, valorPadrao });
     window.ErpOperationalErrors?.show("Não foi possível adicionar o trecho.", [
-      "O erro foi registrado no painel de diagnóstico do formulário."
+      "Tente novamente. Se o problema continuar, informe o suporte."
     ]);
     return null;
   }
@@ -2413,6 +2412,7 @@ function validarKmGlobal() {
         atualizarMapaFormulario();
         // Recalcular totais de trechos existentes ao editar
         linhasAtivasFormulario(".linha-trecho").forEach(tr => {
+          atualizarEstadoKmMultiCliente(tr);
           const km = normalizarNumero(tr.querySelector(".campo-km")?.value);
           const vkm = normalizarNumero(tr.querySelector(".campo-vkm")?.value);
           const cel = tr.querySelector(".total-trecho");

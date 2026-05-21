@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django import forms
 from django.forms import inlineformset_factory, BaseInlineFormSet
 from .models import (
@@ -453,7 +455,7 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
         )
         self.fields["valor_km"].widget.attrs.update(
             {
-                "class": "form-control form-control-sm campo-vkm campo-moeda",
+                "class": "form-control form-control-sm campo-vkm",
                 "inputmode": "decimal",
                 "placeholder": "0,00",
             }
@@ -500,10 +502,22 @@ class BaseTrechoKmFormSet(BaseInlineFormSet):
             km = form.cleaned_data.get("km")
             valor_km = form.cleaned_data.get("valor_km")
             observacao = form.cleaned_data.get("observacao")
+            clientes_raw = ""
+            if getattr(self, "data", None):
+                clientes_raw = self.data.get(f"{form.prefix}-clientes", "")
+            clientes_ids = [
+                item.strip()
+                for item in str(clientes_raw or "").split(",")
+                if item.strip()
+            ]
+            trecho_multi_cliente = len(set(clientes_ids)) > 1
+            if trecho_multi_cliente and valor_km is None:
+                form.cleaned_data["valor_km"] = Decimal("0.00")
+                valor_km = form.cleaned_data["valor_km"]
 
             # Linha totalmente vazia → ignora
             if not form.instance.pk and not any(
-                [data, origem, destino, km, valor_km, observacao]
+                [data, origem, destino, km, observacao]
             ):
                 continue
 
@@ -517,7 +531,7 @@ class BaseTrechoKmFormSet(BaseInlineFormSet):
                 form.add_error("km", "Informe o KM.")
             elif km <= 0:
                 form.add_error("km", "KM deve ser maior que zero.")
-            if valor_km is None:
+            if valor_km is None and not trecho_multi_cliente:
                 form.add_error("valor_km", "Informe o valor por KM.")
 
             # Data fora do período
