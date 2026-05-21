@@ -5,6 +5,7 @@ from django.db import transaction
 from relatorios.models import (
     DespesaRateio,
     StatusRateio,
+    StatusRelatorio,
     TipoEventoHistorico,
 )
 from relatorios.services.financeiro_validator import (
@@ -22,6 +23,12 @@ from relatorios.services.trecho_km_calculo_service import (
 
 
 CENTAVO = Decimal("0.01")
+ESTADOS_FINAIS = {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
+
+
+def _bloquear_finalizado(relatorio):
+    if relatorio.status in ESTADOS_FINAIS:
+        raise RateioError("Relatorio finalizado nao pode ter rateio alterado.")
 
 
 def _money(valor):
@@ -101,6 +108,7 @@ def _distribuir_respeitando_manual(total, cliente_ids, existentes, campo_valor):
 
 
 def garantir_rateio_despesa(despesa):
+    _bloquear_finalizado(despesa.relatorio)
     cliente_ids = _clientes_ids_item(despesa)
     if not cliente_ids:
         return []
@@ -156,6 +164,7 @@ def garantir_rateio_despesa(despesa):
 
 
 def garantir_rateio_trecho(trecho):
+    _bloquear_finalizado(trecho.relatorio)
     return sincronizar_calculo_trecho(trecho)
 
 
@@ -176,6 +185,7 @@ def _validar_soma(total, valores, mensagem):
 
 
 def salvar_rateio_despesa(despesa, dados_rateio, usuario, motivo="", aprovar=False):
+    _bloquear_finalizado(despesa.relatorio)
     total = _money(despesa.valor_final)
     motivo = (motivo or "").strip()
     valores = [_money(item.get("valor_final")) for item in dados_rateio]

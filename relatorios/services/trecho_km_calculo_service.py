@@ -2,7 +2,13 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django.db import transaction
 
-from relatorios.models import Cliente, StatusRateio, TipoEventoHistorico, TrechoRateioKM
+from relatorios.models import (
+    Cliente,
+    StatusRateio,
+    StatusRelatorio,
+    TipoEventoHistorico,
+    TrechoRateioKM,
+)
 from relatorios.services.historico_service import registrar_evento
 from relatorios.services.rateio_exceptions import RateioError
 
@@ -10,6 +16,12 @@ from relatorios.services.rateio_exceptions import RateioError
 CENTAVO = Decimal("0.01")
 DECIMAL_KM = Decimal("0.01")
 DECIMAL_VALOR_KM = Decimal("0.0001")
+ESTADOS_FINAIS = {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
+
+
+def _bloquear_finalizado(relatorio):
+    if relatorio.status in ESTADOS_FINAIS:
+        raise RateioError("Relatorio finalizado nao pode ter calculo de KM alterado.")
 
 
 def _decimal(valor, casas, mensagem):
@@ -65,6 +77,7 @@ def _status_manual(status):
 class TrechoKMCalculoService:
     @staticmethod
     def sincronizar(trecho):
+        _bloquear_finalizado(trecho.relatorio)
         cliente_ids = _clientes_ids_item(trecho)
         if not cliente_ids:
             return []
@@ -144,6 +157,7 @@ class TrechoKMCalculoService:
 
     @staticmethod
     def salvar(trecho, dados_calculo, usuario, motivo="", aprovar=False):
+        _bloquear_finalizado(trecho.relatorio)
         motivo = (motivo or "").strip()
         TrechoKMCalculoService.sincronizar(trecho)
         atuais_pre = {calculo.cliente_id: calculo for calculo in trecho.rateios.all()}

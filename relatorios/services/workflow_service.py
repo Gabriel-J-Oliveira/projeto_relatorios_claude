@@ -26,6 +26,7 @@ from relatorios.services.rateio_service import (
     garantir_rateios_relatorio,
     validar_rateios_relatorio,
 )
+from relatorios.services.snapshot_service import SnapshotError, criar_snapshot_financeiro
 from relatorios.services.validacoes_operacionais import (
     validar_relatorio_para_aprovacao,
     validar_relatorio_para_envio,
@@ -383,6 +384,10 @@ def aprovar_relatorio(relatorio_id, usuario=None, post_data=None):
                 "status_novo": relatorio.status,
             },
         )
+        try:
+            criar_snapshot_financeiro(relatorio, _usuario(usuario))
+        except SnapshotError as exc:
+            raise WorkflowError(exc.args[0]) from exc
         return relatorio
 
 
@@ -394,6 +399,10 @@ def rejeitar_relatorio(relatorio_id, usuario=None, justificativa=""):
         relatorio = _obter_relatorio_bloqueado(relatorio_id)
         _validar_permissao_financeira(usuario)
         validar_transicao(relatorio, StatusRelatorio.REJEITADO)
+        try:
+            garantir_rateios_relatorio(relatorio)
+        except RateioError as exc:
+            raise WorkflowError(str(exc)) from exc
         status_anterior = relatorio.status
         relatorio.motivo_rejeicao = justificativa
         _aplicar_status(relatorio, StatusRelatorio.REJEITADO, ["motivo_rejeicao"])
@@ -408,4 +417,8 @@ def rejeitar_relatorio(relatorio_id, usuario=None, justificativa=""):
                 "status_novo": relatorio.status,
             },
         )
+        try:
+            criar_snapshot_financeiro(relatorio, _usuario(usuario))
+        except SnapshotError as exc:
+            raise WorkflowError(exc.args[0]) from exc
         return relatorio

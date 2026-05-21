@@ -667,6 +667,47 @@ class SequencialRelatorio(models.Model):
         return f"{self.chave}: {self.proximo_numero}"
 
 
+class RelatorioSnapshotFinanceiro(models.Model):
+    relatorio = models.OneToOneField(
+        RelatorioTecnico,
+        on_delete=models.CASCADE,
+        related_name="snapshot_financeiro",
+    )
+    schema_version = models.PositiveSmallIntegerField(default=1)
+    numero = models.CharField(max_length=30, db_index=True)
+    status = models.CharField(max_length=30, choices=StatusRelatorio.choices)
+    total_solicitado = models.DecimalField(max_digits=12, decimal_places=2)
+    total_aprovado = models.DecimalField(max_digits=12, decimal_places=2)
+    diferenca_removida = models.DecimalField(max_digits=12, decimal_places=2)
+    payload = models.JSONField(default=dict, blank=True)
+    checksum = models.CharField(max_length=64, unique=True)
+    finalizado_em = models.DateTimeField()
+    finalizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="snapshots_financeiros_finalizados",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Snapshot financeiro do relatorio"
+        verbose_name_plural = "Snapshots financeiros dos relatorios"
+        ordering = ["-finalizado_em"]
+
+    def __str__(self):
+        return f"Snapshot {self.numero} ({self.get_status_display()})"
+
+    def save(self, *args, **kwargs):
+        if self.pk and not getattr(self, "_permitir_atualizacao_snapshot", False):
+            raise ValidationError("Snapshot financeiro e imutavel.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Snapshot financeiro nao pode ser excluido.")
+
+
 # ─────────────────────────────────────────────────────────────────
 # EQUIPE DO RELATÓRIO
 # ─────────────────────────────────────────────────────────────────

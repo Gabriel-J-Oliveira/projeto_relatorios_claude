@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.core.exceptions import PermissionDenied
 from django.utils.html import format_html
 from django.db.models import Sum
 from .models import (
@@ -6,7 +7,9 @@ from .models import (
     Cliente,
     PoliticaValor,
     RelatorioTecnico,
+    RelatorioSnapshotFinanceiro,
     RelatorioTecnicoEquipe,
+    StatusRelatorio,
     ItemDespesa,
     TrechoKm,
     Adiantamento,
@@ -138,6 +141,30 @@ class RelatorioTecnicoAdmin(admin.ModelAdmin):
     ]
     inlines = [EquipeInline, ItemDespesaInline, TrechoKmInline]
 
+    def _obj_finalizado(self, obj):
+        return obj and obj.status in {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_inline_instances(self, request, obj=None):
+        if self._obj_finalizado(obj):
+            return []
+        return super().get_inline_instances(request, obj)
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = list(super().get_readonly_fields(request, obj))
+        if self._obj_finalizado(obj):
+            fields.extend(field.name for field in obj._meta.fields)
+        return list(dict.fromkeys(fields))
+
+    def save_model(self, request, obj, form, change):
+        if change:
+            anterior = RelatorioTecnico.objects.filter(pk=obj.pk).only("status").first()
+            if anterior and anterior.status in {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}:
+                raise PermissionDenied("Relatorio finalizado nao pode ser alterado.")
+        super().save_model(request, obj, form, change)
+
     fieldsets = (
         (
             "Identificação",
@@ -230,3 +257,41 @@ class AdiantamentoAdmin(admin.ModelAdmin):
     list_display = ["tecnico", "tipo", "valor", "data", "relatorio"]
     list_filter = ["tipo", "tecnico"]
     search_fields = ["tecnico__nome", "descricao"]
+
+
+@admin.register(RelatorioSnapshotFinanceiro)
+class RelatorioSnapshotFinanceiroAdmin(admin.ModelAdmin):
+    list_display = [
+        "numero",
+        "status",
+        "total_solicitado",
+        "total_aprovado",
+        "diferenca_removida",
+        "finalizado_em",
+        "finalizado_por",
+    ]
+    list_filter = ["status", "finalizado_em"]
+    search_fields = ["numero", "relatorio__numero"]
+    readonly_fields = [
+        "relatorio",
+        "schema_version",
+        "numero",
+        "status",
+        "total_solicitado",
+        "total_aprovado",
+        "diferenca_removida",
+        "payload",
+        "checksum",
+        "finalizado_em",
+        "finalizado_por",
+        "criado_em",
+    ]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return request.method in {"GET", "HEAD", "OPTIONS"}
+
+    def has_delete_permission(self, request, obj=None):
+        return False

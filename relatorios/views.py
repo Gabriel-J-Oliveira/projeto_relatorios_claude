@@ -1314,6 +1314,7 @@ def relatorio_consulta_view(request, pk):
                 "tecnico_responsavel",
                 "aprovado_por",
                 "criado_por",
+                "snapshot_financeiro",
             ).prefetch_related(
                 "clientes_vinculados__cliente",
                 "despesas__clientes_vinculados__cliente",

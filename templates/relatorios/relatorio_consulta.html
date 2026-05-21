@@ -42,7 +42,7 @@
         <div>
           <span>Técnicos</span>
           <strong>
-            {% for tecnico in relatorio.tecnicos_exibicao %}
+            {% for tecnico in consulta.tecnicos %}
               {{ tecnico.nome }}{% if not forloop.last %}, {% endif %}
             {% empty %}
               Não informado
@@ -52,7 +52,7 @@
         <div>
           <span>Clientes</span>
           <strong>
-            {% for cliente in relatorio.clientes_exibicao %}
+            {% for cliente in consulta.clientes %}
               {{ cliente.nome }}{% if not forloop.last %}, {% endif %}
             {% empty %}
               Não informado
@@ -62,21 +62,21 @@
         <div>
           <span>Período</span>
           <strong>
-            {{ relatorio.data_inicio|date:"d/m/Y" }}
-            {% if relatorio.data_inicio != relatorio.data_fim %}
-              a {{ relatorio.data_fim|date:"d/m/Y" }}
+            {{ consulta.periodo.inicio }}
+            {% if not consulta.periodo.mesmo_dia %}
+              a {{ consulta.periodo.fim }}
             {% endif %}
           </strong>
         </div>
         <div>
           <span>Finalização</span>
-          <strong>{{ relatorio.aprovado_em|date:"d/m/Y H:i"|default:"Não finalizado" }}</strong>
+          <strong>{{ consulta.finalizado_em|default:"Não finalizado" }}</strong>
         </div>
       </div>
     </div>
     <div class="consulta-status-panel">
       <span class="text-muted small">Resultado financeiro</span>
-      <strong>R$ {{ relatorio.total_aprovado|floatformat:2 }}</strong>
+      <strong>R$ {{ consulta.totais.total_aprovado|floatformat:2 }}</strong>
       <small class="text-muted">Total aprovado para reembolso/prestação</small>
     </div>
   </div>
@@ -86,37 +86,37 @@
   <div class="col-12 col-sm-6 col-xl-2">
     <div class="consulta-kpi">
       <span>Total solicitado</span>
-      <strong>R$ {{ relatorio.total_solicitado|floatformat:2 }}</strong>
+      <strong>R$ {{ consulta.totais.total_solicitado|floatformat:2 }}</strong>
     </div>
   </div>
   <div class="col-12 col-sm-6 col-xl-2">
     <div class="consulta-kpi success">
       <span>Total aprovado</span>
-      <strong>R$ {{ relatorio.total_aprovado|floatformat:2 }}</strong>
+      <strong>R$ {{ consulta.totais.total_aprovado|floatformat:2 }}</strong>
     </div>
   </div>
   <div class="col-12 col-sm-6 col-xl-2">
     <div class="consulta-kpi warning">
       <span>Diferença removida</span>
-      <strong>R$ {{ relatorio.diferenca_removida|floatformat:2 }}</strong>
+      <strong>R$ {{ consulta.totais.diferenca_removida|floatformat:2 }}</strong>
     </div>
   </div>
   <div class="col-12 col-sm-6 col-xl-2">
     <div class="consulta-kpi">
       <span>KM total</span>
-      <strong>{{ relatorio.total_km_percorrido|floatformat:2 }} km</strong>
+      <strong>{{ consulta.totais.total_km_percorrido|floatformat:2 }} km</strong>
     </div>
   </div>
   <div class="col-12 col-sm-6 col-xl-2">
     <div class="consulta-kpi">
       <span>Despesas</span>
-      <strong>{{ relatorio.despesas.count }}</strong>
+      <strong>{{ consulta.contagens.despesas }}</strong>
     </div>
   </div>
   <div class="col-12 col-sm-6 col-xl-2">
     <div class="consulta-kpi">
       <span>Trechos KM</span>
-      <strong>{{ relatorio.trechos.count }}</strong>
+      <strong>{{ consulta.contagens.trechos_km }}</strong>
     </div>
   </div>
 </section>
@@ -177,18 +177,18 @@
       </div>
       <div class="card-body">
         <div class="consulta-timeline">
-          {% for historico in relatorio.historicos.all %}
+          {% for historico in consulta.historicos %}
           <div class="timeline-item">
             <span class="timeline-dot text-bg-{{ historico.badge_cor }}"></span>
             <div>
               <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
                 <strong>{{ historico.acao }}</strong>
-                <span class="badge text-bg-{{ historico.badge_cor }}">{{ historico.get_tipo_evento_display }}</span>
+                <span class="badge text-bg-{{ historico.badge_cor }}">{{ historico.tipo_evento_label }}</span>
               </div>
               <p class="small text-muted mb-1">{{ historico.descricao }}</p>
               <span class="small text-muted">
-                {{ historico.data_hora|date:"d/m/Y H:i" }}
-                {% if historico.usuario %}por {{ historico.usuario.get_full_name|default:historico.usuario.username }}{% endif %}
+                {{ historico.data_hora_display }}
+                {% if historico.usuario_nome %}por {{ historico.usuario_nome }}{% endif %}
               </span>
             </div>
           </div>

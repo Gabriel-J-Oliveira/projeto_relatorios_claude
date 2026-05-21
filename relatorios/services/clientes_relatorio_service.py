@@ -4,8 +4,17 @@ from relatorios.models import (
     Cliente,
     DespesaCliente,
     RelatorioCliente,
+    StatusRelatorio,
     TrechoKMCliente,
 )
+
+
+ESTADOS_FINAIS = {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
+
+
+def _bloquear_finalizado(relatorio):
+    if relatorio.status in ESTADOS_FINAIS:
+        raise ValueError("Relatorio finalizado nao pode ter clientes alterados.")
 
 
 def normalizar_ids_clientes(valor):
@@ -50,6 +59,7 @@ def clientes_trecho(trecho):
 
 @transaction.atomic
 def sync_clientes_relatorio(relatorio, cliente_ids):
+    _bloquear_finalizado(relatorio)
     cliente_ids = normalizar_ids_clientes(cliente_ids)
     clientes_validos = list(
         Cliente.objects.filter(pk__in=cliente_ids, ativo=True).order_by("nome")
@@ -116,6 +126,7 @@ def _cliente_ids_item(cliente_ids, relatorio):
 
 @transaction.atomic
 def sync_clientes_despesa(despesa, cliente_ids):
+    _bloquear_finalizado(despesa.relatorio)
     cliente_ids = _cliente_ids_item(cliente_ids, despesa.relatorio)
     erros = validar_clientes_item_no_relatorio(despesa.relatorio, cliente_ids)
     if erros:
@@ -133,6 +144,7 @@ def sync_clientes_despesa(despesa, cliente_ids):
 
 @transaction.atomic
 def sync_clientes_trecho(trecho, cliente_ids):
+    _bloquear_finalizado(trecho.relatorio)
     cliente_ids = _cliente_ids_item(cliente_ids, trecho.relatorio)
     erros = validar_clientes_item_no_relatorio(trecho.relatorio, cliente_ids)
     if erros:
