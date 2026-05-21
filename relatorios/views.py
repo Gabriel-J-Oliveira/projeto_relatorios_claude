@@ -47,7 +47,6 @@ from .services.autorizacao_service import (
     usuario_pode_atuar_como_financeiro,
     usuario_pode_editar_relatorio,
     usuario_pode_enviar_relatorio,
-    usuario_pode_excluir_relatorio,
     usuario_pode_visualizar_relatorio,
     usuario_eh_superadmin,
 )
@@ -71,6 +70,7 @@ from .services.rateio_service import (
 )
 from .services.resumo_cliente_service import resumo_financeiro_por_cliente
 from .services.consulta_relatorio_service import montar_consulta_relatorio
+from .services.financeiro_validator import validar_integridade_financeira_relatorio
 from .forms import (
     AdiantamentoForm,
     ClienteForm,
@@ -974,6 +974,12 @@ def relatorio_form_view(request, pk=None):
                             if f.instance.pk:
                                 f.instance.delete()
 
+                        erros_integridade = validar_integridade_financeira_relatorio(
+                            relatorio
+                        )
+                        if erros_integridade:
+                            raise WorkflowError(erros_integridade)
+
                         usuario_historico = (
                             request.user if request.user.is_authenticated else None
                         )
@@ -1290,7 +1296,6 @@ def relatorio_detail_view(request, pk):
             ),
             "superadmin_django": usuario_eh_superadmin(request.user),
             "pode_enviar_relatorio": usuario_pode_enviar_relatorio(request.user, relatorio),
-            "pode_excluir_relatorio": usuario_pode_excluir_relatorio(request.user, relatorio),
             "inconsistencias_rateio": inconsistencias_rateio,
             "distribuicao_clientes": distribuicao_clientes,
             "titulo_pagina": f"Relatório {relatorio.identificador}",
@@ -1459,50 +1464,6 @@ def relatorio_pdf_interno_view(request, pk):
     response = HttpResponse(pdf, content_type="application/pdf")
     response["Content-Disposition"] = f'inline; filename="{filename}"'
     return response
-
-
-@login_required
-@exigir_acesso_erp
-def relatorio_delete_view(request, pk):
-    relatorio = get_object_or_404(
-        _relatorios_visiveis(request.user, RelatorioTecnico.objects.all()),
-        pk=pk,
-    )
-    if usuario_pode_excluir_relatorio(request.user, relatorio):
-        if request.method == "POST":
-            numero = relatorio.identificador
-            relatorio.delete()
-            messages.success(request, f"RelatÃ³rio {numero} excluÃ­do.")
-            return redirect("relatorios:relatorio_list")
-        return render(
-            request,
-            "relatorios/relatorio_confirm_delete.html",
-            {
-                "object": relatorio,
-                "titulo_pagina": "Excluir RelatÃ³rio",
-            },
-        )
-    messages.error(request, "ExclusÃ£o de relatÃ³rios estÃ¡ bloqueada por polÃ­tica operacional.")
-    return redirect("relatorios:relatorio_detail", pk=relatorio.pk)
-
-    relatorio = get_object_or_404(RelatorioTecnico, pk=pk)
-    if _relatorio_bloqueado(relatorio):
-        messages.error(request, "Relatório aprovado ou rejeitado não pode ser excluído.")
-        return redirect("relatorios:relatorio_detail", pk=pk)
-
-    if request.method == "POST":
-        numero = relatorio.identificador
-        relatorio.delete()
-        messages.success(request, f"Relatório {numero} excluído.")
-        return redirect("relatorios:relatorio_list")
-    return render(
-        request,
-        "relatorios/relatorio_confirm_delete.html",
-        {
-            "object": relatorio,
-            "titulo_pagina": "Excluir Relatório",
-        },
-    )
 
 
 # ─────────────────────────────────────────────

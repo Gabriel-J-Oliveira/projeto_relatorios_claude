@@ -8,7 +8,7 @@ from relatorios.services.rateio_exceptions import RateioError
 
 
 CENTAVO = Decimal("0.01")
-DECIMAL_KM = Decimal("0.1")
+DECIMAL_KM = Decimal("0.01")
 DECIMAL_VALOR_KM = Decimal("0.0001")
 
 

@@ -55,12 +55,12 @@
     <div class="text-warning small aviso-duplicata"></div>
 </td>
   <td class="p-1 pt-3 col-md-1">
-    <input type="number"
-           step="0.01"
+    <input type="text"
+           inputmode="decimal"
            name="despesas-{{ idx }}-valor"
            id="id_despesas-{{ idx }}-valor"
            value="{{ form.valor.value|default:''|unlocalize }}"
-           class="form-control form-control-sm campo-valor-desp"
+           class="form-control form-control-sm campo-valor-desp campo-moeda"
            oninput="recalcular()">
     <div class="invalid-feedback d-block small erro-inline">
       {% if form.valor.errors %}{{ form.valor.errors.0 }}{% endif %}

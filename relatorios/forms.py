@@ -94,6 +94,7 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
             "data_fim",
             "motivo",
             "centro_custo",
+            "tipo_relatorio",
             "valor_adiantamento",
             "observacoes",
         ]
@@ -116,7 +117,10 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
             "motivo": forms.Textarea(attrs={"rows": 4}),
             "observacoes": forms.Textarea(attrs={"rows": 3}),
         }
-        labels = {"centro_custo": "Centro de Custo / Classificação"}
+        labels = {
+            "centro_custo": "Centro de Custo / Classificacao",
+            "tipo_relatorio": "Tipo de relatorio",
+        }
         help_texts = {
             "centro_custo": "Será aplicado a todas as despesas deste relatório."
         }
@@ -139,6 +143,16 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         self.fields["centro_custo"].widget.attrs[
             "placeholder"
         ] = "Ex: Manutenção, Instalação, Comercial..."
+        self.fields["tipo_relatorio"].widget.attrs.update(
+            {"class": "form-select form-select-sm"}
+        )
+        self.fields["valor_adiantamento"].widget.attrs.update(
+            {
+                "inputmode": "decimal",
+                "class": "form-control form-control-sm campo-moeda",
+                "placeholder": "0,00",
+            }
+        )
 
         if self.instance and self.instance.pk:
             self.fields["tecnicos_equipe"].initial = (
@@ -234,6 +248,12 @@ class ItemDespesaForm(BootstrapMixin, forms.ModelForm):
             self.fields[name].required = False
         self.fields["descricao"].widget.attrs["placeholder"] = "Fornecedor / Detalhe"
         self.fields["valor"].widget.attrs["placeholder"] = "0,00"
+        self.fields["valor"].widget.attrs.update(
+            {
+                "class": "form-control form-control-sm campo-valor-desp campo-moeda",
+                "inputmode": "decimal",
+            }
+        )
         self.fields["comprovante"].widget.attrs.update(
             {
                 "class": "form-control form-control-sm text-nowrap",
@@ -359,16 +379,17 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
         self.fields["km"].widget.attrs.update(
             {
                 "class": "form-control form-control-sm campo-km",
-                "placeholder": "0,0",
+                "inputmode": "decimal",
+                "placeholder": "0,00",
             }
         )
-        if valor_km_padrao and not self.initial.get("valor_km") and not self.data:
-            self.fields["valor_km"].widget.attrs.update(
-                {
-                    "class": "form-control form-control-sm campo-vkm",
-                    "placeholder": "0,0000",
-                }
-            )
+        self.fields["valor_km"].widget.attrs.update(
+            {
+                "class": "form-control form-control-sm campo-vkm campo-moeda",
+                "inputmode": "decimal",
+                "placeholder": "0,00",
+            }
+        )
 
         self.fields["observacao"].widget.attrs.update(
             {

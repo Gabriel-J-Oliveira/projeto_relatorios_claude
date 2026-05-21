@@ -51,8 +51,8 @@
     </div>
   </td>
   <td class="p-1 pt-3">
-    <input type="number"
-           step="0.1"
+    <input type="text"
+           inputmode="decimal"
            name="trechos-{{ idx }}-km"
            id="id_trechos-{{ idx }}-km"
            value="{{ form.km.value|default:''|unlocalize }}"
@@ -63,12 +63,12 @@
     </div>
   </td>
   <td class="p-1 pt-3">
-  <input type="number"
-        step="0.0001"
+  <input type="text"
+        inputmode="decimal"
         name="trechos-{{ idx }}-valor_km"
         id="id_trechos-{{ idx }}-valor_km"
         value="{{ form.valor_km.value|default:''|unlocalize }}"
-        class="form-control form-control-sm campo-vkm {% if form.valor_km.errors %}is-invalid{% endif %}"
+        class="form-control form-control-sm campo-vkm campo-moeda {% if form.valor_km.errors %}is-invalid{% endif %}"
         oninput="calcularTrechoKm(this); recalcular(); validarKmGlobal();">
   <!-- aviso -->
   <div class="text-warning small aviso-inline"></div>

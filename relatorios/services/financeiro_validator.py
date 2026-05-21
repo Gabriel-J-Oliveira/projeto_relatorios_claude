@@ -4,7 +4,7 @@ from relatorios.models import StatusFinanceiroItem
 
 
 CENTAVO = Decimal("0.01")
-DECIMAL_KM = Decimal("0.1")
+DECIMAL_KM = Decimal("0.01")
 DECIMAL_VALOR_KM = Decimal("0.0001")
 
 
@@ -49,6 +49,66 @@ def _clientes_item_ids(item):
 
 def _rateios_por_cliente(item):
     return {rateio.cliente_id: rateio for rateio in item.rateios.all()}
+
+
+def _valor_positivo(valor):
+    valor = _money(valor)
+    return valor is not None and valor > Decimal("0.00")
+
+
+def validar_cobertura_clientes_relatorio(relatorio, clientes_relatorio_ids=None):
+    clientes_relatorio_ids = clientes_relatorio_ids or _clientes_relatorio_ids(relatorio)
+    if not clientes_relatorio_ids:
+        return []
+
+    clientes_com_movimento = set()
+
+    for despesa in relatorio.despesas.all():
+        if not _ativo(despesa):
+            continue
+        clientes_item_ids = _clientes_item_ids(despesa)
+        if not clientes_item_ids and len(clientes_relatorio_ids) == 1:
+            clientes_item_ids = set(clientes_relatorio_ids)
+        rateios = _rateios_por_cliente(despesa)
+        if rateios:
+            clientes_com_movimento.update(
+                cliente_id
+                for cliente_id, rateio in rateios.items()
+                if cliente_id in clientes_item_ids
+                and (
+                    _valor_positivo(rateio.valor_original)
+                    or _valor_positivo(rateio.valor_final)
+                )
+            )
+        else:
+            clientes_com_movimento.update(clientes_item_ids)
+
+    for trecho in relatorio.trechos.all():
+        if not _ativo(trecho):
+            continue
+        clientes_item_ids = _clientes_item_ids(trecho)
+        if not clientes_item_ids and len(clientes_relatorio_ids) == 1:
+            clientes_item_ids = set(clientes_relatorio_ids)
+        calculos = _rateios_por_cliente(trecho)
+        if calculos:
+            clientes_com_movimento.update(
+                cliente_id
+                for cliente_id, calculo in calculos.items()
+                if cliente_id in clientes_item_ids
+                and (
+                    _valor_positivo(calculo.valor_calculado)
+                    or _valor_positivo(calculo.valor_final)
+                )
+            )
+        else:
+            clientes_com_movimento.update(clientes_item_ids)
+
+    sem_movimento = clientes_relatorio_ids - clientes_com_movimento
+    if sem_movimento:
+        return [
+            "Existem clientes no relatório sem participação em despesas ou deslocamentos."
+        ]
+    return []
 
 
 def validar_integridade_despesa(despesa, clientes_relatorio_ids=None):
@@ -183,6 +243,8 @@ def validar_integridade_financeira_relatorio(relatorio):
 
     for trecho in relatorio.trechos.all():
         erros.extend(validar_integridade_trecho(trecho, clientes_relatorio_ids))
+
+    erros.extend(validar_cobertura_clientes_relatorio(relatorio, clientes_relatorio_ids))
 
     total_aprovado = _money(relatorio.total_aprovado)
     if total_aprovado is None or total_aprovado < 0:

@@ -26,7 +26,7 @@ def _dividir_decimal(total, cliente_ids):
 @dataclass
 class ClienteResumoFinanceiroDTO:
     cliente: object
-    km_total: Decimal = Decimal("0.0")
+    km_total: Decimal = Decimal("0.00")
     valor_km_solicitado: Decimal = Decimal("0.00")
     despesas_solicitadas: Decimal = Decimal("0.00")
     total_solicitado: Decimal = Decimal("0.00")
@@ -138,7 +138,7 @@ def resumo_financeiro_por_cliente(relatorio):
                 resumo.itens_rejeitados += 1
 
     for resumo in resumos.values():
-        resumo.km_total = Decimal(resumo.km_total or "0").quantize(Decimal("0.1"))
+        resumo.km_total = Decimal(resumo.km_total or "0").quantize(Decimal("0.01"))
         resumo.despesas_solicitadas = _money(resumo.despesas_solicitadas)
         resumo.valor_km_solicitado = _money(resumo.valor_km_solicitado)
         _marcar_status(resumo)

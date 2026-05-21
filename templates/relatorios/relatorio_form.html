@@ -193,12 +193,20 @@
                     {% endif %}
                   </div>
 
-                  <div class="col-md-5">
+                  <div class="col-md-4">
                     <label class="form-label fw-medium small text-muted">
                       Centro de Custo
                       <span class="fw-normal opacity-75">(aplica-se a todas as despesas)</span>
                     </label>
                     {{ form.centro_custo }}
+                  </div>
+
+                  <div class="col-md-4">
+                    <label class="form-label fw-medium small text-muted">Tipo de relatório</label>
+                    {{ form.tipo_relatorio }}
+                    {% if form.tipo_relatorio.errors %}
+                      <div class="text-danger small mt-1">{{ form.tipo_relatorio.errors.0 }}</div>
+                    {% endif %}
                   </div>
 
                   {# Cliente / Responsável #}
@@ -543,10 +551,20 @@
             {# /tab-content #}
             {# ── RODAPÉ DE AÇÕES ── #}
             <div class="d-flex justify-content-between align-items-center mt-3 py-3 px-4 bg-border rounded shadow-sm border">
-              <a href="{% url 'relatorios:relatorio_list' %}"
-                 class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-left me-1"></i>Voltar
-              </a>
+              <div class="d-flex gap-2">
+                <a href="{% url 'relatorios:relatorio_list' %}"
+                   class="btn btn-outline-secondary btn-sm">
+                  <i class="bi bi-arrow-left me-1"></i>Voltar
+                </a>
+                {% if not instance %}
+                <button type="button"
+                        class="btn btn-outline-danger btn-sm"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalDescartarRelatorio">
+                  <i class="bi bi-trash3 me-1"></i>Excluir
+                </button>
+                {% endif %}
+              </div>
 
               <div class="d-flex gap-2">
                 <button type="submit"
@@ -567,6 +585,42 @@
               </div>
 
               <!-- Modal importação de relatório antigo -->
+              {% if not instance %}
+              <div class="modal fade"
+                   id="modalDescartarRelatorio"
+                   tabindex="-1"
+                   aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                  <div class="modal-content border-0 shadow">
+                    <div class="modal-header bg-light">
+                      <h5 class="modal-title">
+                        <i class="bi bi-exclamation-triangle text-danger me-2"></i>
+                        Descartar relatório
+                      </h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                      <p class="mb-1">Deseja excluir este preenchimento?</p>
+                      <p class="text-muted small mb-0">
+                        Como o relatório ainda não foi salvo como rascunho, nenhum dado será mantido.
+                      </p>
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button"
+                              class="btn btn-outline-secondary btn-sm"
+                              data-bs-dismiss="modal">
+                        Cancelar
+                      </button>
+                      <a href="{% url 'relatorios:relatorio_list' %}"
+                         class="btn btn-danger btn-sm">
+                        <i class="bi bi-trash3 me-1"></i>Excluir preenchimento
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {% endif %}
+
               <div class="modal fade"
                    id="modalSelecionarClientes"
                    tabindex="-1"
@@ -1183,6 +1237,32 @@
     return Number.isFinite(numero) ? numero : 0;
   }
 
+  function formatarDecimalCampo(campo, casas = 2) {
+    if (!campo || !String(campo.value || "").trim()) return;
+    const valor = normalizarNumero(campo.value);
+    campo.value = valor.toFixed(casas).replace(".", ",");
+  }
+
+  function prepararDecimalParaSubmit(campo) {
+    if (!campo || !String(campo.value || "").trim()) return;
+    campo.value = String(campo.value).replace(/\./g, "").replace(",", ".");
+  }
+
+  function aplicarMascarasNumericas(root = document) {
+    root.querySelectorAll(".campo-moeda").forEach(campo => {
+      formatarDecimalCampo(campo, 2);
+      campo.addEventListener("blur", () => formatarDecimalCampo(campo, 2));
+    });
+    root.querySelectorAll(".campo-km").forEach(campo => {
+      formatarDecimalCampo(campo, 2);
+      campo.addEventListener("blur", () => formatarDecimalCampo(campo, 2));
+    });
+  }
+
+  function normalizarCamposDecimaisParaSubmit() {
+    document.querySelectorAll(".campo-moeda, .campo-km").forEach(prepararDecimalParaSubmit);
+  }
+
   let relatorioImportacaoSelecionado = null;
 
   function urlDetalheImportacao(id) {
@@ -1435,6 +1515,7 @@
 
       _idxDesp++;
       atualizarTotalForms(PREFIX_DESP, _idxDesp);
+      aplicarMascarasNumericas(novaLinha);
       atualizarBadgesClientesItens();
       recalcular();
       atualizarBadgesAbasSeguro();
@@ -1485,13 +1566,14 @@ async function adicionarLinhaKm() {
     if (campoVkm && !campoVkm.value) {
       const valorPadrao = normalizarNumero(form.dataset.valorKmCliente);
       if (valorPadrao) {
-        campoVkm.value = valorPadrao.toFixed(2);
+        campoVkm.value = valorPadrao.toFixed(2).replace(".", ",");
       }
     }
     validarKmGlobal(novaLinha);
 
     _idxKm++;
     atualizarTotalForms(PREFIX_KM, _idxKm);
+    aplicarMascarasNumericas(novaLinha);
     atualizarBadgesClientesItens();
     recalcular();
     atualizarBadgesAbasSeguro();
@@ -1588,7 +1670,7 @@ async function adicionarLinhaKm() {
 
     // Rodapés das tabelas
     setText("total-despesas", (totalTec + totalEmp).toFixed(2).replace(".", ","));
-    setText("total-km-percorrido", totalKmKm.toFixed(1));
+    setText("total-km-percorrido", totalKmKm.toFixed(2).replace(".", ","));
     setText("total-km-valor", totalKmPx.toFixed(2).replace(".", ","));
 
     // Resumo
@@ -1782,6 +1864,7 @@ document.addEventListener("blur", function (e) {
     atualizarBadgesClientesRelatorio();
     atualizarBadgesClientesItens();
     atualizarBadgesTecnicosEquipe();
+    aplicarMascarasNumericas();
     recalcular();
     const modalImportacao = document.getElementById("modalImportarRelatorio");
     modalImportacao?.addEventListener("shown.bs.modal", buscarRelatoriosImportacao);
@@ -1837,6 +1920,8 @@ document.addEventListener("blur", function (e) {
         window.ErpOperationalErrors?.show("Não foi possível salvar o relatório.", [
           "Selecione os clientes, técnicos e clientes dos itens preenchidos."
         ]);
+      } else {
+        normalizarCamposDecimaisParaSubmit();
       }
     });
     document.querySelectorAll("form[method='post']").forEach(form => {

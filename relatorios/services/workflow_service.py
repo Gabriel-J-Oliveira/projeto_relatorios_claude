@@ -23,6 +23,7 @@ from relatorios.services.rateio_service import (
     RateioError,
     garantir_rateio_despesa,
     garantir_rateio_trecho,
+    garantir_rateios_relatorio,
     validar_rateios_relatorio,
 )
 from relatorios.services.validacoes_operacionais import (
@@ -279,6 +280,11 @@ def _salvar_valores_aprovados(post_data, relatorio, usuario, consolidar=False):
 
 
 def _validar_aprovacao_financeira(relatorio):
+    try:
+        garantir_rateios_relatorio(relatorio)
+    except RateioError as exc:
+        raise WorkflowError(str(exc)) from exc
+
     resultado = validar_relatorio_para_aprovacao(relatorio)
     if not resultado.ok:
         raise WorkflowError(resultado.errors)
@@ -303,6 +309,10 @@ def enviar_para_conferencia(relatorio_id, usuario=None):
         relatorio = _obter_relatorio_bloqueado(relatorio_id)
         _validar_permissao_envio(relatorio, usuario)
         validar_transicao(relatorio, StatusRelatorio.CONFERENCIA)
+        try:
+            garantir_rateios_relatorio(relatorio)
+        except RateioError as exc:
+            raise WorkflowError(str(exc)) from exc
         resultado_envio = validar_relatorio_para_envio(relatorio)
         if not resultado_envio.ok:
             raise WorkflowError(resultado_envio.errors)

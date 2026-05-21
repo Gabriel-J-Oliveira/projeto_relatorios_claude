@@ -110,6 +110,7 @@ class TrechoKmInline(admin.TabularInline):
 class RelatorioTecnicoAdmin(admin.ModelAdmin):
     list_display = [
         "numero",
+        "tipo_relatorio",
         "cliente",
         "tecnico_responsavel",
         "data_inicio",
@@ -121,6 +122,7 @@ class RelatorioTecnicoAdmin(admin.ModelAdmin):
     ]
     list_filter = [
         "status",
+        "tipo_relatorio",
         "tipo_localidade",
         "tecnico_responsavel",
         "cliente",
@@ -152,7 +154,7 @@ class RelatorioTecnicoAdmin(admin.ModelAdmin):
                     ("cidade_atendimento", "uf_atendimento", "tipo_localidade"),
                     ("data_inicio", "data_fim"),
                     "motivo",
-                    "centro_custo",
+                    ("centro_custo", "tipo_relatorio"),
                 ),
             },
         ),

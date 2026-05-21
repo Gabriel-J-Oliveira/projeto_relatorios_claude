@@ -116,10 +116,6 @@ def usuario_pode_enviar_relatorio(user, relatorio):
     return usuario_pode_editar_relatorio(user, relatorio)
 
 
-def usuario_pode_excluir_relatorio(user, relatorio=None):
-    return usuario_eh_superadmin(user)
-
-
 def queryset_relatorios_visiveis(user, queryset):
     if usuario_eh_superadmin(user) or usuario_eh_administrativo(user):
         return queryset
@@ -147,7 +143,6 @@ def permissoes_usuario(user):
         "visualiza_cadastros": administrativo,
         "visualiza_adiantamentos": administrativo,
         "aprova_relatorios": administrativo,
-        "exclui_relatorios": superadmin,
     }
 
 

@@ -30,6 +30,11 @@ class StatusRelatorio(models.TextChoices):
     REJEITADO = "rejeitado", "Rejeitado"
 
 
+class TipoRelatorio(models.TextChoices):
+    INSTITUCIONAL = "institucional", "Institucional"
+    OPERACIONAL = "operacional", "Operacional"
+
+
 class StatusFinanceiroItem(models.TextChoices):
     APROVADO = "aprovado", "Aprovado"
     REJEITADO = "rejeitado", "Rejeitado"
@@ -343,6 +348,13 @@ class RelatorioTecnico(models.Model):
         max_length=100,
         blank=True,
         help_text="Aplicado a todos os itens deste relatório.",
+    )
+
+    tipo_relatorio = models.CharField(
+        "Tipo de relatorio",
+        max_length=20,
+        choices=TipoRelatorio.choices,
+        default=TipoRelatorio.OPERACIONAL,
     )
 
     # Financeiro
@@ -904,8 +916,8 @@ class TrechoKm(models.Model):
     km = models.DecimalField(
         "Quilômetros",
         max_digits=8,
-        decimal_places=1,
-        validators=[MinValueValidator(Decimal("0.1"))],
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
     )
     valor_km = models.DecimalField(
         "Valor por km (R$)",
@@ -1070,10 +1082,10 @@ class TrechoRateioKM(models.Model):
         on_delete=models.PROTECT,
         related_name="rateios_trechos_km",
     )
-    km_original = models.DecimalField(max_digits=8, decimal_places=1)
-    km_final = models.DecimalField(max_digits=8, decimal_places=1)
+    km_original = models.DecimalField(max_digits=8, decimal_places=2)
+    km_final = models.DecimalField(max_digits=8, decimal_places=2)
     valor_rateado = models.DecimalField(max_digits=10, decimal_places=2)
-    km_cliente = models.DecimalField(max_digits=8, decimal_places=1, default=Decimal("0.0"))
+    km_cliente = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal("0.00"))
     valor_km = models.DecimalField(max_digits=10, decimal_places=4, default=Decimal("0.0000"))
     valor_calculado = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     valor_final = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))

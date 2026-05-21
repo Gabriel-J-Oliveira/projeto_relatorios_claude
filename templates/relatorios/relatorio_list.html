@@ -171,12 +171,6 @@
                     <i class="bi bi-pencil"></i>
                   </a>
                 {% endif %}
-                {% if permissoes_erp.exclui_relatorios and r.status != 'aprovado' and r.status != 'rejeitado' %}
-                <a href="{% url 'relatorios:relatorio_delete' r.pk %}"
-                   class="btn btn-sm btn-outline-danger" title="Excluir">
-                  <i class="bi bi-trash"></i>
-                </a>
-                {% endif %}
               </div>
             </td>
           </tr>
