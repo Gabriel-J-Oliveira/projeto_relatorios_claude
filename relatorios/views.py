@@ -1244,6 +1244,9 @@ def relatorio_detail_view(request, pk):
         ),
         pk=pk,
     )
+    if relatorio.status in {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}:
+        return redirect("relatorios:relatorio_consulta", pk=relatorio.pk)
+
     inconsistencias_rateio = []
     try:
         garantir_rateios_relatorio(relatorio)

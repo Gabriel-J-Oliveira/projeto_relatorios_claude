@@ -82,10 +82,10 @@ def usuario_pode_gerenciar_cadastros(user):
 
 
 def usuario_pode_editar_relatorio(user, relatorio):
-    if usuario_eh_superadmin(user):
-        return True
     if relatorio.status in {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}:
         return False
+    if usuario_eh_superadmin(user):
+        return True
     if (
         relatorio.status == StatusRelatorio.AJUSTE
         and usuario_pode_atuar_como_financeiro(user)

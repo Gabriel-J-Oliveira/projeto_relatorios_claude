@@ -69,8 +69,18 @@
 
   <div class="card-body p-0">
     {% if relatorios %}
-    <div class="table-responsive">
+    <div class="relatorios-list-table-wrap">
       <table class="table table-hover align-middle mb-0 relatorios-list-table">
+        <colgroup>
+          <col class="col-numero">
+          <col class="col-cliente">
+          <col class="col-tecnico">
+          <col class="col-periodo">
+          <col class="col-km">
+          <col class="col-total">
+          <col class="col-status">
+          <col class="col-acoes">
+        </colgroup>
         <thead class="table-light">
           <tr>
             <th class="ps-4 py-3 fw-semibold text-muted small">Número</th>
@@ -87,7 +97,7 @@
           {% for r in relatorios %}
           <tr>
             <td class="ps-4" data-label="Número">
-              <a href="{% url 'relatorios:relatorio_detail' r.pk %}"
+              <a href="{% if r.status == 'aprovado' or r.status == 'rejeitado' %}{% url 'relatorios:relatorio_consulta' r.pk %}{% else %}{% url 'relatorios:relatorio_detail' r.pk %}{% endif %}"
                  class="fw-semibold text-primary text-decoration-none">
                 {{ r.identificador }}
               </a>
@@ -144,16 +154,10 @@
             </td>
             <td class="text-end pe-4" data-label="Ações">
               <div class="d-flex gap-1 justify-content-end">
-                <a href="{% url 'relatorios:relatorio_detail' r.pk %}"
+                <a href="{% if r.status == 'aprovado' or r.status == 'rejeitado' %}{% url 'relatorios:relatorio_consulta' r.pk %}{% else %}{% url 'relatorios:relatorio_detail' r.pk %}{% endif %}"
                    class="btn btn-sm btn-outline-secondary" title="Ver">
                   <i class="bi bi-eye"></i>
                 </a>
-                {% if r.status == 'aprovado' or r.status == 'rejeitado' %}
-                  <a href="{% url 'relatorios:relatorio_consulta' r.pk %}"
-                     class="btn btn-sm btn-outline-primary" title="Consulta final">
-                    <i class="bi bi-layout-text-window-reverse"></i>
-                  </a>
-                {% endif %}
                 <form method="post" action="{% url 'relatorios:relatorio_duplicate' r.pk %}" class="d-inline">
                   {% csrf_token %}
                   <button type="submit" class="btn btn-outline-secondary btn-sm" title="Duplicar">
@@ -161,13 +165,13 @@
                     <span class="ms-1"></span>
                   </button>
                 </form>
-                {% if r.status != 'aprovado' and r.status != 'rejeitado' %}
+                {% if r.status == 'rascunho' or r.status == 'ajuste_pendente' %}
                   <a href="{% url 'relatorios:relatorio_update' r.pk %}"
                      class="btn btn-sm btn-outline-primary" title="Editar">
                     <i class="bi bi-pencil"></i>
                   </a>
                 {% endif %}
-                {% if permissoes_erp.exclui_relatorios %}
+                {% if permissoes_erp.exclui_relatorios and r.status != 'aprovado' and r.status != 'rejeitado' %}
                 <a href="{% url 'relatorios:relatorio_delete' r.pk %}"
                    class="btn btn-sm btn-outline-danger" title="Excluir">
                   <i class="bi bi-trash"></i>
@@ -234,11 +238,53 @@
     min-width: min(320px, calc(100vw - 2rem));
   }
 
-  @media (max-width: 1400px) {
+  .relatorios-list-table-wrap {
+    width: 100%;
+    overflow: visible;
+  }
+
+  .relatorios-list-table {
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  .relatorios-list-table .col-numero { width: 11%; }
+  .relatorios-list-table .col-cliente { width: 20%; }
+  .relatorios-list-table .col-tecnico { width: 16%; }
+  .relatorios-list-table .col-periodo { width: 13%; }
+  .relatorios-list-table .col-km { width: 8%; }
+  .relatorios-list-table .col-total { width: 10%; }
+  .relatorios-list-table .col-status { width: 12%; }
+  .relatorios-list-table .col-acoes { width: 10%; min-width: 128px; }
+
+  .relatorios-list-table td,
+  .relatorios-list-table th {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .relatorios-list-table td[data-label="Ações"] .d-flex,
+  .relatorios-list-table td[data-label="AÃ§Ãµes"] .d-flex {
+    flex-wrap: wrap;
+    gap: .25rem !important;
+  }
+
+  .relatorios-list-table td[data-label="Ações"] .btn,
+  .relatorios-list-table td[data-label="AÃ§Ãµes"] .btn {
+    flex: 0 0 auto;
+  }
+
+  .relatorios-list-table td[data-label="Ações"] form,
+  .relatorios-list-table td[data-label="AÃ§Ãµes"] form {
+    flex: 0 0 auto;
+  }
+
+  @media (max-width: 1600px) {
     .relatorios-list-table {
       border-collapse: separate;
       border-spacing: 0 .75rem;
       padding: .75rem;
+      table-layout: auto;
     }
 
     .relatorios-list-table thead {
