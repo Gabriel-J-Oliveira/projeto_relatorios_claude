@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from io import BytesIO
+from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from django.conf import settings
@@ -282,6 +283,14 @@ def _fonte_dados(relatorio):
     return snapshot.payload or {}
 
 
+def _logo_empresa_uri():
+    logo_path = Path(settings.MEDIA_ROOT) / "Png" / "NovaMarca_cinza (pequeno).png"
+    if not logo_path.exists():
+        logger.warning("Logo do PDF de cliente nao encontrada em %s.", logo_path)
+        return ""
+    return logo_path.as_uri()
+
+
 def listar_clientes_pdf(relatorio):
     payload = _fonte_dados(relatorio)
     if payload:
@@ -318,6 +327,7 @@ def montar_contexto_pdf_cliente(relatorio, cliente_id, request=None):
     emitido_em = timezone.localtime(timezone.now())
     return {
         "empresa": EMPRESA_PADRAO,
+        "logo_src": _logo_empresa_uri(),
         "relatorio": contexto_relatorio,
         "cliente": cliente,
         "tecnicos": contexto_relatorio["tecnicos"],

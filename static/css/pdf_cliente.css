@@ -1,17 +1,17 @@
 @page {
   size: A4;
-  margin: 17mm 15mm 20mm;
+  margin: 16mm 15mm 19mm;
 
   @bottom-left {
     content: "Control Sul Gestão Empresarial";
-    color: #7b8493;
-    font-size: 8pt;
+    color: #8a93a3;
+    font-size: 7.5pt;
   }
 
   @bottom-right {
     content: "Página " counter(page) " de " counter(pages);
-    color: #7b8493;
-    font-size: 8pt;
+    color: #8a93a3;
+    font-size: 7.5pt;
   }
 }
 
@@ -20,80 +20,117 @@
 }
 
 body {
+  background: #ffffff;
   color: #172033;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 10pt;
+  font-size: 9.6pt;
   line-height: 1.45;
 }
 
 .pdf-header {
-  align-items: flex-start;
-  border-bottom: 2px solid #1f344f;
+  align-items: center;
+  background: linear-gradient(135deg, #f7f9fc 0%, #ffffff 68%);
+  border: 1px solid #e2e7ef;
+  border-radius: 14px;
   display: flex;
   justify-content: space-between;
   margin-bottom: 18px;
-  padding-bottom: 15px;
+  padding: 18px 20px;
+}
+
+.brand-area {
+  align-items: center;
+  display: flex;
+  gap: 18px;
+}
+
+.brand-logo {
+  height: 46px;
+  max-width: 190px;
+  object-fit: contain;
 }
 
 .company {
-  color: #1f344f;
+  color: #5d6675;
   font-size: 9pt;
   font-weight: 700;
-  letter-spacing: .05em;
-  margin-bottom: 7px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.document-kicker {
+  color: #697386;
+  font-size: 8pt;
+  font-weight: 700;
+  letter-spacing: .08em;
+  margin: 0 0 5px;
   text-transform: uppercase;
 }
 
 h1 {
-  color: #0f172a;
-  font-size: 20pt;
-  letter-spacing: .03em;
+  color: #111827;
+  font-size: 19pt;
+  letter-spacing: .035em;
+  line-height: 1.1;
   margin: 0;
 }
 
-.subtitle {
-  color: #6b7280;
-  font-size: 9pt;
-  margin: 4px 0 0;
-}
-
 .report-box {
-  border: 1px solid #d7dde7;
-  border-radius: 7px;
-  min-width: 120px;
-  padding: 10px 12px;
+  background: #172033;
+  border-radius: 12px;
+  color: #ffffff;
+  min-width: 132px;
+  padding: 12px 14px;
   text-align: right;
 }
 
-.report-box span,
-.meta-grid span {
-  color: #687386;
+.report-box span {
+  color: #cbd5e1;
   display: block;
-  font-size: 8pt;
+  font-size: 7.5pt;
   font-weight: 700;
-  letter-spacing: .04em;
+  letter-spacing: .08em;
   margin-bottom: 4px;
   text-transform: uppercase;
 }
 
 .report-box strong {
-  color: #1f344f;
-  font-size: 14pt;
+  color: #ffffff;
+  display: block;
+  font-size: 15pt;
+}
+
+.report-box small {
+  color: #dbe3ee;
+  display: block;
+  font-size: 8pt;
+  margin-top: 4px;
 }
 
 .meta-grid {
   display: grid;
   gap: 10px;
   grid-template-columns: 1.15fr 1fr;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
 }
 
 .meta-grid > div {
-  background: #f6f8fb;
+  background: #ffffff;
   border: 1px solid #e1e7ef;
-  border-radius: 7px;
-  min-height: 58px;
-  padding: 10px 12px;
+  border-radius: 11px;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, .035);
+  min-height: 66px;
+  padding: 13px 14px;
+}
+
+.meta-grid span {
+  color: #6b7280;
+  display: block;
+  font-size: 7.6pt;
+  font-weight: 700;
+  letter-spacing: .07em;
+  margin-bottom: 5px;
+  text-transform: uppercase;
 }
 
 .meta-grid strong,
@@ -102,28 +139,46 @@ h1 {
 }
 
 .meta-grid strong {
-  font-size: 10pt;
+  color: #172033;
+  font-size: 10.2pt;
+  line-height: 1.28;
 }
 
 .meta-grid small {
   color: #6b7280;
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
 .items-section {
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
-.items-section h2 {
-  color: #1f344f;
+.section-heading {
+  align-items: flex-end;
+  border-bottom: 1px solid #dfe5ee;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 9px;
+  padding-bottom: 8px;
+}
+
+.section-heading h2 {
+  color: #172033;
   font-size: 10pt;
-  letter-spacing: .03em;
-  margin: 0 0 8px;
+  letter-spacing: .055em;
+  margin: 0;
   text-transform: uppercase;
 }
 
+.section-heading span {
+  color: #7a8494;
+  font-size: 8pt;
+  font-weight: 700;
+}
+
 .items-table {
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   page-break-inside: auto;
   width: 100%;
 }
@@ -137,26 +192,48 @@ h1 {
 }
 
 .items-table th {
-  background: #1f344f;
-  color: #fff;
-  font-size: 8.5pt;
-  letter-spacing: .03em;
-  padding: 8px 9px;
+  background: #eef2f7;
+  border-bottom: 1px solid #d4dce8;
+  color: #334155;
+  font-size: 7.8pt;
+  letter-spacing: .06em;
+  padding: 9px 10px;
   text-align: left;
   text-transform: uppercase;
 }
 
+.items-table th:first-child {
+  border-radius: 9px 0 0 0;
+}
+
+.items-table th:last-child {
+  border-radius: 0 9px 0 0;
+}
+
 .items-table td {
-  border-bottom: 1px solid #e1e7ef;
-  padding: 8px 9px;
+  border-bottom: 1px solid #e6ebf2;
+  color: #263244;
+  padding: 9px 10px;
   vertical-align: top;
 }
 
 .items-table tbody tr:nth-child(even) td {
-  background: #fafbfc;
+  background: #fafcff;
+}
+
+.items-table tbody tr:nth-child(odd) td {
+  background: #ffffff;
+}
+
+.items-table td:nth-child(2) {
+  color: #5f6b7c;
+  font-size: 8.8pt;
+  white-space: nowrap;
 }
 
 .amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
   text-align: right;
   white-space: nowrap;
 }
@@ -169,45 +246,50 @@ h1 {
 
 .total-box {
   align-items: center;
-  background: #edf7f1;
-  border: 1px solid #c7e5d3;
-  border-radius: 8px;
+  background: linear-gradient(135deg, #eaf7f0, #f7fcf9);
+  border: 1px solid #b7dec7;
+  border-radius: 14px;
   display: flex;
   justify-content: space-between;
-  margin: 18px 0;
-  padding: 14px 16px;
+  margin: 20px 0 18px;
+  padding: 16px 18px;
+  page-break-inside: avoid;
 }
 
 .total-box span {
   color: #1f5138;
-  font-size: 10pt;
-  font-weight: 700;
-  letter-spacing: .04em;
+  font-size: 9.2pt;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
 }
 
 .total-box strong {
-  color: #176139;
-  font-size: 17pt;
+  color: #146438;
+  font-size: 20pt;
+  letter-spacing: 0;
 }
 
 .notice {
-  background: #f6f8fb;
-  border-left: 4px solid #1f344f;
-  color: #3d4656;
+  background: #f7f9fc;
+  border-left: 4px solid #8795a8;
+  border-radius: 0 10px 10px 0;
+  color: #475467;
+  font-size: 9pt;
   margin-top: 18px;
   padding: 12px 14px;
 }
 
 .signature {
-  margin-top: 44px;
+  margin-top: 48px;
   page-break-inside: avoid;
   text-align: center;
 }
 
 .signature-line {
-  border-top: 1px solid #2f3a4c;
-  margin: 0 auto 8px;
-  width: 240px;
+  border-top: 1px solid #3c4657;
+  margin: 0 auto 9px;
+  width: 260px;
 }
 
 .signature strong,
@@ -215,8 +297,13 @@ h1 {
   display: block;
 }
 
+.signature strong {
+  color: #172033;
+  font-size: 10pt;
+}
+
 .signature span {
   color: #687386;
-  font-size: 9pt;
+  font-size: 8.7pt;
   margin-top: 3px;
 }
