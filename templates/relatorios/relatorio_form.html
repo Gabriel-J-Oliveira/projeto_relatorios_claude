@@ -1013,7 +1013,12 @@
       position: absolute;
       right: 0;
       top: calc(100% - 0.5rem);
-      z-index: 1060;
+      z-index: 3000;
+      box-shadow: 0 .75rem 1.5rem rgba(15, 23, 42, .16);
+    }
+    .linha-trecho td {
+      position: relative;
+      overflow: visible;
     }
     .endereco-sugestao {
       cursor: pointer;
@@ -1053,6 +1058,15 @@
       color: #332701;
       background: var(--bs-warning);
     }
+    .km-mapa-excedente-grid {
+      border-top: 1px solid var(--bs-border-color);
+      background: var(--bs-body-bg);
+      padding: 1rem;
+    }
+    .km-mapa-excedente-grid .km-mapa-col,
+    .km-mapa-excedente-grid .km-excedente-col {
+      min-width: 0;
+    }
           </style>
         {% endblock %}
         {% block extra_js %}
@@ -1077,6 +1091,7 @@
   const enderecoSugestoesCache = new WeakMap();
   let mapaFormularioKm = null;
   let mapaFormularioKmLayers = null;
+  let linhaTrechoSelecionadaMapa = null;
 
   // Prefixos Django
   const PREFIX_DESP = "despesas";
@@ -1379,6 +1394,40 @@
     return mapaFormularioKm;
   }
 
+  function organizarBlocoMapaKm() {
+    const mapa = document.getElementById("mapa-km-formulario");
+    const excedente = document.querySelector("[name='km_excedente_interno']");
+    const botaoAdicionar = document.getElementById("btn-adicionar-km");
+    if (!mapa || !excedente || !botaoAdicionar) return;
+
+    const blocoMapa = mapa.closest(".border-top");
+    const blocoExcedente = excedente.closest(".border-top");
+    const blocoControles = botaoAdicionar.closest(".p-3");
+    if (!blocoMapa || !blocoExcedente || !blocoControles || blocoMapa.dataset.organizado === "true") return;
+
+    blocoMapa.parentNode.insertBefore(blocoControles, blocoMapa);
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "km-mapa-excedente-grid";
+    wrapper.dataset.organizado = "true";
+    wrapper.innerHTML = '<div class="row g-3 align-items-start"><div class="col-12 col-md-8 km-mapa-col"></div><div class="col-12 col-md-4 km-excedente-col"></div></div>';
+    const colMapa = wrapper.querySelector(".km-mapa-col");
+    const colExcedente = wrapper.querySelector(".km-excedente-col");
+
+    while (blocoMapa.firstChild) colMapa.appendChild(blocoMapa.firstChild);
+    const rowExcedente = blocoExcedente.querySelector(".row");
+    if (rowExcedente) {
+      const campoCol = rowExcedente.querySelector(".col-12") || rowExcedente.firstElementChild;
+      if (campoCol) {
+        campoCol.className = "";
+        while (campoCol.firstChild) colExcedente.appendChild(campoCol.firstChild);
+      }
+    }
+
+    blocoMapa.replaceWith(wrapper);
+    blocoExcedente.remove();
+  }
+
   function limparCamadasMapa() {
     if (mapaFormularioKmLayers) {
       mapaFormularioKmLayers.clearLayers();
@@ -1407,6 +1456,7 @@
         .map(getNomeCliente);
       return {
         ordem: index + 1,
+        linha,
         origem: campoEndereco(linha, "origem")?.value || "",
         destino: campoEndereco(linha, "destino")?.value || "",
         origemLat,
@@ -1418,6 +1468,7 @@
         kmInformado: linha.querySelector(".mapa-km-informado")?.value || linha.querySelector(".campo-km")?.value || "",
         diferenca: linha.querySelector(".mapa-km-diferenca")?.value || "",
         divergente: linha.classList.contains("km-divergente"),
+        selecionado: linha === linhaTrechoSelecionadaMapa,
         clientes,
       };
     }).filter(Boolean);
@@ -1427,7 +1478,8 @@
     if (!mapaFormularioKmLayers) return;
     const origem = [trecho.origemLat, trecho.origemLon];
     const destino = [trecho.destinoLat, trecho.destinoLon];
-    const cor = trecho.divergente ? "#f59f00" : "#0d6efd";
+    const cor = trecho.divergente ? "#f59f00" : trecho.selecionado ? "#198754" : "#0d6efd";
+    const peso = trecho.selecionado ? 6 : 4;
     const popup = `
       <div class="small">
         <div class="fw-semibold mb-1">Trecho ${escapeHtmlMapa(trecho.ordem)}</div>
@@ -1450,10 +1502,10 @@
 
     if (trecho.rotaGeojson && trecho.rotaGeojson.coordinates) {
       L.geoJSON(trecho.rotaGeojson, {
-        style: { color: cor, weight: 4, opacity: .82 },
+        style: { color: cor, weight: peso, opacity: .82 },
       }).bindPopup(popup).addTo(mapaFormularioKmLayers);
     } else {
-      L.polyline([origem, destino], { color: cor, weight: 4, opacity: .72, dashArray: "6,6" })
+      L.polyline([origem, destino], { color: cor, weight: peso, opacity: .72, dashArray: "6,6" })
         .bindPopup(popup)
         .addTo(mapaFormularioKmLayers);
     }
@@ -1493,9 +1545,15 @@
       return;
     }
     vazio?.classList.add("d-none");
+    const selecionados = trechos.filter(trecho => trecho.selecionado);
+    const trechosParaBounds = selecionados.length ? selecionados : trechos;
     const bounds = [];
     trechos.forEach(trecho => desenharTrechoNoMapa(trecho, bounds));
-    ajustarBoundsMapa(bounds);
+    const boundsFoco = [];
+    trechosParaBounds.forEach(trecho => {
+      boundsFoco.push([trecho.origemLat, trecho.origemLon], [trecho.destinoLat, trecho.destinoLon]);
+    });
+    ajustarBoundsMapa(boundsFoco.length ? boundsFoco : bounds);
   }
 
   function prepararDecimalParaSubmit(campo) {
@@ -2467,6 +2525,8 @@ document.addEventListener("blur", function (e) {
         logFormError("erro_backend_salvamento_parse", error);
       }
     }
+    organizarBlocoMapaKm();
+    document.getElementById("corpo-trechos")?.closest(".table-responsive")?.classList.add("overflow-visible");
     document.getElementById("btn-adicionar-despesa")
       ?.addEventListener("click", event => {
         event.preventDefault();
@@ -2476,6 +2536,20 @@ document.addEventListener("blur", function (e) {
       ?.addEventListener("click", event => {
         event.preventDefault();
         adicionarLinhaKm();
+      });
+    document.getElementById("corpo-trechos")
+      ?.addEventListener("focusin", event => {
+        const linha = event.target.closest(".linha-trecho");
+        if (!linha) return;
+        linhaTrechoSelecionadaMapa = linha;
+        atualizarMapaFormulario();
+      });
+    document.getElementById("corpo-trechos")
+      ?.addEventListener("click", event => {
+        const linha = event.target.closest(".linha-trecho");
+        if (!linha) return;
+        linhaTrechoSelecionadaMapa = linha;
+        atualizarMapaFormulario();
       });
     document.getElementById("btn-atualizar-mapa-km")
       ?.addEventListener("click", event => {
