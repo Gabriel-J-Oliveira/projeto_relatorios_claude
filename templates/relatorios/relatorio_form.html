@@ -2594,6 +2594,11 @@ document.addEventListener("blur", function (e) {
         selecionarRelatorioImportacao(botao.dataset.importarRelatorio);
       });
     document.getElementById("form-relatorio")?.addEventListener("submit", event => {
+      const form = event.currentTarget;
+      form?.querySelectorAll("button[type='submit']").forEach(button => {
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+      });
       let invalido = false;
       const clientesRelatorio = getClientesRelatorioIds();
       const erroRelatorio = document.querySelector(".erro-clientes-relatorio");
@@ -2621,6 +2626,7 @@ document.addEventListener("blur", function (e) {
       });
       if (invalido) {
         event.preventDefault();
+        if (form) form.dataset.submitting = "";
         logFormEvent("submit_bloqueado_validacao_frontend", {
           clientes: clientesRelatorio,
           tecnicos: tecnicosRelatorio,
@@ -2633,9 +2639,32 @@ document.addEventListener("blur", function (e) {
       }
     });
     document.querySelectorAll("form[method='post']").forEach(form => {
-      form.addEventListener("submit", () => {
+      form.addEventListener("submit", event => {
+        if (event.defaultPrevented) {
+          form.dataset.submitting = "";
+          form.querySelectorAll("button[type='submit']").forEach(button => {
+            button.disabled = false;
+            button.removeAttribute("aria-busy");
+          });
+          return;
+        }
+        if (form.dataset.submitting === "true") {
+          event.preventDefault();
+          return;
+        }
+        form.dataset.submitting = "true";
         form.querySelectorAll("button[type='submit']").forEach(button => {
           button.disabled = true;
+          button.setAttribute("aria-busy", "true");
+        });
+      });
+    });
+    window.addEventListener("pageshow", () => {
+      document.querySelectorAll("form[method='post']").forEach(form => {
+        form.dataset.submitting = "";
+        form.querySelectorAll("button[type='submit']").forEach(button => {
+          button.disabled = false;
+          button.removeAttribute("aria-busy");
         });
       });
     });

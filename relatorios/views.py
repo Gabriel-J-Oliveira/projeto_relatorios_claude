@@ -183,6 +183,32 @@ def _clientes_item_post(request, prefix):
     return normalizar_ids_clientes(request.POST.get(f"{prefix}-clientes"))
 
 
+def _clientes_item_instance_value(instance):
+    if not getattr(instance, "pk", None):
+        return ""
+    try:
+        ids = instance.clientes_vinculados.values_list("cliente_id", flat=True)
+    except Exception:
+        return ""
+    return ",".join(str(cliente_id) for cliente_id in ids)
+
+
+def _popular_clientes_formset_para_template(formset, request):
+    for form in getattr(formset, "forms", []):
+        chave = f"{form.prefix}-clientes"
+        if request.method == "POST":
+            valor = request.POST.get(chave, "")
+        else:
+            valor = _clientes_item_instance_value(form.instance)
+        form.clientes_value = valor
+        form.clientes_value_set = True
+
+
+def _popular_clientes_formsets_para_template(request, fs_desp, fs_km):
+    _popular_clientes_formset_para_template(fs_desp, request)
+    _popular_clientes_formset_para_template(fs_km, request)
+
+
 def _validar_clientes_formsets(request, fs_desp, fs_km, cliente_ids_relatorio):
     erros = []
     clientes_relatorio = set(cliente_ids_relatorio)
@@ -1057,6 +1083,7 @@ def relatorio_form_view(request, pk=None):
             prefix="trechos",
             form_kwargs={"valor_km_padrao": valor_km_padrao},
         )
+        _popular_clientes_formsets_para_template(request, fs_desp, fs_km)
 
         form_ok = form.is_valid()
         desp_ok = fs_desp.is_valid()
@@ -1316,6 +1343,7 @@ def relatorio_form_view(request, pk=None):
             prefix="trechos",
             form_kwargs={"valor_km_padrao": valor_km_padrao},
         )
+        _popular_clientes_formsets_para_template(request, fs_desp, fs_km)
 
     # ── Renderização (GET e POST com erro chegam aqui) ─────────────────────────
     return render(
