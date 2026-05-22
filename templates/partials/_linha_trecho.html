@@ -1,4 +1,4 @@
-{% load l10n %}
+﻿{% load l10n %}
 <tr class="linha-trecho"
     id="linha-trecho-nova-{{ idx }}"
     data-form-index="{{ idx }}"
@@ -22,6 +22,7 @@
            name="trechos-{{ idx }}-data"
            id="id_trechos-{{ idx }}-data"
            value="{% if form.data.value %}{{ form.data.value|date:'Y-m-d'|default:form.data.value }}{% endif %}"
+           max="{% now 'Y-m-d' %}"
            class="form-control form-control-sm {% if form.data.errors %}is-invalid{% endif %}">
     <div class="invalid-feedback d-block small erro-inline">
       {% if form.data.errors %}{{ form.data.errors.0 }}{% endif %}
@@ -119,39 +120,60 @@
     {{ form.rota_geojson }}
   </td>
   <td class="p-1 pt-3">
-  <input type="text"
-        inputmode="decimal"
-        name="trechos-{{ idx }}-valor_km"
-        id="id_trechos-{{ idx }}-valor_km"
-        value="{{ form.valor_km.value|default:''|unlocalize }}"
-        class="form-control form-control-sm campo-vkm {% if form.valor_km.errors %}is-invalid{% endif %}"
-        oninput="calcularTrechoKm(this); recalcular(); validarKmGlobal();">
-  <!-- aviso -->
-  <div class="text-warning small aviso-inline"></div>
-  <div class="invalid-feedback d-block small erro-inline">
-    {% if form.valor_km.errors %}{{ form.valor_km.errors.0 }}{% endif %}
-  </div>
-</td>
+    <input type="hidden"
+           name="trechos-{{ idx }}-valor_km"
+           id="id_trechos-{{ idx }}-valor_km"
+           value="{{ form.valor_km.value|default:''|unlocalize }}"
+           class="campo-vkm">
+    <div class="form-control form-control-sm bg-body-secondary text-muted small d-flex align-items-center">
+      AutomÃ¡tico
+    </div>
+    <div class="invalid-feedback d-block small erro-inline">
+      {% if form.valor_km.errors %}{{ form.valor_km.errors.0 }}{% endif %}
+    </div>
+  </td>
   <td class="p-1 px-3 pt-4 fw-bold small total-trecho text-start">
     R$ 0,00
     <div class="text-warning fw-normal small aviso-km-multicliente"></div>
   </td>
-  <td class="p-1 pt-3">
+  <td class="p-1 text-center text-nowrap col-md-3 pt-3">
     {% if form.instance.comprovante %}
       <a href="{{ form.instance.comprovante.url }}"
          target="_blank"
-         class="btn btn-sm btn-outline-success w-100 mb-1"
-         title="Abrir comprovante">
-        <i class="bi bi-paperclip"></i> Ver
+         class="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1 px-2 py-1 mb-1">
+        <i class="bi bi-file-earmark-check small"></i>
+        Atual
       </a>
     {% endif %}
-    <input type="file"
-           name="trechos-{{ idx }}-comprovante"
-           id="id_trechos-{{ idx }}-comprovante"
-           class="form-control form-control-sm {% if form.comprovante.errors %}is-invalid{% endif %}"
-           accept="image/*,.pdf">
+    <label class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 px-2 py-1 mb-0 cursor-pointer">
+      <i class="bi bi-paperclip small"></i>
+      <input type="file"
+             name="trechos-{{ idx }}-comprovante"
+             id="id_trechos-{{ idx }}-comprovante"
+             class="form-sm {% if form.comprovante.errors %}is-invalid{% endif %}"
+             accept="image/*,.pdf"
+             onchange="this.parentElement.classList.replace('btn-outline-secondary', 'btn-success')">
+    </label>
+    <div class="d-flex gap-1 mt-1">
+      <select name="trechos-{{ idx }}-tipo_documento_comprovante"
+              id="id_trechos-{{ idx }}-tipo_documento_comprovante"
+              class="form-select form-select-sm tipo-documento-comprovante {% if form.tipo_documento_comprovante.errors %}is-invalid{% endif %}">
+        <option value="">Tipo</option>
+        {% for value, label in form.fields.tipo_documento_comprovante.choices %}
+          {% if value %}
+            <option value="{{ value }}" {% if form.tipo_documento_comprovante.value == value %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+      <input type="text"
+             name="trechos-{{ idx }}-numero_documento_comprovante"
+             id="id_trechos-{{ idx }}-numero_documento_comprovante"
+             value="{{ form.numero_documento_comprovante.value|default:'' }}"
+             placeholder="Nº doc."
+             class="form-control form-control-sm numero-documento-comprovante {% if form.numero_documento_comprovante.errors %}is-invalid{% endif %}">
+    </div>
     <div class="invalid-feedback d-block small erro-inline">
-      {% if form.comprovante.errors %}{{ form.comprovante.errors.0 }}{% endif %}
+      {% if form.comprovante.errors %}{{ form.comprovante.errors.0 }}{% elif form.tipo_documento_comprovante.errors %}{{ form.tipo_documento_comprovante.errors.0 }}{% elif form.numero_documento_comprovante.errors %}{{ form.numero_documento_comprovante.errors.0 }}{% endif %}
     </div>
   </td>
   <td class="p-1 pt-3">
@@ -188,3 +210,4 @@
     </button>
   </td>
 </tr>
+

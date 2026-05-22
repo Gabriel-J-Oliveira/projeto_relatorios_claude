@@ -142,9 +142,11 @@
     <table class="data-table">
       <thead>
         <tr>
+          <th>ID</th>
           <th>Data</th>
           <th>Tipo</th>
           <th>Descrição</th>
+          <th>Nº doc.</th>
           <th>Cliente(s) / Rateio</th>
           <th class="amount">Solicitado</th>
           <th class="amount">Aprovado</th>
@@ -155,9 +157,11 @@
       <tbody>
         {% for despesa in pdf.despesas %}
           <tr class="{% if despesa.rejeitado %}row-rejected{% elif despesa.badge == 'warning' %}row-adjusted{% endif %}">
+            <td>#{{ despesa.item_id }}</td>
             <td>{{ despesa.data|date:"d/m/Y"|default:"-" }}</td>
             <td>{{ despesa.tipo }}</td>
             <td>{{ despesa.descricao }}</td>
+            <td>{{ despesa.numero_documento }}</td>
             <td>{{ despesa.clientes_rateio }}</td>
             <td class="amount">R$ {{ despesa.solicitado|floatformat:2 }}</td>
             <td class="amount">R$ {{ despesa.aprovado|floatformat:2 }}</td>
@@ -165,7 +169,7 @@
             <td>{{ despesa.motivo }}</td>
           </tr>
         {% empty %}
-          <tr><td colspan="8" class="empty">Nenhuma despesa registrada.</td></tr>
+          <tr><td colspan="10" class="empty">Nenhuma despesa registrada.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -176,9 +180,11 @@
     <table class="data-table">
       <thead>
         <tr>
+          <th>ID</th>
           <th>Data</th>
           <th>Origem</th>
           <th>Destino</th>
+          <th>Nº doc.</th>
           <th class="amount">KM</th>
           <th>Cliente</th>
           <th class="amount">Valor/KM</th>
@@ -190,9 +196,11 @@
       <tbody>
         {% for trecho in pdf.trechos %}
           <tr class="{% if trecho.rejeitado %}row-rejected{% elif trecho.badge == 'warning' %}row-adjusted{% endif %}">
+            <td>#{{ trecho.item_id }}</td>
             <td>{{ trecho.data|date:"d/m/Y"|default:"-" }}</td>
             <td>{{ trecho.origem }}</td>
             <td>{{ trecho.destino }}</td>
+            <td>{{ trecho.numero_documento }}</td>
             <td class="amount">{{ trecho.km|floatformat:2 }}</td>
             <td>{{ trecho.cliente }}</td>
             <td class="amount">R$ {{ trecho.valor_km|floatformat:2 }}</td>
@@ -201,7 +209,7 @@
             <td>{{ trecho.motivo }}</td>
           </tr>
         {% empty %}
-          <tr><td colspan="9" class="empty">Nenhum trecho KM registrado.</td></tr>
+          <tr><td colspan="11" class="empty">Nenhum trecho KM registrado.</td></tr>
         {% endfor %}
       </tbody>
     </table>

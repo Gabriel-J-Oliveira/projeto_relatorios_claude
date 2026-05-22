@@ -5,6 +5,7 @@ app_name = "relatorios"
 
 urlpatterns = [
     path("dashboard/", views.DashboardView.as_view(), name="dashboard"),
+    path("dashboard/dados/", views.dashboard_dados_json, name="dashboard_dados"),
 
     # Relatórios
     path("relatorios/", views.RelatorioListView.as_view(), name="relatorio_list"),

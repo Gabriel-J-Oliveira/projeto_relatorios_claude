@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from io import BytesIO
+import os
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -30,12 +31,35 @@ class PdfClienteError(Exception):
 class ItemPdfCliente:
     data: object
     documento: str
+    numero_documento: str
     descricao: str
     valor: Decimal
+    percentual: Decimal | None = None
+    origem_item: str = ""
+    origem_id: int | None = None
+    comprovante_path: str = ""
+    comprovante_nome: str = ""
 
 
 def _money(valor):
     return Decimal(str(valor or "0.00")).quantize(Decimal("0.01"))
+
+
+def _percentual(valor, total):
+    total = Decimal(str(total or "0.00"))
+    if total <= 0:
+        return None
+    return ((Decimal(str(valor or "0.00")) / total) * Decimal("100")).quantize(
+        Decimal("0.01")
+    )
+
+
+def _arquivo_info(arquivo_payload):
+    if not arquivo_payload:
+        return "", ""
+    path = arquivo_payload.get("path") or ""
+    nome = arquivo_payload.get("nome") or os.path.basename(path)
+    return path, nome
 
 
 def _data(valor):
@@ -91,6 +115,7 @@ def _relatorio_snapshot_contexto(payload):
         "identificador": relatorio.get("identificador") or relatorio.get("numero") or "",
         "periodo_inicio": _data(relatorio.get("data_inicio")),
         "periodo_fim": _data(relatorio.get("data_fim")),
+        "motivo": relatorio.get("motivo") or "",
         "finalizado_em": _datetime(
             assinatura.get("aprovado_em") or assinatura.get("finalizado_em")
         ),
@@ -121,6 +146,8 @@ def _itens_snapshot_cliente(payload, cliente_id):
                 and any(int(cliente.get("id") or 0) == cliente_id for cliente in clientes_despesa)
                 else []
             )
+        total_item = _money(despesa.get("valor_final") or despesa.get("valor_solicitado"))
+        comprovante_path, comprovante_nome = _arquivo_info(despesa.get("comprovante"))
         for rateio in rateios_cliente:
             valor = _money(rateio.get("valor_final"))
             if valor <= 0:
@@ -129,8 +156,14 @@ def _itens_snapshot_cliente(payload, cliente_id):
                 ItemPdfCliente(
                     data=_data(despesa.get("data")),
                     documento="Comprovante",
+                    numero_documento=despesa.get("numero_documento_comprovante") or "",
                     descricao=despesa.get("descricao") or despesa.get("tipo_label") or "Despesa",
                     valor=valor,
+                    percentual=_percentual(valor, total_item),
+                    origem_item="despesa",
+                    origem_id=despesa.get("id"),
+                    comprovante_path=comprovante_path,
+                    comprovante_nome=comprovante_nome,
                 )
             )
 
@@ -152,6 +185,8 @@ def _itens_snapshot_cliente(payload, cliente_id):
                 and any(int(cliente.get("id") or 0) == cliente_id for cliente in clientes_trecho)
                 else []
             )
+        total_item = _money(trecho.get("valor_final") or trecho.get("valor_calculado"))
+        comprovante_path, comprovante_nome = _arquivo_info(trecho.get("comprovante"))
         for rateio in rateios_cliente:
             valor = _money(rateio.get("valor_final"))
             if valor <= 0:
@@ -165,8 +200,14 @@ def _itens_snapshot_cliente(payload, cliente_id):
                 ItemPdfCliente(
                     data=_data(trecho.get("data")),
                     documento="Relatório KM",
+                    numero_documento=trecho.get("numero_documento_comprovante") or "",
                     descricao=descricao,
                     valor=valor,
+                    percentual=_percentual(valor, total_item),
+                    origem_item="trecho",
+                    origem_id=trecho.get("id"),
+                    comprovante_path=comprovante_path,
+                    comprovante_nome=comprovante_nome,
                 )
             )
 
@@ -195,6 +236,7 @@ def _relatorio_vivo_contexto(relatorio):
         "identificador": relatorio.identificador,
         "periodo_inicio": relatorio.data_inicio,
         "periodo_fim": relatorio.data_fim,
+        "motivo": relatorio.motivo or "",
         "finalizado_em": relatorio.aprovado_em,
         "tecnicos": [tecnico.nome for tecnico in relatorio.tecnicos_exibicao()],
         "usa_snapshot": False,
@@ -210,7 +252,11 @@ def _itens_vivos_cliente(relatorio, cliente_id):
             continue
         rateios = list(despesa.rateios.all())
         if rateios:
-            valores = [rateio.valor_final for rateio in rateios if rateio.cliente_id == cliente_id]
+            valores = [
+                (rateio.valor_final, rateio.percentual)
+                for rateio in rateios
+                if rateio.cliente_id == cliente_id
+            ]
         else:
             clientes = list(despesa.clientes_vinculados.all())
             cliente_participa = (
@@ -219,8 +265,12 @@ def _itens_vivos_cliente(relatorio, cliente_id):
                 if clientes
                 else relatorio.cliente_id == cliente_id
             )
-            valores = [despesa.valor_final] if cliente_participa else []
-        for valor_rateado in valores:
+            valores = [
+                (despesa.valor_final, _percentual(despesa.valor_final, despesa.valor_final))
+            ] if cliente_participa else []
+        comprovante_path = despesa.comprovante.name if despesa.comprovante else ""
+        comprovante_nome = os.path.basename(comprovante_path) if comprovante_path else ""
+        for valor_rateado, percentual in valores:
             valor = _money(valor_rateado)
             if valor <= 0:
                 continue
@@ -228,8 +278,14 @@ def _itens_vivos_cliente(relatorio, cliente_id):
                 ItemPdfCliente(
                     data=despesa.data,
                     documento="Comprovante",
+                    numero_documento=despesa.numero_documento_comprovante or "",
                     descricao=despesa.descricao,
                     valor=valor,
+                    percentual=percentual,
+                    origem_item="despesa",
+                    origem_id=despesa.pk,
+                    comprovante_path=comprovante_path,
+                    comprovante_nome=comprovante_nome,
                 )
             )
 
@@ -238,7 +294,12 @@ def _itens_vivos_cliente(relatorio, cliente_id):
             continue
         rateios = list(trecho.rateios.all())
         if rateios:
-            valores = [rateio.valor_final for rateio in rateios if rateio.cliente_id == cliente_id]
+            total_trecho = sum((rateio.valor_final for rateio in rateios), Decimal("0.00"))
+            valores = [
+                (rateio.valor_final, _percentual(rateio.valor_final, total_trecho))
+                for rateio in rateios
+                if rateio.cliente_id == cliente_id
+            ]
         else:
             clientes = list(trecho.clientes_vinculados.all())
             cliente_participa = (
@@ -247,8 +308,12 @@ def _itens_vivos_cliente(relatorio, cliente_id):
                 if clientes
                 else relatorio.cliente_id == cliente_id
             )
-            valores = [trecho.valor_final] if cliente_participa else []
-        for valor_rateado in valores:
+            valores = [
+                (trecho.valor_final, _percentual(trecho.valor_final, trecho.valor_final))
+            ] if cliente_participa else []
+        comprovante_path = trecho.comprovante.name if trecho.comprovante else ""
+        comprovante_nome = os.path.basename(comprovante_path) if comprovante_path else ""
+        for valor_rateado, percentual in valores:
             valor = _money(valor_rateado)
             if valor <= 0:
                 continue
@@ -256,8 +321,14 @@ def _itens_vivos_cliente(relatorio, cliente_id):
                 ItemPdfCliente(
                     data=trecho.data,
                     documento="Relatório KM",
+                    numero_documento=trecho.numero_documento_comprovante or "",
                     descricao=f"{trecho.origem} -> {trecho.destino}",
                     valor=valor,
+                    percentual=percentual,
+                    origem_item="trecho",
+                    origem_id=trecho.pk,
+                    comprovante_path=comprovante_path,
+                    comprovante_nome=comprovante_nome,
                 )
             )
 
@@ -360,6 +431,43 @@ def nome_arquivo_pdf_cliente(relatorio, cliente):
     return f"relatorio_{numero}_{nome_cliente}.pdf"
 
 
+def _pasta_cliente(cliente):
+    return slugify(cliente.get("nome") or "cliente") or "cliente"
+
+
+def _arquivo_anexo_path(nome_storage):
+    if not nome_storage:
+        return None
+    raiz = Path(getattr(settings, "ANEXOS_ROOT", settings.MEDIA_ROOT)).resolve()
+    caminho = (raiz / nome_storage).resolve()
+    try:
+        caminho.relative_to(raiz)
+    except ValueError:
+        logger.warning("Anexo fora de ANEXOS_ROOT ignorado no ZIP: %s", nome_storage)
+        return None
+    return caminho if caminho.exists() and caminho.is_file() else None
+
+
+def _adicionar_anexos_cliente(arquivo_zip, pasta_cliente, itens):
+    usados = set()
+    for item in itens:
+        caminho = _arquivo_anexo_path(item.comprovante_path)
+        if not caminho:
+            continue
+        nome_base = item.comprovante_nome or caminho.name
+        prefixo = item.origem_item or "item"
+        item_id = item.origem_id or "sem-id"
+        nome_zip = f"{pasta_cliente}/comprovantes/{prefixo}_{item_id}_{nome_base}"
+        contador = 2
+        while nome_zip in usados:
+            stem = Path(nome_base).stem
+            suffix = Path(nome_base).suffix
+            nome_zip = f"{pasta_cliente}/comprovantes/{prefixo}_{item_id}_{stem}_{contador}{suffix}"
+            contador += 1
+        arquivo_zip.write(caminho, nome_zip)
+        usados.add(nome_zip)
+
+
 def gerar_pdf_cliente(relatorio, cliente_id, request=None):
     contexto = montar_contexto_pdf_cliente(relatorio, cliente_id, request=request)
     return _render_pdf_cliente(contexto), contexto
@@ -386,8 +494,11 @@ def gerar_zip_pdfs_clientes(relatorio, request=None):
                 ignorados.append((cliente, str(exc)))
                 continue
             filename = nome_arquivo_pdf_cliente(relatorio, contexto["cliente"])
-            arquivo_zip.writestr(filename, pdf)
-            gerados.append(filename)
+            pasta = _pasta_cliente(contexto["cliente"])
+            caminho_pdf = f"{pasta}/{filename}"
+            arquivo_zip.writestr(caminho_pdf, pdf)
+            _adicionar_anexos_cliente(arquivo_zip, pasta, contexto.get("itens") or [])
+            gerados.append(caminho_pdf)
 
     if not gerados:
         raise PdfClienteError("Nenhum cliente possui valores aprovados para gerar PDF.")

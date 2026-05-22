@@ -155,6 +155,13 @@ def _despesa_payload(despesa):
         "rejeitado_em": _datetime(despesa.rejeitado_em),
         "observacoes": despesa.observacoes,
         "comprovante": _arquivo_payload(despesa.comprovante),
+        "tipo_documento_comprovante": despesa.tipo_documento_comprovante,
+        "tipo_documento_comprovante_label": (
+            despesa.get_tipo_documento_comprovante_display()
+            if despesa.tipo_documento_comprovante
+            else ""
+        ),
+        "numero_documento_comprovante": despesa.numero_documento_comprovante,
         "clientes": [
             _cliente_payload(vinculo.cliente)
             for vinculo in despesa.clientes_vinculados.all()
@@ -199,6 +206,13 @@ def _trecho_payload(trecho):
         "rejeitado_em": _datetime(trecho.rejeitado_em),
         "observacao": trecho.observacao,
         "comprovante": _arquivo_payload(getattr(trecho, "comprovante", None)),
+        "tipo_documento_comprovante": trecho.tipo_documento_comprovante,
+        "tipo_documento_comprovante_label": (
+            trecho.get_tipo_documento_comprovante_display()
+            if trecho.tipo_documento_comprovante
+            else ""
+        ),
+        "numero_documento_comprovante": trecho.numero_documento_comprovante,
         "clientes": [
             _cliente_payload(vinculo.cliente)
             for vinculo in trecho.clientes_vinculados.all()
@@ -292,6 +306,9 @@ def construir_snapshot_financeiro(relatorio, usuario=None):
                 {
                     "tipo": "Comprovante",
                     "descricao": despesa["descricao"],
+                    "tipo_documento": despesa.get("tipo_documento_comprovante"),
+                    "tipo_documento_label": despesa.get("tipo_documento_comprovante_label"),
+                    "numero_documento": despesa.get("numero_documento_comprovante"),
                     **despesa["comprovante"],
                 }
             )
@@ -301,6 +318,9 @@ def construir_snapshot_financeiro(relatorio, usuario=None):
                 {
                     "tipo": "Comprovante KM",
                     "descricao": trecho["descricao"],
+                    "tipo_documento": trecho.get("tipo_documento_comprovante"),
+                    "tipo_documento_label": trecho.get("tipo_documento_comprovante_label"),
+                    "numero_documento": trecho.get("numero_documento_comprovante"),
                     **trecho["comprovante"],
                 }
             )

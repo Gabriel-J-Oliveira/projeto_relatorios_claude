@@ -90,6 +90,11 @@ class QuemPagou(models.TextChoices):
     EMPRESA = "empresa", "Empresa"
 
 
+class TipoDocumentoComprovante(models.TextChoices):
+    NOTA_FISCAL = "nota_fiscal", "Nota Fiscal"
+    RECIBO = "recibo", "Recibo"
+
+
 class PapelTecnico(models.TextChoices):
     RESPONSAVEL = "responsavel", "Responsável"
     APOIO = "apoio", "Apoio"
@@ -641,16 +646,21 @@ class RelatorioTecnico(models.Model):
         }.get(self.status, "secondary")
 
     def clean(self):
+        erros = {}
         if self.data_fim and self.data_inicio:
             if self.data_fim < self.data_inicio:
-                raise ValidationError(
-                    {"data_fim": "Data fim não pode ser anterior à data início."}
-                )
+                erros["data_fim"] = "Data fim não pode ser anterior à data início."
+        hoje = timezone.localdate()
+        if self.data_inicio and self.data_inicio > hoje:
+            erros["data_inicio"] = "Data início não pode ser futura."
+        if self.data_fim and self.data_fim > hoje:
+            erros["data_fim"] = "Data fim não pode ser futura."
 
         if self.km_excedente_interno is not None and self.km_excedente_interno < 0:
-            raise ValidationError(
-                {"km_excedente_interno": "KM excedente nao pode ser negativo."}
-            )
+            erros["km_excedente_interno"] = "KM excedente nao pode ser negativo."
+
+        if erros:
+            raise ValidationError(erros)
 
     def pode_enviar(self):
         erros = []
@@ -896,6 +906,17 @@ class ItemDespesa(models.Model):
         blank=True,
         null=True,
     )
+    tipo_documento_comprovante = models.CharField(
+        "Tipo do documento",
+        max_length=20,
+        choices=TipoDocumentoComprovante.choices,
+        blank=True,
+    )
+    numero_documento_comprovante = models.CharField(
+        "Nº do documento",
+        max_length=80,
+        blank=True,
+    )
     observacoes = models.TextField("Observações", blank=True)
     criado_em = models.DateTimeField(auto_now_add=True)
 
@@ -933,6 +954,8 @@ class ItemDespesa(models.Model):
                     f"Data fora do período do relatório "
                     f"({rel.data_inicio:%d/%m/%Y} a {rel.data_fim:%d/%m/%Y})."
                 )
+        if self.data and self.data > timezone.localdate():
+            erros["data"] = "Data não pode ser futura."
         if self.tipo and self.data and self.valor:
             limite = PoliticaValor.limite_para(self.tipo, self.data)
             if limite and self.valor > limite:
@@ -940,6 +963,13 @@ class ItemDespesa(models.Model):
                     f"Limite para {self.get_tipo_display()} é "
                     f"R$ {limite:.2f}. Informado: R$ {self.valor:.2f}."
                 )
+        if (
+            self.tipo_documento_comprovante == TipoDocumentoComprovante.NOTA_FISCAL
+            and not self.numero_documento_comprovante
+        ):
+            erros["numero_documento_comprovante"] = (
+                "Informe o número do documento para Nota Fiscal."
+            )
         if erros:
             raise ValidationError(erros)
 
@@ -1118,6 +1148,17 @@ class TrechoKm(models.Model):
         blank=True,
         null=True,
     )
+    tipo_documento_comprovante = models.CharField(
+        "Tipo do documento",
+        max_length=20,
+        choices=TipoDocumentoComprovante.choices,
+        blank=True,
+    )
+    numero_documento_comprovante = models.CharField(
+        "Nº do documento",
+        max_length=80,
+        blank=True,
+    )
     status_financeiro = models.CharField(
         "Status financeiro",
         max_length=10,
@@ -1234,21 +1275,29 @@ class TrechoKm(models.Model):
         super().save(*args, **kwargs)
 
     def clean(self):
+        erros = {}
         if self.km_calculado_api is not None and self.km_calculado_api < 0:
-            raise ValidationError({"km_calculado_api": "KM calculado não pode ser negativo."})
+            erros["km_calculado_api"] = "KM calculado não pode ser negativo."
         if self.km_informado is not None and self.km_informado < 0:
-            raise ValidationError({"km_informado": "KM informado não pode ser negativo."})
+            erros["km_informado"] = "KM informado não pode ser negativo."
         if self.relatorio_id and self.data:
             rel = self.relatorio
             if self.data < rel.data_inicio or self.data > rel.data_fim:
-                raise ValidationError(
-                    {
-                        "data": (
-                            f"Data fora do período do relatório "
-                            f"({rel.data_inicio:%d/%m/%Y} a {rel.data_fim:%d/%m/%Y})."
-                        )
-                    }
+                erros["data"] = (
+                    f"Data fora do período do relatório "
+                    f"({rel.data_inicio:%d/%m/%Y} a {rel.data_fim:%d/%m/%Y})."
                 )
+        if self.data and self.data > timezone.localdate():
+            erros["data"] = "Data não pode ser futura."
+        if (
+            self.tipo_documento_comprovante == TipoDocumentoComprovante.NOTA_FISCAL
+            and not self.numero_documento_comprovante
+        ):
+            erros["numero_documento_comprovante"] = (
+                "Informe o número do documento para Nota Fiscal."
+            )
+        if erros:
+            raise ValidationError(erros)
 
     @property
     def km_fora_politica(self):
@@ -1320,6 +1369,13 @@ class AnexoRelatorio(models.Model):
     )
     criado_em = models.DateTimeField("Enviado em", auto_now_add=True)
     observacao = models.TextField("Observacao", blank=True)
+    tipo_documento = models.CharField(
+        "Tipo do documento",
+        max_length=20,
+        choices=TipoDocumentoComprovante.choices,
+        blank=True,
+    )
+    numero_documento = models.CharField("Nº do documento", max_length=80, blank=True)
 
     class Meta:
         verbose_name = "Anexo do Relatorio"
@@ -1343,6 +1399,8 @@ class AnexoRelatorio(models.Model):
             raise ValidationError("A despesa do anexo nao pertence ao relatorio.")
         if self.trecho_id and self.relatorio_id and self.trecho.relatorio_id != self.relatorio_id:
             raise ValidationError("O trecho KM do anexo nao pertence ao relatorio.")
+        if self.tipo_documento == TipoDocumentoComprovante.NOTA_FISCAL and not self.numero_documento:
+            raise ValidationError("Informe o número do documento para Nota Fiscal.")
 
     @classmethod
     def registrar_comprovante(
@@ -1364,6 +1422,8 @@ class AnexoRelatorio(models.Model):
             "tipo_mime": getattr(origem, "content_type", "") or _tipo_mime_por_nome(arquivo.name),
             "tamanho_bytes": getattr(origem, "size", None) or getattr(arquivo, "size", None) or 0,
             "enviado_por": usuario if getattr(usuario, "is_authenticated", False) else None,
+            "tipo_documento": getattr(despesa or trecho, "tipo_documento_comprovante", "") or "",
+            "numero_documento": getattr(despesa or trecho, "numero_documento_comprovante", "") or "",
         }
         filtros = {"relatorio": relatorio}
         if despesa:

@@ -375,7 +375,7 @@
                         <th class="px-3 py-2 fw-semibold text-muted small">Origem</th>
                         <th class="px-3 py-2 fw-semibold text-muted small">Destino</th>
                         <th class="px-3 py-2 fw-semibold text-muted small" style="width: 100px;">KM</th>
-                        <th class="px-3 py-2 fw-semibold text-muted small" style="width: 100px;">R$/KM</th>
+                        <th class="px-3 py-2 fw-semibold text-muted small" style="width: 110px;">R$/KM auto</th>
                         <th class="px-3 py-2 fw-semibold text-muted small" style="width: 120px;">Total R$</th>
                         <th class="px-3 py-2 fw-semibold text-muted small">Comprovante</th>
                         <th class="px-3 py-2 fw-semibold text-muted small">Obs.</th>
@@ -469,14 +469,9 @@
                     <i class="bi bi-plus-circle"></i> Adicionar trecho
                   </button>
 
-                  <div id="alerta-km"
-                       class="mt-2 px-3 py-2 rounded bg-light d-flex align-items-center gap-2">
+                  <div class="small text-muted d-flex align-items-center gap-2">
                     <i class="bi bi-shield-check text-muted"></i>
-
-                    <span class="small text-muted mb-0">
-                      Valor/KM padrão:
-                      <strong id="valor-km-ref">R$ {{ valor_km_padrao|floatformat:2 }}</strong>
-                    </span>
+                    Valor/KM definido automaticamente pelo cliente.
                   </div>
                 </div>
               </div>
@@ -1223,20 +1218,13 @@
     const total = linha.querySelector(".total-trecho");
     const aviso = linha.querySelector(".aviso-km-multicliente");
     if (campoValorKm) {
-      campoValorKm.readOnly = multi;
-      campoValorKm.classList.toggle("bg-body-tertiary", multi);
-      campoValorKm.classList.toggle("text-muted", multi);
-      campoValorKm.classList.toggle("opacity-75", multi);
-      campoValorKm.placeholder = multi ? "Por cliente" : "0,00";
       if (multi) {
         campoValorKm.value = "";
-      } else if (!campoValorKm.value) {
-        const valorPadrao = normalizarNumero(document.getElementById("form-relatorio")?.dataset?.valorKmCliente);
+      } else if (!campoValorKm.value || normalizarNumero(campoValorKm.value) <= 0) {
+        const clienteId = idsFromValue(linha.querySelector(".clientes-item-input")?.value)[0] || getClientesRelatorioIds()[0];
+        const valorPadrao = obterValorKmCliente(clienteId) || normalizarNumero(document.getElementById("form-relatorio")?.dataset?.valorKmCliente);
         if (valorPadrao) campoValorKm.value = valorPadrao.toFixed(2).replace(".", ",");
       }
-      campoValorKm.title = multi
-        ? "Valores de KM serão calculados automaticamente por cliente após envio do relatório."
-        : "";
     }
     if (aviso) {
       aviso.textContent = multi
@@ -2072,6 +2060,7 @@
       _idxDesp++;
       atualizarTotalForms(PREFIX_DESP, _idxDesp);
       aplicarMascarasNumericas(novaLinha);
+      aplicarLimiteDatas(novaLinha);
       atualizarBadgesClientesItens();
       recalcular();
       atualizarBadgesAbasSeguro();
@@ -2130,6 +2119,7 @@ async function adicionarLinhaKm() {
     _idxKm++;
     atualizarTotalForms(PREFIX_KM, _idxKm);
     aplicarMascarasNumericas(novaLinha);
+    aplicarLimiteDatas(novaLinha);
     prepararLinhaMapaKm(novaLinha);
     atualizarBadgesClientesItens();
     recalcular();
@@ -2149,6 +2139,60 @@ async function adicionarLinhaKm() {
 }
 
   // ── Remover linha ─────────────────────────────────────────────
+  const HOJE_ISO = new Date().toISOString().slice(0, 10);
+
+  function aplicarLimiteDatas(root = document) {
+    root.querySelectorAll('input[type="date"]').forEach(input => {
+      input.max = HOJE_ISO;
+    });
+  }
+
+  function marcarCampoInvalido(input, mensagem) {
+    if (!input) return;
+    input.classList.add("is-invalid");
+    let feedback = input.closest("td, .mb-3, .col-md-4, .col-md-6, .col-12")?.querySelector(".erro-inline, .invalid-feedback");
+    if (!feedback) {
+      feedback = document.createElement("div");
+      feedback.className = "invalid-feedback d-block small erro-inline";
+      input.insertAdjacentElement("afterend", feedback);
+    }
+    feedback.textContent = mensagem;
+  }
+
+  function limparValidacaoCampo(input) {
+    if (!input) return;
+    input.classList.remove("is-invalid");
+    const feedback = input.closest("td, .mb-3, .col-md-4, .col-md-6, .col-12")?.querySelector(".erro-inline, .invalid-feedback");
+    if (feedback && feedback.dataset.backend !== "true") feedback.textContent = "";
+  }
+
+  function validarDatasFuturasFrontend(root = document) {
+    let invalido = false;
+    root.querySelectorAll('input[type="date"]').forEach(input => {
+      limparValidacaoCampo(input);
+      if (input.value && input.value > HOJE_ISO) {
+        invalido = true;
+        marcarCampoInvalido(input, "Data não pode ser futura.");
+      }
+    });
+    return !invalido;
+  }
+
+  function validarDocumentosComprovanteFrontend(root = document) {
+    let invalido = false;
+    root.querySelectorAll(".linha-despesa, .linha-trecho").forEach(linha => {
+      if (linhaEstaRemovida(linha) || !linhaTemConteudoSeguro(linha)) return;
+      const tipo = linha.querySelector(".tipo-documento-comprovante");
+      const numero = linha.querySelector(".numero-documento-comprovante");
+      limparValidacaoCampo(numero);
+      if (tipo?.value === "nota_fiscal" && !String(numero?.value || "").trim()) {
+        invalido = true;
+        marcarCampoInvalido(numero, "Informe o número do documento para Nota Fiscal.");
+      }
+    });
+    return !invalido;
+  }
+
   function removerLinha(btn) {
 
   const tr = btn.closest("tr");
@@ -2317,61 +2361,7 @@ async function adicionarLinhaKm() {
   }
 
 function validarKmGlobal() {
-  const form = document.getElementById("form-relatorio");
-  const alerta = document.getElementById("alerta-km");
-
-  if (!form) return 0;
-
-  const valorPadrao = normalizarNumero(form.dataset.valorKmCliente);
-  if (!Number.isFinite(valorPadrao)) return 0;
-
-  let temDivergencia = false;
-
-  linhasAtivasFormulario(".linha-trecho").forEach(linha => {
-    const campo = linha.querySelector('input[name$="-valor_km"]');
-    if (!campo || !campo.value) return;
-
-    const valorLinha = normalizarNumero(campo.value);
-    if (!Number.isFinite(valorLinha)) return;
-
-    if (Math.abs(valorLinha - valorPadrao) > 0.0001) {
-      temDivergencia = true;
-    }
-  });
-
-  // Atualiza UI (se existir)
-  if (alerta) {
-    const icone = alerta.querySelector("i");
-    const texto = alerta.querySelector("#valor-km-ref");
-
-    alerta.classList.remove("bg-warning-subtle", "border-warning", "text-warning");
-    alerta.classList.add("bg-light");
-
-    if (icone) {
-      icone.classList.remove("bi-shield-exclamation", "text-warning");
-      icone.classList.add("bi-shield-check", "text-muted");
-    }
-
-    if (temDivergencia) {
-      alerta.classList.remove("bg-light");
-      alerta.classList.add("bg-warning-subtle", "border-warning", "text-warning");
-
-      if (icone) {
-        icone.classList.remove("bi-shield-check", "text-muted");
-        icone.classList.add("bi-shield-exclamation", "text-warning");
-      }
-
-      if (texto) {
-        texto.innerHTML = `R$ ${valorPadrao.toFixed(2)} <span class="ms-2">(valores alterados)</span>`;
-      }
-    } else {
-      if (texto) {
-        texto.innerHTML = `R$ ${valorPadrao.toFixed(2)}`;
-      }
-    }
-  }
-
-  return valorPadrao;
+  return normalizarNumero(document.getElementById("form-relatorio")?.dataset?.valorKmCliente);
 }
 
   // ── Helpers ─────────────────────────────────────────────────
@@ -2392,8 +2382,14 @@ function validarKmGlobal() {
     return {
       init() {
         // Recalcula ao mudar adiantamento
-        document.querySelector("[name='valor_adiantamento']")
-          ?.addEventListener("input", recalcular);
+        const campoAdiantamento = document.querySelector("[name='valor_adiantamento']");
+        campoAdiantamento?.addEventListener("focus", event => {
+          const valor = (event.target.value || "").trim();
+          if (["0", "0,00", "0.00", "00,00"].includes(valor)) {
+            event.target.value = "";
+          }
+        });
+        campoAdiantamento?.addEventListener("input", recalcular);
         document.querySelector("[name='km_excedente_interno']")
           ?.addEventListener("input", () => {
             recalcular();
@@ -2434,20 +2430,8 @@ function validarKmGlobal() {
   if (!Number.isFinite(numero) || numero <= 0) return;
 
   form.dataset.valorKmCliente = numero.toFixed(2);
-
-  const ref = document.getElementById("valor-km-ref");
-  if (ref) {
-    ref.textContent = "R$ " + numero.toFixed(2).replace(".", ",");
-  }
 }
 
-document.addEventListener("blur", function (e) {
-  if (!e.target.matches('input[name$="-valor_km"]')) return;
-
-  if (e.target.value) {
-    e.target.dataset.editado = "true"; //
-  }
-}, true);
   // Inicialização imediata (sem Alpine em modo não-defer)
   document.addEventListener("input", function (event) {
     const endereco = event.target.closest(".campo-endereco-mapa");
@@ -2514,6 +2498,7 @@ document.addEventListener("blur", function (e) {
   });
 
   document.addEventListener("DOMContentLoaded", () => {
+    aplicarLimiteDatas(document);
     const diagnosticoBackend = document.getElementById("diagnostico-backend-relatorio");
     if (diagnosticoBackend) {
       try {
@@ -2607,6 +2592,12 @@ document.addEventListener("blur", function (e) {
       const erroTecnicos = document.querySelector(".erro-tecnicos-relatorio");
       if (erroRelatorio) erroRelatorio.textContent = "";
       if (erroTecnicos) erroTecnicos.textContent = "";
+      if (!validarDatasFuturasFrontend(form)) {
+        invalido = true;
+      }
+      if (!validarDocumentosComprovanteFrontend(form)) {
+        invalido = true;
+      }
       if (!clientesRelatorio.length) {
         invalido = true;
         if (erroRelatorio) erroRelatorio.textContent = "Selecione ao menos um cliente.";

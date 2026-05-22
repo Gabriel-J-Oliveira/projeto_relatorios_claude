@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django import forms
 from django.forms import inlineformset_factory, BaseInlineFormSet
+from django.utils import timezone
 from .models import (
     RelatorioTecnico,
     ItemDespesa,
@@ -9,6 +10,7 @@ from .models import (
     Tecnico,
     Cliente,
     Adiantamento,
+    TipoDocumentoComprovante,
 )
 
 # forms.py
@@ -141,6 +143,7 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         ).order_by("nome")
         for name in ["data_inicio", "data_fim"]:
             self.fields[name].input_formats = ["%Y-%m-%d", "%d/%m/%Y"]
+            self.fields[name].widget.attrs["max"] = timezone.localdate().isoformat()
         self.fields["numero"].required = False
         self.fields["numero"].disabled = True
         self.fields["numero"].widget.attrs["placeholder"] = "Gerado no envio"
@@ -201,6 +204,11 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         fim = cd.get("data_fim")
         if ini and fim and fim < ini:
             self.add_error("data_fim", "Data fim não pode ser anterior à data início.")
+        hoje = timezone.localdate()
+        if ini and ini > hoje:
+            self.add_error("data_inicio", "Data início não pode ser futura.")
+        if fim and fim > hoje:
+            self.add_error("data_fim", "Data fim não pode ser futura.")
         resp = cd.get("tecnico_responsavel")
         equipe = cd.get("tecnicos_equipe", [])
         if resp and resp in equipe:
@@ -254,6 +262,8 @@ class ItemDespesaForm(BootstrapMixin, forms.ModelForm):
             "valor",
             "quem_pagou",
             "comprovante",
+            "tipo_documento_comprovante",
+            "numero_documento_comprovante",
             "observacoes",
         ]
         widgets = {
@@ -268,6 +278,7 @@ class ItemDespesaForm(BootstrapMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["data"].input_formats = ["%Y-%m-%d", "%d/%m/%Y"]
+        self.fields["data"].widget.attrs["max"] = timezone.localdate().isoformat()
         for name in [
             "data",
             "tipo",
@@ -275,6 +286,8 @@ class ItemDespesaForm(BootstrapMixin, forms.ModelForm):
             "valor",
             "quem_pagou",
             "comprovante",
+            "tipo_documento_comprovante",
+            "numero_documento_comprovante",
             "observacoes",
         ]:
             self.fields[name].required = False
@@ -290,6 +303,15 @@ class ItemDespesaForm(BootstrapMixin, forms.ModelForm):
             {
                 "class": "form-control form-control-sm text-nowrap",
                 "accept": "image/*,.pdf",
+            }
+        )
+        self.fields["tipo_documento_comprovante"].widget.attrs.update(
+            {"class": "form-select form-select-sm tipo-documento-comprovante"}
+        )
+        self.fields["numero_documento_comprovante"].widget.attrs.update(
+            {
+                "class": "form-control form-control-sm numero-documento-comprovante",
+                "placeholder": "Nº do documento",
             }
         )
 
@@ -314,6 +336,8 @@ class BaseItemDespesaFormSet(BaseInlineFormSet):
             valor = form.cleaned_data.get("valor")
             quem_pagou = form.cleaned_data.get("quem_pagou")
             comprovante = form.cleaned_data.get("comprovante")
+            tipo_documento = form.cleaned_data.get("tipo_documento_comprovante")
+            numero_documento = form.cleaned_data.get("numero_documento_comprovante")
             observacoes = form.cleaned_data.get("observacoes")
 
             # linha vazia
@@ -336,6 +360,17 @@ class BaseItemDespesaFormSet(BaseInlineFormSet):
 
             if valor is not None and valor <= 0:
                 form.add_error("valor", "Valor deve ser maior que zero.")
+            if data and data > timezone.localdate():
+                form.add_error("data", "Data não pode ser futura.")
+
+            if (
+                tipo_documento == TipoDocumentoComprovante.NOTA_FISCAL
+                and not numero_documento
+            ):
+                form.add_error(
+                    "numero_documento_comprovante",
+                    "Informe o número do documento para Nota Fiscal.",
+                )
 
             if data and relatorio and relatorio.data_inicio and relatorio.data_fim:
                 if data < relatorio.data_inicio or data > relatorio.data_fim:
@@ -386,6 +421,8 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
             "rota_geojson",
             "valor_km",
             "comprovante",
+            "tipo_documento_comprovante",
+            "numero_documento_comprovante",
             "observacao",
         ]
         widgets = {
@@ -414,6 +451,7 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
         valor_km_padrao = kwargs.pop("valor_km_padrao", None)
         super().__init__(*args, **kwargs)
         self.fields["data"].input_formats = ["%Y-%m-%d", "%d/%m/%Y"]
+        self.fields["data"].widget.attrs["max"] = timezone.localdate().isoformat()
         for name in [
             "data",
             "origem",
@@ -432,6 +470,8 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
             "rota_geojson",
             "valor_km",
             "comprovante",
+            "tipo_documento_comprovante",
+            "numero_documento_comprovante",
             "observacao",
         ]:
             self.fields[name].required = False
@@ -468,6 +508,15 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
             {
                 "class": "form-control form-control-sm text-nowrap",
                 "accept": "image/*,.pdf",
+            }
+        )
+        self.fields["tipo_documento_comprovante"].widget.attrs.update(
+            {"class": "form-select form-select-sm tipo-documento-comprovante"}
+        )
+        self.fields["numero_documento_comprovante"].widget.attrs.update(
+            {
+                "class": "form-control form-control-sm numero-documento-comprovante",
+                "placeholder": "Nº do documento",
             }
         )
 
@@ -512,6 +561,8 @@ class BaseTrechoKmFormSet(BaseInlineFormSet):
             km = form.cleaned_data.get("km")
             valor_km = form.cleaned_data.get("valor_km")
             comprovante = form.cleaned_data.get("comprovante")
+            tipo_documento = form.cleaned_data.get("tipo_documento_comprovante")
+            numero_documento = form.cleaned_data.get("numero_documento_comprovante")
             observacao = form.cleaned_data.get("observacao")
             clientes_raw = ""
             if getattr(self, "data", None):
@@ -521,10 +572,20 @@ class BaseTrechoKmFormSet(BaseInlineFormSet):
                 for item in str(clientes_raw or "").split(",")
                 if item.strip()
             ]
-            trecho_multi_cliente = len(set(clientes_ids)) > 1
+            clientes_ids_unicos = list(dict.fromkeys(clientes_ids))
+            trecho_multi_cliente = len(clientes_ids_unicos) > 1
             if trecho_multi_cliente and valor_km is None:
                 form.cleaned_data["valor_km"] = Decimal("0.00")
                 valor_km = form.cleaned_data["valor_km"]
+            elif len(clientes_ids_unicos) == 1 and valor_km is None:
+                valor_cliente = (
+                    Cliente.objects.filter(pk=clientes_ids_unicos[0])
+                    .values_list("valor_km", flat=True)
+                    .first()
+                )
+                if valor_cliente is not None:
+                    form.cleaned_data["valor_km"] = valor_cliente
+                    valor_km = valor_cliente
 
             # Linha totalmente vazia → ignora
             if not form.instance.pk and not any(
@@ -543,7 +604,17 @@ class BaseTrechoKmFormSet(BaseInlineFormSet):
             elif km <= 0:
                 form.add_error("km", "KM deve ser maior que zero.")
             if valor_km is None and not trecho_multi_cliente:
-                form.add_error("valor_km", "Informe o valor por KM.")
+                form.cleaned_data["valor_km"] = Decimal("0.00")
+            if data and data > timezone.localdate():
+                form.add_error("data", "Data não pode ser futura.")
+            if (
+                tipo_documento == TipoDocumentoComprovante.NOTA_FISCAL
+                and not numero_documento
+            ):
+                form.add_error(
+                    "numero_documento_comprovante",
+                    "Informe o número do documento para Nota Fiscal.",
+                )
 
             # Data fora do período
             if data and relatorio and relatorio.data_inicio and relatorio.data_fim:

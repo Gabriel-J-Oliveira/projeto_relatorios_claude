@@ -1,4 +1,4 @@
-{% load l10n %}
+﻿{% load l10n %}
 <tr class="linha-despesa"
     id="linha-despesa-nova-{{ idx }}"
     data-form-index="{{ idx }}"
@@ -22,6 +22,7 @@
            name="despesas-{{ idx }}-data"
            id="id_despesas-{{ idx }}-data"
            value="{% if form.data.value %}{{ form.data.value|date:'Y-m-d'|default:form.data.value }}{% endif %}"
+           max="{% now 'Y-m-d' %}"
            class="form-control form-control-sm {% if form.data.errors %}is-invalid{% endif %}">
     <div class="invalid-feedback d-block small erro-inline">
       {% if form.data.errors %}{{ form.data.errors.0 }}{% endif %}
@@ -95,8 +96,26 @@
               class="form-sm {% if form.comprovante.errors %}is-invalid{% endif %}"
               onchange=" this.parentElement.classList.replace( 'btn-outline-secondary', 'btn-success' )">
     </label>
+    <div class="d-flex gap-1 mt-1">
+      <select name="despesas-{{ idx }}-tipo_documento_comprovante"
+              id="id_despesas-{{ idx }}-tipo_documento_comprovante"
+              class="form-select form-select-sm tipo-documento-comprovante {% if form.tipo_documento_comprovante.errors %}is-invalid{% endif %}">
+        <option value="">Tipo</option>
+        {% for value, label in form.fields.tipo_documento_comprovante.choices %}
+          {% if value %}
+            <option value="{{ value }}" {% if form.tipo_documento_comprovante.value == value %}selected{% endif %}>{{ label }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+      <input type="text"
+             name="despesas-{{ idx }}-numero_documento_comprovante"
+             id="id_despesas-{{ idx }}-numero_documento_comprovante"
+             value="{{ form.numero_documento_comprovante.value|default:'' }}"
+             placeholder="Nº doc."
+             class="form-control form-control-sm numero-documento-comprovante {% if form.numero_documento_comprovante.errors %}is-invalid{% endif %}">
+    </div>
     <div class="invalid-feedback d-block small erro-inline">
-      {% if form.comprovante.errors %}{{ form.comprovante.errors.0 }}{% endif %}
+      {% if form.comprovante.errors %}{{ form.comprovante.errors.0 }}{% elif form.tipo_documento_comprovante.errors %}{{ form.tipo_documento_comprovante.errors.0 }}{% elif form.numero_documento_comprovante.errors %}{{ form.numero_documento_comprovante.errors.0 }}{% endif %}
     </div>
   </td>
   <td class="p-1 pt-3 col-md-3">
@@ -135,3 +154,4 @@
     </button>
   </td>
 </tr>
+

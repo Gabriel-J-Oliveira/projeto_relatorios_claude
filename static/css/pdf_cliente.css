@@ -149,6 +149,30 @@ h1 {
   margin-top: 3px;
 }
 
+.meta-note {
+  background: #f7f9fc;
+  border: 1px solid #e1e7ef;
+  border-left: 4px solid #3b82f6;
+  border-radius: 10px;
+  margin: -8px 0 20px;
+  padding: 12px 14px;
+}
+
+.meta-note span {
+  color: #6b7280;
+  display: block;
+  font-size: 7.6pt;
+  font-weight: 700;
+  letter-spacing: .07em;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+
+.meta-note p {
+  color: #172033;
+  margin: 0;
+}
+
 .items-section {
   margin-top: 4px;
 }

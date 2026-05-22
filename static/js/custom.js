@@ -295,16 +295,6 @@ document.addEventListener("blur", function (e) {
     e.target.dataset.touched = "true";
   }
 
-  // 2. Regra específica: valor_km
-  if (e.target.matches('input[name$="-valor_km"]')) {
-
-    if (e.target.value) {
-      e.target.dataset.editado = "true";
-      validarKmGlobal();
-    }
-
-  }
-
 }, true);
 
 /* ============================================================
@@ -654,77 +644,29 @@ const FieldRules = [
     },
   },
   {
-    test: c => c.name?.includes("-km") || c.name?.includes("-valor_km"),
+    test: c => c.name?.includes("-km") && !c.name?.includes("-valor_km"),
     run(campo) {
       const linha = campo.closest(".linha-trecho");
       if (!linha) return;
 
       const campoKm = linha.querySelector('input[name$="-km"]');
-      const campoVkm = linha.querySelector('input[name$="-valor_km"]');
-      const clientesKm = String(linha.querySelector(".clientes-item-input")?.value || "")
-        .split(",")
-        .map(id => id.trim())
-        .filter(Boolean);
-      const multiClienteKm = new Set(clientesKm).size > 1;
-
       const km = parseFloat(campoKm?.value);
-      const vkm = parseFloat(campoVkm?.value);
-
       const kmTouched = campoKm?.dataset.touched;
-      const vkmTouched = campoVkm?.dataset.touched;
 
       // limpa antes
       UI.clearError(campoKm);
-      UI.clearError(campoVkm);
 
       // 🔥 só valida depois de interação
-      if (kmTouched || vkmTouched) {
+      if (kmTouched) {
 
         if (!campoKm?.value) {
           UI.setError(campoKm, "Informe o KM.");
         } else if (km < 0.1) {
           UI.setError(campoKm, "KM deve ser no mínimo 0.1.");
         }
-
-        if (!multiClienteKm && !campoVkm?.value) {
-          UI.setError(campoVkm, "Informe o valor por KM.");
-        }
       }
     }
   },
-  {
-    test: c => c.name?.includes("-valor_km"),
-
-    run(campo) {
-      const linha = campo.closest(".linha-trecho");
-      const clientesKm = String(linha?.querySelector(".clientes-item-input")?.value || "")
-        .split(",")
-        .map(id => id.trim())
-        .filter(Boolean);
-      if (new Set(clientesKm).size > 1) {
-        UI.clearWarning(campo);
-        return;
-      }
-      const valor = parseFloat(campo.value) || 0;
-      const padrao = getValorKmPadrao();
-      // limpa antes
-      UI.clearWarning(campo);
-
-      if (!valor || !padrao) return;
-
-      const tolerancia = 0.0001;
-      const divergente = Math.abs(valor - padrao) > tolerancia;
-
-      if (divergente) {
-        UI.setWarning(
-          campo,
-          `Valor diferente do padrão (${padrao.toFixed(2)}).`
-        );
-      } else {
-        UI.clearWarning(campo);
-      }
-    }
-  }
 ];
 
 
@@ -858,7 +800,7 @@ const Controller = (() => {
     });
 
     atualizarBadgesAbas();
-    validarKmGlobal();
+    if (typeof validarKmGlobal === "function") validarKmGlobal();
   }
 
   // 🔥 ESSA PARTE FALTAVA
@@ -876,36 +818,8 @@ const Controller = (() => {
 const campoCliente = document.querySelector('[name="cliente"]');
 
 campoCliente?.addEventListener("change", function () {
-  const form = document.getElementById("form-relatorio");
-
-  // 1. pega valor antigo ANTES de qualquer alteração
-  const valorAntigo = parseFloat(form?.dataset.valorKmCliente);
-
-  const opt = this.selectedOptions?.[0];
-  const novoValor = parseFloat(opt?.dataset.valorKm || "");
-
-  if (!Number.isFinite(novoValor) || novoValor <= 0) return;
-
-  document.querySelectorAll(".linha-trecho").forEach(linha => {
-    const campo = linha.querySelector('input[name$="-valor_km"]');
-    if (!campo) return;
-
-    const foiEditado = campo.dataset.editado === "true";
-
-    // ✔️ regra correta
-    if (!campo.value || !foiEditado) {
-      campo.value = novoValor.toFixed(2);
-
-      const campoKm = linha.querySelector('input[name$="-km"]');
-      if (campoKm) calcularTrechoKm(campoKm);
-    }
-  });
-
-  // 🔵 2. só agora atualiza o padrão global
-  atualizarValorKmPadraoAtual(novoValor);
-
   recalcular();
-  validarKmGlobal();
+  if (typeof validarKmGlobal === "function") validarKmGlobal();
 });
 
 /* ============================================================

@@ -159,9 +159,11 @@ def _despesas_snapshot(payload):
         status, badge = _item_status(rejeitado, solicitado, aprovado)
         linhas.append(
             _ns(
+                item_id=despesa.get("id"),
                 data=_date(despesa.get("data")),
                 tipo=despesa.get("tipo_label") or despesa.get("tipo") or "-",
                 descricao=despesa.get("descricao") or "-",
+                numero_documento=despesa.get("numero_documento_comprovante") or "-",
                 clientes_rateio=_texto_clientes_rateio(rateios) if rateios else ", ".join(
                     cliente.get("nome") for cliente in despesa.get("clientes") or [] if cliente.get("nome")
                 ) or "-",
@@ -189,9 +191,11 @@ def _trechos_snapshot(payload):
                 status, badge = _item_status(rejeitado, solicitado, aprovado)
                 linhas.append(
                     _ns(
+                        item_id=trecho.get("id"),
                         data=_date(trecho.get("data")),
                         origem=trecho.get("origem") or "-",
                         destino=trecho.get("destino") or "-",
+                        numero_documento=trecho.get("numero_documento_comprovante") or "-",
                         km=_money(rateio.get("km_cliente") or rateio.get("km_final")),
                         cliente=rateio.get("cliente_nome") or "-",
                         valor_km=Decimal(str(rateio.get("valor_km") or "0.00")),
@@ -208,9 +212,11 @@ def _trechos_snapshot(payload):
             status, badge = _item_status(rejeitado, solicitado, aprovado)
             linhas.append(
                 _ns(
+                    item_id=trecho.get("id"),
                     data=_date(trecho.get("data")),
                     origem=trecho.get("origem") or "-",
                     destino=trecho.get("destino") or "-",
+                    numero_documento=trecho.get("numero_documento_comprovante") or "-",
                     km=_money(trecho.get("km")),
                     cliente=", ".join(cliente.get("nome") for cliente in trecho.get("clientes") or [] if cliente.get("nome")) or "-",
                     valor_km=Decimal(str(trecho.get("valor_km_final") or trecho.get("valor_km") or "0.00")),
@@ -379,9 +385,11 @@ def _despesas_vivas(relatorio):
         status, badge = _item_status(rejeitado, despesa.valor, aprovado)
         linhas.append(
             _ns(
+                item_id=despesa.pk,
                 data=despesa.data,
                 tipo=despesa.get_tipo_display(),
                 descricao=despesa.descricao,
+                numero_documento=despesa.numero_documento_comprovante or "-",
                 clientes_rateio="; ".join(
                     f"{rateio.cliente.nome}: R$ {rateio.valor_final:.2f}".replace(".", ",")
                     for rateio in rateios
@@ -409,9 +417,11 @@ def _trechos_vivos(relatorio):
                 status, badge = _item_status(rejeitado, rateio.valor_calculado, aprovado)
                 linhas.append(
                     _ns(
+                        item_id=trecho.pk,
                         data=trecho.data,
                         origem=trecho.origem,
                         destino=trecho.destino,
+                        numero_documento=trecho.numero_documento_comprovante or "-",
                         km=rateio.km_cliente,
                         cliente=rateio.cliente.nome,
                         valor_km=rateio.valor_km,
@@ -427,9 +437,11 @@ def _trechos_vivos(relatorio):
             status, badge = _item_status(rejeitado, trecho.valor_calculado, aprovado)
             linhas.append(
                 _ns(
+                    item_id=trecho.pk,
                     data=trecho.data,
                     origem=trecho.origem,
                     destino=trecho.destino,
+                    numero_documento=trecho.numero_documento_comprovante or "-",
                     km=trecho.km,
                     cliente=", ".join(v.cliente.nome for v in trecho.clientes_vinculados.all()) or "-",
                     valor_km=trecho.valor_km_final,

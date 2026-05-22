@@ -86,20 +86,24 @@ def usuario_pode_editar_relatorio(user, relatorio):
         return False
     if usuario_eh_superadmin(user):
         return True
-    if (
-        relatorio.status == StatusRelatorio.AJUSTE
-        and usuario_pode_atuar_como_financeiro(user)
-    ):
-        return False
-    if usuario_eh_administrativo(user):
-        return True
-    return usuario_eh_dono_relatorio(user, relatorio)
+    return usuario_eh_dono_relatorio(user, relatorio) or usuario_eh_responsavel_relatorio(
+        user, relatorio
+    )
 
 
 def usuario_eh_dono_relatorio(user, relatorio):
     if not getattr(user, "is_authenticated", False):
         return False
     return bool(getattr(relatorio, "criado_por_id", None) == user.pk)
+
+
+def usuario_eh_responsavel_relatorio(user, relatorio):
+    if not getattr(user, "is_authenticated", False):
+        return False
+    tecnico = getattr(relatorio, "tecnico_responsavel", None)
+    email_usuario = (getattr(user, "email", "") or "").strip().lower()
+    email_tecnico = (getattr(tecnico, "email", "") or "").strip().lower()
+    return bool(email_usuario and email_tecnico and email_usuario == email_tecnico)
 
 
 def usuario_pode_visualizar_relatorio(user, relatorio):

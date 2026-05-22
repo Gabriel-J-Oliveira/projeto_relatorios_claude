@@ -288,7 +288,9 @@
             <tbody>
               {% for d in relatorio.despesas.all %}
               <tr id="linha-despesa-{{ forloop.counter }}"
-                  class="linha-despesa {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}table-danger opacity-75{% endif %}">
+                  data-item-tipo="despesa"
+                  data-item-id="{{ d.pk }}"
+                  class="linha-despesa {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}item-rejeitado-forte{% endif %}">
                 <td class="ps-3 small text-muted">{{ d.data|date:"d/m/Y"|default:"A preencher" }}</td>
                 <td>
                   <span class="badge bg-body-tertiary text-body-secondary small">
@@ -364,6 +366,11 @@
                     <div class="col-md-2">
                       <span class="text-muted">Valor final</span>
                       <div class="fw-semibold text-success total-aprovado-despesa-linha">R$ {{ d.valor_final|floatformat:2 }}</div>
+                    </div>
+                    <div class="col-md-2">
+                      <span class="text-muted">Documento</span>
+                      <div class="fw-semibold">{{ d.get_tipo_documento_comprovante_display|default:"-" }}</div>
+                      <div class="text-muted">{{ d.numero_documento_comprovante|default:"-" }}</div>
                     </div>
                     <div class="col-md-2">
                       <span class="text-muted">Status</span>
@@ -444,7 +451,7 @@
                 <th class="ps-3 small fw-semibold text-muted">Data</th>
                 <th class="small fw-semibold text-muted">KM</th>
                 <th class="small fw-semibold text-muted">R$/KM Solicitado</th>
-                <th class="small fw-semibold text-muted">R$/KM Aprovado</th>
+                <th class="small fw-semibold text-muted">AprovaÃ§Ã£o KM</th>
                 <th class="small fw-semibold text-muted">Total Solicitado</th>
                 <th class="small fw-semibold text-muted text-center">Doc.</th>
                 <th class="small fw-semibold text-muted text-center">Rateio</th>
@@ -454,26 +461,14 @@
             <tbody>
               {% for t in relatorio.trechos.all %}
               <tr id="linha-trecho-{{ forloop.counter }}"
-                  class="linha-trecho {% if t.rejeitado or t.status_financeiro == 'rejeitado' %}table-danger opacity-75{% endif %}">
+                  data-item-tipo="trecho"
+                  data-item-id="{{ t.pk }}"
+                  class="linha-trecho {% if t.rejeitado or t.status_financeiro == 'rejeitado' %}item-rejeitado-forte{% endif %}">
                 <td class="ps-3 small text-muted">{{ t.data|date:"d/m/Y"|default:"A preencher" }}</td>
                 <td class="small">{{ t.km }} km</td>
                 <td class="small text-muted">R$ {{ t.valor_km|floatformat:2 }}</td>
-                <td>
-                  <input type="text"
-                         inputmode="decimal"
-                         name="trecho_{{ t.pk }}_valor_km_aprovado"
-                         value="{{ t.valor_km_aprovado|default_if_none:'' }}"
-                         placeholder="Integral"
-                         class="form-control form-control-sm campo-aprovado-km campo-moeda"
-                         data-km="{{ t.km }}"
-                         data-valor-km-original="{{ t.valor_km }}"
-                         data-valor-final-original="{{ t.valor_final_clientes|unlocalize }}"
-                         data-multi-cliente="{% if t.tem_multiplos_clientes %}1{% else %}0{% endif %}"
-                         data-status-financeiro="{% if t.rejeitado %}rejeitado{% else %}{{ t.status_financeiro }}{% endif %}"
-                         {% if t.tem_multiplos_clientes %}disabled title="KM calculado automaticamente por cliente"{% elif not superadmin_django %}{% if not pode_atuar_financeiro or relatorio.status == 'aprovado' or relatorio.status == 'rejeitado' or t.rejeitado or t.status_financeiro == 'rejeitado' %}disabled{% endif %}{% endif %}>
-                  {% if t.tem_multiplos_clientes %}
-                  <div class="small text-warning mt-1">Auto por cliente</div>
-                  {% endif %}
+                <td class="small text-muted">
+                  Gerenciado no rateio
                 </td>
                 <td class="small fw-semibold text-success">R$ {{ t.valor_calculado_clientes|floatformat:2 }}</td>
                 <td class="text-center">
@@ -543,6 +538,11 @@
                       <div class="fw-semibold">
                         <span class="badge bg-primary-subtle text-primary">Técnico</span>
                       </div>
+                    </div>
+                    <div class="col-md-2">
+                      <span class="text-muted">Documento</span>
+                      <div class="fw-semibold">{{ t.get_tipo_documento_comprovante_display|default:"-" }}</div>
+                      <div class="text-muted">{{ t.numero_documento_comprovante|default:"-" }}</div>
                     </div>
                     <div class="col-md-2">
                       <span class="text-muted">Total aprovado</span>
@@ -954,9 +954,9 @@
                 <td class="small">{{ r.cliente.nome }}</td>
                 <td class="small text-muted">R$ {{ r.valor_original|floatformat:2 }}</td>
                 <td>
-                  <input type="number"
-                         step="0.01"
-                         class="form-control form-control-sm rateio-valor"
+                  <input type="text"
+                         inputmode="decimal"
+                         class="form-control form-control-sm rateio-valor campo-moeda"
                          data-cliente-id="{{ r.cliente_id }}"
                          data-original="{{ r.valor_final|unlocalize }}"
                          value="{{ r.valor_final|unlocalize }}"
@@ -980,8 +980,7 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
         {% if pode_alterar_itens_financeiros and not d.rejeitado and d.status_financeiro != 'rejeitado' %}
-        <button type="button" class="btn btn-outline-primary btn-sm rateio-salvar" data-rateio-acao="salvar">Salvar ajustes</button>
-        <button type="button" class="btn btn-success btn-sm rateio-salvar" data-rateio-acao="aprovar">Aprovar rateio</button>
+        <button type="button" class="btn btn-primary btn-sm rateio-salvar" data-rateio-acao="salvar">Salvar</button>
         {% endif %}
       </div>
     </div>
@@ -1066,8 +1065,7 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
         {% if pode_alterar_itens_financeiros and not t.rejeitado and t.status_financeiro != 'rejeitado' %}
-        <button type="button" class="btn btn-outline-primary btn-sm rateio-salvar" data-rateio-acao="salvar">Salvar ajustes</button>
-        <button type="button" class="btn btn-success btn-sm rateio-salvar" data-rateio-acao="aprovar">Aprovar rateio</button>
+        <button type="button" class="btn btn-primary btn-sm rateio-salvar" data-rateio-acao="salvar">Salvar</button>
         {% endif %}
       </div>
     </div>
@@ -1080,6 +1078,9 @@
     {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
     <form id="form-restaurar-despesa-{{ d.pk }}"
           method="post"
+          data-item-financeiro-form
+          data-item-tipo="despesa"
+          data-item-id="{{ d.pk }}"
           action="{% url 'relatorios:relatorio_item_financeiro' relatorio.pk 'despesa' d.pk 'restaurar' %}">
       {% csrf_token %}
     </form>
@@ -1087,7 +1088,11 @@
     <div class="modal fade" id="modal-rejeitar-despesa-{{ d.pk }}" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
-          <form method="post" action="{% url 'relatorios:relatorio_item_financeiro' relatorio.pk 'despesa' d.pk 'rejeitar' %}">
+          <form method="post"
+                data-item-financeiro-form
+                data-item-tipo="despesa"
+                data-item-id="{{ d.pk }}"
+                action="{% url 'relatorios:relatorio_item_financeiro' relatorio.pk 'despesa' d.pk 'rejeitar' %}">
             {% csrf_token %}
             <div class="modal-header bg-danger-subtle">
               <h5 class="modal-title">
@@ -1121,6 +1126,9 @@
     {% if t.rejeitado or t.status_financeiro == 'rejeitado' %}
     <form id="form-restaurar-trecho-{{ t.pk }}"
           method="post"
+          data-item-financeiro-form
+          data-item-tipo="trecho"
+          data-item-id="{{ t.pk }}"
           action="{% url 'relatorios:relatorio_item_financeiro' relatorio.pk 'trecho' t.pk 'restaurar' %}">
       {% csrf_token %}
     </form>
@@ -1128,7 +1136,11 @@
     <div class="modal fade" id="modal-rejeitar-trecho-{{ t.pk }}" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
-          <form method="post" action="{% url 'relatorios:relatorio_item_financeiro' relatorio.pk 'trecho' t.pk 'rejeitar' %}">
+          <form method="post"
+                data-item-financeiro-form
+                data-item-tipo="trecho"
+                data-item-id="{{ t.pk }}"
+                action="{% url 'relatorios:relatorio_item_financeiro' relatorio.pk 'trecho' t.pk 'rejeitar' %}">
             {% csrf_token %}
             <div class="modal-header bg-danger-subtle">
               <h5 class="modal-title">
@@ -1667,8 +1679,38 @@
             if (!response.ok || !data.success) {
               throw new Error((data.errors || ["Erro ao salvar rateio."]).join(" "));
             }
-            bootstrap.Modal.getInstance(modal)?.hide();
-            window.location.reload();
+            (data.rateios || []).forEach(function (rateio) {
+              const input = modal.querySelector(`[data-cliente-id="${rateio.cliente_id}"]`);
+              const linha = input?.closest("tr");
+              if (!linha) return;
+              if (tipo === "despesa") {
+                const valorInput = linha.querySelector(".rateio-valor");
+                if (valorInput) {
+                  valorInput.value = String(rateio.valor_final || "").replace(".", ",");
+                  valorInput.dataset.original = rateio.valor_final || "0";
+                  formatarDecimalCampo(valorInput, 2);
+                }
+              } else {
+                const valorKmInput = linha.querySelector(".rateio-valor-km");
+                const valorFinalLinha = linha.querySelector(".rateio-valor-final-linha");
+                if (valorKmInput) {
+                  valorKmInput.value = String(rateio.valor_km || "").replace(".", ",");
+                  valorKmInput.dataset.original = rateio.valor_km || "0";
+                  formatarDecimalCampo(valorKmInput, 2);
+                }
+                if (valorFinalLinha && rateio.valor_final) {
+                  valorFinalLinha.textContent = formatMoney(parseMoney(rateio.valor_final));
+                  valorFinalLinha.dataset.original = rateio.valor_final;
+                }
+              }
+            });
+            validarRateioModal(modal);
+            const feedback = modal.querySelector(".rateio-feedback");
+            if (feedback) {
+              feedback.className = "rateio-feedback small mt-3 text-success";
+              feedback.textContent = "Rateio salvo com sucesso.";
+            }
+            atualizarTotaisFinanceiros();
           } catch (error) {
             const feedback = modal.querySelector(".rateio-feedback");
             if (feedback) {
@@ -1679,6 +1721,45 @@
             button.disabled = false;
           }
         });
+      });
+    });
+
+    document.querySelectorAll("[data-item-financeiro-form]").forEach(function (form) {
+      form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        const botao = document.activeElement?.closest("button");
+        if (botao) botao.disabled = true;
+        try {
+          const response = await fetch(form.action, {
+            method: "POST",
+            headers: {
+              "X-CSRFToken": form.querySelector("[name=csrfmiddlewaretoken]")?.value || "",
+              "X-Requested-With": "XMLHttpRequest",
+            },
+            credentials: "same-origin",
+            body: new FormData(form),
+          });
+          const data = await response.json();
+          if (!response.ok || !data.success) {
+            throw new Error((data.errors || ["Erro ao alterar item."]).join(" "));
+          }
+          const linha = document.querySelector(
+            `[data-item-tipo="${data.tipo}"][data-item-id="${data.item_id}"]`
+          );
+          if (linha) {
+            linha.classList.toggle("item-rejeitado-forte", Boolean(data.rejeitado));
+            linha.querySelectorAll(".campo-aprovado-despesa, .campo-aprovado-km").forEach(function (input) {
+              input.disabled = Boolean(data.rejeitado);
+              input.dataset.statusFinanceiro = data.status_financeiro || "";
+            });
+          }
+          bootstrap.Modal.getInstance(form.closest(".modal"))?.hide();
+          atualizarTotaisFinanceiros();
+        } catch (error) {
+          alert(error.message);
+        } finally {
+          if (botao) botao.disabled = false;
+        }
       });
     });
 

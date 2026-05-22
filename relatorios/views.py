@@ -76,11 +76,11 @@ from .services.pdf_cliente_service import (
     PdfClienteError,
     gerar_pdf_cliente,
     gerar_zip_pdfs_clientes,
-    listar_clientes_pdf,
     nome_arquivo_pdf_cliente,
 )
 from .services.pdf_interno_service import montar_contexto_pdf_interno
 from .services.maps_service import MapsServiceError, buscar_endereco, calcular_rota
+from .services.dashboard_service import get_dashboard_context, get_dashboard_data
 from .forms import (
     AdiantamentoForm,
     ClienteForm,
@@ -799,9 +799,7 @@ def _avisos_financeiro(relatorio):
             )
 
     trechos_por_data = {}
-    trechos_valor_km_divergente = []
     trechos_km_rota_divergente = []
-    valor_km_padrao = relatorio.cliente.valor_km if relatorio.cliente_id else None
 
     for idx, trecho in enumerate(trechos, start=1):
         linha_id = f"linha-trecho-{idx}"
@@ -809,26 +807,8 @@ def _avisos_financeiro(relatorio):
         if trecho.data:
             trechos_por_data.setdefault(trecho.data, []).append((idx, trecho))
 
-        if valor_km_padrao and trecho.valor_km != valor_km_padrao:
-            trechos_valor_km_divergente.append((idx, trecho))
         if trecho.km_divergente_rota:
             trechos_km_rota_divergente.append((idx, trecho))
-
-    if trechos_valor_km_divergente:
-        linha_ids = [
-            f"linha-trecho-{idx}" for idx, _trecho in trechos_valor_km_divergente
-        ]
-        for idx, _trecho in trechos_valor_km_divergente:
-            linha_id = f"linha-trecho-{idx}"
-            avisos.append(
-                {
-                    "tipo": "valor_km_divergente",
-                    "mensagem": f"Verificar trecho {idx}: valor KM diferente do padrão do cliente.",
-                    "linha_id": linha_id,
-                    "linha_ids": linha_ids,
-                    "icone": "bi-speedometer2",
-                }
-            )
 
     if trechos_km_rota_divergente:
         linha_ids = [
@@ -868,131 +848,16 @@ class DashboardView(AcessoErpMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-
-        administrativo = usuario_eh_administrativo(self.request.user)
-        qs_relatorios = _relatorios_visiveis(self.request.user, RelatorioTecnico.objects.all())
-        total_relatorios = qs_relatorios.count()
-        total_base = total_relatorios or 1
-
-        total_conferencia = qs_relatorios.filter(
-            status=StatusRelatorio.CONFERENCIA
-        ).count()
-
-        total_adiantamentos = (
-            Adiantamento.objects.aggregate(total=Sum("valor"))["total"]
-            if administrativo
-            else Decimal("0.00")
-        ) or Decimal("0.00")
-
-        total_itens = qs_relatorios.aggregate(total=Sum("despesas__valor"))[
-            "total"
-        ] or Decimal("0.00")
-
-        total_km_valor = qs_relatorios.aggregate(
-            total=Sum("trechos__valor_calculado")
-        )["total"] or Decimal("0.00")
-
-        total_despesas_valor = total_itens + total_km_valor
-        total_tecnicos = Tecnico.objects.filter(ativo=True).count() if administrativo else 0
-        total_clientes = Cliente.objects.filter(ativo=True).count() if administrativo else 0
-
-        model_fields = {field.name for field in RelatorioTecnico._meta.get_fields()}
-        select_related_fields = ["cliente"]
-        if "tecnico" in model_fields:
-            select_related_fields.append("tecnico")
-        elif "tecnico_responsavel" in model_fields:
-            select_related_fields.append("tecnico_responsavel")
-
-        relatorios_recentes = qs_relatorios.select_related(
-            *select_related_fields
-        ).order_by("-criado_em")[:8]
-
-        status_keys = [
-            StatusRelatorio.RASCUNHO,
-            StatusRelatorio.CONFERENCIA,
-            StatusRelatorio.AJUSTE,
-            StatusRelatorio.APROVADO,
-            StatusRelatorio.REJEITADO,
-        ]
-        status_choices = dict(getattr(StatusRelatorio, "choices", []))
-        percentuais = {
-            status: (
-                round(
-                    qs_relatorios.filter(status=status).count()
-                    / total_base
-                    * 100
-                )
-                if status in status_choices
-                else 0
-            )
-            for status in status_keys
-        }
-
-        def moeda(valor):
-            return (
-                f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-            )
-
-        ctx.update(
-            {
-                "titulo_pagina": "Dashboard",
-                "dashboard_global": administrativo,
-                "dashboard_individual": not administrativo,
-                "total_relatorios": total_relatorios,
-                "total_pendentes": total_conferencia,
-                "total_conferencia": total_conferencia,
-                "total_adiantamentos_valor": total_adiantamentos,
-                "total_despesas_valor": total_despesas_valor,
-                "total_tecnicos": total_tecnicos,
-                "total_clientes": total_clientes,
-                "total_adiantamentos": moeda(total_adiantamentos),
-                "total_despesas": moeda(total_despesas_valor),
-                "cards": [
-                    {
-                        "titulo": "Total de Relatórios",
-                        "valor": total_relatorios,
-                        "icone": "bi-file-earmark-text",
-                        "cor": "primary",
-                        "rodape": f"{total_relatorios} relatórios cadastrados",
-                    },
-                    {
-                        "titulo": "Adiantamentos",
-                        "valor": moeda(total_adiantamentos),
-                        "icone": "bi-cash-coin",
-                        "cor": "success",
-                        "rodape": "total lançado no sistema",
-                    },
-                    {
-                        "titulo": "Conferência",
-                        "valor": total_conferencia,
-                        "icone": "bi-hourglass-split",
-                        "cor": "warning",
-                        "rodape": "aguardando conferência",
-                    },
-                    {
-                        "titulo": "Total de Despesas",
-                        "valor": moeda(total_despesas_valor),
-                        "icone": "bi-graph-up-arrow",
-                        "cor": "danger",
-                        "rodape": "soma de itens e deslocamento",
-                    },
-                ],
-                "relatorios_recentes": relatorios_recentes,
-                "pct_rascunho": percentuais.get("rascunho", 0),
-                "pct_pendente": percentuais.get(StatusRelatorio.CONFERENCIA, 0),
-                "pct_conferencia": percentuais.get(StatusRelatorio.CONFERENCIA, 0),
-                "pct_ajuste": percentuais.get(StatusRelatorio.AJUSTE, 0),
-                "pct_aprovado": percentuais.get("aprovado", 0),
-                "percentuais_status": percentuais,
-            }
-        )
-
+        ctx.update(get_dashboard_context(self.request.user, self.request.GET))
+        ctx["titulo_pagina"] = "Dashboard"
         return ctx
 
 
-# ─────────────────────────────────────────────
-# LISTAGEM
-# ─────────────────────────────────────────────
+@require_GET
+@login_required
+@exigir_acesso_erp
+def dashboard_dados_json(request):
+    return JsonResponse(get_dashboard_data(request.user, request.GET))
 
 
 class RelatorioListView(AcessoErpMixin, ListView):
@@ -1255,6 +1120,13 @@ def relatorio_form_view(request, pk=None):
                             )
                             trecho = f.save(commit=False)
                             trecho.relatorio = relatorio
+                            clientes_trecho = _clientes_item_post(request, f.prefix)
+                            if len(clientes_trecho) == 1:
+                                trecho.valor_km = Decimal(
+                                    str(_get_valor_km_para_cliente(clientes_trecho[0]) or "0")
+                                )
+                            elif len(clientes_trecho) > 1:
+                                trecho.valor_km = Decimal("0.00")
                             trecho.save()
                             _registrar_metadados_comprovante(
                                 relatorio,
@@ -1270,7 +1142,7 @@ def relatorio_form_view(request, pk=None):
                             )
                             erros_trecho = sync_clientes_trecho(
                                 trecho,
-                                _clientes_item_post(request, f.prefix),
+                                clientes_trecho,
                             )
                             if erros_trecho:
                                 raise WorkflowError(erros_trecho)
@@ -1769,18 +1641,6 @@ def relatorio_clientes_pdf_view(request, pk):
         return _redirect_pdf_cliente_error(relatorio)
 
     try:
-        clientes = listar_clientes_pdf(relatorio)
-        if len(clientes) == 1:
-            pdf, contexto = gerar_pdf_cliente(
-                relatorio,
-                clientes[0]["id"],
-                request=request,
-            )
-            filename = nome_arquivo_pdf_cliente(relatorio, contexto["cliente"])
-            response = HttpResponse(pdf, content_type="application/pdf")
-            response["Content-Disposition"] = f'inline; filename="{filename}"'
-            return response
-
         zip_bytes, gerados, ignorados = gerar_zip_pdfs_clientes(
             relatorio,
             request=request,
@@ -2104,9 +1964,15 @@ def relatorio_duplicate_view(request, pk):
 @login_required
 @exigir_financeiro
 def relatorio_item_financeiro_view(request, pk, tipo, item_pk, acao):
-    if tipo not in {"despesa", "trecho"} or acao not in {"rejeitar", "restaurar"}:
-        messages.error(request, "Ação inválida para o item.")
+    espera_json = _request_espera_json(request)
+    def resposta_erro(mensagem, status=400):
+        if espera_json:
+            return JsonResponse({"success": False, "errors": [mensagem]}, status=status)
+        messages.error(request, mensagem)
         return redirect("relatorios:relatorio_detail", pk=pk)
+
+    if tipo not in {"despesa", "trecho"} or acao not in {"rejeitar", "restaurar"}:
+        return resposta_erro("Ação inválida para o item.")
 
     try:
         with transaction.atomic():
@@ -2114,11 +1980,9 @@ def relatorio_item_financeiro_view(request, pk, tipo, item_pk, acao):
                 RelatorioTecnico.objects.select_for_update(), pk=pk
             )
             if _relatorio_bloqueado(relatorio):
-                messages.error(
-                    request,
+                return resposta_erro(
                     "Relatório aprovado ou rejeitado está bloqueado para alterações.",
                 )
-                return redirect("relatorios:relatorio_detail", pk=pk)
 
             modelo = ItemDespesa if tipo == "despesa" else TrechoKm
             item = get_object_or_404(
@@ -2138,8 +2002,7 @@ def relatorio_item_financeiro_view(request, pk, tipo, item_pk, acao):
                     or ""
                 ).strip()
                 if not motivo:
-                    messages.error(request, "Informe a justificativa da rejeição do item.")
-                    return redirect("relatorios:relatorio_detail", pk=pk)
+                    return resposta_erro("Informe a justificativa da rejeição do item.")
 
                 agora = timezone.now()
                 item.rejeitado = True
@@ -2179,7 +2042,7 @@ def relatorio_item_financeiro_view(request, pk, tipo, item_pk, acao):
                         "motivo": motivo,
                     },
                 )
-                messages.success(request, "Item removido do reembolso.")
+                mensagem_sucesso = "Item removido do reembolso."
 
             else:
                 item.rejeitado = False
@@ -2212,10 +2075,35 @@ def relatorio_item_financeiro_view(request, pk, tipo, item_pk, acao):
                         "item_id": item.pk,
                     },
                 )
-                messages.success(request, "Item restaurado para o reembolso.")
+                mensagem_sucesso = "Item restaurado para o reembolso."
+
+        if espera_json:
+            return JsonResponse(
+                {
+                    "success": True,
+                    "tipo": tipo,
+                    "item_id": item.pk,
+                    "acao": acao,
+                    "rejeitado": bool(item.rejeitado),
+                    "status_financeiro": item.status_financeiro,
+                    "valor_final": str(
+                        item.valor_final if tipo == "despesa" else item.valor_final_clientes
+                    ),
+                    "message": mensagem_sucesso,
+                }
+            )
+        messages.success(request, mensagem_sucesso)
 
     except Exception as exc:
         logger.exception("Erro ao alterar item financeiro do relatório %s: %s", pk, exc)
+        if espera_json:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "errors": ["Erro interno ao alterar item. Tente novamente."],
+                },
+                status=500,
+            )
         messages.error(request, "Erro interno ao alterar item. Tente novamente.")
 
     return redirect("relatorios:relatorio_detail", pk=pk)

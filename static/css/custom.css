@@ -375,3 +375,38 @@ textarea.form-control {
     padding-right: .875rem !important;
   }
 }
+
+.table > tbody > tr.item-rejeitado-forte > * {
+  background-color: #b42318 !important;
+  border-color: #8f1d14 !important;
+  color: #fff !important;
+}
+
+.table > tbody > tr.item-rejeitado-forte .text-muted,
+.table > tbody > tr.item-rejeitado-forte .text-body-secondary,
+.table > tbody > tr.item-rejeitado-forte .fw-semibold,
+.table > tbody > tr.item-rejeitado-forte a,
+.table > tbody > tr.item-rejeitado-forte .btn {
+  color: #fff !important;
+}
+
+.table > tbody > tr.item-rejeitado-forte .form-control,
+.table > tbody > tr.item-rejeitado-forte .form-select {
+  background-color: rgba(255, 255, 255, .9) !important;
+  color: #111827 !important;
+}
+
+[data-bs-theme="dark"] .btn-outline-secondary,
+.theme-dark .btn-outline-secondary {
+  border-color: rgba(255, 255, 255, .78);
+  color: #fff;
+}
+
+[data-bs-theme="dark"] .btn-outline-secondary:hover,
+[data-bs-theme="dark"] .btn-outline-secondary:focus,
+.theme-dark .btn-outline-secondary:hover,
+.theme-dark .btn-outline-secondary:focus {
+  background-color: #fff;
+  border-color: #fff;
+  color: #111827;
+}

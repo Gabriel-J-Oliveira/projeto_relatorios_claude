@@ -1,202 +1,329 @@
 {% extends "base.html" %}
 {% block titulo %}Dashboard{% endblock %}
-{% block page_title %}{% if dashboard_global %}Dashboard Global{% else %}Meu Dashboard{% endif %}{% endblock %}
+{% block page_title %}{% if dashboard_global %}Dashboard executivo{% else %}Meu dashboard{% endif %}{% endblock %}
 {% block breadcrumb %}<li class="breadcrumb-item active">Dashboard</li>{% endblock %}
+
 {% block content %}
-  <div class="row g-3 mb-4">
+<div id="dashboard-root"
+     data-dashboard-url="{% url 'relatorios:dashboard_dados' %}"
+     data-dashboard-global="{% if dashboard_global %}true{% else %}false{% endif %}">
+
+  <form method="get" class="card border-0 shadow-sm mb-4" id="dashboard-filtros">
+    <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center justify-content-between gap-2 flex-wrap">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-funnel text-primary"></i>
+        <h6 class="mb-0 fw-semibold">Filtros</h6>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">
+        <i class="bi bi-arrow-clockwise me-1"></i>Aplicar
+      </button>
+    </div>
+    <div class="card-body">
+      <div class="row g-3 align-items-end">
+        <div class="col-12 col-md-6 col-xl-2">
+          <label class="form-label small text-muted">Data inicial</label>
+          <input type="date" name="data_inicio" value="{{ filtros_dashboard.data_inicio }}" class="form-control form-control-sm">
+        </div>
+        <div class="col-12 col-md-6 col-xl-2">
+          <label class="form-label small text-muted">Data final</label>
+          <input type="date" name="data_fim" value="{{ filtros_dashboard.data_fim }}" class="form-control form-control-sm">
+        </div>
+        <div class="col-12 col-md-6 col-xl-2">
+          <label class="form-label small text-muted">Cliente</label>
+          <select name="cliente" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            {% for cliente in clientes_filtro %}
+              <option value="{{ cliente.pk }}" {% if filtros_dashboard.cliente|stringformat:"s" == cliente.pk|stringformat:"s" %}selected{% endif %}>{{ cliente.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% if pode_filtrar_tecnico %}
+        <div class="col-12 col-md-6 col-xl-2">
+          <label class="form-label small text-muted">Técnico</label>
+          <select name="tecnico" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            {% for tecnico in tecnicos_filtro %}
+              <option value="{{ tecnico.pk }}" {% if filtros_dashboard.tecnico|stringformat:"s" == tecnico.pk|stringformat:"s" %}selected{% endif %}>{{ tecnico.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+        <div class="col-12 col-md-6 col-xl-2">
+          <label class="form-label small text-muted">Status</label>
+          <select name="status" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            {% for value, label in status_filtro %}
+              <option value="{{ value }}" {% if filtros_dashboard.status == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-6 col-xl-2">
+          <label class="form-label small text-muted">Centro de custo</label>
+          <input type="text" name="centro_custo" value="{{ filtros_dashboard.centro_custo }}" class="form-control form-control-sm" placeholder="Todos">
+        </div>
+      </div>
+      {% if dashboard_individual %}
+      <div class="alert alert-info border-0 shadow-sm small mt-3 mb-0">
+        <i class="bi bi-person-lock me-1"></i>
+        Dados limitados aos relatórios vinculados ao seu usuário.
+      </div>
+      {% endif %}
+    </div>
+  </form>
+
+  <div class="row g-3 mb-4" id="dashboard-kpis">
     {% for card in cards %}
-      <div class="col-12 col-sm-6 col-xl-3">
-        <div class="card border-0 shadow-sm h-100">
-          <div class="card-body d-flex align-items-center gap-3">
-            <div class="d-flex align-items-center justify-content-center rounded-3 bg-{{ card.cor }}-subtle text-{{ card.cor }}"
-                 style="width: 52px;
-                        height: 52px;
-                        font-size: 1.5rem;
-                        flex-shrink: 0">
-              <i class="bi {{ card.icone }}"></i>
-            </div>
-            <div>
-              <p class="text-muted small mb-0 fw-medium">{{ card.titulo }}</p>
-              <h3 class="fw-bold mb-0 text-body-emphasis">{{ card.valor }}</h3>
-            </div>
+    <div class="col-12 col-md-6 col-xxl-2">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="d-flex align-items-center justify-content-center rounded-3 bg-{{ card.cor }}-subtle text-{{ card.cor }}"
+               style="width:48px;height:48px;font-size:1.35rem;flex-shrink:0">
+            <i class="bi {{ card.icone }}"></i>
           </div>
-          <div class="card-footer bg-transparent border-top-0 pt-0 pb-3 px-3">
-            <small class="text-muted">
-              {% if card.valor == 0 or card.valor == "R$ 0,00" %}
-                <i class="bi bi-exclamation-circle me-1"></i>Nenhum dado registrado
-              {% else %}
-                <i class="bi bi-info-circle me-1"></i>{{ card.rodape }}
-              {% endif %}
-            </small>
+          <div class="min-w-0">
+            <p class="small text-muted fw-medium mb-1">{{ card.titulo }}</p>
+            <h4 class="fw-bold mb-0 text-body-emphasis" data-kpi="{{ card.id }}">{{ card.valor }}</h4>
           </div>
         </div>
       </div>
+    </div>
     {% endfor %}
   </div>
-  <!-- ── LINHA: TABELA + GRÁFICO LATERAL ── -->
-  <div class="row g-3">
-    <!-- Tabela de relatórios recentes -->
+
+  <div class="row g-3 mb-4">
     <div class="col-12 col-xl-8">
-      <div class="card border-0 shadow-sm">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent border-bottom py-3">
+          <h6 class="mb-0 fw-semibold"><i class="bi bi-graph-up-arrow text-primary me-2"></i>Evolução financeira</h6>
+        </div>
+        <div class="card-body">
+          <div id="chart-evolucao-financeira" class="dashboard-chart"></div>
+          <div class="dashboard-empty d-none text-center text-muted small py-4">Sem dados para o período selecionado.</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-xl-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent border-bottom py-3">
+          <h6 class="mb-0 fw-semibold"><i class="bi bi-pie-chart text-success me-2"></i>Status dos relatórios</h6>
+        </div>
+        <div class="card-body">
+          <div id="chart-status-relatorios" class="dashboard-chart"></div>
+          <div class="dashboard-empty d-none text-center text-muted small py-4">Sem relatórios encontrados.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-xl-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent border-bottom py-3">
+          <h6 class="mb-0 fw-semibold"><i class="bi bi-building text-primary me-2"></i>Gastos por cliente</h6>
+        </div>
+        <div class="card-body">
+          <div id="chart-gastos-cliente" class="dashboard-chart"></div>
+          <div class="dashboard-empty d-none text-center text-muted small py-4">Sem valores aprovados para exibir.</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-xl-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent border-bottom py-3">
+          <h6 class="mb-0 fw-semibold">
+            <i class="bi {% if dashboard_global %}bi-person-lines-fill{% else %}bi-list-check{% endif %} text-warning me-2"></i>
+            {% if dashboard_global %}Relatórios por técnico{% else %}Meus relatórios por status{% endif %}
+          </h6>
+        </div>
+        <div class="card-body">
+          <div id="chart-relatorios-tecnico" class="dashboard-chart"></div>
+          <div class="dashboard-empty d-none text-center text-muted small py-4">Sem dados para exibir.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-xl-5">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent border-bottom py-3">
+          <h6 class="mb-0 fw-semibold">
+            <i class="bi bi-speedometer2 text-info me-2"></i>
+            {% if dashboard_global %}KM por técnico{% else %}Evolução do meu KM{% endif %}
+          </h6>
+        </div>
+        <div class="card-body">
+          <div id="chart-km-tecnico" class="dashboard-chart"></div>
+          <div class="dashboard-empty d-none text-center text-muted small py-4">Sem KM registrado.</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-xl-7">
+      <div class="card border-0 shadow-sm h-100">
         <div class="card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3">
-          <div class="d-flex align-items-center gap-2">
-            <i class="bi bi-clock-history text-primary"></i>
-            <h6 class="mb-0 fw-semibold">Relatórios Recentes</h6>
-          </div>
-          <a href="{% url 'relatorios:relatorio_create' %}"
-             class="btn btn-primary">
-            <i class="bi bi-plus-lg"></i> Novo Relatório
+          <h6 class="mb-0 fw-semibold"><i class="bi bi-clock-history text-primary me-2"></i>Relatórios recentes</h6>
+          <a href="{% url 'relatorios:relatorio_create' %}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>Novo relatório
           </a>
         </div>
         <div class="card-body p-0">
           {% if relatorios_recentes %}
-            <div class="table-responsive">
-              <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
-                  <tr>
-                    <th class="ps-4 py-3 fw-semibold text-muted small">Nº / Cliente</th>
-                    <th class="py-3 fw-semibold text-muted small">Técnico</th>
-                    <th class="py-3 fw-semibold text-muted small">Data</th>
-                    <th class="py-3 fw-semibold text-muted small">Status</th>
-                    <th class="py-3 fw-semibold text-muted small text-end pe-4">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for relatorio in relatorios_recentes %}
-                    <tr>
-                      <td class="ps-4">
-                        <div class="fw-semibold text-body-emphasis small">{{ relatorio.numero }}</div>
-                        <div class="text-muted" style="font-size: .8rem;">{{ relatorio.cliente }}</div>
-                      </td>
-                      <td class="small">{{ relatorio.tecnico_responsavel }}</td>
-                      <td class="small text-muted">{{ relatorio.data_inicio|date:"d/m/Y" }}</td>
-                      <td>
-                        <span class="badge bg-{{ relatorio.status_badge_cor }}-subtle text-{{ relatorio.status_badge_cor }} rounded-pill px-2">
-                          {{ relatorio.get_status_display }}
-                        </span>
-                      </td>
-                      <td class="text-end pe-4">
-                        <a href="{% url 'relatorios:relatorio_detail' relatorio.id %}"
-                           class="btn btn-sm btn-outline-primary">
-                          <i class="bi bi-eye"></i> Visualizar
-                        </a>
-                      </td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-4 small text-muted">Relatório</th>
+                  <th class="small text-muted">Cliente</th>
+                  <th class="small text-muted">Técnico</th>
+                  <th class="small text-muted">Status</th>
+                  <th class="text-end pe-4 small text-muted">Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for relatorio in relatorios_recentes %}
+                <tr>
+                  <td class="ps-4 small fw-semibold">{{ relatorio.identificador }}</td>
+                  <td class="small">{{ relatorio.cliente_principal_exibicao|default:relatorio.cliente }}</td>
+                  <td class="small">{{ relatorio.tecnico_principal_exibicao|default:relatorio.tecnico_responsavel }}</td>
+                  <td><span class="badge bg-{{ relatorio.status_badge_cor }}-subtle text-{{ relatorio.status_badge_cor }}">{{ relatorio.get_status_display }}</span></td>
+                  <td class="text-end pe-4">
+                    <a href="{% url 'relatorios:relatorio_detail' relatorio.pk %}" class="btn btn-sm btn-outline-primary">
+                      <i class="bi bi-eye"></i>
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
           {% else %}
-            <!-- Estado vazio -->
-            <div class="text-center py-5">
-              <div class="mb-3 text-muted" style="font-size: 3rem;">
-                <i class="bi bi-inbox"></i>
-              </div>
-              <h6 class="text-body-secondary fw-semibold">Nenhum relatório cadastrado</h6>
-              <p class="text-muted small mb-4">Comece criando seu primeiro relatório técnico de campo.</p>
-              <a href="#"
-                 class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1">
-                <i class="bi bi-plus-lg"></i> Criar Relatório
-              </a>
-            </div>
-          {% endif %}
-        </div>
-        {% if relatorios_recentes %}
-          <div class="card-footer bg-transparent border-top py-3 text-center">
-            <a href="#" class="btn btn-sm btn-outline-primary">Ver todos os relatórios</a>
+          <div class="text-center text-muted small py-5">
+            <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+            Nenhum relatório encontrado para os filtros atuais.
           </div>
-        {% endif %}
-      </div>
-    </div>
-    <!-- Painel lateral: Resumo financeiro -->
-    <div class="col-12 col-xl-4">
-      <!-- Card status rápido -->
-      <div class="card border-0 shadow-sm mb-3">
-        <div class="card-header bg-transparent border-bottom py-3">
-          <div class="d-flex align-items-center gap-2">
-            <i class="bi bi-pie-chart text-success"></i>
-            <h6 class="mb-0 fw-semibold">Status dos Relatórios</h6>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="d-flex flex-column gap-3">
-            <div>
-              <div class="d-flex justify-content-between small mb-1">
-                <span class="fw-medium">Conferência</span>
-                <span class="text-muted">{{ pct_conferencia }}%</span>
-              </div>
-              <div class="progress" style="height: 6px;">
-                <div class="progress-bar bg-warning" style="width: {{ pct_conferencia }}%"></div>
-              </div>
-            </div>
-            <div>
-              <div class="d-flex justify-content-between small mb-1">
-                <span class="fw-medium">Ajuste</span>
-                <span class="text-muted">{{ pct_ajuste }}%</span>
-              </div>
-              <div class="progress" style="height: 6px;">
-                <div class="progress-bar bg-orange" style="width: {{ pct_ajuste }}%"></div>
-              </div>
-            </div>
-            <div>
-              <div class="d-flex justify-content-between small mb-1">
-                <span class="fw-medium">Aprovados</span>
-                <span class="text-muted">{{ pct_aprovado }}%</span>
-              </div>
-              <div class="progress" style="height: 6px;">
-                <div class="progress-bar bg-success" style="width: {{ pct_aprovado }}%"></div>
-              </div>
-            </div>
-          </div>
-          <hr class="my-3">
-          <div class="d-flex flex-column gap-2">
-            <div class="d-flex justify-content-between align-items-center">
-              <span class="small text-muted">Total de técnicos</span>
-              <span class="fw-semibold">0</span>
-            </div>
-            <div class="d-flex justify-content-between align-items-center">
-              <span class="small text-muted">Total de clientes</span>
-              <span class="fw-semibold">0</span>
-            </div>
-            <div class="d-flex justify-content-between align-items-center">
-              <span class="small text-muted">Adiantamentos em aberto</span>
-              <span class="fw-semibold text-warning">R$ 0,00</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- Atalhos rápidos -->
-      <div class="card border-0 shadow-sm">
-        <div class="card-header bg-transparent border-bottom py-3">
-          <div class="d-flex align-items-center gap-2">
-            <i class="bi bi-lightning-charge text-warning"></i>
-            <h6 class="mb-0 fw-semibold">Ações Rápidas</h6>
-          </div>
-        </div>
-        <div class="card-body d-flex flex-column gap-2">
-          <a href="{% url 'relatorios:relatorio_create' %}" 
-              class="btn btn-outline-primary d-flex align-items-center gap-2">
-            <i class="bi bi-plus-lg"></i> Novo Relatório
-          </a>
-          {% if permissoes_erp.visualiza_adiantamentos %}
-          <a href="{% url 'relatorios:adiantamento_create' %}"
-             class="btn btn-outline-success d-flex align-items-center gap-2">
-            <i class="bi bi-cash-stack"></i> Lançar Adiantamento
-          </a>
-          {% endif %}
-          {% if permissoes_erp.visualiza_cadastros %}
-          <a href="{% url 'relatorios:tecnico_create' %}"
-             class="btn btn-outline-secondary d-flex align-items-center gap-2">
-            <i class="bi bi-person-plus"></i> Cadastrar Técnico
-          </a>
-          <a href="{% url 'relatorios:cliente_create' %}"
-             class="btn btn-outline-secondary d-flex align-items-center gap-2">
-            <i class="bi bi-building-add"></i> Cadastrar Cliente
-          </a>
           {% endif %}
         </div>
       </div>
     </div>
   </div>
+</div>
 {% endblock %}
-<script>console.log("Dashboard carregada - verifique se este arquivo é o correto!");</script>
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+{{ dashboard_data|json_script:"dashboard-data-inicial" }}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const root = document.getElementById("dashboard-root");
+  if (!root || !window.ApexCharts) return;
+  let dashboardData = JSON.parse(document.getElementById("dashboard-data-inicial").textContent);
+  const charts = {};
+  const moeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+  const texto = document.documentElement.getAttribute("data-bs-theme") === "dark" ? "#e5e7eb" : "#374151";
+
+  function hasSeries(values) {
+    if (!values) return false;
+    if (Array.isArray(values)) return values.some(value => Number(value) > 0);
+    return false;
+  }
+
+  function renderChart(id, options, empty) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = "";
+    el.closest(".card-body")?.querySelector(".dashboard-empty")?.classList.toggle("d-none", !empty);
+    el.classList.toggle("d-none", empty);
+    if (empty) return;
+    charts[id]?.destroy();
+    charts[id] = new ApexCharts(el, options);
+    charts[id].render();
+  }
+
+  function baseOptions() {
+    return {
+      chart: { toolbar: { show: false }, fontFamily: "inherit", foreColor: texto },
+      dataLabels: { enabled: false },
+      grid: { borderColor: "rgba(148, 163, 184, .22)" },
+      tooltip: { theme: document.documentElement.getAttribute("data-bs-theme") === "dark" ? "dark" : "light" },
+    };
+  }
+
+  function atualizarKpis(kpis) {
+    const mapa = {
+      total_solicitado: kpis.total_solicitado_formatado,
+      total_aprovado: kpis.total_aprovado_formatado,
+      diferenca_removida: kpis.diferenca_removida_formatado,
+      relatorios_pendentes: kpis.relatorios_pendentes,
+      relatorios_ajuste: kpis.relatorios_ajuste,
+      km_total: `${kpis.km_total_formatado} km`,
+    };
+    Object.entries(mapa).forEach(([id, valor]) => {
+      const el = document.querySelector(`[data-kpi="${id}"]`);
+      if (el) el.textContent = valor;
+    });
+  }
+
+  function desenhar(data) {
+    atualizarKpis(data.kpis);
+    const evolucao = data.charts.evolucao_financeira;
+    renderChart("chart-evolucao-financeira", {
+      ...baseOptions(),
+      chart: { ...baseOptions().chart, type: "area", height: 310 },
+      stroke: { curve: "smooth", width: 2 },
+      fill: { type: "gradient", gradient: { opacityFrom: .28, opacityTo: .03 } },
+      colors: ["#0d6efd", "#198754", "#dc3545"],
+      series: evolucao.series,
+      xaxis: { categories: evolucao.labels },
+      yaxis: { labels: { formatter: value => moeda.format(value) } },
+    }, !evolucao.labels.length);
+
+    const status = data.charts.status_relatorios;
+    renderChart("chart-status-relatorios", {
+      ...baseOptions(),
+      chart: { ...baseOptions().chart, type: "donut", height: 310 },
+      labels: status.labels,
+      series: status.series,
+      colors: status.colors,
+      legend: { position: "bottom" },
+    }, !hasSeries(status.series));
+
+    const clientes = data.charts.gastos_por_cliente;
+    renderChart("chart-gastos-cliente", {
+      ...baseOptions(),
+      chart: { ...baseOptions().chart, type: "bar", height: 330 },
+      plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
+      series: [{ name: "Aprovado", data: clientes.series }],
+      xaxis: { categories: clientes.labels, labels: { formatter: value => moeda.format(value) } },
+      colors: ["#0d6efd"],
+    }, !clientes.labels.length);
+
+    const relatorios = data.charts.relatorios_por_tecnico;
+    const relatorioSeries = Array.isArray(relatorios.series?.[0]?.data)
+      ? relatorios.series
+      : [{ name: "Relatórios", data: relatorios.series || [] }];
+    renderChart("chart-relatorios-tecnico", {
+      ...baseOptions(),
+      chart: { ...baseOptions().chart, type: data.escopo === "global" ? "bar" : "donut", height: 330 },
+      labels: data.escopo === "global" ? undefined : relatorios.labels,
+      series: data.escopo === "global" ? relatorioSeries : relatorios.series,
+      xaxis: data.escopo === "global" ? { categories: relatorios.labels } : undefined,
+      colors: data.escopo === "global" ? ["#f0ad4e"] : relatorios.colors,
+      legend: { position: "bottom" },
+    }, data.escopo === "global" ? !relatorios.labels.length : !hasSeries(relatorios.series));
+
+    const km = data.charts.km_por_tecnico;
+    const kmGlobal = data.escopo === "global";
+    renderChart("chart-km-tecnico", {
+      ...baseOptions(),
+      chart: { ...baseOptions().chart, type: kmGlobal ? "bar" : "area", height: 300 },
+      stroke: { curve: "smooth", width: 2 },
+      series: kmGlobal ? [{ name: "KM", data: km.series }] : km.series,
+      xaxis: { categories: km.labels },
+      colors: ["#0dcaf0"],
+    }, !km.labels.length);
+  }
+
+  desenhar(dashboardData);
+});
+</script>
+{% endblock %}
