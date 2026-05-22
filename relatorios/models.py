@@ -15,6 +15,8 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from decimal import Decimal
 
+from .storage import anexos_storage
+
 
 def _valor_monetario(valor):
     return (valor or Decimal("0.00")).quantize(Decimal("0.01"))
@@ -890,6 +892,7 @@ class ItemDespesa(models.Model):
     comprovante = models.FileField(
         "Comprovante",
         upload_to="comprovantes/%Y/%m/",
+        storage=anexos_storage,
         blank=True,
         null=True,
     )
@@ -1111,6 +1114,7 @@ class TrechoKm(models.Model):
     comprovante = models.FileField(
         "Comprovante",
         upload_to="comprovantes_km/%Y/%m/",
+        storage=anexos_storage,
         blank=True,
         null=True,
     )
@@ -1299,7 +1303,11 @@ class AnexoRelatorio(models.Model):
         null=True,
         blank=True,
     )
-    arquivo = models.FileField("Arquivo", upload_to="anexos_relatorios/%Y/%m/")
+    arquivo = models.FileField(
+        "Arquivo",
+        upload_to="anexos_relatorios/%Y/%m/",
+        storage=anexos_storage,
+    )
     nome_original = models.CharField("Nome original", max_length=255)
     tipo_mime = models.CharField("Tipo MIME", max_length=120, blank=True)
     tamanho_bytes = models.PositiveBigIntegerField("Tamanho em bytes", default=0)

@@ -111,6 +111,11 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# Arquivos anexados por usuários, como comprovantes de despesa/KM.
+# Mantido separado de MEDIA_ROOT para preservar /media/ apenas para assets internos.
+ANEXOS_URL = config("ANEXOS_URL", default="/anexos/")
+ANEXOS_ROOT = Path(config("ANEXOS_ROOT", default="/home/app_relatorios_files"))
+
 
 # ─── Diretórios operacionais ─────────────────────────────────────────────────
 LOG_DIR = BASE_DIR / "logs"

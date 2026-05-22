@@ -3,26 +3,32 @@
 import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
+import relatorios.storage
 
 
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('relatorios', '0028_repair_trechokm_geocoding_fields'),
+        ('relatorios', '0027_km_excedente_rota_geojson'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
+        migrations.AlterField(
+            model_name='itemdespesa',
+            name='comprovante',
+            field=models.FileField(blank=True, null=True, storage=relatorios.storage.AnexosStorage(), upload_to='comprovantes/%Y/%m/', verbose_name='Comprovante'),
+        ),
         migrations.AddField(
             model_name='trechokm',
             name='comprovante',
-            field=models.FileField(blank=True, null=True, upload_to='comprovantes_km/%Y/%m/', verbose_name='Comprovante'),
+            field=models.FileField(blank=True, null=True, storage=relatorios.storage.AnexosStorage(), upload_to='comprovantes_km/%Y/%m/', verbose_name='Comprovante'),
         ),
         migrations.CreateModel(
             name='AnexoRelatorio',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('arquivo', models.FileField(upload_to='anexos_relatorios/%Y/%m/', verbose_name='Arquivo')),
+                ('arquivo', models.FileField(storage=relatorios.storage.AnexosStorage(), upload_to='anexos_relatorios/%Y/%m/', verbose_name='Arquivo')),
                 ('nome_original', models.CharField(max_length=255, verbose_name='Nome original')),
                 ('tipo_mime', models.CharField(blank=True, max_length=120, verbose_name='Tipo MIME')),
                 ('tamanho_bytes', models.PositiveBigIntegerField(default=0, verbose_name='Tamanho em bytes')),

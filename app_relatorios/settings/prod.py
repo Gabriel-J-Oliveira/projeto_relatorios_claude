@@ -12,10 +12,9 @@ from .base import *  # noqa
 
 DEBUG = False
 
-MEDIA_ROOT = Path(config("MEDIA_ROOT", default="/home/app_relatorios_files"))
-
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+ANEXOS_ROOT.mkdir(parents=True, exist_ok=True)
 STATIC_ROOT.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_HOSTS = config(
