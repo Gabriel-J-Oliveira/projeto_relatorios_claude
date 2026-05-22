@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block titulo %}Confirmar cadastro{% endblock %}
+{% block page_title %}Confirmação cadastral{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item active">Confirmar cadastro</li>
+{% endblock %}
+
+{% block page_actions %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-7 col-xl-5">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-transparent border-bottom py-3">
+        <div class="d-flex align-items-center gap-2">
+          <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary-subtle text-primary"
+                style="width:36px;height:36px;">
+            <i class="bi bi-person-check"></i>
+          </span>
+          <div>
+            <h5 class="mb-0 fw-semibold">Antes de continuar, confirme seus dados cadastrais.</h5>
+            <p class="text-muted small mb-0">Essas informações serão usadas internamente no ERP.</p>
+          </div>
+        </div>
+      </div>
+      <div class="card-body p-4">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ next }}">
+
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger border-0 shadow-sm small">
+              {{ form.non_field_errors }}
+            </div>
+          {% endif %}
+
+          <div class="row g-3">
+            <div class="col-12 col-md-6">
+              <label class="form-label fw-medium" for="{{ form.first_name.id_for_label }}">{{ form.first_name.label }}</label>
+              {{ form.first_name }}
+              {% for error in form.first_name.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label fw-medium" for="{{ form.last_name.id_for_label }}">{{ form.last_name.label }}</label>
+              {{ form.last_name }}
+              {% for error in form.last_name.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-medium" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+              {{ form.email }}
+              {% for error in form.email.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="alert alert-info border-0 shadow-sm small mt-4 mb-0">
+            <i class="bi bi-info-circle me-1"></i>
+            Após salvar, você será direcionado para a tela solicitada.
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100 mt-4">
+            <i class="bi bi-check2-circle me-1"></i>Salvar e continuar
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

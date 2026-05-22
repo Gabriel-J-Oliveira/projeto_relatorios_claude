@@ -4,6 +4,7 @@ Não use este arquivo diretamente. Use dev.py ou prod.py.
 """
 
 import json
+import os
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -55,6 +56,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "relatorios.middleware.IdentidadeCorporativaMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "relatorios.middleware.CadastroObrigatorioMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -117,8 +119,44 @@ ANEXOS_URL = config("ANEXOS_URL", default="/anexos/")
 ANEXOS_ROOT = Path(config("ANEXOS_ROOT", default="/home/app_relatorios_files"))
 
 
+# Email interno / SMTP. Em desenvolvimento, dev.py pode sobrescrever para console.
+EMAIL_BACKEND = config(
+    "EMAIL_BACKEND",
+    default="django.core.mail.backends.smtp.EmailBackend",
+)
+EMAIL_HOST = config("EMAIL_HOST", default="")
+EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
+EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=15, cast=int)
+DEFAULT_FROM_EMAIL = config(
+    "DEFAULT_FROM_EMAIL",
+    default=EMAIL_HOST_USER or "naoresponda@controlsul.com.br",
+)
+APP_BASE_URL = config("APP_BASE_URL", default="")
+EMAIL_DESTINATARIOS_FINALIZACAO_EXTRA = config(
+    "EMAIL_DESTINATARIOS_FINALIZACAO_EXTRA",
+    default="",
+    cast=lambda v: [email.strip() for email in v.split(",") if email.strip()],
+)
+
+
 # ─── Diretórios operacionais ─────────────────────────────────────────────────
-LOG_DIR = BASE_DIR / "logs"
+APP_LOG_LEVEL = config("APP_LOG_LEVEL", default="INFO").upper()
+LOG_DIR = Path(config("APP_LOG_DIR", default=str(BASE_DIR / "logs")))
+
+
+def _preparar_diretorio_logs(path):
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        return path.is_dir() and os.access(path, os.W_OK)
+    except OSError:
+        return False
+
+
+LOG_FILES_ENABLED = _preparar_diretorio_logs(LOG_DIR)
 
 
 # Sessao corporativa: 60 minutos de inatividade.
@@ -142,6 +180,7 @@ CACHES = {
         "LOCATION": config("CACHE_LOCATION", default="erp-relatorios-cache"),
     }
 }
+DASHBOARD_CACHE_TTL = config("DASHBOARD_CACHE_TTL", default=180, cast=int)
 
 
 # ─── Chave primária padrão ────────────────────────────────────────────────────
@@ -312,28 +351,138 @@ if LDAP_AUTH_ENABLED:
         if LDAP_REQUIRE_GROUP:
             AUTH_LDAP_REQUIRE_GROUP = LDAP_REQUIRE_GROUP
 
+LOG_FORMAT_VERBOSE = (
+    "[{asctime}] [{levelname}] {name} {module}.{funcName}:{lineno} - {message}"
+)
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": LOG_FORMAT_VERBOSE,
+            "style": "{",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        },
+        "console": {
+            "format": "[{levelname}] {name}: {message}",
+            "style": "{",
+        },
+    },
+    "filters": {
+        "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"},
+    },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
+            "formatter": "console",
+            "level": "DEBUG",
         },
     },
     "root": {
         "handlers": ["console"],
-        "level": "DEBUG",
+        "level": APP_LOG_LEVEL,
     },
     "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "django.security": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
         "django_auth_ldap": {
             "handlers": ["console"],
-            "level": "DEBUG" if LDAP_AUTH_ENABLED else "INFO",
+            "level": "DEBUG" if LDAP_AUTH_ENABLED and APP_LOG_LEVEL == "DEBUG" else "INFO",
+            "propagate": False,
+        },
+        "relatorios": {
+            "handlers": ["console"],
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
+        "relatorios.middleware": {
+            "handlers": ["console"],
+            "level": APP_LOG_LEVEL,
             "propagate": False,
         },
         "relatorios.services.identidade": {
             "handlers": ["console"],
-            "level": "INFO",
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
+        "relatorios.services.email_service": {
+            "handlers": ["console"],
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
+        "relatorios.services.maps_service": {
+            "handlers": ["console"],
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
+        "relatorios.services.pdf_cliente_service": {
+            "handlers": ["console"],
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
+        "relatorios.services.pdf_interno_service": {
+            "handlers": ["console"],
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
+        "relatorios.services.workflow_service": {
+            "handlers": ["console"],
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
+        "relatorios.services.snapshot_service": {
+            "handlers": ["console"],
+            "level": APP_LOG_LEVEL,
             "propagate": False,
         },
     },
 }
+
+
+def _adicionar_file_handler(nome, arquivo, level="INFO"):
+    LOGGING["handlers"][nome] = {
+        "class": "logging.handlers.RotatingFileHandler",
+        "filename": str(LOG_DIR / arquivo),
+        "maxBytes": 10 * 1024 * 1024,
+        "backupCount": 10,
+        "formatter": "verbose",
+        "level": level,
+        "encoding": "utf-8",
+    }
+
+
+if LOG_FILES_ENABLED:
+    _adicionar_file_handler("app_file", "app_relatorios.log", APP_LOG_LEVEL)
+    _adicionar_file_handler("errors_file", "errors.log", "ERROR")
+    _adicionar_file_handler("emails_file", "emails.log", APP_LOG_LEVEL)
+    _adicionar_file_handler("maps_file", "maps.log", APP_LOG_LEVEL)
+    _adicionar_file_handler("pdfs_file", "pdfs.log", APP_LOG_LEVEL)
+    _adicionar_file_handler("security_file", "security.log", "WARNING")
+
+    LOGGING["root"]["handlers"] = ["console", "app_file", "errors_file"]
+    LOGGING["loggers"]["django"]["handlers"] = ["console", "app_file", "errors_file"]
+    LOGGING["loggers"]["django.request"]["handlers"] = ["console", "errors_file"]
+    LOGGING["loggers"]["django.security"]["handlers"] = ["console", "security_file", "errors_file"]
+    LOGGING["loggers"]["relatorios"]["handlers"] = ["console", "app_file", "errors_file"]
+    LOGGING["loggers"]["relatorios.middleware"]["handlers"] = ["console", "security_file", "errors_file"]
+    LOGGING["loggers"]["relatorios.services.identidade"]["handlers"] = ["console", "security_file", "errors_file"]
+    LOGGING["loggers"]["relatorios.services.email_service"]["handlers"] = ["console", "emails_file", "errors_file"]
+    LOGGING["loggers"]["relatorios.services.maps_service"]["handlers"] = ["console", "maps_file", "errors_file"]
+    LOGGING["loggers"]["relatorios.services.pdf_cliente_service"]["handlers"] = ["console", "pdfs_file", "errors_file"]
+    LOGGING["loggers"]["relatorios.services.pdf_interno_service"]["handlers"] = ["console", "pdfs_file", "errors_file"]
+    LOGGING["loggers"]["relatorios.services.workflow_service"]["handlers"] = ["console", "app_file", "security_file", "errors_file"]
+    LOGGING["loggers"]["relatorios.services.snapshot_service"]["handlers"] = ["console", "app_file", "pdfs_file", "errors_file"]

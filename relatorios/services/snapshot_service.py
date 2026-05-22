@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 from decimal import Decimal
 
 from django.core.exceptions import ObjectDoesNotExist
@@ -16,6 +17,7 @@ from relatorios.services.resumo_cliente_service import resumo_financeiro_por_cli
 
 SCHEMA_VERSION = 1
 ESTADOS_COM_SNAPSHOT = {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
+logger = logging.getLogger(__name__)
 
 
 class SnapshotError(Exception):
@@ -470,18 +472,25 @@ def validar_snapshot_payload(payload):
 @transaction.atomic
 def criar_snapshot_financeiro(relatorio, usuario=None):
     if relatorio.status not in ESTADOS_COM_SNAPSHOT:
+        logger.warning(
+            "Snapshot bloqueado para relatorio %s em status %s.",
+            relatorio.pk,
+            relatorio.status,
+        )
         raise SnapshotError("Snapshot financeiro so pode ser criado para relatorio finalizado.")
 
     try:
+        logger.info("Snapshot financeiro ja existente reutilizado para relatorio %s.", relatorio.pk)
         return relatorio.snapshot_financeiro
     except ObjectDoesNotExist:
         pass
 
+    logger.info("Iniciando criacao de snapshot financeiro do relatorio %s.", relatorio.pk)
     payload = construir_snapshot_financeiro(relatorio, usuario)
     validar_snapshot_payload(payload)
     checksum = calcular_checksum(payload)
     finalizado_em = timezone.now()
-    return RelatorioSnapshotFinanceiro.objects.create(
+    snapshot = RelatorioSnapshotFinanceiro.objects.create(
         relatorio=relatorio,
         schema_version=SCHEMA_VERSION,
         numero=relatorio.numero or relatorio.identificador,
@@ -494,3 +503,9 @@ def criar_snapshot_financeiro(relatorio, usuario=None):
         finalizado_em=finalizado_em,
         finalizado_por=usuario if getattr(usuario, "is_authenticated", False) else None,
     )
+    logger.info(
+        "Snapshot financeiro criado para relatorio %s com checksum %s.",
+        relatorio.pk,
+        checksum,
+    )
+    return snapshot

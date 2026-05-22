@@ -66,6 +66,8 @@ class TipoEventoHistorico(models.TextChoices):
     ITEM_REJEITADO = "item_rejeitado", "Item rejeitado pelo financeiro"
     ITEM_REATIVADO = "item_reativado", "Item reativado pelo financeiro"
     VALOR_ALTERADO = "valor_alterado", "Valor aprovado alterado"
+    EMAIL_ENVIADO = "email_enviado", "Email enviado"
+    EMAIL_FALHA = "email_falha", "Falha no envio de email"
 
 
 class TipoLocalidade(models.TextChoices):
@@ -133,6 +135,29 @@ class UF(models.TextChoices):
 # ─────────────────────────────────────────────────────────────────
 # TECNICO
 # ─────────────────────────────────────────────────────────────────
+
+
+class PerfilUsuario(models.Model):
+    usuario = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="perfil_usuario",
+    )
+    cadastro_confirmado_em = models.DateTimeField(
+        "Cadastro confirmado em",
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Perfil de usuário"
+        verbose_name_plural = "Perfis de usuários"
+
+    def __str__(self):
+        return f"Perfil de {self.usuario}"
 
 
 class Tecnico(models.Model):
@@ -421,6 +446,11 @@ class RelatorioTecnico(models.Model):
         verbose_name = "Relatório Técnico"
         verbose_name_plural = "Relatórios Técnicos"
         ordering = ["-data_inicio", "-criado_em"]
+        indexes = [
+            models.Index(fields=["status", "data_inicio"]),
+            models.Index(fields=["data_inicio", "data_fim"]),
+            models.Index(fields=["criado_em"]),
+        ]
 
     def __str__(self):
         return f"{self.identificador} — {self.cliente}"
@@ -506,6 +536,13 @@ class RelatorioTecnico(models.Model):
 
     @property
     def total_despesas_tecnico(self):
+        prefetched = getattr(self, "_prefetched_objects_cache", {})
+        if "despesas" in prefetched:
+            total = sum(
+                (despesa.valor for despesa in prefetched["despesas"] if despesa.quem_pagou == QuemPagou.TECNICO),
+                Decimal("0.00"),
+            )
+            return _valor_monetario(total)
         total = self.despesas.filter(quem_pagou=QuemPagou.TECNICO).aggregate(
             t=models.Sum("valor")
         )["t"] or Decimal("0.00")
@@ -513,6 +550,13 @@ class RelatorioTecnico(models.Model):
 
     @property
     def total_despesas_empresa(self):
+        prefetched = getattr(self, "_prefetched_objects_cache", {})
+        if "despesas" in prefetched:
+            total = sum(
+                (despesa.valor for despesa in prefetched["despesas"] if despesa.quem_pagou == QuemPagou.EMPRESA),
+                Decimal("0.00"),
+            )
+            return _valor_monetario(total)
         total = self.despesas.filter(quem_pagou=QuemPagou.EMPRESA).aggregate(
             t=models.Sum("valor")
         )["t"] or Decimal("0.00")
@@ -632,7 +676,11 @@ class RelatorioTecnico(models.Model):
 
     @property
     def total_km_percorrido(self):
-        total = self.trechos.aggregate(t=models.Sum("km"))["t"] or Decimal("0.00")
+        prefetched = getattr(self, "_prefetched_objects_cache", {})
+        if "trechos" in prefetched:
+            total = sum((trecho.km for trecho in prefetched["trechos"]), Decimal("0.00"))
+        else:
+            total = self.trechos.aggregate(t=models.Sum("km"))["t"] or Decimal("0.00")
         return total + (self.km_excedente_interno or Decimal("0.00"))
 
     @property
@@ -719,6 +767,8 @@ class HistoricoRelatorio(models.Model):
             TipoEventoHistorico.ITEM_REJEITADO: "danger",
             TipoEventoHistorico.ITEM_REATIVADO: "primary",
             TipoEventoHistorico.VALOR_ALTERADO: "info",
+            TipoEventoHistorico.EMAIL_ENVIADO: "success",
+            TipoEventoHistorico.EMAIL_FALHA: "danger",
         }.get(self.tipo_evento, "secondary")
 
 
@@ -775,6 +825,9 @@ class RelatorioSnapshotFinanceiro(models.Model):
         verbose_name = "Snapshot financeiro do relatorio"
         verbose_name_plural = "Snapshots financeiros dos relatorios"
         ordering = ["-finalizado_em"]
+        indexes = [
+            models.Index(fields=["status", "finalizado_em"]),
+        ]
 
     def __str__(self):
         return f"Snapshot {self.numero} ({self.get_status_display()})"
@@ -924,6 +977,11 @@ class ItemDespesa(models.Model):
         verbose_name = "Item de Despesa"
         verbose_name_plural = "Itens de Despesa"
         ordering = ["ordem", "data", "tipo"]
+        indexes = [
+            models.Index(fields=["relatorio", "data"]),
+            models.Index(fields=["relatorio", "tipo"]),
+            models.Index(fields=["status_financeiro", "rejeitado"]),
+        ]
 
     def __str__(self):
         return f"{self.get_tipo_display()} — R$ {self.valor}"
@@ -1190,6 +1248,11 @@ class TrechoKm(models.Model):
         verbose_name = "Trecho de KM"
         verbose_name_plural = "Trechos de KM"
         ordering = ["ordem", "data"]
+        indexes = [
+            models.Index(fields=["relatorio", "data"]),
+            models.Index(fields=["status_financeiro", "rejeitado"]),
+            models.Index(fields=["diferenca_km_percentual"]),
+        ]
 
     def __str__(self):
         return f"{self.origem} → {self.destino} ({self.km} km)"

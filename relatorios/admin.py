@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib import admin
 from django.core.exceptions import PermissionDenied
 from django.utils.html import format_html
@@ -14,12 +16,23 @@ from .models import (
     TrechoKm,
     Adiantamento,
     AnexoRelatorio,
+    PerfilUsuario,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────
 # TECNICO
 # ─────────────────────────────────────────────
+
+
+@admin.register(PerfilUsuario)
+class PerfilUsuarioAdmin(admin.ModelAdmin):
+    list_display = ["usuario", "cadastro_confirmado_em", "atualizado_em"]
+    search_fields = ["usuario__username", "usuario__first_name", "usuario__last_name", "usuario__email"]
+    readonly_fields = ["criado_em", "atualizado_em"]
 
 
 @admin.register(Tecnico)
@@ -192,6 +205,11 @@ class RelatorioTecnicoAdmin(admin.ModelAdmin):
         if change:
             anterior = RelatorioTecnico.objects.filter(pk=obj.pk).only("status").first()
             if anterior and anterior.status in {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}:
+                logger.warning(
+                    "Tentativa de alterar relatorio finalizado via admin. relatorio=%s usuario=%s",
+                    obj.pk,
+                    getattr(request.user, "pk", None),
+                )
                 raise PermissionDenied("Relatorio finalizado nao pode ser alterado.")
         super().save_model(request, obj, form, change)
 

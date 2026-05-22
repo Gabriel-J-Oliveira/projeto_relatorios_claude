@@ -1,3 +1,4 @@
+import logging
 import re
 from decimal import Decimal, InvalidOperation
 
@@ -36,6 +37,7 @@ from relatorios.services.validacoes_operacionais import (
 
 CHAVE_SEQUENCIAL_RELATORIO = "relatorio_oficial"
 ESTADOS_FINAIS = {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
+logger = logging.getLogger(__name__)
 
 
 class WorkflowError(Exception):
@@ -58,6 +60,18 @@ def _obter_relatorio_bloqueado(relatorio_ou_id):
 
 def _usuario(usuario):
     return usuario if getattr(usuario, "is_authenticated", False) else None
+
+
+def _executar_notificacao(relatorio, funcao, aviso):
+    try:
+        funcao(relatorio)
+    except Exception as exc:
+        logger.exception(
+            "Falha ao executar notificacao de email do relatorio %s: %s",
+            getattr(relatorio, "pk", None),
+            exc,
+        )
+        relatorio._email_warning = aviso
 
 
 def _validar_permissao_envio(relatorio, usuario):
@@ -169,6 +183,13 @@ def gerar_numero_oficial(relatorio):
 def validar_transicao(relatorio, novo_status):
     resultado = validar_transicao_status(relatorio, novo_status)
     if not resultado.ok:
+        logger.warning(
+            "Transicao de status bloqueada no relatorio %s: %s -> %s | erros=%s",
+            relatorio.pk,
+            relatorio.status,
+            novo_status,
+            resultado.errors,
+        )
         raise WorkflowError(resultado.errors)
 
 
@@ -362,7 +383,25 @@ def enviar_para_conferencia(relatorio_id, usuario=None):
             f"Relatório {relatorio.numero} enviado para conferência.",
             {"status_anterior": status_anterior, "status_novo": relatorio.status},
         )
-        return relatorio
+        logger.info(
+            "Relatorio %s enviado para conferencia. Status anterior=%s novo=%s.",
+            relatorio.pk,
+            status_anterior,
+            relatorio.status,
+        )
+    from relatorios.services.email_service import (
+        notificar_relatorio_enviado,
+        notificar_relatorio_reenviado,
+    )
+
+    _executar_notificacao(
+        relatorio,
+        notificar_relatorio_reenviado
+        if tipo_evento == TipoEventoHistorico.REENVIADO
+        else notificar_relatorio_enviado,
+        "Relatório enviado, mas houve falha no envio do email.",
+    )
+    return relatorio
 
 
 def solicitar_ajuste(relatorio_id, usuario=None, justificativa=""):
@@ -387,7 +426,20 @@ def solicitar_ajuste(relatorio_id, usuario=None, justificativa=""):
                 "status_novo": relatorio.status,
             },
         )
-        return relatorio
+        logger.info(
+            "Ajuste solicitado no relatorio %s. Status anterior=%s novo=%s.",
+            relatorio.pk,
+            status_anterior,
+            relatorio.status,
+        )
+    from relatorios.services.email_service import notificar_ajuste_solicitado
+
+    _executar_notificacao(
+        relatorio,
+        notificar_ajuste_solicitado,
+        "Ajuste solicitado, mas houve falha no envio do email.",
+    )
+    return relatorio
 
 
 def aprovar_relatorio(relatorio_id, usuario=None, post_data=None):
@@ -418,7 +470,20 @@ def aprovar_relatorio(relatorio_id, usuario=None, post_data=None):
             criar_snapshot_financeiro(relatorio, _usuario(usuario))
         except SnapshotError as exc:
             raise WorkflowError(exc.args[0]) from exc
-        return relatorio
+        logger.info(
+            "Relatorio %s aprovado. Status anterior=%s total_aprovado=%s.",
+            relatorio.pk,
+            status_anterior,
+            relatorio.total_aprovado,
+        )
+    from relatorios.services.email_service import notificar_relatorio_aprovado
+
+    _executar_notificacao(
+        relatorio,
+        notificar_relatorio_aprovado,
+        "Relatório aprovado, mas houve falha no envio do email.",
+    )
+    return relatorio
 
 
 def rejeitar_relatorio(relatorio_id, usuario=None, justificativa=""):
@@ -451,4 +516,16 @@ def rejeitar_relatorio(relatorio_id, usuario=None, justificativa=""):
             criar_snapshot_financeiro(relatorio, _usuario(usuario))
         except SnapshotError as exc:
             raise WorkflowError(exc.args[0]) from exc
-        return relatorio
+        logger.info(
+            "Relatorio %s rejeitado definitivamente. Status anterior=%s.",
+            relatorio.pk,
+            status_anterior,
+        )
+    from relatorios.services.email_service import notificar_relatorio_rejeitado
+
+    _executar_notificacao(
+        relatorio,
+        notificar_relatorio_rejeitado,
+        "Relatório rejeitado, mas houve falha no envio do email.",
+    )
+    return relatorio

@@ -8,12 +8,14 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import PermissionDenied
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from .models import (
     Adiantamento,
     Cliente,
     HistoricoRelatorio,
     ItemDespesa,
+    PerfilUsuario,
     RelatorioTecnico,
     RelatorioTecnicoEquipe,
     StatusFinanceiroItem,
@@ -1550,3 +1552,64 @@ class IdentidadeAdUtilitariosTests(SimpleTestCase):
         from relatorios.services.identidade import ldap_backend
 
         self.assertEqual(ldap_backend._ldap_server_uris(), ["ldap://dc01", "ldap://dc02"])
+
+
+class CompletarCadastroUsuarioTests(TestCase):
+    def setUp(self):
+        self.grupo_tecnico = Group.objects.get(name="Tecnico")
+
+    def criar_usuario(self, completo=False):
+        usuario = get_user_model().objects.create_user(
+            username="usuario.cadastro",
+            password="senha-teste",
+            first_name="Usuario" if completo else "",
+            last_name="Teste" if completo else "",
+            email="usuario.cadastro@example.com" if completo else "",
+        )
+        usuario.groups.add(self.grupo_tecnico)
+        if completo:
+            PerfilUsuario.objects.create(
+                usuario=usuario,
+                cadastro_confirmado_em=timezone.now(),
+            )
+        return usuario
+
+    def test_usuario_incompleto_e_redirecionado_para_confirmacao(self):
+        usuario = self.criar_usuario(completo=False)
+        self.client.force_login(usuario)
+
+        response = self.client.get(reverse("relatorios:relatorio_list"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("relatorios:completar_cadastro"), response["Location"])
+        self.assertIn("next=", response["Location"])
+
+    def test_usuario_completo_acessa_url_protegida(self):
+        usuario = self.criar_usuario(completo=True)
+        self.client.force_login(usuario)
+
+        response = self.client.get(reverse("relatorios:relatorio_list"))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_confirmacao_salva_dados_e_redireciona_para_next(self):
+        usuario = self.criar_usuario(completo=False)
+        self.client.force_login(usuario)
+        next_url = reverse("relatorios:relatorio_list")
+
+        response = self.client.post(
+            f"{reverse('relatorios:completar_cadastro')}?next={next_url}",
+            {
+                "first_name": "Gabriel",
+                "last_name": "Oliveira",
+                "email": "gabriel.oliveira@example.com",
+                "next": next_url,
+            },
+        )
+
+        self.assertRedirects(response, next_url)
+        usuario.refresh_from_db()
+        self.assertEqual(usuario.first_name, "Gabriel")
+        self.assertEqual(usuario.last_name, "Oliveira")
+        self.assertEqual(usuario.email, "gabriel.oliveira@example.com")
+        self.assertIsNotNone(usuario.perfil_usuario.cadastro_confirmado_em)

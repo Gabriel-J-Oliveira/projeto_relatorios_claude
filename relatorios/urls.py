@@ -4,6 +4,7 @@ from . import views
 app_name = "relatorios"
 
 urlpatterns = [
+    path("completar-cadastro/", views.completar_cadastro_view, name="completar_cadastro"),
     path("dashboard/", views.DashboardView.as_view(), name="dashboard"),
     path("dashboard/dados/", views.dashboard_dados_json, name="dashboard_dados"),
 

@@ -12,6 +12,8 @@ EVENTOS_LEGADOS = {
     "Trecho KM rejeitado pelo financeiro": TipoEventoHistorico.ITEM_REJEITADO,
     "Item restaurado pelo financeiro": TipoEventoHistorico.ITEM_REATIVADO,
     "Valor aprovado alterado": TipoEventoHistorico.VALOR_ALTERADO,
+    "Email enviado": TipoEventoHistorico.EMAIL_ENVIADO,
+    "Falha no envio de email": TipoEventoHistorico.EMAIL_FALHA,
 }
 
 

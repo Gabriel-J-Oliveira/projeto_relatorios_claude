@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django import forms
+from django.contrib.auth import get_user_model
 from django.forms import inlineformset_factory, BaseInlineFormSet
 from django.utils import timezone
 from .models import (
@@ -12,9 +13,6 @@ from .models import (
     Adiantamento,
     TipoDocumentoComprovante,
 )
-
-# forms.py
-
 
 class ClienteSelectWithData(forms.Select):
     """
@@ -65,6 +63,49 @@ class BootstrapMixin:
                 w.attrs.setdefault("rows", 3)
             else:
                 w.attrs.setdefault("class", "form-control form-control-sm")
+
+
+class CompletarCadastroUsuarioForm(BootstrapMixin, forms.Form):
+    first_name = forms.CharField(
+        label="Nome",
+        max_length=150,
+        required=True,
+        error_messages={"required": "Informe seu nome."},
+    )
+    last_name = forms.CharField(
+        label="Sobrenome",
+        max_length=150,
+        required=True,
+        error_messages={"required": "Informe seu sobrenome."},
+    )
+    email = forms.EmailField(
+        label="E-mail",
+        max_length=254,
+        required=True,
+        error_messages={
+            "required": "Informe seu e-mail.",
+            "invalid": "Informe um e-mail válido.",
+        },
+    )
+
+    def __init__(self, *args, user=None, **kwargs):
+        self.user = user
+        initial = kwargs.pop("initial", {}) or {}
+        if user is not None:
+            initial.setdefault("first_name", user.first_name)
+            initial.setdefault("last_name", user.last_name)
+            initial.setdefault("email", user.email)
+        super().__init__(*args, initial=initial, **kwargs)
+
+    def clean_email(self):
+        email = (self.cleaned_data["email"] or "").strip().lower()
+        User = get_user_model()
+        qs = User.objects.filter(email__iexact=email)
+        if self.user is not None and self.user.pk:
+            qs = qs.exclude(pk=self.user.pk)
+        if qs.exists():
+            raise forms.ValidationError("Este e-mail já está em uso por outro usuário.")
+        return email
 
 
 # ─────────────────────────────────────────────

@@ -93,12 +93,48 @@
   <div class="row g-3 mb-4">
     <div class="col-12 col-xl-8">
       <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-transparent border-bottom py-3">
-          <h6 class="mb-0 fw-semibold"><i class="bi bi-graph-up-arrow text-primary me-2"></i>Evolução financeira</h6>
+        <div class="card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3">
+          <h6 class="mb-0 fw-semibold"><i class="bi bi-clock-history text-primary me-2"></i>Relatórios recentes</h6>
+          <a href="{% url 'relatorios:relatorio_create' %}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>Novo relatório
+          </a>
         </div>
-        <div class="card-body">
-          <div id="chart-evolucao-financeira" class="dashboard-chart"></div>
-          <div class="dashboard-empty d-none text-center text-muted small py-4">Sem dados para o período selecionado.</div>
+        <div class="card-body p-0">
+          {% if relatorios_recentes %}
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-4 small text-muted">Relatório</th>
+                  <th class="small text-muted">Cliente</th>
+                  <th class="small text-muted">Técnico</th>
+                  <th class="small text-muted">Status</th>
+                  <th class="text-end pe-4 small text-muted">Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for relatorio in relatorios_recentes %}
+                <tr>
+                  <td class="ps-4 small fw-semibold">{{ relatorio.identificador }}</td>
+                  <td class="small">{{ relatorio.cliente_principal_exibicao|default:relatorio.cliente }}</td>
+                  <td class="small">{{ relatorio.tecnico_principal_exibicao|default:relatorio.tecnico_responsavel }}</td>
+                  <td><span class="badge bg-{{ relatorio.status_badge_cor }}-subtle text-{{ relatorio.status_badge_cor }}">{{ relatorio.get_status_display }}</span></td>
+                  <td class="text-end pe-4">
+                    <a href="{% url 'relatorios:relatorio_detail' relatorio.pk %}" class="btn btn-sm btn-outline-primary">
+                      <i class="bi bi-eye"></i>
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="text-center text-muted small py-5">
+            <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+            Nenhum relatório encontrado para os filtros atuais.
+          </div>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -160,48 +196,12 @@
     </div>
     <div class="col-12 col-xl-7">
       <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3">
-          <h6 class="mb-0 fw-semibold"><i class="bi bi-clock-history text-primary me-2"></i>Relatórios recentes</h6>
-          <a href="{% url 'relatorios:relatorio_create' %}" class="btn btn-primary btn-sm">
-            <i class="bi bi-plus-lg me-1"></i>Novo relatório
-          </a>
+        <div class="card-header bg-transparent border-bottom py-3">
+          <h6 class="mb-0 fw-semibold"><i class="bi bi-graph-up-arrow text-primary me-2"></i>Evolução financeira</h6>
         </div>
-        <div class="card-body p-0">
-          {% if relatorios_recentes %}
-          <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-              <thead class="table-light">
-                <tr>
-                  <th class="ps-4 small text-muted">Relatório</th>
-                  <th class="small text-muted">Cliente</th>
-                  <th class="small text-muted">Técnico</th>
-                  <th class="small text-muted">Status</th>
-                  <th class="text-end pe-4 small text-muted">Ação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for relatorio in relatorios_recentes %}
-                <tr>
-                  <td class="ps-4 small fw-semibold">{{ relatorio.identificador }}</td>
-                  <td class="small">{{ relatorio.cliente_principal_exibicao|default:relatorio.cliente }}</td>
-                  <td class="small">{{ relatorio.tecnico_principal_exibicao|default:relatorio.tecnico_responsavel }}</td>
-                  <td><span class="badge bg-{{ relatorio.status_badge_cor }}-subtle text-{{ relatorio.status_badge_cor }}">{{ relatorio.get_status_display }}</span></td>
-                  <td class="text-end pe-4">
-                    <a href="{% url 'relatorios:relatorio_detail' relatorio.pk %}" class="btn btn-sm btn-outline-primary">
-                      <i class="bi bi-eye"></i>
-                    </a>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          {% else %}
-          <div class="text-center text-muted small py-5">
-            <i class="bi bi-inbox fs-2 d-block mb-2"></i>
-            Nenhum relatório encontrado para os filtros atuais.
-          </div>
-          {% endif %}
+        <div class="card-body">
+          <div id="chart-evolucao-financeira" class="dashboard-chart"></div>
+          <div class="dashboard-empty d-none text-center text-muted small py-4">Sem dados para o período selecionado.</div>
         </div>
       </div>
     </div>

@@ -12,7 +12,6 @@ from .base import *  # noqa
 
 DEBUG = False
 
-LOG_DIR.mkdir(parents=True, exist_ok=True)
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 ANEXOS_ROOT.mkdir(parents=True, exist_ok=True)
 STATIC_ROOT.mkdir(parents=True, exist_ok=True)
@@ -55,22 +54,6 @@ DATABASES = {
     }
 }
 
-LOGGING["handlers"]["file"] = {
-    "class": "logging.handlers.RotatingFileHandler",
-    "filename": LOG_DIR / "django.log",
-    "maxBytes": 10 * 1024 * 1024,
-    "backupCount": 5,
-    "formatter": "verbose",
-}
-LOGGING["formatters"] = {
-    "verbose": {
-        "format": "{levelname} {asctime} {name} {process:d} {thread:d} {message}",
-        "style": "{",
-    },
-}
-LOGGING["root"]["handlers"] = ["console", "file"]
-LOGGING["loggers"]["django.request"] = {
-    "handlers": ["console", "file"],
-    "level": "ERROR",
-    "propagate": False,
-}
+if not LOG_FILES_ENABLED:
+    LOGGING["loggers"]["django.security"]["handlers"] = ["console"]
+    LOGGING["loggers"]["django.request"]["handlers"] = ["console"]

@@ -4,8 +4,12 @@ from dataclasses import replace
 from django.conf import settings
 from django.contrib.auth import logout
 from django.core.exceptions import PermissionDenied
+from django.shortcuts import redirect
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 from django.utils import timezone
 
+from relatorios.models import PerfilUsuario
 from relatorios.services.autorizacao_service import (
     usuario_eh_superadmin,
     usuario_pode_acessar_erp,
@@ -29,6 +33,70 @@ logger = logging.getLogger(__name__)
 
 
 CHAVE_REVALIDACAO = "identidade_revalidada_em"
+
+
+def perfil_usuario_completo(user):
+    if not getattr(user, "is_authenticated", False):
+        return True
+    perfil, _criado = PerfilUsuario.objects.get_or_create(usuario=user)
+    return bool(
+        perfil.cadastro_confirmado_em
+        and (user.first_name or "").strip()
+        and (user.last_name or "").strip()
+        and (user.email or "").strip()
+    )
+
+
+class CadastroObrigatorioMiddleware:
+    """
+    Bloqueia acesso ao ERP ate o usuario autenticado confirmar os dados
+    cadastrais obrigatorios. O controle e backend-first e nao interfere no
+    fluxo LDAP; usa o User Django ja autenticado.
+    """
+
+    ROTAS_LIBERADAS = {
+        "login",
+        "logout",
+        "relatorios:completar_cadastro",
+    }
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        user = getattr(request, "user", None)
+        if getattr(user, "is_authenticated", False) and not self._rota_liberada(request):
+            if not perfil_usuario_completo(user):
+                destino = reverse("relatorios:completar_cadastro")
+                next_url = request.get_full_path()
+                if url_has_allowed_host_and_scheme(
+                    next_url,
+                    allowed_hosts={request.get_host()},
+                    require_https=request.is_secure(),
+                ):
+                    destino = f"{destino}?{urlencode({'next': next_url})}"
+                return redirect(destino)
+        return self.get_response(request)
+
+    def _rota_liberada(self, request):
+        if request.path.startswith(settings.STATIC_URL):
+            return True
+        if request.path.startswith(settings.MEDIA_URL):
+            return True
+        if request.path.startswith(getattr(settings, "ANEXOS_URL", "/anexos/")):
+            return True
+        caminhos_liberados = {
+            reverse("login"),
+            reverse("logout"),
+            reverse("relatorios:completar_cadastro"),
+        }
+        if request.path in caminhos_liberados:
+            return True
+        match = getattr(request, "resolver_match", None)
+        if not match:
+            return False
+        nomes = {match.view_name, match.url_name}
+        return bool(nomes & self.ROTAS_LIBERADAS)
 
 
 class IdentidadeCorporativaMiddleware:
@@ -55,12 +123,14 @@ class IdentidadeCorporativaMiddleware:
             return
 
         if not user.is_active:
+            logger.warning("Sessao bloqueada para usuario inativo id=%s.", user.pk)
             self._encerrar_sessao(request, "usuario_inativo")
 
         if self._deve_revalidar_ldap(request, user):
             self._revalidar_usuario_ldap(request, user)
 
         if not usuario_pode_acessar_erp(user):
+            logger.warning("Sessao bloqueada por ausencia de grupo ERP usuario id=%s.", user.pk)
             self._encerrar_sessao(request, "usuario_sem_grupo_erp")
 
     def _deve_revalidar_ldap(self, request, user):
@@ -141,4 +211,5 @@ class IdentidadeCorporativaMiddleware:
             {"username": username, "motivo": motivo},
         )
         logout(request)
+        logger.warning("Sessao encerrada por controle de seguranca. usuario=%s motivo=%s", username, motivo)
         raise PermissionDenied("Usuario sem autorizacao ativa para acessar o ERP.")

@@ -9,7 +9,7 @@
 {% endblock %}
 
 {% block page_actions %}
-  <a href="{% url 'relatorios:relatorio_create' %}" class="btn btn-primary d-flex align-items-center gap-1">
+  <a href="{% url 'relatorios:relatorio_create' %}" class="btn btn-primary btn-sm d-flex align-items-center gap-1">
     <i class="bi bi-plus-lg"></i> Novo Relatório
   </a>
 {% endblock %}
@@ -17,8 +17,8 @@
 {% block content %}
 
 <!-- Filtros -->
-<div class="card border-0 shadow-sm mb-4">
-  <div class="card-body py-3">
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
     <form method="get" class="row g-2 align-items-end">
       <div class="col-12 col-md-3">
         {{ form_filtro.busca.label_tag }}
@@ -45,10 +45,10 @@
         {{ form_filtro.data_fim }}
       </div>
       <div class="col-6 col-md-1 d-flex gap-1">
-        <button type="submit" class="btn btn-primary w-100">
+        <button type="submit" class="btn btn-primary btn-sm w-100">
           <i class="bi bi-search"></i>
         </button>
-        <a href="{% url 'relatorios:relatorio_list' %}" class="btn btn-outline-secondary w-100">
+        <a href="{% url 'relatorios:relatorio_list' %}" class="btn btn-outline-secondary btn-sm w-100">
           <i class="bi bi-x"></i>
         </a>
       </div>
@@ -58,7 +58,7 @@
 
 <!-- Tabela -->
 <div class="card border-0 shadow-sm">
-  <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center justify-content-between">
+  <div class="card-header bg-transparent border-bottom py-2 d-flex align-items-center justify-content-between">
     <div class="d-flex align-items-center gap-2">
       <i class="bi bi-table text-primary"></i>
       <h6 class="mb-0 fw-semibold">
@@ -70,7 +70,7 @@
   <div class="card-body p-0">
     {% if relatorios %}
     <div class="relatorios-list-table-wrap">
-      <table class="table table-hover align-middle mb-0 relatorios-list-table">
+      <table class="table table-sm table-hover align-middle mb-0 relatorios-list-table">
         <colgroup>
           <col class="col-numero">
           <col class="col-cliente">
@@ -83,14 +83,23 @@
         </colgroup>
         <thead class="table-light">
           <tr>
-            <th class="ps-4 py-3 fw-semibold text-muted small">Número</th>
-            <th class="py-3 fw-semibold text-muted small">Cliente</th>
-            <th class="py-3 fw-semibold text-muted small">Técnico</th>
-            <th class="py-3 fw-semibold text-muted small">Período</th>
-            <th class="py-3 fw-semibold text-muted small">KM</th>
-            <th class="py-3 fw-semibold text-muted small">Total</th>
-            <th class="py-3 fw-semibold text-muted small">Status</th>
-            <th class="py-3 fw-semibold text-muted small text-end pe-4">Ações</th>
+            <th class="ps-4 py-2 fw-semibold text-muted small">
+              <a href="{{ numero_sort_url }}" class="text-muted text-decoration-none d-inline-flex align-items-center gap-1">
+                Número
+                {% if sort_atual == "numero" %}
+                  <i class="bi {% if direcao_atual == 'desc' %}bi-sort-down{% else %}bi-sort-up{% endif %}"></i>
+                {% else %}
+                  <i class="bi bi-arrow-down-up opacity-50"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="py-2 fw-semibold text-muted small">Cliente</th>
+            <th class="py-2 fw-semibold text-muted small">Técnico</th>
+            <th class="py-2 fw-semibold text-muted small">Período</th>
+            <th class="py-2 fw-semibold text-muted small">KM</th>
+            <th class="py-2 fw-semibold text-muted small">Total</th>
+            <th class="py-2 fw-semibold text-muted small">Status</th>
+            <th class="py-2 fw-semibold text-muted small text-end pe-4">Ações</th>
           </tr>
         </thead>
         <tbody>
@@ -186,19 +195,19 @@
         <ul class="pagination pagination-sm mb-0 gap-1">
           {% if page_obj.has_previous %}
             <li class="page-item">
-              <a class="page-link rounded" href="?page={{ page_obj.previous_page_number }}">
+              <a class="page-link rounded" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.previous_page_number }}">
                 <i class="bi bi-chevron-left"></i>
               </a>
             </li>
           {% endif %}
           {% for num in paginator.page_range %}
             <li class="page-item {% if num == page_obj.number %}active{% endif %}">
-              <a class="page-link rounded" href="?page={{ num }}">{{ num }}</a>
+              <a class="page-link rounded" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ num }}">{{ num }}</a>
             </li>
           {% endfor %}
           {% if page_obj.has_next %}
             <li class="page-item">
-              <a class="page-link rounded" href="?page={{ page_obj.next_page_number }}">
+              <a class="page-link rounded" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.next_page_number }}">
                 <i class="bi bi-chevron-right"></i>
               </a>
             </li>
@@ -234,32 +243,49 @@
 
   .relatorios-list-table-wrap {
     width: 100%;
-    overflow: visible;
+    overflow-x: auto;
+    overflow-y: visible;
   }
 
   .relatorios-list-table {
     width: 100%;
+    min-width: 1040px;
     table-layout: fixed;
+    font-size: .82rem;
   }
 
-  .relatorios-list-table .col-numero { width: 11%; }
+  .relatorios-list-table .col-numero { width: 10%; }
   .relatorios-list-table .col-cliente { width: 20%; }
-  .relatorios-list-table .col-tecnico { width: 16%; }
+  .relatorios-list-table .col-tecnico { width: 15%; }
   .relatorios-list-table .col-periodo { width: 13%; }
   .relatorios-list-table .col-km { width: 8%; }
   .relatorios-list-table .col-total { width: 10%; }
   .relatorios-list-table .col-status { width: 12%; }
-  .relatorios-list-table .col-acoes { width: 10%; min-width: 128px; }
+  .relatorios-list-table .col-acoes { width: 12%; min-width: 136px; }
 
   .relatorios-list-table td,
   .relatorios-list-table th {
     min-width: 0;
     overflow-wrap: anywhere;
+    padding: .42rem .5rem !important;
+    vertical-align: middle;
+  }
+
+  .relatorios-list-table .badge {
+    font-size: .68rem;
+    padding: .3rem .55rem;
+  }
+
+  .relatorios-list-table .btn-sm {
+    --bs-btn-padding-y: .18rem;
+    --bs-btn-padding-x: .36rem;
+    --bs-btn-font-size: .75rem;
+    line-height: 1.2;
   }
 
   .relatorios-list-table td[data-label="Ações"] .d-flex,
   .relatorios-list-table td[data-label="AÃ§Ãµes"] .d-flex {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: .25rem !important;
   }
 
@@ -273,12 +299,18 @@
     flex: 0 0 auto;
   }
 
-  @media (max-width: 1600px) {
+  @media (max-width: 991.98px) {
+    .relatorios-list-table-wrap {
+      overflow-x: visible;
+    }
+
     .relatorios-list-table {
+      min-width: 0;
       border-collapse: separate;
       border-spacing: 0 .75rem;
       padding: .75rem;
       table-layout: auto;
+      font-size: .9rem;
     }
 
     .relatorios-list-table thead {

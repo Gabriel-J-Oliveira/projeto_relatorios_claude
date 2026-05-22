@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.contrib.auth.models import Group
 
-from relatorios.services.autorizacao_service import GRUPOS_ERP
+from relatorios.services.autorizacao_service import GRUPOS_ERP, GRUPO_DOMAIN_ADMINS
 
 
 def normalizar_identificador_grupo(valor):
@@ -74,6 +74,9 @@ def mapear_grupos_ad_para_django(grupos_ad, mapeamento=None):
         if aliases_grupo_ad(grupo_ad_mapeado) & aliases_recebidos:
             grupos_resolvidos.add(grupo_django)
 
+    if normalizar_identificador_grupo("Domain Admins") in aliases_recebidos:
+        grupos_resolvidos.add(GRUPO_DOMAIN_ADMINS)
+
     return sorted(grupos_resolvidos)
 
 
@@ -83,4 +86,3 @@ def garantir_grupos_erp():
         grupo, _criado = Group.objects.get_or_create(name=nome)
         grupos.append(grupo)
     return grupos
-

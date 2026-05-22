@@ -1,5 +1,6 @@
 import logging
 import json
+import time
 from decimal import Decimal
 
 from django.contrib import messages
@@ -14,6 +15,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import ListView, TemplateView
 
@@ -22,6 +24,7 @@ from .models import (
     AnexoRelatorio,
     Cliente,
     ItemDespesa,
+    PerfilUsuario,
     RelatorioTecnico,
     RelatorioTecnicoEquipe,
     StatusFinanceiroItem,
@@ -84,6 +87,7 @@ from .services.dashboard_service import get_dashboard_context, get_dashboard_dat
 from .forms import (
     AdiantamentoForm,
     ClienteForm,
+    CompletarCadastroUsuarioForm,
     ItemDespesaForm,
     ItemDespesaFormSet,
     RelatorioFiltroForm,
@@ -96,6 +100,42 @@ from .forms import (
 logger = logging.getLogger(__name__)
 
 BLOQUEIO_POS_APROVACAO = {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
+
+
+@login_required
+def completar_cadastro_view(request):
+    perfil, _criado = PerfilUsuario.objects.get_or_create(usuario=request.user)
+    next_url = request.GET.get("next") or request.POST.get("next") or ""
+
+    if request.method == "POST":
+        form = CompletarCadastroUsuarioForm(request.POST, user=request.user)
+        if form.is_valid():
+            request.user.first_name = form.cleaned_data["first_name"].strip()
+            request.user.last_name = form.cleaned_data["last_name"].strip()
+            request.user.email = form.cleaned_data["email"]
+            request.user.save(update_fields=["first_name", "last_name", "email"])
+            perfil.cadastro_confirmado_em = timezone.now()
+            perfil.save(update_fields=["cadastro_confirmado_em", "atualizado_em"])
+            messages.success(request, "Dados cadastrais confirmados com sucesso.")
+            if next_url and url_has_allowed_host_and_scheme(
+                next_url,
+                allowed_hosts={request.get_host()},
+                require_https=request.is_secure(),
+            ):
+                return redirect(next_url)
+            return redirect("relatorios:dashboard")
+    else:
+        form = CompletarCadastroUsuarioForm(user=request.user)
+
+    return render(
+        request,
+        "registration/completar_cadastro.html",
+        {
+            "form": form,
+            "next": next_url,
+            "perfil": perfil,
+        },
+    )
 
 
 # ─────────────────────────────────────────────
@@ -857,7 +897,16 @@ class DashboardView(AcessoErpMixin, TemplateView):
 @login_required
 @exigir_acesso_erp
 def dashboard_dados_json(request):
-    return JsonResponse(get_dashboard_data(request.user, request.GET))
+    inicio = time.perf_counter()
+    dados = get_dashboard_data(request.user, request.GET)
+    duracao = time.perf_counter() - inicio
+    if duracao > 2:
+        logger.warning(
+            "Endpoint JSON do dashboard lento. usuario=%s duracao=%.2fs",
+            request.user.pk,
+            duracao,
+        )
+    return JsonResponse(dados)
 
 
 class RelatorioListView(AcessoErpMixin, ListView):
@@ -870,10 +919,12 @@ class RelatorioListView(AcessoErpMixin, ListView):
         qs = _relatorios_visiveis(
             self.request.user,
             RelatorioTecnico.objects.select_related(
-                "cliente", "tecnico_responsavel"
+                "cliente", "tecnico_responsavel", "aprovado_por", "criado_por", "snapshot_financeiro"
             ).prefetch_related(
                 "clientes_vinculados__cliente",
                 "equipe__tecnico",
+                "despesas",
+                "trechos",
             ),
         )
         form = _relatorio_filtro_form(self.request.user, self.request.GET)
@@ -897,13 +948,35 @@ class RelatorioListView(AcessoErpMixin, ListView):
                     | Q(tecnico_responsavel__nome__icontains=q)
                     | Q(cidade_atendimento__icontains=q)
                 )
-        return qs
+        sort = self.request.GET.get("sort")
+        direction = self.request.GET.get("dir")
+        if sort == "numero":
+            campo_numero = "-numero" if direction == "desc" else "numero"
+            return qs.order_by(campo_numero, "-criado_em")
+        return qs.order_by("-criado_em")
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        params = self.request.GET.copy()
+        params.pop("page", None)
+        params_sem_ordem = params.copy()
+        params_sem_ordem.pop("sort", None)
+        params_sem_ordem.pop("dir", None)
+        sort_atual = self.request.GET.get("sort")
+        direcao_atual = self.request.GET.get("dir")
+        proxima_direcao_numero = (
+            "desc" if sort_atual == "numero" and direcao_atual != "desc" else "asc"
+        )
+        params_numero = params_sem_ordem.copy()
+        params_numero["sort"] = "numero"
+        params_numero["dir"] = proxima_direcao_numero
         ctx["form_filtro"] = _relatorio_filtro_form(self.request.user, self.request.GET)
         ctx["titulo_pagina"] = "Relatórios Técnicos"
         ctx["total"] = self.get_queryset().count()
+        ctx["sort_atual"] = sort_atual
+        ctx["direcao_atual"] = direcao_atual
+        ctx["numero_sort_url"] = "?" + params_numero.urlencode()
+        ctx["pagination_query"] = params.urlencode()
         return ctx
 
 
@@ -1433,7 +1506,9 @@ def relatorio_detail_view(request, pk):
     except RateioError as exc:
         inconsistencias_rateio = [str(exc)]
     relatorio = (
-        RelatorioTecnico.objects.select_related("cliente", "tecnico_responsavel")
+        RelatorioTecnico.objects.select_related(
+            "cliente", "tecnico_responsavel", "aprovado_por", "criado_por", "snapshot_financeiro"
+        )
         .prefetch_related(
             "clientes_vinculados__cliente",
             "despesas__clientes_vinculados__cliente",
@@ -1612,6 +1687,8 @@ def relatorio_cliente_pdf_view(request, pk, cliente_id):
         messages.error(request, "O PDF do cliente só pode ser gerado após aprovação.")
         return _redirect_pdf_cliente_error(relatorio)
 
+    inicio_pdf = time.perf_counter()
+    logger.info("Inicio da geracao do PDF de cliente para relatorio %s cliente %s.", pk, cliente_id)
     try:
         pdf, contexto = gerar_pdf_cliente(relatorio, cliente_id, request=request)
     except PermissionDenied:
@@ -1627,6 +1704,10 @@ def relatorio_cliente_pdf_view(request, pk, cliente_id):
         return _redirect_pdf_cliente_error(relatorio)
 
     filename = nome_arquivo_pdf_cliente(relatorio, contexto["cliente"])
+    duracao_pdf = time.perf_counter() - inicio_pdf
+    if duracao_pdf > 5:
+        logger.warning("PDF de cliente lento. relatorio=%s cliente=%s duracao=%.2fs", pk, cliente_id, duracao_pdf)
+    logger.info("PDF de cliente gerado para relatorio %s cliente %s.", pk, cliente_id)
     response = HttpResponse(pdf, content_type="application/pdf")
     response["Content-Disposition"] = f'inline; filename="{filename}"'
     return response
@@ -1640,6 +1721,8 @@ def relatorio_clientes_pdf_view(request, pk):
         messages.error(request, "O PDF do cliente só pode ser gerado após aprovação.")
         return _redirect_pdf_cliente_error(relatorio)
 
+    inicio_pdf = time.perf_counter()
+    logger.info("Inicio da geracao do ZIP de PDFs de clientes para relatorio %s.", pk)
     try:
         zip_bytes, gerados, ignorados = gerar_zip_pdfs_clientes(
             relatorio,
@@ -1664,6 +1747,10 @@ def relatorio_clientes_pdf_view(request, pk):
             len(ignorados),
         )
 
+    duracao_pdf = time.perf_counter() - inicio_pdf
+    if duracao_pdf > 8:
+        logger.warning("ZIP de PDFs de clientes lento. relatorio=%s duracao=%.2fs", pk, duracao_pdf)
+    logger.info("ZIP de PDFs de clientes gerado para relatorio %s com %s arquivo(s).", pk, len(gerados))
     filename = f"relatorio_{relatorio.numero or relatorio.pk}_clientes.zip"
     response = HttpResponse(zip_bytes, content_type="application/zip")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
@@ -1697,6 +1784,8 @@ def relatorio_pdf_interno_view(request, pk):
         )
         return redirect("relatorios:relatorio_detail", pk=pk)
 
+    inicio_pdf = time.perf_counter()
+    logger.info("Inicio da geracao do PDF interno do relatorio %s.", pk)
     emitido_em = timezone.localtime(timezone.now())
     usuario_gerador = request.user if request.user.is_authenticated else None
     pdf_contexto = montar_contexto_pdf_interno(
@@ -1734,6 +1823,10 @@ def relatorio_pdf_interno_view(request, pk):
     ).write_pdf(stylesheets=[CSS(filename=str(css_path))])
 
     filename = f"relatorio-interno-{relatorio.numero}.pdf"
+    duracao_pdf = time.perf_counter() - inicio_pdf
+    if duracao_pdf > 5:
+        logger.warning("PDF interno lento. relatorio=%s duracao=%.2fs", pk, duracao_pdf)
+    logger.info("PDF interno gerado para relatorio %s.", pk)
     response = HttpResponse(pdf, content_type="application/pdf")
     response["Content-Disposition"] = f'inline; filename="{filename}"'
     return response
@@ -1878,6 +1971,7 @@ def mapa_buscar_endereco_json(request):
             status=400,
         )
 
+    inicio = time.perf_counter()
     try:
         resultados = buscar_endereco(query)
     except MapsServiceError as exc:
@@ -1889,6 +1983,9 @@ def mapa_buscar_endereco_json(request):
             status=500,
         )
 
+    duracao = time.perf_counter() - inicio
+    if duracao > 3:
+        logger.warning("Busca de endereco lenta. duracao=%.2fs tamanho_query=%s", duracao, len(query))
     return JsonResponse({"success": True, "data": resultados})
 
 
@@ -1911,6 +2008,7 @@ def mapa_calcular_rota_json(request):
             status=400,
         )
 
+    inicio = time.perf_counter()
     try:
         rota = calcular_rota(**parametros)
     except MapsServiceError as exc:
@@ -1922,6 +2020,9 @@ def mapa_calcular_rota_json(request):
             status=500,
         )
 
+    duracao = time.perf_counter() - inicio
+    if duracao > 3:
+        logger.warning("Calculo de rota lento. duracao=%.2fs", duracao)
     return JsonResponse({"success": True, "data": rota})
 
 
@@ -2246,6 +2347,8 @@ def relatorio_status_view(request, pk, status):
         request,
         f'Status alterado para "{relatorio.get_status_display()}".',
     )
+    if getattr(relatorio, "_email_warning", ""):
+        messages.warning(request, relatorio._email_warning)
     return redirect("relatorios:relatorio_detail", pk=pk)
 
 

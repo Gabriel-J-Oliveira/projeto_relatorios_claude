@@ -1,6 +1,13 @@
+import hashlib
+import json
+import logging
+import time
 from collections import defaultdict
+from datetime import timedelta
 from decimal import Decimal
 
+from django.conf import settings
+from django.core.cache import cache
 from django.db.models import Q
 from django.utils import timezone
 
@@ -15,6 +22,7 @@ from relatorios.services.autorizacao_service import (
     usuario_eh_administrativo,
 )
 
+logger = logging.getLogger(__name__)
 
 STATUS_CORES = {
     StatusRelatorio.RASCUNHO: "#6c757d",
@@ -44,6 +52,22 @@ def _periodo_label(data):
     return data.strftime("%m/%Y")
 
 
+def _usar_bucket_diario(filtros):
+    data_inicio = filtros.get("data_inicio")
+    data_fim = filtros.get("data_fim")
+    if not data_inicio or not data_fim:
+        return False
+    return (data_fim - data_inicio).days <= 120
+
+
+def _bucket_periodo(data, filtros):
+    if not data:
+        return "sem-data", "Sem data"
+    if _usar_bucket_diario(filtros):
+        return data.isoformat(), data.strftime("%d/%m")
+    return data.strftime("%Y-%m"), data.strftime("%m/%Y")
+
+
 def _parse_date(valor):
     if not valor:
         return None
@@ -59,7 +83,7 @@ def usuario_tem_dashboard_global(user):
 
 def filtros_dashboard(user, params):
     hoje = timezone.localdate()
-    inicio_padrao = hoje.replace(day=1)
+    inicio_padrao = hoje - timedelta(days=365)
     status = (params.get("status") or "").strip()
     centro_custo = (params.get("centro_custo") or "").strip()
 
@@ -140,8 +164,7 @@ def _relatorios_materializados(user, filtros):
     return list(get_dashboard_queryset(user, filtros))
 
 
-def get_kpis(user, filtros):
-    relatorios = _relatorios_materializados(user, filtros)
+def get_kpis(relatorios):
     total_solicitado = sum((r.total_solicitado for r in relatorios), Decimal("0.00"))
     total_aprovado = sum((r.total_aprovado for r in relatorios), Decimal("0.00"))
     km_total = sum((r.total_km_percorrido for r in relatorios), Decimal("0.00"))
@@ -162,20 +185,27 @@ def get_kpis(user, filtros):
     }
 
 
-def get_evolucao_financeira(user, filtros):
-    relatorios = _relatorios_materializados(user, filtros)
-    buckets = defaultdict(lambda: {"solicitado": Decimal("0.00"), "aprovado": Decimal("0.00")})
+def get_evolucao_financeira(relatorios, filtros):
+    buckets = defaultdict(
+        lambda: {
+            "label": "",
+            "solicitado": Decimal("0.00"),
+            "aprovado": Decimal("0.00"),
+        }
+    )
     for relatorio in relatorios:
-        chave = _periodo_label(relatorio.data_inicio)
+        chave, label = _bucket_periodo(relatorio.data_inicio, filtros)
+        buckets[chave]["label"] = label
         buckets[chave]["solicitado"] += relatorio.total_solicitado
         buckets[chave]["aprovado"] += relatorio.total_aprovado
 
-    labels = sorted(buckets)
-    solicitado = [_decimal_json(buckets[label]["solicitado"]) for label in labels]
-    aprovado = [_decimal_json(buckets[label]["aprovado"]) for label in labels]
+    chaves = sorted(buckets)
+    labels = [buckets[chave]["label"] for chave in chaves]
+    solicitado = [_decimal_json(buckets[chave]["solicitado"]) for chave in chaves]
+    aprovado = [_decimal_json(buckets[chave]["aprovado"]) for chave in chaves]
     diferenca = [
-        _decimal_json(max(buckets[label]["solicitado"] - buckets[label]["aprovado"], Decimal("0.00")))
-        for label in labels
+        _decimal_json(max(buckets[chave]["solicitado"] - buckets[chave]["aprovado"], Decimal("0.00")))
+        for chave in chaves
     ]
     return {
         "labels": labels,
@@ -187,8 +217,7 @@ def get_evolucao_financeira(user, filtros):
     }
 
 
-def get_gastos_por_cliente(user, filtros):
-    relatorios = _relatorios_materializados(user, filtros)
+def get_gastos_por_cliente(relatorios):
     totais = defaultdict(Decimal)
     for relatorio in relatorios:
         for despesa in relatorio.despesas.all():
@@ -216,13 +245,15 @@ def get_gastos_por_cliente(user, filtros):
     }
 
 
-def get_relatorios_por_tecnico(user, filtros):
-    relatorios = _relatorios_materializados(user, filtros)
+def get_relatorios_por_tecnico(relatorios):
     totais = defaultdict(int)
     for relatorio in relatorios:
-        tecnico = relatorio.tecnico_principal_exibicao()
-        nome = tecnico.nome if tecnico else "Não informado"
-        totais[nome] += 1
+        tecnicos = list(relatorio.tecnicos_exibicao())
+        if not tecnicos:
+            totais["Não informado"] += 1
+            continue
+        for tecnico in tecnicos:
+            totais[tecnico.nome] += 1
     ranking = sorted(totais.items(), key=lambda item: item[1], reverse=True)[:12]
     return {
         "labels": [nome for nome, _total in ranking],
@@ -230,13 +261,15 @@ def get_relatorios_por_tecnico(user, filtros):
     }
 
 
-def get_km_por_tecnico(user, filtros):
-    relatorios = _relatorios_materializados(user, filtros)
+def get_km_por_tecnico(relatorios):
     totais = defaultdict(Decimal)
     for relatorio in relatorios:
-        tecnico = relatorio.tecnico_principal_exibicao()
-        nome = tecnico.nome if tecnico else "Não informado"
-        totais[nome] += _money(relatorio.total_km_percorrido)
+        tecnicos = list(relatorio.tecnicos_exibicao())
+        if not tecnicos:
+            totais["Não informado"] += _money(relatorio.total_km_percorrido)
+            continue
+        for tecnico in tecnicos:
+            totais[tecnico.nome] += _money(relatorio.total_km_percorrido)
     ranking = sorted(totais.items(), key=lambda item: item[1], reverse=True)[:12]
     return {
         "labels": [nome for nome, _total in ranking],
@@ -244,8 +277,7 @@ def get_km_por_tecnico(user, filtros):
     }
 
 
-def get_status_relatorios(user, filtros):
-    relatorios = _relatorios_materializados(user, filtros)
+def get_status_relatorios(relatorios):
     labels = dict(StatusRelatorio.choices)
     contadores = {status: 0 for status in labels}
     for relatorio in relatorios:
@@ -257,39 +289,74 @@ def get_status_relatorios(user, filtros):
     }
 
 
+def _dashboard_cache_key(user, filtros):
+    payload = {
+        "user": getattr(user, "pk", None),
+        "global": usuario_tem_dashboard_global(user),
+        "filtros": serializar_filtros(filtros),
+    }
+    raw = json.dumps(payload, sort_keys=True, default=str)
+    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    return f"dashboard:v2:{digest}"
+
+
+def _dashboard_cache_ttl():
+    return getattr(settings, "DASHBOARD_CACHE_TTL", 180)
+
+
 def get_dashboard_data(user, params):
     filtros = filtros_dashboard(user, params)
+    cache_key = _dashboard_cache_key(user, filtros)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    inicio = time.perf_counter()
+    relatorios = _relatorios_materializados(user, filtros)
     global_view = usuario_tem_dashboard_global(user)
-    kpis = get_kpis(user, filtros)
+    kpis = get_kpis(relatorios)
     charts = {
-        "evolucao_financeira": get_evolucao_financeira(user, filtros),
-        "gastos_por_cliente": get_gastos_por_cliente(user, filtros),
-        "status_relatorios": get_status_relatorios(user, filtros),
+        "evolucao_financeira": get_evolucao_financeira(relatorios, filtros),
+        "gastos_por_cliente": get_gastos_por_cliente(relatorios),
+        "status_relatorios": get_status_relatorios(relatorios),
     }
     if global_view:
-        charts["relatorios_por_tecnico"] = get_relatorios_por_tecnico(user, filtros)
-        charts["km_por_tecnico"] = get_km_por_tecnico(user, filtros)
+        charts["relatorios_por_tecnico"] = get_relatorios_por_tecnico(relatorios)
+        charts["km_por_tecnico"] = get_km_por_tecnico(relatorios)
     else:
-        charts["relatorios_por_tecnico"] = get_status_relatorios(user, filtros)
-        charts["km_por_tecnico"] = get_evolucao_km_individual(user, filtros)
+        charts["relatorios_por_tecnico"] = get_status_relatorios(relatorios)
+        charts["km_por_tecnico"] = get_evolucao_km_individual(relatorios, filtros)
 
-    return {
+    dados = {
         "escopo": "global" if global_view else "individual",
         "filtros": serializar_filtros(filtros),
         "kpis": serializar_kpis(kpis),
         "charts": charts,
     }
+    cache.set(cache_key, dados, _dashboard_cache_ttl())
+    duracao = time.perf_counter() - inicio
+    if duracao > 2:
+        logger.warning(
+            "Dashboard calculado lentamente para usuario=%s escopo=%s filtros=%s duracao=%.2fs",
+            getattr(user, "pk", None),
+            dados["escopo"],
+            dados["filtros"],
+            duracao,
+        )
+    return dados
 
 
-def get_evolucao_km_individual(user, filtros):
-    relatorios = _relatorios_materializados(user, filtros)
-    buckets = defaultdict(Decimal)
+def get_evolucao_km_individual(relatorios, filtros):
+    buckets = defaultdict(lambda: {"label": "", "km": Decimal("0.00")})
     for relatorio in relatorios:
-        buckets[_periodo_label(relatorio.data_inicio)] += _money(relatorio.total_km_percorrido)
-    labels = sorted(buckets)
+        chave, label = _bucket_periodo(relatorio.data_inicio, filtros)
+        buckets[chave]["label"] = label
+        buckets[chave]["km"] += _money(relatorio.total_km_percorrido)
+    chaves = sorted(buckets)
+    labels = [buckets[chave]["label"] for chave in chaves]
     return {
         "labels": labels,
-        "series": [{"name": "KM", "data": [_decimal_json(buckets[label]) for label in labels]}],
+        "series": [{"name": "KM", "data": [_decimal_json(buckets[chave]["km"]) for chave in chaves]}],
     }
 
 
