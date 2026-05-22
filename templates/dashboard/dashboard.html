@@ -304,12 +304,13 @@ document.addEventListener("DOMContentLoaded", function () {
     renderChart("chart-relatorios-tecnico", {
       ...baseOptions(),
       chart: { ...baseOptions().chart, type: data.escopo === "global" ? "bar" : "donut", height: 330 },
+      plotOptions: data.escopo === "global" ? { bar: { horizontal: true, borderRadius: 4 } } : undefined,
       labels: data.escopo === "global" ? undefined : relatorios.labels,
       series: data.escopo === "global" ? relatorioSeries : relatorios.series,
       xaxis: data.escopo === "global" ? { categories: relatorios.labels } : undefined,
       colors: data.escopo === "global" ? ["#f0ad4e"] : relatorios.colors,
       legend: { position: "bottom" },
-    }, data.escopo === "global" ? !relatorios.labels.length : !hasSeries(relatorios.series));
+    }, data.escopo === "global" ? !hasSeries(relatorioSeries[0]?.data) : !hasSeries(relatorios.series));
 
     const km = data.charts.km_por_tecnico;
     const kmGlobal = data.escopo === "global";

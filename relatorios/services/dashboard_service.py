@@ -277,6 +277,58 @@ def get_km_por_tecnico(relatorios):
     }
 
 
+def _tecnicos_relatorio_para_dashboard(relatorio):
+    tecnicos = []
+    vistos = set()
+    if relatorio.tecnico_responsavel_id:
+        tecnicos.append(relatorio.tecnico_responsavel)
+        vistos.add(relatorio.tecnico_responsavel_id)
+
+    prefetched = getattr(relatorio, "_prefetched_objects_cache", {})
+    equipe = prefetched.get("equipe")
+    if equipe is None:
+        equipe = relatorio.equipe.select_related("tecnico").all()
+    for membro in equipe:
+        if membro.tecnico_id in vistos:
+            continue
+        tecnicos.append(membro.tecnico)
+        vistos.add(membro.tecnico_id)
+    return tecnicos
+
+
+def get_relatorios_por_tecnico_dashboard(relatorios):
+    totais = defaultdict(int)
+    for relatorio in relatorios:
+        tecnicos = _tecnicos_relatorio_para_dashboard(relatorio)
+        if not tecnicos:
+            totais["Nao informado"] += 1
+            continue
+        for tecnico in tecnicos:
+            totais[tecnico.nome] += 1
+    ranking = sorted(totais.items(), key=lambda item: item[1], reverse=True)[:12]
+    return {
+        "labels": [nome for nome, _total in ranking],
+        "series": [total for _nome, total in ranking],
+    }
+
+
+def get_km_por_tecnico_dashboard(relatorios):
+    totais = defaultdict(Decimal)
+    for relatorio in relatorios:
+        km_relatorio = _money(relatorio.total_km_percorrido)
+        tecnicos = _tecnicos_relatorio_para_dashboard(relatorio)
+        if not tecnicos:
+            totais["Nao informado"] += km_relatorio
+            continue
+        for tecnico in tecnicos:
+            totais[tecnico.nome] += km_relatorio
+    ranking = sorted(totais.items(), key=lambda item: item[1], reverse=True)[:12]
+    return {
+        "labels": [nome for nome, _total in ranking],
+        "series": [_decimal_json(total) for _nome, total in ranking],
+    }
+
+
 def get_status_relatorios(relatorios):
     labels = dict(StatusRelatorio.choices)
     contadores = {status: 0 for status in labels}
@@ -297,7 +349,7 @@ def _dashboard_cache_key(user, filtros):
     }
     raw = json.dumps(payload, sort_keys=True, default=str)
     digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
-    return f"dashboard:v2:{digest}"
+    return f"dashboard:v3:{digest}"
 
 
 def _dashboard_cache_ttl():
@@ -321,8 +373,8 @@ def get_dashboard_data(user, params):
         "status_relatorios": get_status_relatorios(relatorios),
     }
     if global_view:
-        charts["relatorios_por_tecnico"] = get_relatorios_por_tecnico(relatorios)
-        charts["km_por_tecnico"] = get_km_por_tecnico(relatorios)
+        charts["relatorios_por_tecnico"] = get_relatorios_por_tecnico_dashboard(relatorios)
+        charts["km_por_tecnico"] = get_km_por_tecnico_dashboard(relatorios)
     else:
         charts["relatorios_por_tecnico"] = get_status_relatorios(relatorios)
         charts["km_por_tecnico"] = get_evolucao_km_individual(relatorios, filtros)
