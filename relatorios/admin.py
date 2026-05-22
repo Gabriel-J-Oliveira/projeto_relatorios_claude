@@ -13,6 +13,7 @@ from .models import (
     ItemDespesa,
     TrechoKm,
     Adiantamento,
+    AnexoRelatorio,
 )
 
 
@@ -99,6 +100,7 @@ class TrechoKmInline(admin.TabularInline):
         "destino",
         "km",
         "valor_km",
+        "comprovante",
         "valor_calculado",
         "observacao",
     ]
@@ -107,6 +109,34 @@ class TrechoKmInline(admin.TabularInline):
 # ─────────────────────────────────────────────
 # RELATORIO TECNICO
 # ─────────────────────────────────────────────
+
+
+@admin.register(AnexoRelatorio)
+class AnexoRelatorioAdmin(admin.ModelAdmin):
+    list_display = [
+        "nome_original",
+        "relatorio",
+        "despesa",
+        "trecho",
+        "tipo_mime",
+        "tamanho_bytes",
+        "enviado_por",
+        "criado_em",
+    ]
+    list_filter = ["tipo_mime", "criado_em"]
+    search_fields = [
+        "nome_original",
+        "arquivo",
+        "relatorio__numero",
+        "relatorio__cliente__nome",
+    ]
+    readonly_fields = [
+        "nome_original",
+        "tipo_mime",
+        "tamanho_bytes",
+        "enviado_por",
+        "criado_em",
+    ]
 
 
 @admin.register(RelatorioTecnico)

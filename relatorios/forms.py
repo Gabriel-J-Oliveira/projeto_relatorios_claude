@@ -385,6 +385,7 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
             "fonte_calculo_rota",
             "rota_geojson",
             "valor_km",
+            "comprovante",
             "observacao",
         ]
         widgets = {
@@ -430,6 +431,7 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
             "fonte_calculo_rota",
             "rota_geojson",
             "valor_km",
+            "comprovante",
             "observacao",
         ]:
             self.fields[name].required = False
@@ -460,6 +462,12 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
                 "class": "form-control form-control-sm campo-vkm",
                 "inputmode": "decimal",
                 "placeholder": "0,00",
+            }
+        )
+        self.fields["comprovante"].widget.attrs.update(
+            {
+                "class": "form-control form-control-sm text-nowrap",
+                "accept": "image/*,.pdf",
             }
         )
 
@@ -503,6 +511,7 @@ class BaseTrechoKmFormSet(BaseInlineFormSet):
             destino = form.cleaned_data.get("destino")
             km = form.cleaned_data.get("km")
             valor_km = form.cleaned_data.get("valor_km")
+            comprovante = form.cleaned_data.get("comprovante")
             observacao = form.cleaned_data.get("observacao")
             clientes_raw = ""
             if getattr(self, "data", None):
@@ -519,7 +528,7 @@ class BaseTrechoKmFormSet(BaseInlineFormSet):
 
             # Linha totalmente vazia → ignora
             if not form.instance.pk and not any(
-                [data, origem, destino, km, observacao]
+                [data, origem, destino, km, comprovante, observacao]
             ):
                 continue
 

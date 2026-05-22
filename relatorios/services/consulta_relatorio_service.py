@@ -556,6 +556,16 @@ def _montar_consulta_viva(relatorio):
                 )
             )
 
+        if trecho.comprovante:
+            anexos.append(
+                AnexoConsultaRelatorioDTO(
+                    tipo="Comprovante KM",
+                    descricao=descricao,
+                    url=trecho.comprovante.url,
+                    nome=trecho.comprovante.name.rsplit("/", 1)[-1],
+                )
+            )
+
     for linha in relatorio.rateio_km_excedente_clientes():
         itens.append(
             ItemConsultaRelatorioDTO(

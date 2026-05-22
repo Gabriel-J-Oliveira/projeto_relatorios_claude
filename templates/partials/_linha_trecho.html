@@ -137,6 +137,24 @@
     <div class="text-warning fw-normal small aviso-km-multicliente"></div>
   </td>
   <td class="p-1 pt-3">
+    {% if form.instance.comprovante %}
+      <a href="{{ form.instance.comprovante.url }}"
+         target="_blank"
+         class="btn btn-sm btn-outline-success w-100 mb-1"
+         title="Abrir comprovante">
+        <i class="bi bi-paperclip"></i> Ver
+      </a>
+    {% endif %}
+    <input type="file"
+           name="trechos-{{ idx }}-comprovante"
+           id="id_trechos-{{ idx }}-comprovante"
+           class="form-control form-control-sm {% if form.comprovante.errors %}is-invalid{% endif %}"
+           accept="image/*,.pdf">
+    <div class="invalid-feedback d-block small erro-inline">
+      {% if form.comprovante.errors %}{{ form.comprovante.errors.0 }}{% endif %}
+    </div>
+  </td>
+  <td class="p-1 pt-3">
     <input type="text"
            name="trechos-{{ idx }}-observacao"
            id="id_trechos-{{ idx }}-observacao"

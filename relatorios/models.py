@@ -6,6 +6,8 @@ Mudanças:
 - RelatorioTecnicoEquipe mantido para múltiplos técnicos
 """
 
+import mimetypes
+
 from django.db import models
 from django.conf import settings
 from django.core.validators import MinValueValidator
@@ -16,6 +18,11 @@ from decimal import Decimal
 
 def _valor_monetario(valor):
     return (valor or Decimal("0.00")).quantize(Decimal("0.01"))
+
+
+def _tipo_mime_por_nome(nome_arquivo):
+    tipo_mime, _encoding = mimetypes.guess_type(nome_arquivo or "")
+    return tipo_mime or "application/octet-stream"
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -1101,6 +1108,12 @@ class TrechoKm(models.Model):
         null=True,
         blank=True,
     )
+    comprovante = models.FileField(
+        "Comprovante",
+        upload_to="comprovantes_km/%Y/%m/",
+        blank=True,
+        null=True,
+    )
     status_financeiro = models.CharField(
         "Status financeiro",
         max_length=10,
@@ -1265,6 +1278,98 @@ class TrechoKMCliente(models.Model):
 
 
 # ─────────────────────────────────────────────────────────────────
+
+class AnexoRelatorio(models.Model):
+    relatorio = models.ForeignKey(
+        RelatorioTecnico,
+        on_delete=models.CASCADE,
+        related_name="anexos",
+    )
+    despesa = models.ForeignKey(
+        ItemDespesa,
+        on_delete=models.CASCADE,
+        related_name="anexos",
+        null=True,
+        blank=True,
+    )
+    trecho = models.ForeignKey(
+        TrechoKm,
+        on_delete=models.CASCADE,
+        related_name="anexos",
+        null=True,
+        blank=True,
+    )
+    arquivo = models.FileField("Arquivo", upload_to="anexos_relatorios/%Y/%m/")
+    nome_original = models.CharField("Nome original", max_length=255)
+    tipo_mime = models.CharField("Tipo MIME", max_length=120, blank=True)
+    tamanho_bytes = models.PositiveBigIntegerField("Tamanho em bytes", default=0)
+    enviado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="anexos_relatorios_enviados",
+    )
+    criado_em = models.DateTimeField("Enviado em", auto_now_add=True)
+    observacao = models.TextField("Observacao", blank=True)
+
+    class Meta:
+        verbose_name = "Anexo do Relatorio"
+        verbose_name_plural = "Anexos dos Relatorios"
+        ordering = ["-criado_em", "-id"]
+        indexes = [
+            models.Index(fields=["relatorio", "criado_em"]),
+            models.Index(fields=["despesa"]),
+            models.Index(fields=["trecho"]),
+        ]
+
+    def __str__(self):
+        return self.nome_original or self.arquivo.name
+
+    def clean(self):
+        if self.despesa_id and self.trecho_id:
+            raise ValidationError(
+                "O anexo deve estar vinculado a despesa ou trecho KM, nao ambos."
+            )
+        if self.despesa_id and self.relatorio_id and self.despesa.relatorio_id != self.relatorio_id:
+            raise ValidationError("A despesa do anexo nao pertence ao relatorio.")
+        if self.trecho_id and self.relatorio_id and self.trecho.relatorio_id != self.relatorio_id:
+            raise ValidationError("O trecho KM do anexo nao pertence ao relatorio.")
+
+    @classmethod
+    def registrar_comprovante(
+        cls,
+        *,
+        relatorio,
+        usuario=None,
+        despesa=None,
+        trecho=None,
+        arquivo=None,
+        arquivo_original=None,
+    ):
+        if not relatorio or not arquivo:
+            return None
+        origem = arquivo_original or arquivo
+        defaults = {
+            "arquivo": arquivo.name,
+            "nome_original": getattr(origem, "name", "") or arquivo.name.rsplit("/", 1)[-1],
+            "tipo_mime": getattr(origem, "content_type", "") or _tipo_mime_por_nome(arquivo.name),
+            "tamanho_bytes": getattr(origem, "size", None) or getattr(arquivo, "size", None) or 0,
+            "enviado_por": usuario if getattr(usuario, "is_authenticated", False) else None,
+        }
+        filtros = {"relatorio": relatorio}
+        if despesa:
+            filtros["despesa"] = despesa
+            filtros["trecho__isnull"] = True
+        elif trecho:
+            filtros["trecho"] = trecho
+            filtros["despesa__isnull"] = True
+        else:
+            return None
+        anexo, _created = cls.objects.update_or_create(defaults=defaults, **filtros)
+        return anexo
+
+
 # ADIANTAMENTO
 # ─────────────────────────────────────────────────────────────────
 

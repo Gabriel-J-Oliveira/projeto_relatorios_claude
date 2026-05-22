@@ -19,6 +19,7 @@ from django.views.generic import ListView, TemplateView
 
 from .models import (
     Adiantamento,
+    AnexoRelatorio,
     Cliente,
     ItemDespesa,
     RelatorioTecnico,
@@ -209,6 +210,28 @@ def _popular_clientes_formsets_para_template(request, fs_desp, fs_km):
     _popular_clientes_formset_para_template(fs_km, request)
 
 
+def _registrar_metadados_comprovante(relatorio, usuario, item, arquivo_original=None):
+    arquivo = getattr(item, "comprovante", None)
+    if not arquivo:
+        return
+    if isinstance(item, ItemDespesa):
+        AnexoRelatorio.registrar_comprovante(
+            relatorio=relatorio,
+            usuario=usuario,
+            despesa=item,
+            arquivo=arquivo,
+            arquivo_original=arquivo_original,
+        )
+    elif isinstance(item, TrechoKm):
+        AnexoRelatorio.registrar_comprovante(
+            relatorio=relatorio,
+            usuario=usuario,
+            trecho=item,
+            arquivo=arquivo,
+            arquivo_original=arquivo_original,
+        )
+
+
 def _validar_clientes_formsets(request, fs_desp, fs_km, cliente_ids_relatorio):
     erros = []
     clientes_relatorio = set(cliente_ids_relatorio)
@@ -376,6 +399,7 @@ def _duplicar_relatorio(original, usuario=None):
             rota_geojson=trecho.rota_geojson or {},
             valor_km=trecho.valor_km,
             valor_km_aprovado=None,
+            comprovante=None,
             observacao=trecho.observacao,
         )
         for trecho in trechos_originais
@@ -1106,6 +1130,7 @@ def relatorio_form_view(request, pk=None):
 
         fs_km = TrechoKmFormSet(
             request.POST,
+            request.FILES,
             instance=instance,
             prefix="trechos",
             form_kwargs={"valor_km_padrao": valor_km_padrao},
@@ -1201,6 +1226,12 @@ def relatorio_form_view(request, pk=None):
                             item = f.save(commit=False)
                             item.relatorio = relatorio
                             item.save()
+                            _registrar_metadados_comprovante(
+                                relatorio,
+                                usuario_historico,
+                                item,
+                                f.cleaned_data.get("comprovante"),
+                            )
                             erros_item = sync_clientes_despesa(
                                 item,
                                 _clientes_item_post(request, f.prefix),
@@ -1225,6 +1256,12 @@ def relatorio_form_view(request, pk=None):
                             trecho = f.save(commit=False)
                             trecho.relatorio = relatorio
                             trecho.save()
+                            _registrar_metadados_comprovante(
+                                relatorio,
+                                usuario_historico,
+                                trecho,
+                                f.cleaned_data.get("comprovante"),
+                            )
                             _registrar_auditoria_geografica_trecho(
                                 relatorio,
                                 usuario_historico,
