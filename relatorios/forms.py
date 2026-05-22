@@ -120,6 +120,8 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
             ),
             "motivo": forms.Textarea(attrs={"rows": 4}),
             "observacoes": forms.Textarea(attrs={"rows": 3}),
+            "valor_adiantamento": forms.TextInput(),
+            "km_excedente_interno": forms.TextInput(),
             "observacao_km_excedente": forms.Textarea(attrs={"rows": 2}),
         }
         labels = {
@@ -435,14 +437,14 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
         self.fields["origem"].widget.attrs.update(
             {
                 "class": "form-control form-control-sm",
-                "placeholder": "Cidade origem",
+                "placeholder": "Endereço origem",
             }
         )
 
         self.fields["destino"].widget.attrs.update(
             {
                 "class": "form-control form-control-sm",
-                "placeholder": "Cidade destino",
+                "placeholder": "Endereço destino",
             }
         )
 

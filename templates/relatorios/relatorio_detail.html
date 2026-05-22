@@ -789,9 +789,6 @@
           <div class="cliente-carousel-slide {% if not forloop.first %}d-none{% endif %}"
                data-cliente-slide="{{ forloop.counter0 }}">
             <div class="d-flex align-items-center justify-content-between mb-2">
-              <span class="badge {% if resumo.tem_divergencia %}bg-warning text-dark{% else %}bg-success{% endif %}">
-                {{ resumo.status_financeiro }}
-              </span>
               {% if resumo.tem_divergencia %}
               <span class="badge bg-danger-subtle text-danger">Divergência</span>
               {% endif %}
@@ -1357,7 +1354,7 @@
         return;
       }
 
-      const mapa = L.map(container, { scrollWheelZoom: false });
+      const mapa = L.map(container, { scrollWheelZoom: true });
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap",

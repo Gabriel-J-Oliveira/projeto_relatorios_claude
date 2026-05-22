@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 
-from relatorios.models import StatusFinanceiroItem, StatusRelatorio
+from relatorios.models import StatusFinanceiroItem, StatusRelatorio, TipoEventoHistorico
 from relatorios.services.resumo_cliente_service import resumo_financeiro_por_cliente
 from relatorios.services.snapshot_service import SnapshotError, validar_snapshot_payload
 
@@ -159,6 +159,12 @@ def _status_badge_cor(status):
 def _historicos_snapshot(payload):
     historicos = []
     for historico in payload.get("historico") or []:
+        if not _historico_deve_exibir(
+            historico.get("tipo_evento"),
+            historico.get("descricao") or "",
+            historico.get("dados_json") or {},
+        ):
+            continue
         usuario = historico.get("usuario") or {}
         historicos.append(
             _ns(
@@ -171,6 +177,22 @@ def _historicos_snapshot(payload):
             )
         )
     return historicos
+
+
+def _historico_deve_exibir(tipo_evento, descricao, dados_json):
+    if tipo_evento != TipoEventoHistorico.VALOR_ALTERADO:
+        return True
+
+    descricao = descricao or ""
+    dados_json = dados_json or {}
+    valor_anterior = str(dados_json.get("valor_anterior") or "").strip()
+    valor_anterior_zero = valor_anterior in {"", "0", "0.0", "0.00", "0.0000"}
+
+    if descricao.startswith("Valor por KM aprovado do trecho"):
+        return False
+    if descricao.startswith("Valor aprovado da despesa") and valor_anterior_zero:
+        return False
+    return True
 
 
 def _km_excedente_snapshot(payload):
@@ -611,6 +633,11 @@ def _montar_consulta_viva(relatorio):
                 tipo_evento_label=historico.get_tipo_evento_display(),
             )
             for historico in relatorio.historicos.all()
+            if _historico_deve_exibir(
+                historico.tipo_evento,
+                historico.descricao,
+                historico.dados_json or {},
+            )
         ],
         "itens": itens,
         "anexos": anexos,

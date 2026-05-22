@@ -33,7 +33,7 @@
            name="trechos-{{ idx }}-origem"
            id="id_trechos-{{ idx }}-origem"
            value="{{ form.origem.value|default:'' }}"
-           placeholder="Cidade origem"
+           placeholder="Endereço origem"
            autocomplete="off"
            class="form-control form-control-sm campo-endereco-mapa {% if form.origem.errors %}is-invalid{% endif %}"
            data-map-role="origem">
@@ -63,7 +63,7 @@
            name="trechos-{{ idx }}-destino"
            id="id_trechos-{{ idx }}-destino"
            value="{{ form.destino.value|default:'' }}"
-           placeholder="Cidade destino"
+           placeholder="Endereço destino"
            autocomplete="off"
            class="form-control form-control-sm campo-endereco-mapa {% if form.destino.errors %}is-invalid{% endif %}"
            data-map-role="destino">

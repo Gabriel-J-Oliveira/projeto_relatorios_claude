@@ -211,25 +211,47 @@ def _salvar_valores_aprovados(post_data, relatorio, usuario, consolidar=False):
 
     for despesa in despesas:
         nome_campo = f"despesa_{despesa.pk}_valor_aprovado"
+        valor_postado = post_data.get(nome_campo)
+        valor_postado_preenchido = str(valor_postado or "").strip() != ""
         if despesa.rejeitado or despesa.status_financeiro == StatusFinanceiroItem.REJEITADO:
             valor_aprovado = Decimal("0.00") if consolidar else despesa.valor_aprovado
         else:
-            valor_aprovado = _parse_decimal_financeiro(post_data.get(nome_campo))
+            valor_aprovado = _parse_decimal_financeiro(valor_postado)
         if consolidar and valor_aprovado is None:
             valor_aprovado = despesa.valor
-        novos_valores_despesas.append((despesa, valor_aprovado))
+        registrar_alteracao = (
+            valor_postado_preenchido
+            and valor_aprovado is not None
+            and valor_aprovado != despesa.valor
+        ) or (
+            despesa.valor_aprovado is not None
+            and despesa.valor_aprovado != valor_aprovado
+        )
+        novos_valores_despesas.append((despesa, valor_aprovado, registrar_alteracao))
 
     for trecho in trechos:
+        if trecho.tem_multiplos_clientes:
+            continue
         nome_campo = f"trecho_{trecho.pk}_valor_km_aprovado"
+        valor_postado = post_data.get(nome_campo)
+        valor_postado_preenchido = str(valor_postado or "").strip() != ""
         if trecho.rejeitado or trecho.status_financeiro == StatusFinanceiroItem.REJEITADO:
             valor_km_aprovado = Decimal("0.00") if consolidar else trecho.valor_km_aprovado
         else:
-            valor_km_aprovado = _parse_decimal_financeiro(post_data.get(nome_campo))
+            valor_km_aprovado = _parse_decimal_financeiro(valor_postado)
         if consolidar and valor_km_aprovado is None:
             valor_km_aprovado = trecho.valor_km.quantize(Decimal("0.01"))
-        novos_valores_trechos.append((trecho, valor_km_aprovado))
+        registrar_alteracao = (
+            valor_postado_preenchido
+            and valor_km_aprovado is not None
+            and valor_km_aprovado != trecho.valor_km.quantize(Decimal("0.01"))
+        ) or (
+            trecho.valor_km_aprovado is not None
+            and trecho.valor_km_aprovado != valor_km_aprovado
+        )
+        novos_valores_trechos.append((trecho, valor_km_aprovado, registrar_alteracao))
 
-    for despesa, valor_aprovado in novos_valores_despesas:
+    for despesa, valor_aprovado, registrar_alteracao in novos_valores_despesas:
         if despesa.valor_aprovado != valor_aprovado:
             valor_anterior = despesa.valor_aprovado
             despesa.valor_aprovado = valor_aprovado
@@ -238,6 +260,8 @@ def _salvar_valores_aprovados(post_data, relatorio, usuario, consolidar=False):
                 garantir_rateio_despesa(despesa)
             except RateioError as exc:
                 raise WorkflowError(f"Despesa {despesa.pk}: {exc}") from exc
+            if not registrar_alteracao:
+                continue
             registrar_evento(
                 relatorio,
                 usuario,
@@ -254,7 +278,7 @@ def _salvar_valores_aprovados(post_data, relatorio, usuario, consolidar=False):
                 },
             )
 
-    for trecho, valor_km_aprovado in novos_valores_trechos:
+    for trecho, valor_km_aprovado, registrar_alteracao in novos_valores_trechos:
         if trecho.valor_km_aprovado != valor_km_aprovado:
             valor_anterior = trecho.valor_km_aprovado
             trecho.valor_km_aprovado = valor_km_aprovado
@@ -263,6 +287,8 @@ def _salvar_valores_aprovados(post_data, relatorio, usuario, consolidar=False):
                 garantir_rateio_trecho(trecho)
             except RateioError as exc:
                 raise WorkflowError(f"Trecho KM {trecho.pk}: {exc}") from exc
+            if not registrar_alteracao:
+                continue
             registrar_evento(
                 relatorio,
                 usuario,

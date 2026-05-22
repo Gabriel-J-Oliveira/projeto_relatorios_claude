@@ -1362,7 +1362,7 @@
     if (!container || typeof L === "undefined") return null;
     if (mapaFormularioKm) return mapaFormularioKm;
 
-    mapaFormularioKm = L.map(container, { scrollWheelZoom: false });
+    mapaFormularioKm = L.map(container, { scrollWheelZoom: true });
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: "&copy; OpenStreetMap",
