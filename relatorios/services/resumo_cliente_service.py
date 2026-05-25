@@ -26,6 +26,7 @@ def _dividir_decimal(total, cliente_ids):
 @dataclass
 class ClienteResumoFinanceiroDTO:
     cliente: object
+    motivo_viagem: str = ""
     km_total: Decimal = Decimal("0.00")
     valor_km_solicitado: Decimal = Decimal("0.00")
     despesas_solicitadas: Decimal = Decimal("0.00")
@@ -75,6 +76,10 @@ def _marcar_status(resumo):
 def resumo_financeiro_por_cliente(relatorio):
     clientes = list(relatorio.clientes_exibicao())
     clientes_por_id = {cliente.pk: cliente for cliente in clientes}
+    motivos_por_cliente = {
+        vinculo.cliente_id: vinculo.motivo_viagem or ""
+        for vinculo in relatorio.clientes_vinculados.all()
+    }
 
     for despesa in relatorio.despesas.all():
         for vinculo in despesa.clientes_vinculados.select_related("cliente"):
@@ -92,7 +97,10 @@ def resumo_financeiro_por_cliente(relatorio):
         clientes_por_id[relatorio.cliente_id] = relatorio.cliente
 
     resumos = {
-        cliente_id: ClienteResumoFinanceiroDTO(cliente=cliente)
+        cliente_id: ClienteResumoFinanceiroDTO(
+            cliente=cliente,
+            motivo_viagem=motivos_por_cliente.get(cliente_id, ""),
+        )
         for cliente_id, cliente in clientes_por_id.items()
     }
     clientes_relatorio_ids = list(resumos.keys())
@@ -141,7 +149,10 @@ def resumo_financeiro_por_cliente(relatorio):
         cliente = linha["cliente"]
         resumo = resumos.get(cliente.pk)
         if not resumo:
-            resumo = ClienteResumoFinanceiroDTO(cliente=cliente)
+            resumo = ClienteResumoFinanceiroDTO(
+                cliente=cliente,
+                motivo_viagem=motivos_por_cliente.get(cliente.pk, ""),
+            )
             resumos[cliente.pk] = resumo
         resumo.km_total += linha["km"]
         resumo.valor_km_solicitado += _money(linha["valor_calculado"])

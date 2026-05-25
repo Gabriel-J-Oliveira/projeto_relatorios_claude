@@ -167,6 +167,16 @@ def _despesas_snapshot(payload):
                 clientes_rateio=_texto_clientes_rateio(rateios) if rateios else ", ".join(
                     cliente.get("nome") for cliente in despesa.get("clientes") or [] if cliente.get("nome")
                 ) or "-",
+                rateios=[
+                    _ns(
+                        cliente=rateio.get("cliente_nome") or "-",
+                        valor_original=_money(rateio.get("valor_original")),
+                        valor_final=_money(rateio.get("valor_final")),
+                        status=rateio.get("status_label") or rateio.get("status") or "-",
+                        motivo=rateio.get("motivo_ajuste") or "",
+                    )
+                    for rateio in rateios
+                ],
                 solicitado=solicitado,
                 aprovado=_money(aprovado),
                 status=status,
@@ -184,49 +194,37 @@ def _trechos_snapshot(payload):
         rejeitado = bool(trecho.get("rejeitado"))
         motivo = trecho.get("motivo_rejeicao") or trecho.get("motivo_recusa") or "-"
         rateios = trecho.get("rateios") or []
-        if rateios:
-            for rateio in rateios:
-                solicitado = _money(rateio.get("valor_calculado"))
-                aprovado = Decimal("0.00") if rejeitado else _money(rateio.get("valor_final"))
-                status, badge = _item_status(rejeitado, solicitado, aprovado)
-                linhas.append(
+        solicitado = _money(trecho.get("valor_calculado"))
+        aprovado = Decimal("0.00") if rejeitado else _money(trecho.get("valor_final"))
+        status, badge = _item_status(rejeitado, solicitado, aprovado)
+        linhas.append(
+            _ns(
+                item_id=trecho.get("id"),
+                data=_date(trecho.get("data")),
+                origem=trecho.get("origem") or "-",
+                destino=trecho.get("destino") or "-",
+                km=_money(trecho.get("km")),
+                km_calculado_api=_money(trecho.get("km_calculado_api")),
+                solicitado=solicitado,
+                total_final=_money(aprovado),
+                status=status,
+                badge=badge,
+                rejeitado=rejeitado,
+                motivo=motivo,
+                rateios=[
                     _ns(
-                        item_id=trecho.get("id"),
-                        data=_date(trecho.get("data")),
-                        origem=trecho.get("origem") or "-",
-                        destino=trecho.get("destino") or "-",
-                        numero_documento=trecho.get("numero_documento_comprovante") or "-",
-                        km=_money(rateio.get("km_cliente") or rateio.get("km_final")),
                         cliente=rateio.get("cliente_nome") or "-",
+                        km=_money(rateio.get("km_cliente") or rateio.get("km_final")),
                         valor_km=Decimal(str(rateio.get("valor_km") or "0.00")),
-                        total_final=_money(aprovado),
-                        status=status,
-                        badge=badge,
-                        rejeitado=rejeitado,
-                        motivo=motivo,
+                        valor_original=_money(rateio.get("valor_calculado")),
+                        valor_final=_money(rateio.get("valor_final")),
+                        status=rateio.get("status_label") or rateio.get("status") or "-",
+                        motivo=rateio.get("motivo_ajuste") or "",
                     )
-                )
-        else:
-            solicitado = _money(trecho.get("valor_calculado"))
-            aprovado = Decimal("0.00") if rejeitado else _money(trecho.get("valor_final"))
-            status, badge = _item_status(rejeitado, solicitado, aprovado)
-            linhas.append(
-                _ns(
-                    item_id=trecho.get("id"),
-                    data=_date(trecho.get("data")),
-                    origem=trecho.get("origem") or "-",
-                    destino=trecho.get("destino") or "-",
-                    numero_documento=trecho.get("numero_documento_comprovante") or "-",
-                    km=_money(trecho.get("km")),
-                    cliente=", ".join(cliente.get("nome") for cliente in trecho.get("clientes") or [] if cliente.get("nome")) or "-",
-                    valor_km=Decimal(str(trecho.get("valor_km_final") or trecho.get("valor_km") or "0.00")),
-                    total_final=_money(aprovado),
-                    status=status,
-                    badge=badge,
-                    rejeitado=rejeitado,
-                    motivo=motivo,
-                )
+                    for rateio in rateios
+                ],
             )
+        )
     return linhas
 
 
@@ -394,6 +392,16 @@ def _despesas_vivas(relatorio):
                     f"{rateio.cliente.nome}: R$ {rateio.valor_final:.2f}".replace(".", ",")
                     for rateio in rateios
                 ) or ", ".join(v.cliente.nome for v in despesa.clientes_vinculados.all()) or "-",
+                rateios=[
+                    _ns(
+                        cliente=rateio.cliente.nome,
+                        valor_original=_money(rateio.valor_original),
+                        valor_final=_money(rateio.valor_final),
+                        status=rateio.get_status_display(),
+                        motivo=rateio.motivo_ajuste or "",
+                    )
+                    for rateio in rateios
+                ],
                 solicitado=despesa.valor,
                 aprovado=_money(aprovado),
                 status=status,
@@ -411,47 +419,37 @@ def _trechos_vivos(relatorio):
         rejeitado = _item_rejeitado(trecho)
         motivo = trecho.motivo_rejeicao or trecho.motivo_recusa or "-"
         rateios = list(trecho.rateios.all())
-        if rateios:
-            for rateio in rateios:
-                aprovado = Decimal("0.00") if rejeitado else rateio.valor_final
-                status, badge = _item_status(rejeitado, rateio.valor_calculado, aprovado)
-                linhas.append(
+        solicitado = _money(trecho.valor_calculado_clientes)
+        aprovado = Decimal("0.00") if rejeitado else _money(trecho.valor_final_clientes)
+        status, badge = _item_status(rejeitado, solicitado, aprovado)
+        linhas.append(
+            _ns(
+                item_id=trecho.pk,
+                data=trecho.data,
+                origem=trecho.origem,
+                destino=trecho.destino,
+                km=trecho.km,
+                km_calculado_api=trecho.km_calculado_api or Decimal("0.00"),
+                solicitado=solicitado,
+                total_final=_money(aprovado),
+                status=status,
+                badge=badge,
+                rejeitado=rejeitado,
+                motivo=motivo,
+                rateios=[
                     _ns(
-                        item_id=trecho.pk,
-                        data=trecho.data,
-                        origem=trecho.origem,
-                        destino=trecho.destino,
-                        numero_documento=trecho.numero_documento_comprovante or "-",
-                        km=rateio.km_cliente,
                         cliente=rateio.cliente.nome,
+                        km=_money(rateio.km_cliente),
                         valor_km=rateio.valor_km,
-                        total_final=_money(aprovado),
-                        status=status,
-                        badge=badge,
-                        rejeitado=rejeitado,
-                        motivo=motivo,
+                        valor_original=_money(rateio.valor_calculado),
+                        valor_final=_money(rateio.valor_final),
+                        status=rateio.get_status_display(),
+                        motivo=rateio.motivo_ajuste or "",
                     )
-                )
-        else:
-            aprovado = Decimal("0.00") if rejeitado else trecho.valor_final
-            status, badge = _item_status(rejeitado, trecho.valor_calculado, aprovado)
-            linhas.append(
-                _ns(
-                    item_id=trecho.pk,
-                    data=trecho.data,
-                    origem=trecho.origem,
-                    destino=trecho.destino,
-                    numero_documento=trecho.numero_documento_comprovante or "-",
-                    km=trecho.km,
-                    cliente=", ".join(v.cliente.nome for v in trecho.clientes_vinculados.all()) or "-",
-                    valor_km=trecho.valor_km_final,
-                    total_final=_money(aprovado),
-                    status=status,
-                    badge=badge,
-                    rejeitado=rejeitado,
-                    motivo=motivo,
-                )
+                    for rateio in rateios
+                ],
             )
+        )
     return linhas
 
 

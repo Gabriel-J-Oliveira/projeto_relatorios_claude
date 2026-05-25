@@ -241,6 +241,19 @@
                     <div class="invalid-feedback d-block small erro-tecnicos-relatorio"></div>
                   </div>
 
+                  <div class="col-12">
+                    <div class="border rounded-2 bg-body-tertiary p-3">
+                      <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                        <div>
+                          <h6 class="mb-0 fw-semibold">Motivo da viagem por cliente</h6>
+                          <small class="text-muted">Informe o objetivo da viagem para cada cliente selecionado.</small>
+                        </div>
+                      </div>
+                      <div id="motivos-clientes-relatorio" class="row g-2"></div>
+                      <div class="invalid-feedback d-block small erro-motivos-clientes"></div>
+                    </div>
+                  </div>
+
                   {# Localidade #}
                   <div class="col-md-5">
                     <label class="form-label fw-medium small text-muted">Cidade de Atendimento *</label>
@@ -282,10 +295,10 @@
                     {% endif %}
                   </div>
 
-                  {# Motivo #}
-                  <div class="col-12">
+                  {# Motivo legado mantido apenas para compatibilidade #}
+                  <div class="d-none">
                     <label class="form-label fw-medium small text-muted">Motivo / Descrição do Serviço *</label>
-                    {{ form.motivo }}
+                    <input type="hidden" name="motivo" value="{{ form.motivo.value|default:'' }}">
                     {% if form.motivo.errors %}
                       <div class="text-danger small mt-1">{{ form.motivo.errors.0 }}</div>
                     {% endif %}
@@ -377,7 +390,6 @@
                         <th class="px-3 py-2 fw-semibold text-muted small" style="width: 100px;">KM</th>
                         <th class="px-3 py-2 fw-semibold text-muted small" style="width: 110px;">R$/KM auto</th>
                         <th class="px-3 py-2 fw-semibold text-muted small" style="width: 120px;">Total R$</th>
-                        <th class="px-3 py-2 fw-semibold text-muted small">Comprovante</th>
                         <th class="px-3 py-2 fw-semibold text-muted small">Obs.</th>
                         <th class="px-3 py-2 fw-semibold text-muted small">Clientes</th>
                         <th class="px-3 py-2" style="width: 90px;">Ações</th>
@@ -401,7 +413,7 @@
                         <td class="py-2 fw-bold small">
                           R$ <span id="total-km-valor">0,00</span>
                         </td>
-                        <td colspan="4"></td>
+                        <td colspan="3"></td>
                       </tr>
                     </tfoot>
                   </table>
@@ -1030,6 +1042,7 @@
           </style>
         {% endblock %}
         {% block extra_js %}
+          {{ motivos_clientes_relatorio|json_script:"motivos-clientes-relatorio-data" }}
           <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
           <script>
   /* ═══════════════════════════════════════════════════════════════
@@ -1114,6 +1127,51 @@
     return btn?.dataset.clienteNome || `Cliente ${id}`;
   }
 
+  const motivosClientesRelatorio = (() => {
+    try {
+      return JSON.parse(document.getElementById("motivos-clientes-relatorio-data")?.textContent || "{}");
+    } catch (_error) {
+      return {};
+    }
+  })();
+
+  function coletarMotivosClientesAtuais() {
+    document.querySelectorAll(".motivo-cliente-textarea").forEach(campo => {
+      motivosClientesRelatorio[campo.dataset.clienteId] = campo.value;
+    });
+  }
+
+  function atualizarMotivosClientesRelatorio() {
+    coletarMotivosClientesAtuais();
+    const ids = getClientesRelatorioIds();
+    const container = document.getElementById("motivos-clientes-relatorio");
+    if (!container) return;
+    if (!ids.length) {
+      container.innerHTML = '<div class="col-12 text-muted small">Selecione clientes para informar o motivo da viagem.</div>';
+      return;
+    }
+    container.innerHTML = ids.map(id => {
+      const nome = getNomeCliente(id);
+      const valor = String(motivosClientesRelatorio[id] || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+      return `
+        <div class="col-12 col-lg-6 motivo-cliente-card" data-cliente-id="${id}">
+          <div class="border rounded-2 bg-body p-2 h-100">
+            <label class="form-label small fw-semibold mb-1">${nome}</label>
+            <textarea name="motivo_cliente_${id}"
+                      class="form-control form-control-sm motivo-cliente-textarea"
+                      data-cliente-id="${id}"
+                      rows="2"
+                      placeholder="Descreva o motivo da viagem para este cliente">${valor}</textarea>
+            <div class="text-danger small mt-1 motivo-cliente-erro d-none">Informe o motivo da viagem.</div>
+          </div>
+        </div>`;
+    }).join("");
+  }
+
   function getNomeTecnico(id) {
     const btn = document.querySelector(`.tecnico-opcao[data-tecnico-id="${id}"]`);
     return btn?.dataset.tecnicoNome || `Técnico ${id}`;
@@ -1135,6 +1193,7 @@
         ? ids.map(id => `<span class="badge rounded-pill text-bg-secondary">${getNomeCliente(id)}</span>`).join("")
         : '<span class="text-muted small">Nenhum cliente selecionado</span>';
     }
+    atualizarMotivosClientesRelatorio();
   }
 
   function getTecnicosEquipeSelect() {
@@ -1921,6 +1980,7 @@
     if (document.getElementById("importar-cliente")?.checked) {
       const clientesRelatorio = dados.cliente_ids?.length ? dados.cliente_ids : [dados.cliente_id];
       setClientesInput(document.getElementById("id_clientes_relatorio"), clientesRelatorio);
+      Object.assign(motivosClientesRelatorio, dados.motivos_clientes || {});
       atualizarBadgesClientesRelatorio();
       atualizarBadgesClientesItens();
     }
@@ -2180,7 +2240,7 @@ async function adicionarLinhaKm() {
 
   function validarDocumentosComprovanteFrontend(root = document) {
     let invalido = false;
-    root.querySelectorAll(".linha-despesa, .linha-trecho").forEach(linha => {
+    root.querySelectorAll(".linha-despesa").forEach(linha => {
       if (linhaEstaRemovida(linha) || !linhaTemConteudoSeguro(linha)) return;
       const tipo = linha.querySelector(".tipo-documento-comprovante");
       const numero = linha.querySelector(".numero-documento-comprovante");
@@ -2581,6 +2641,7 @@ function validarKmGlobal() {
       });
     document.getElementById("form-relatorio")?.addEventListener("submit", event => {
       const form = event.currentTarget;
+      const acaoSubmit = event.submitter?.value || "rascunho";
       form?.querySelectorAll("button[type='submit']").forEach(button => {
         button.disabled = false;
         button.removeAttribute("aria-busy");
@@ -2588,9 +2649,11 @@ function validarKmGlobal() {
       let invalido = false;
       const clientesRelatorio = getClientesRelatorioIds();
       const erroRelatorio = document.querySelector(".erro-clientes-relatorio");
+      const erroMotivos = document.querySelector(".erro-motivos-clientes");
       const tecnicosRelatorio = getTecnicosEquipeIds();
       const erroTecnicos = document.querySelector(".erro-tecnicos-relatorio");
       if (erroRelatorio) erroRelatorio.textContent = "";
+      if (erroMotivos) erroMotivos.textContent = "";
       if (erroTecnicos) erroTecnicos.textContent = "";
       if (!validarDatasFuturasFrontend(form)) {
         invalido = true;
@@ -2601,6 +2664,18 @@ function validarKmGlobal() {
       if (!clientesRelatorio.length) {
         invalido = true;
         if (erroRelatorio) erroRelatorio.textContent = "Selecione ao menos um cliente.";
+      }
+      if (acaoSubmit !== "rascunho") {
+        document.querySelectorAll(".motivo-cliente-textarea").forEach(campo => {
+          const erro = campo.closest(".motivo-cliente-card")?.querySelector(".motivo-cliente-erro");
+          const vazio = !String(campo.value || "").trim();
+          campo.classList.toggle("is-invalid", vazio);
+          erro?.classList.toggle("d-none", !vazio);
+          if (vazio) invalido = true;
+        });
+        if (invalido && erroMotivos && clientesRelatorio.length) {
+          erroMotivos.textContent = "Informe o motivo da viagem para todos os clientes do relatório.";
+        }
       }
       if (!tecnicosRelatorio.length) {
         invalido = true;

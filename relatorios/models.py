@@ -884,6 +884,7 @@ class RelatorioCliente(models.Model):
         related_name="relatorios_cliente",
     )
     ordem = models.PositiveSmallIntegerField("Ordem", default=0)
+    motivo_viagem = models.TextField("Motivo da viagem", blank=True)
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -1352,13 +1353,6 @@ class TrechoKm(models.Model):
                 )
         if self.data and self.data > timezone.localdate():
             erros["data"] = "Data não pode ser futura."
-        if (
-            self.tipo_documento_comprovante == TipoDocumentoComprovante.NOTA_FISCAL
-            and not self.numero_documento_comprovante
-        ):
-            erros["numero_documento_comprovante"] = (
-                "Informe o número do documento para Nota Fiscal."
-            )
         if erros:
             raise ValidationError(erros)
 

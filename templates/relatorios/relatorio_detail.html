@@ -252,9 +252,6 @@
           <dd class="col-sm-8">{{ relatorio.centro_custo }}</dd>
           {% endif %}
         </dl>
-        <hr class="my-3">
-        <h6 class="fw-semibold small text-muted mb-2">Motivo / Descrição</h6>
-        <p class="mb-0 small" style="white-space:pre-line">{{ relatorio.motivo }}</p>
       </div>
     </div>
 
@@ -368,11 +365,6 @@
                       <div class="fw-semibold text-success total-aprovado-despesa-linha">R$ {{ d.valor_final|floatformat:2 }}</div>
                     </div>
                     <div class="col-md-2">
-                      <span class="text-muted">Documento</span>
-                      <div class="fw-semibold">{{ d.get_tipo_documento_comprovante_display|default:"-" }}</div>
-                      <div class="text-muted">{{ d.numero_documento_comprovante|default:"-" }}</div>
-                    </div>
-                    <div class="col-md-2">
                       <span class="text-muted">Status</span>
                       <div>
                         {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
@@ -401,6 +393,44 @@
                         </button>
                         {% endif %}
                       {% endif %}
+                    </div>
+                    <div class="col-12">
+                      <div class="border rounded-2 bg-body p-2">
+                        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                          <span class="text-muted fw-semibold">Rateio por cliente</span>
+                          <span class="badge bg-body-tertiary text-body-secondary">Detalhamento financeiro</span>
+                        </div>
+                        <div class="table-responsive">
+                          <table class="table table-sm align-middle mb-0">
+                            <thead>
+                              <tr>
+                                <th class="small text-muted">Cliente</th>
+                                <th class="small text-muted text-end">Solicitado</th>
+                                <th class="small text-muted text-end">Aprovado</th>
+                                <th class="small text-muted">Status</th>
+                                <th class="small text-muted">Motivo</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {% for r in d.rateios.all %}
+                              <tr>
+                                <td class="small fw-semibold">{{ r.cliente.nome }}</td>
+                                <td class="small text-end">R$ {{ r.valor_original|floatformat:2 }}</td>
+                                <td class="small text-end fw-semibold text-success">R$ {{ r.valor_final|floatformat:2 }}</td>
+                                <td class="small">
+                                  <span class="badge bg-body-tertiary text-body-secondary">{{ r.get_status_display }}</span>
+                                </td>
+                                <td class="small text-muted">{{ r.motivo_ajuste|default:"-" }}</td>
+                              </tr>
+                              {% empty %}
+                              <tr>
+                                <td colspan="5" class="small text-muted">Rateio ainda nao gerado para esta despesa.</td>
+                              </tr>
+                              {% endfor %}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
                     </div>
                     {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
                     {% if d.motivo_rejeicao or d.motivo_recusa %}
@@ -453,7 +483,6 @@
                 <th class="small fw-semibold text-muted">R$/KM Solicitado</th>
                 <th class="small fw-semibold text-muted">AprovaÃ§Ã£o KM</th>
                 <th class="small fw-semibold text-muted">Total Solicitado</th>
-                <th class="small fw-semibold text-muted text-center">Doc.</th>
                 <th class="small fw-semibold text-muted text-center">Rateio</th>
                 <th class="small fw-semibold text-muted text-end pe-3">Mais informações</th>
               </tr>
@@ -471,17 +500,6 @@
                   Gerenciado no rateio
                 </td>
                 <td class="small fw-semibold text-success">R$ {{ t.valor_calculado_clientes|floatformat:2 }}</td>
-                <td class="text-center">
-                  {% if t.comprovante %}
-                  <a href="{{ t.comprovante.url }}" target="_blank" class="btn btn-sm btn-outline-success rounded-circle px-2 py-1" title="Abrir anexo">
-                    <i class="bi bi-paperclip"></i>
-                  </a>
-                  {% else %}
-                  <span class="btn btn-sm btn-outline-secondary rounded-circle px-2 py-1 disabled opacity-50" title="Sem anexo">
-                    <i class="bi bi-paperclip"></i>
-                  </span>
-                  {% endif %}
-                </td>
                 <td class="text-center">
                   <button type="button"
                           class="btn btn-sm btn-outline-info rounded-circle rateio-info-btn"
@@ -505,7 +523,7 @@
                 </td>
               </tr>
               <tr class="collapse bg-body-tertiary" id="detalhes-trecho-{{ t.pk }}">
-                <td colspan="8" class="px-3 py-3">
+                <td colspan="7" class="px-3 py-3">
                   <div class="row g-3 small">
                     <div class="col-md-2">
                       <span class="text-muted">Origem</span>
@@ -538,11 +556,6 @@
                       <div class="fw-semibold">
                         <span class="badge bg-primary-subtle text-primary">Técnico</span>
                       </div>
-                    </div>
-                    <div class="col-md-2">
-                      <span class="text-muted">Documento</span>
-                      <div class="fw-semibold">{{ t.get_tipo_documento_comprovante_display|default:"-" }}</div>
-                      <div class="text-muted">{{ t.numero_documento_comprovante|default:"-" }}</div>
                     </div>
                     <div class="col-md-2">
                       <span class="text-muted">Total aprovado</span>
@@ -586,6 +599,46 @@
                       {% endif %}
                     </div>
                     <div class="col-12">
+                      <div class="border rounded-2 bg-body p-2">
+                        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                          <span class="text-muted fw-semibold">Calculo de KM por cliente</span>
+                          <span class="badge bg-body-tertiary text-body-secondary">Detalhamento financeiro</span>
+                        </div>
+                        <div class="table-responsive">
+                          <table class="table table-sm align-middle mb-0">
+                            <thead>
+                              <tr>
+                                <th class="small text-muted">Cliente</th>
+                                <th class="small text-muted text-end">KM</th>
+                                <th class="small text-muted text-end">Valor/KM</th>
+                                <th class="small text-muted text-end">Automatico</th>
+                                <th class="small text-muted text-end">Final</th>
+                                <th class="small text-muted">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {% for r in t.rateios.all %}
+                              <tr>
+                                <td class="small fw-semibold">{{ r.cliente.nome }}</td>
+                                <td class="small text-end">{{ r.km_cliente|floatformat:2 }} km</td>
+                                <td class="small text-end">R$ {{ r.valor_km|floatformat:2 }}</td>
+                                <td class="small text-end">R$ {{ r.valor_calculado|floatformat:2 }}</td>
+                                <td class="small text-end fw-semibold text-success">R$ {{ r.valor_final|floatformat:2 }}</td>
+                                <td class="small">
+                                  <span class="badge bg-body-tertiary text-body-secondary">{{ r.get_status_display }}</span>
+                                </td>
+                              </tr>
+                              {% empty %}
+                              <tr>
+                                <td colspan="6" class="small text-muted">Calculo por cliente ainda nao gerado para este trecho.</td>
+                              </tr>
+                              {% endfor %}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-12">
                       <span class="text-muted">Observações</span>
                       <div class="fw-semibold">{{ t.observacao|default:"Sem observações" }}</div>
                       {% if t.rejeitado or t.status_financeiro == 'rejeitado' %}
@@ -601,9 +654,7 @@
             </tbody>
             <tfoot class="table-light fw-semibold">
               <tr>
-                <td colspan="3" class="ps-3 small text-end text-muted">Total KM</td>
-                <td class="small">{{ relatorio.total_km_percorrido }} km</td>
-                <td></td>
+                <td colspan="4" class="ps-3 small text-end text-muted">Total KM: {{ relatorio.total_km_percorrido }} km</td>
                 <td class="small fw-bold text-success">R$ {{ relatorio.total_km|floatformat:2 }}</td>
                 <td class="small fw-bold text-success" id="total-aprovado-km">R$ {{ relatorio.total_aprovado_km|floatformat:2 }}</td>
                 <td></td>
@@ -793,6 +844,12 @@
               <span class="badge bg-danger-subtle text-danger">Divergência</span>
               {% endif %}
             </div>
+            {% if resumo.motivo_viagem %}
+            <div class="border rounded-2 bg-body-tertiary p-2 mb-2 small">
+              <span class="text-muted d-block">Motivo da viagem</span>
+              <strong style="white-space:pre-line">{{ resumo.motivo_viagem }}</strong>
+            </div>
+            {% endif %}
             <div class="table-responsive-none">
               <table class="table table-sm mb-0 cliente-mini-table">
                 <tbody>

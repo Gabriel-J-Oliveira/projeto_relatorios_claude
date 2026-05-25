@@ -33,6 +33,7 @@ class ItemPdfCliente:
     documento: str
     numero_documento: str
     descricao: str
+    valor_total: Decimal
     valor: Decimal
     percentual: Decimal | None = None
     origem_item: str = ""
@@ -115,7 +116,6 @@ def _relatorio_snapshot_contexto(payload):
         "identificador": relatorio.get("identificador") or relatorio.get("numero") or "",
         "periodo_inicio": _data(relatorio.get("data_inicio")),
         "periodo_fim": _data(relatorio.get("data_fim")),
-        "motivo": relatorio.get("motivo") or "",
         "finalizado_em": _datetime(
             assinatura.get("aprovado_em") or assinatura.get("finalizado_em")
         ),
@@ -146,7 +146,7 @@ def _itens_snapshot_cliente(payload, cliente_id):
                 and any(int(cliente.get("id") or 0) == cliente_id for cliente in clientes_despesa)
                 else []
             )
-        total_item = _money(despesa.get("valor_final") or despesa.get("valor_solicitado"))
+        total_item = _money(despesa.get("valor_solicitado") or despesa.get("valor_final"))
         comprovante_path, comprovante_nome = _arquivo_info(despesa.get("comprovante"))
         for rateio in rateios_cliente:
             valor = _money(rateio.get("valor_final"))
@@ -158,6 +158,7 @@ def _itens_snapshot_cliente(payload, cliente_id):
                     documento="Comprovante",
                     numero_documento=despesa.get("numero_documento_comprovante") or "",
                     descricao=despesa.get("descricao") or despesa.get("tipo_label") or "Despesa",
+                    valor_total=total_item,
                     valor=valor,
                     percentual=_percentual(valor, total_item),
                     origem_item="despesa",
@@ -185,8 +186,7 @@ def _itens_snapshot_cliente(payload, cliente_id):
                 and any(int(cliente.get("id") or 0) == cliente_id for cliente in clientes_trecho)
                 else []
             )
-        total_item = _money(trecho.get("valor_final") or trecho.get("valor_calculado"))
-        comprovante_path, comprovante_nome = _arquivo_info(trecho.get("comprovante"))
+        total_item = _money(trecho.get("valor_calculado") or trecho.get("valor_final"))
         for rateio in rateios_cliente:
             valor = _money(rateio.get("valor_final"))
             if valor <= 0:
@@ -200,14 +200,13 @@ def _itens_snapshot_cliente(payload, cliente_id):
                 ItemPdfCliente(
                     data=_data(trecho.get("data")),
                     documento="Relatório KM",
-                    numero_documento=trecho.get("numero_documento_comprovante") or "",
+                    numero_documento="",
                     descricao=descricao,
+                    valor_total=total_item,
                     valor=valor,
                     percentual=_percentual(valor, total_item),
                     origem_item="trecho",
                     origem_id=trecho.get("id"),
-                    comprovante_path=comprovante_path,
-                    comprovante_nome=comprovante_nome,
                 )
             )
 
@@ -236,7 +235,6 @@ def _relatorio_vivo_contexto(relatorio):
         "identificador": relatorio.identificador,
         "periodo_inicio": relatorio.data_inicio,
         "periodo_fim": relatorio.data_fim,
-        "motivo": relatorio.motivo or "",
         "finalizado_em": relatorio.aprovado_em,
         "tecnicos": [tecnico.nome for tecnico in relatorio.tecnicos_exibicao()],
         "usa_snapshot": False,
@@ -280,6 +278,7 @@ def _itens_vivos_cliente(relatorio, cliente_id):
                     documento="Comprovante",
                     numero_documento=despesa.numero_documento_comprovante or "",
                     descricao=despesa.descricao,
+                    valor_total=_money(despesa.valor),
                     valor=valor,
                     percentual=percentual,
                     origem_item="despesa",
@@ -311,8 +310,6 @@ def _itens_vivos_cliente(relatorio, cliente_id):
             valores = [
                 (trecho.valor_final, _percentual(trecho.valor_final, trecho.valor_final))
             ] if cliente_participa else []
-        comprovante_path = trecho.comprovante.name if trecho.comprovante else ""
-        comprovante_nome = os.path.basename(comprovante_path) if comprovante_path else ""
         for valor_rateado, percentual in valores:
             valor = _money(valor_rateado)
             if valor <= 0:
@@ -321,14 +318,13 @@ def _itens_vivos_cliente(relatorio, cliente_id):
                 ItemPdfCliente(
                     data=trecho.data,
                     documento="Relatório KM",
-                    numero_documento=trecho.numero_documento_comprovante or "",
+                    numero_documento="",
                     descricao=f"{trecho.origem} -> {trecho.destino}",
+                    valor_total=_money(trecho.valor_calculado_clientes),
                     valor=valor,
                     percentual=percentual,
                     origem_item="trecho",
                     origem_id=trecho.pk,
-                    comprovante_path=comprovante_path,
-                    comprovante_nome=comprovante_nome,
                 )
             )
 
@@ -380,6 +376,7 @@ def montar_contexto_pdf_cliente(relatorio, cliente_id, request=None):
             raise PdfClienteError("Cliente nao pertence ao snapshot financeiro do relatorio.")
         contexto_relatorio = _relatorio_snapshot_contexto(payload)
         itens = _itens_snapshot_cliente(payload, cliente_id)
+        motivo_viagem = cliente.get("motivo_viagem") or ""
     else:
         clientes = _clientes_vivos(relatorio)
         cliente = next(
@@ -390,6 +387,13 @@ def montar_contexto_pdf_cliente(relatorio, cliente_id, request=None):
             raise PdfClienteError("Cliente nao pertence ao relatorio.")
         contexto_relatorio = _relatorio_vivo_contexto(relatorio)
         itens = _itens_vivos_cliente(relatorio, cliente_id)
+        motivo_viagem = ""
+        for vinculo in relatorio.clientes_vinculados.all():
+            if vinculo.cliente_id == int(cliente_id):
+                motivo_viagem = vinculo.motivo_viagem or ""
+                break
+        if not motivo_viagem and len(clientes) == 1:
+            motivo_viagem = relatorio.motivo or ""
 
     total = sum((item.valor for item in itens), Decimal("0.00")).quantize(Decimal("0.01"))
     if total <= 0:
@@ -402,6 +406,7 @@ def montar_contexto_pdf_cliente(relatorio, cliente_id, request=None):
         "relatorio": contexto_relatorio,
         "cliente": cliente,
         "tecnicos": contexto_relatorio["tecnicos"],
+        "motivo_viagem": motivo_viagem,
         "itens": itens,
         "total": total,
         "emitido_em": emitido_em,

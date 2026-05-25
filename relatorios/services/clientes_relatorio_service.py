@@ -43,6 +43,15 @@ def obter_clientes_relatorio(relatorio):
     return relatorio.clientes_relacionados()
 
 
+def obter_motivos_clientes_relatorio(relatorio):
+    if not relatorio or not getattr(relatorio, "pk", None):
+        return {}
+    return {
+        vinculo.cliente_id: vinculo.motivo_viagem or ""
+        for vinculo in relatorio.clientes_vinculados.all()
+    }
+
+
 def clientes_despesa(despesa):
     qs = Cliente.objects.filter(despesas_cliente__despesa=despesa).order_by("nome")
     if qs.exists():
@@ -58,9 +67,10 @@ def clientes_trecho(trecho):
 
 
 @transaction.atomic
-def sync_clientes_relatorio(relatorio, cliente_ids):
+def sync_clientes_relatorio(relatorio, cliente_ids, motivos_por_cliente=None):
     _bloquear_finalizado(relatorio)
     cliente_ids = normalizar_ids_clientes(cliente_ids)
+    motivos_por_cliente = motivos_por_cliente or {}
     clientes_validos = list(
         Cliente.objects.filter(pk__in=cliente_ids, ativo=True).order_by("nome")
     )
@@ -71,10 +81,16 @@ def sync_clientes_relatorio(relatorio, cliente_ids):
     ).delete()
 
     for ordem, cliente_id in enumerate(ids_validos):
+        motivo = str(
+            motivos_por_cliente.get(cliente_id)
+            or motivos_por_cliente.get(str(cliente_id))
+            or ""
+        ).strip()
+        defaults = {"ordem": ordem, "motivo_viagem": motivo}
         RelatorioCliente.objects.update_or_create(
             relatorio=relatorio,
             cliente_id=cliente_id,
-            defaults={"ordem": ordem},
+            defaults=defaults,
         )
 
     if ids_validos and relatorio.cliente_id != ids_validos[0]:

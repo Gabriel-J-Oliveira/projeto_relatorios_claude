@@ -147,7 +147,6 @@
           <th>Tipo</th>
           <th>Descrição</th>
           <th>Nº doc.</th>
-          <th>Cliente(s) / Rateio</th>
           <th class="amount">Solicitado</th>
           <th class="amount">Aprovado</th>
           <th>Status</th>
@@ -162,14 +161,24 @@
             <td>{{ despesa.tipo }}</td>
             <td>{{ despesa.descricao }}</td>
             <td>{{ despesa.numero_documento }}</td>
-            <td>{{ despesa.clientes_rateio }}</td>
             <td class="amount">R$ {{ despesa.solicitado|floatformat:2 }}</td>
             <td class="amount">R$ {{ despesa.aprovado|floatformat:2 }}</td>
             <td><span class="badge badge-{{ despesa.badge }}">{{ despesa.status }}</span></td>
             <td>{{ despesa.motivo }}</td>
           </tr>
+          <tr class="subrow">
+            <td></td>
+            <td colspan="8">
+              <strong>Rateio:</strong>
+              {% for rateio in despesa.rateios %}
+                {{ rateio.cliente }} — solicitado R$ {{ rateio.valor_original|floatformat:2 }} / aprovado R$ {{ rateio.valor_final|floatformat:2 }}{% if rateio.motivo %} ({{ rateio.motivo }}){% endif %}{% if not forloop.last %}; {% endif %}
+              {% empty %}
+                {{ despesa.clientes_rateio }}
+              {% endfor %}
+            </td>
+          </tr>
         {% empty %}
-          <tr><td colspan="10" class="empty">Nenhuma despesa registrada.</td></tr>
+          <tr><td colspan="9" class="empty">Nenhuma despesa registrada.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -184,11 +193,10 @@
           <th>Data</th>
           <th>Origem</th>
           <th>Destino</th>
-          <th>Nº doc.</th>
-          <th class="amount">KM</th>
-          <th>Cliente</th>
-          <th class="amount">Valor/KM</th>
-          <th class="amount">Total final</th>
+          <th class="amount">KM informado</th>
+          <th class="amount">KM API</th>
+          <th class="amount">Total solicitado</th>
+          <th class="amount">Total aprovado</th>
           <th>Status</th>
           <th>Motivo recusa</th>
         </tr>
@@ -200,16 +208,26 @@
             <td>{{ trecho.data|date:"d/m/Y"|default:"-" }}</td>
             <td>{{ trecho.origem }}</td>
             <td>{{ trecho.destino }}</td>
-            <td>{{ trecho.numero_documento }}</td>
             <td class="amount">{{ trecho.km|floatformat:2 }}</td>
-            <td>{{ trecho.cliente }}</td>
-            <td class="amount">R$ {{ trecho.valor_km|floatformat:2 }}</td>
+            <td class="amount">{{ trecho.km_calculado_api|floatformat:2 }}</td>
+            <td class="amount">R$ {{ trecho.solicitado|floatformat:2 }}</td>
             <td class="amount">R$ {{ trecho.total_final|floatformat:2 }}</td>
             <td><span class="badge badge-{{ trecho.badge }}">{{ trecho.status }}</span></td>
             <td>{{ trecho.motivo }}</td>
           </tr>
+          <tr class="subrow">
+            <td></td>
+            <td colspan="9">
+              <strong>Clientes:</strong>
+              {% for rateio in trecho.rateios %}
+                {{ rateio.cliente }} — {{ rateio.km|floatformat:2 }} km x R$ {{ rateio.valor_km|floatformat:2 }} = R$ {{ rateio.valor_final|floatformat:2 }}{% if rateio.motivo %} ({{ rateio.motivo }}){% endif %}{% if not forloop.last %}; {% endif %}
+              {% empty %}
+                Sem cálculo por cliente registrado.
+              {% endfor %}
+            </td>
+          </tr>
         {% empty %}
-          <tr><td colspan="11" class="empty">Nenhum trecho KM registrado.</td></tr>
+          <tr><td colspan="10" class="empty">Nenhum trecho KM registrado.</td></tr>
         {% endfor %}
       </tbody>
     </table>

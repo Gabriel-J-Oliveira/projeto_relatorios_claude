@@ -67,7 +67,7 @@ def _arquivo_payload(arquivo):
     }
 
 
-def _cliente_payload(cliente, ordem=0):
+def _cliente_payload(cliente, ordem=0, motivo_viagem=""):
     return {
         "id": cliente.pk,
         "nome": cliente.nome,
@@ -77,6 +77,7 @@ def _cliente_payload(cliente, ordem=0):
         "cidade_uf": cliente.cidade_uf,
         "valor_km": _decimal(cliente.valor_km),
         "ordem": ordem,
+        "motivo_viagem": motivo_viagem or "",
     }
 
 
@@ -207,14 +208,6 @@ def _trecho_payload(trecho):
         "rejeitado_por": _user_payload(trecho.rejeitado_por),
         "rejeitado_em": _datetime(trecho.rejeitado_em),
         "observacao": trecho.observacao,
-        "comprovante": _arquivo_payload(getattr(trecho, "comprovante", None)),
-        "tipo_documento_comprovante": trecho.tipo_documento_comprovante,
-        "tipo_documento_comprovante_label": (
-            trecho.get_tipo_documento_comprovante_display()
-            if trecho.tipo_documento_comprovante
-            else ""
-        ),
-        "numero_documento_comprovante": trecho.numero_documento_comprovante,
         "clientes": [
             _cliente_payload(vinculo.cliente)
             for vinculo in trecho.clientes_vinculados.all()
@@ -253,6 +246,7 @@ def _distribuicao_payload(relatorio):
         clientes.append(
             {
                 "cliente": _cliente_payload(resumo.cliente),
+                "motivo_viagem": resumo.motivo_viagem,
                 "km_total": _decimal(resumo.km_total),
                 "valor_km_solicitado": _decimal(resumo.valor_km_solicitado),
                 "despesas_solicitadas": _decimal(resumo.despesas_solicitadas),
@@ -289,10 +283,21 @@ def _historico_payload(relatorio):
 
 def construir_snapshot_financeiro(relatorio, usuario=None):
     finalizado_em = timezone.now()
-    clientes = [
-        _cliente_payload(cliente, ordem=idx)
-        for idx, cliente in enumerate(relatorio.clientes_exibicao())
-    ]
+    vinculos_clientes = list(relatorio.clientes_vinculados.select_related("cliente").all())
+    if vinculos_clientes:
+        clientes = [
+            _cliente_payload(
+                vinculo.cliente,
+                ordem=idx,
+                motivo_viagem=vinculo.motivo_viagem,
+            )
+            for idx, vinculo in enumerate(vinculos_clientes)
+        ]
+    else:
+        clientes = [
+            _cliente_payload(cliente, ordem=idx, motivo_viagem=relatorio.motivo)
+            for idx, cliente in enumerate(relatorio.clientes_exibicao())
+        ]
     tecnicos = []
     for idx, tecnico in enumerate(relatorio.tecnicos_exibicao()):
         papel = "Responsavel" if idx == 0 else "Apoio"
@@ -314,19 +319,6 @@ def construir_snapshot_financeiro(relatorio, usuario=None):
                     **despesa["comprovante"],
                 }
             )
-    for trecho in trechos:
-        if trecho["comprovante"]:
-            anexos.append(
-                {
-                    "tipo": "Comprovante KM",
-                    "descricao": trecho["descricao"],
-                    "tipo_documento": trecho.get("tipo_documento_comprovante"),
-                    "tipo_documento_label": trecho.get("tipo_documento_comprovante_label"),
-                    "numero_documento": trecho.get("numero_documento_comprovante"),
-                    **trecho["comprovante"],
-                }
-            )
-
     observacoes = []
     if relatorio.observacoes:
         observacoes.append({"titulo": "Observacoes gerais", "texto": relatorio.observacoes})
@@ -362,7 +354,7 @@ def construir_snapshot_financeiro(relatorio, usuario=None):
             "tipo_localidade_label": relatorio.get_tipo_localidade_display(),
             "data_inicio": _date(relatorio.data_inicio),
             "data_fim": _date(relatorio.data_fim),
-            "motivo": relatorio.motivo,
+            "motivo": "",
             "observacoes": relatorio.observacoes,
             "motivo_rejeicao": relatorio.motivo_rejeicao,
             "criado_em": _datetime(relatorio.criado_em),

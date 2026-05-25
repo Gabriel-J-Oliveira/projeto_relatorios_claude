@@ -137,6 +137,108 @@
 {{ mapa_trechos_json|json_script:"mapa-trechos-consulta-data" }}
 
 <section class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-transparent border-bottom">
+    <h6 class="mb-0 fw-semibold">Despesas originais e rateio</h6>
+    <small class="text-muted">Item lançado completo, com distribuição por cliente.</small>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive consulta-table-wrap">
+      <table class="table table-sm align-middle mb-0 consulta-table">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">ID</th>
+            <th>Data</th>
+            <th>Tipo</th>
+            <th>Descrição</th>
+            <th class="text-end">Solicitado</th>
+            <th class="text-end">Aprovado</th>
+            <th class="text-end pe-4">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for despesa in consulta.despesas_internas %}
+          <tr>
+            <td class="ps-4">#{{ despesa.id }}</td>
+            <td>{{ despesa.data|date:"d/m/Y"|default:"-" }}</td>
+            <td>{{ despesa.tipo }}</td>
+            <td>{{ despesa.descricao }}</td>
+            <td class="text-end">R$ {{ despesa.valor_solicitado|floatformat:2 }}</td>
+            <td class="text-end fw-semibold">R$ {{ despesa.valor_aprovado|floatformat:2 }}</td>
+            <td class="text-end pe-4"><span class="badge rounded-pill text-bg-{{ despesa.badge }}">{{ despesa.status }}</span></td>
+          </tr>
+          <tr class="bg-body-tertiary">
+            <td></td>
+            <td colspan="6" class="small">
+              <span class="text-muted fw-semibold me-2">Rateio:</span>
+              {% for rateio in despesa.rateios %}
+                <span class="badge rounded-pill text-bg-light border me-1 mb-1">{{ rateio.cliente }}: R$ {{ rateio.valor_original|floatformat:2 }} / R$ {{ rateio.valor_final|floatformat:2 }}</span>
+              {% empty %}
+                <span class="text-muted">Sem rateio registrado.</span>
+              {% endfor %}
+              {% if despesa.motivo %}<span class="text-danger ms-2">{{ despesa.motivo }}</span>{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" class="text-center text-muted py-4">Nenhuma despesa registrada.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-transparent border-bottom">
+    <h6 class="mb-0 fw-semibold">Trechos KM originais e cálculo por cliente</h6>
+    <small class="text-muted">Trecho lançado completo, com cálculo individual por cliente.</small>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive consulta-table-wrap">
+      <table class="table table-sm align-middle mb-0 consulta-table">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">ID</th>
+            <th>Data</th>
+            <th>Origem / destino</th>
+            <th class="text-end">KM</th>
+            <th class="text-end">KM API</th>
+            <th class="text-end">Aprovado</th>
+            <th class="text-end pe-4">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for trecho in consulta.trechos_internos %}
+          <tr>
+            <td class="ps-4">#{{ trecho.id }}</td>
+            <td>{{ trecho.data|date:"d/m/Y"|default:"-" }}</td>
+            <td>{{ trecho.origem }} -> {{ trecho.destino }}</td>
+            <td class="text-end">{{ trecho.km|floatformat:2 }}</td>
+            <td class="text-end">{{ trecho.km_calculado_api|floatformat:2 }}</td>
+            <td class="text-end fw-semibold">R$ {{ trecho.valor_aprovado|floatformat:2 }}</td>
+            <td class="text-end pe-4"><span class="badge rounded-pill text-bg-{{ trecho.badge }}">{{ trecho.status }}</span></td>
+          </tr>
+          <tr class="bg-body-tertiary">
+            <td></td>
+            <td colspan="6" class="small">
+              <span class="text-muted fw-semibold me-2">Clientes:</span>
+              {% for rateio in trecho.rateios %}
+                <span class="badge rounded-pill text-bg-light border me-1 mb-1">{{ rateio.cliente }}: {{ rateio.km|floatformat:2 }} km x R$ {{ rateio.valor_km|floatformat:2 }} = R$ {{ rateio.valor_final|floatformat:2 }}</span>
+              {% empty %}
+                <span class="text-muted">Sem cálculo por cliente registrado.</span>
+              {% endfor %}
+              {% if trecho.motivo %}<span class="text-danger ms-2">{{ trecho.motivo }}</span>{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" class="text-center text-muted py-4">Nenhum trecho KM registrado.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm mb-4">
   <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center">
     <div>
       <h6 class="mb-0 fw-semibold">
@@ -234,6 +336,12 @@
                 {{ resumo.status_financeiro }}
               </span>
             </div>
+            {% if resumo.motivo_viagem %}
+            <div class="border rounded-2 bg-body-tertiary p-2 mb-3 small">
+              <span class="text-muted d-block">Motivo da viagem</span>
+              <strong style="white-space:pre-line">{{ resumo.motivo_viagem }}</strong>
+            </div>
+            {% endif %}
             <div class="cliente-resumo-list">
               <div><span>KM</span><strong>{{ resumo.km_total|floatformat:2 }} km</strong></div>
               <div><span>Despesas</span><strong>R$ {{ resumo.despesas_solicitadas|floatformat:2 }}</strong></div>
@@ -285,8 +393,8 @@
 <section class="card border-0 shadow-sm mb-4">
   <div class="card-header bg-transparent border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
     <div>
-      <h6 class="mb-0 fw-semibold">Resultado final consolidado</h6>
-      <small class="text-muted">Itens finais sem edição ou ações operacionais</small>
+      <h6 class="mb-0 fw-semibold">Resultado final consolidado por cliente</h6>
+      <small class="text-muted">Itens finais por cliente após rateio, sem edição ou ações operacionais</small>
     </div>
     <span class="badge rounded-pill text-bg-light border">{{ consulta.itens|length }} lançamento(s)</span>
   </div>

@@ -189,6 +189,7 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         self.fields["numero"].disabled = True
         self.fields["numero"].widget.attrs["placeholder"] = "Gerado no envio"
         self.fields["numero"].help_text = "Gerado automaticamente ao enviar para conferência."
+        self.fields["motivo"].required = False
         self.fields["valor_adiantamento"].required = False
         self.fields["km_excedente_interno"].required = False
         self.fields["observacao_km_excedente"].required = False
@@ -461,9 +462,6 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
             "fonte_calculo_rota",
             "rota_geojson",
             "valor_km",
-            "comprovante",
-            "tipo_documento_comprovante",
-            "numero_documento_comprovante",
             "observacao",
         ]
         widgets = {
@@ -510,9 +508,6 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
             "fonte_calculo_rota",
             "rota_geojson",
             "valor_km",
-            "comprovante",
-            "tipo_documento_comprovante",
-            "numero_documento_comprovante",
             "observacao",
         ]:
             self.fields[name].required = False
@@ -545,22 +540,6 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
                 "placeholder": "0,00",
             }
         )
-        self.fields["comprovante"].widget.attrs.update(
-            {
-                "class": "form-control form-control-sm text-nowrap",
-                "accept": "image/*,.pdf",
-            }
-        )
-        self.fields["tipo_documento_comprovante"].widget.attrs.update(
-            {"class": "form-select form-select-sm tipo-documento-comprovante"}
-        )
-        self.fields["numero_documento_comprovante"].widget.attrs.update(
-            {
-                "class": "form-control form-control-sm numero-documento-comprovante",
-                "placeholder": "Nº do documento",
-            }
-        )
-
         self.fields["observacao"].widget.attrs.update(
             {
                 "class": "form-control form-control-sm",
@@ -601,9 +580,6 @@ class BaseTrechoKmFormSet(BaseInlineFormSet):
             destino = form.cleaned_data.get("destino")
             km = form.cleaned_data.get("km")
             valor_km = form.cleaned_data.get("valor_km")
-            comprovante = form.cleaned_data.get("comprovante")
-            tipo_documento = form.cleaned_data.get("tipo_documento_comprovante")
-            numero_documento = form.cleaned_data.get("numero_documento_comprovante")
             observacao = form.cleaned_data.get("observacao")
             clientes_raw = ""
             if getattr(self, "data", None):
@@ -630,7 +606,7 @@ class BaseTrechoKmFormSet(BaseInlineFormSet):
 
             # Linha totalmente vazia → ignora
             if not form.instance.pk and not any(
-                [data, origem, destino, km, comprovante, observacao]
+                [data, origem, destino, km, observacao]
             ):
                 continue
 
@@ -648,15 +624,6 @@ class BaseTrechoKmFormSet(BaseInlineFormSet):
                 form.cleaned_data["valor_km"] = Decimal("0.00")
             if data and data > timezone.localdate():
                 form.add_error("data", "Data não pode ser futura.")
-            if (
-                tipo_documento == TipoDocumentoComprovante.NOTA_FISCAL
-                and not numero_documento
-            ):
-                form.add_error(
-                    "numero_documento_comprovante",
-                    "Informe o número do documento para Nota Fiscal.",
-                )
-
             # Data fora do período
             if data and relatorio and relatorio.data_inicio and relatorio.data_fim:
                 if data < relatorio.data_inicio or data > relatorio.data_fim:

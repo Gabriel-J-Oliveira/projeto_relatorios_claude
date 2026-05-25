@@ -69,6 +69,22 @@ def relatorio_tem_itens_ativos(relatorio):
     )
 
 
+def validar_motivos_clientes_relatorio(relatorio):
+    vinculos = list(relatorio.clientes_vinculados.select_related("cliente").all())
+    if not vinculos and relatorio.cliente_id:
+        return [] if (relatorio.motivo or "").strip() else [
+            "Informe o motivo da viagem para todos os clientes do relatorio."
+        ]
+    sem_motivo = [
+        vinculo.cliente.nome
+        for vinculo in vinculos
+        if not (vinculo.motivo_viagem or "").strip()
+    ]
+    if sem_motivo:
+        return ["Informe o motivo da viagem para todos os clientes do relatorio."]
+    return []
+
+
 def validar_valores_negativos(relatorio):
     erros = []
 
@@ -113,6 +129,7 @@ def validar_relatorio_para_envio(relatorio):
         erros.append("Adicione pelo menos uma despesa ou trecho de KM antes de enviar.")
 
     erros.extend(validar_valores_negativos(relatorio))
+    erros.extend(validar_motivos_clientes_relatorio(relatorio))
     erros.extend(validar_integridade_financeira_relatorio(relatorio))
 
     return ResultadoValidacaoOperacional.falha(erros)
@@ -138,6 +155,7 @@ def validar_relatorio_para_aprovacao(relatorio):
         erros.append("O valor aprovado total e R$ 0,00.")
 
     erros.extend(validar_valores_negativos(relatorio))
+    erros.extend(validar_motivos_clientes_relatorio(relatorio))
     erros.extend(validar_integridade_financeira_relatorio(relatorio))
 
     return ResultadoValidacaoOperacional.falha(erros)

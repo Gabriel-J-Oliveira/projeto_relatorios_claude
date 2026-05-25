@@ -37,6 +37,7 @@ from .services.historico_service import registrar_evento
 from .services.clientes_relatorio_service import (
     normalizar_ids_clientes,
     obter_clientes_relatorio,
+    obter_motivos_clientes_relatorio,
     sync_clientes_despesa,
     sync_clientes_relatorio,
     sync_clientes_trecho,
@@ -195,6 +196,17 @@ def _clientes_selecionados_do_request(request, instance=None):
     return [], []
 
 
+def _motivos_clientes_do_request(request, instance=None):
+    motivos = {}
+    if request.method == "POST":
+        for cliente_id in normalizar_ids_clientes(request.POST.get("clientes_relatorio")):
+            motivos[cliente_id] = (
+                request.POST.get(f"motivo_cliente_{cliente_id}") or ""
+            ).strip()
+        return motivos
+    return obter_motivos_clientes_relatorio(instance) if instance else {}
+
+
 def _tecnicos_selecionados_do_request(request, instance=None):
     if request.method == "POST":
         ids = []
@@ -259,14 +271,6 @@ def _registrar_metadados_comprovante(relatorio, usuario, item, arquivo_original=
             relatorio=relatorio,
             usuario=usuario,
             despesa=item,
-            arquivo=arquivo,
-            arquivo_original=arquivo_original,
-        )
-    elif isinstance(item, TrechoKm):
-        AnexoRelatorio.registrar_comprovante(
-            relatorio=relatorio,
-            usuario=usuario,
-            trecho=item,
             arquivo=arquivo,
             arquivo_original=arquivo_original,
         )
@@ -380,11 +384,16 @@ def _duplicar_relatorio(original, usuario=None):
 
     clientes_originais = list(original.clientes_vinculados.select_related("cliente").all())
     if not clientes_originais and original.cliente_id:
-        novo.clientes_vinculados.create(cliente=original.cliente, ordem=1)
+        novo.clientes_vinculados.create(
+            cliente=original.cliente,
+            ordem=1,
+            motivo_viagem=original.motivo or "",
+        )
     for vinculo in clientes_originais:
         novo.clientes_vinculados.create(
             cliente=vinculo.cliente,
             ordem=vinculo.ordem,
+            motivo_viagem=vinculo.motivo_viagem or original.motivo or "",
         )
 
     despesas_originais = list(
@@ -1027,6 +1036,7 @@ def relatorio_form_view(request, pk=None):
             request,
             instance,
         )
+        motivos_clientes = _motivos_clientes_do_request(request, instance)
         cliente_id = clientes_post_ids[0] if clientes_post_ids else request.POST.get("cliente")
         valor_km_padrao = _get_valor_km_para_cliente(cliente_id)
         logger.debug(
@@ -1043,6 +1053,7 @@ def relatorio_form_view(request, pk=None):
             request,
             instance,
         )
+        motivos_clientes = _motivos_clientes_do_request(request, instance)
         cliente_id = getattr(instance, "cliente_id", None) if instance else None
         valor_km_padrao = _get_valor_km_para_cliente(cliente_id)
         logger.debug(
@@ -1144,7 +1155,11 @@ def relatorio_form_view(request, pk=None):
                         relatorio.cliente_id = cliente_ids_relatorio[0]
                         relatorio.save()
                         form.save_m2m()
-                        sync_clientes_relatorio(relatorio, cliente_ids_relatorio)
+                        sync_clientes_relatorio(
+                            relatorio,
+                            cliente_ids_relatorio,
+                            motivos_clientes,
+                        )
 
                         tecnicos_apoio = form.cleaned_data.get("tecnicos_equipe", [])
                         _sync_equipe(relatorio, tecnicos_apoio)
@@ -1201,12 +1216,6 @@ def relatorio_form_view(request, pk=None):
                             elif len(clientes_trecho) > 1:
                                 trecho.valor_km = Decimal("0.00")
                             trecho.save()
-                            _registrar_metadados_comprovante(
-                                relatorio,
-                                usuario_historico,
-                                trecho,
-                                f.cleaned_data.get("comprovante"),
-                            )
                             _registrar_auditoria_geografica_trecho(
                                 relatorio,
                                 usuario_historico,
@@ -1283,6 +1292,7 @@ def relatorio_form_view(request, pk=None):
                             "resumo_erros": resumo_erros,
                             "clientes_selecionados_ids": clientes_post_ids,
                             "clientes_selecionados_nomes": clientes_post_nomes,
+                            "motivos_clientes_relatorio": motivos_clientes,
                             "tecnicos_selecionados_ids": tecnicos_post_ids,
                             "tecnicos_selecionados_nomes": tecnicos_post_nomes,
                         },
@@ -1319,6 +1329,7 @@ def relatorio_form_view(request, pk=None):
                             "diagnostico_backend": diagnostico_backend,
                             "clientes_selecionados_ids": clientes_post_ids,
                             "clientes_selecionados_nomes": clientes_post_nomes,
+                            "motivos_clientes_relatorio": motivos_clientes,
                             "tecnicos_selecionados_ids": tecnicos_post_ids,
                             "tecnicos_selecionados_nomes": tecnicos_post_nomes,
                         },
@@ -1376,6 +1387,7 @@ def relatorio_form_view(request, pk=None):
             "resumo_erros": resumo_erros,
             "clientes_selecionados_ids": clientes_post_ids,
             "clientes_selecionados_nomes": clientes_post_nomes,
+            "motivos_clientes_relatorio": motivos_clientes,
             "tecnicos_selecionados_ids": tecnicos_post_ids,
             "tecnicos_selecionados_nomes": tecnicos_post_nomes,
         },
@@ -1910,6 +1922,7 @@ def relatorio_import_detail_json(request, pk):
         pk=pk,
     )
     clientes_relatorio = obter_clientes_relatorio(relatorio)
+    motivos_clientes = obter_motivos_clientes_relatorio(relatorio)
 
     return JsonResponse(
         {
@@ -1917,6 +1930,7 @@ def relatorio_import_detail_json(request, pk):
             "numero": relatorio.identificador,
             "cliente_id": relatorio.cliente_id,
             "cliente_ids": [cliente.pk for cliente in clientes_relatorio],
+            "motivos_clientes": motivos_clientes,
             "tecnico_id": relatorio.tecnico_responsavel_id,
             "apoio_ids": list(relatorio.equipe.values_list("tecnico_id", flat=True)),
             "valor_adiantamento": str(relatorio.valor_adiantamento or Decimal("0.00")),

@@ -114,6 +114,7 @@ def _snapshot_distribuicao(payload):
         clientes.append(
             _ns(
                 cliente=_ns(nome=cliente.get("nome") or "Nao informado"),
+                motivo_viagem=resumo.get("motivo_viagem") or cliente.get("motivo_viagem") or "",
                 km_total=_decimal(resumo.get("km_total")),
                 valor_km_solicitado=_decimal(resumo.get("valor_km_solicitado")),
                 despesas_solicitadas=_decimal(resumo.get("despesas_solicitadas")),
@@ -353,6 +354,115 @@ def _itens_snapshot(payload):
     return sorted(itens, key=lambda item: (item.data is None, item.data, item.tipo, item.cliente))
 
 
+def _status_interno_snapshot(item, solicitado, aprovado):
+    status, badge = _badge_snapshot(item.get("rejeitado"), solicitado, aprovado)
+    return status, badge
+
+
+def _rateios_despesa_snapshot(despesa, payload):
+    rateios = despesa.get("rateios") or []
+    if rateios:
+        return [
+            _ns(
+                cliente=rateio.get("cliente_nome") or "Nao informado",
+                valor_original=_money(rateio.get("valor_original")),
+                valor_final=_money(rateio.get("valor_final")),
+                status=rateio.get("status_label") or rateio.get("status") or "-",
+                motivo=rateio.get("motivo_ajuste") or "",
+            )
+            for rateio in rateios
+        ]
+    clientes = despesa.get("clientes") or payload.get("clientes") or []
+    return [
+        _ns(
+            cliente=cliente.get("nome") or "Nao informado",
+            valor_original=_money(despesa.get("valor_solicitado")),
+            valor_final=_money(despesa.get("valor_final")),
+            status="-",
+            motivo="",
+        )
+        for cliente in clientes[:1]
+    ]
+
+
+def _despesas_internas_snapshot(payload):
+    linhas = []
+    for despesa in payload.get("despesas") or []:
+        solicitado = _money(despesa.get("valor_solicitado"))
+        aprovado = Decimal("0.00") if despesa.get("rejeitado") else _money(despesa.get("valor_final"))
+        status, badge = _status_interno_snapshot(despesa, solicitado, aprovado)
+        linhas.append(
+            _ns(
+                id=despesa.get("id"),
+                data=_data_iso(despesa.get("data")),
+                tipo=despesa.get("tipo_label") or despesa.get("tipo") or "-",
+                descricao=despesa.get("descricao") or "-",
+                valor_solicitado=solicitado,
+                valor_aprovado=aprovado,
+                status=status,
+                badge=badge,
+                motivo=despesa.get("motivo_rejeicao") or despesa.get("motivo_recusa") or "",
+                rateios=_rateios_despesa_snapshot(despesa, payload),
+            )
+        )
+    return linhas
+
+
+def _rateios_trecho_snapshot(trecho, payload):
+    rateios = trecho.get("rateios") or []
+    if rateios:
+        return [
+            _ns(
+                cliente=rateio.get("cliente_nome") or "Nao informado",
+                km=_money(rateio.get("km_cliente") or rateio.get("km_final")),
+                valor_km=Decimal(str(rateio.get("valor_km") or "0.00")),
+                valor_original=_money(rateio.get("valor_calculado")),
+                valor_final=_money(rateio.get("valor_final")),
+                status=rateio.get("status_label") or rateio.get("status") or "-",
+                motivo=rateio.get("motivo_ajuste") or "",
+            )
+            for rateio in rateios
+        ]
+    clientes = trecho.get("clientes") or payload.get("clientes") or []
+    return [
+        _ns(
+            cliente=cliente.get("nome") or "Nao informado",
+            km=_money(trecho.get("km")),
+            valor_km=Decimal(str(trecho.get("valor_km_final") or trecho.get("valor_km") or "0.00")),
+            valor_original=_money(trecho.get("valor_calculado")),
+            valor_final=_money(trecho.get("valor_final")),
+            status="-",
+            motivo="",
+        )
+        for cliente in clientes[:1]
+    ]
+
+
+def _trechos_internos_snapshot(payload):
+    linhas = []
+    for trecho in payload.get("trechos_km") or []:
+        solicitado = _money(trecho.get("valor_calculado"))
+        aprovado = Decimal("0.00") if trecho.get("rejeitado") else _money(trecho.get("valor_final"))
+        status, badge = _status_interno_snapshot(trecho, solicitado, aprovado)
+        linhas.append(
+            _ns(
+                id=trecho.get("id"),
+                data=_data_iso(trecho.get("data")),
+                origem=trecho.get("origem") or "-",
+                destino=trecho.get("destino") or "-",
+                km=_money(trecho.get("km")),
+                km_calculado_api=_money(trecho.get("km_calculado_api")),
+                valor_solicitado=solicitado,
+                valor_aprovado=aprovado,
+                status=status,
+                badge=badge,
+                motivo=trecho.get("motivo_rejeicao") or trecho.get("motivo_recusa") or "",
+                rateios=_rateios_trecho_snapshot(trecho, payload),
+            )
+        )
+    return linhas
+
+
 def _montar_consulta_snapshot(snapshot):
     payload = snapshot.payload or {}
     relatorio = payload.get("relatorio") or {}
@@ -397,6 +507,8 @@ def _montar_consulta_snapshot(snapshot):
         "km_excedente": _km_excedente_snapshot(payload),
         "mapa_trechos": _mapa_trechos_snapshot(payload),
         "historicos": _historicos_snapshot(payload),
+        "despesas_internas": _despesas_internas_snapshot(payload),
+        "trechos_internos": _trechos_internos_snapshot(payload),
         "itens": _itens_snapshot(payload),
         "anexos": [
             AnexoConsultaRelatorioDTO(
@@ -463,6 +575,88 @@ def _mapa_trechos_vivo(relatorio):
             }
         )
     return dados
+
+
+def _despesas_internas_vivas(relatorio):
+    linhas = []
+    for despesa in relatorio.despesas.all():
+        solicitado = _money(despesa.valor)
+        aprovado = Decimal("0.00") if _item_rejeitado(despesa) else _money(despesa.valor_final)
+        status, badge = _badge_item(despesa, solicitado, aprovado)
+        rateios = [
+            _ns(
+                cliente=rateio.cliente.nome,
+                valor_original=_money(rateio.valor_original),
+                valor_final=_money(rateio.valor_final),
+                status=rateio.get_status_display(),
+                motivo=rateio.motivo_ajuste or "",
+            )
+            for rateio in despesa.rateios.all()
+        ]
+        if not rateios:
+            vinculos = list(despesa.clientes_vinculados.select_related("cliente").all())
+            rateios = [
+                _ns(cliente=vinculo.cliente.nome, valor_original=solicitado, valor_final=aprovado, status="-", motivo="")
+                for vinculo in vinculos[:1]
+            ] or [_ns(cliente=_cliente_nome(relatorio.cliente), valor_original=solicitado, valor_final=aprovado, status="-", motivo="")]
+        linhas.append(
+            _ns(
+                id=despesa.pk,
+                data=despesa.data,
+                tipo=despesa.get_tipo_display(),
+                descricao=despesa.descricao,
+                valor_solicitado=solicitado,
+                valor_aprovado=aprovado,
+                status=status,
+                badge=badge,
+                motivo=despesa.motivo_rejeicao or despesa.motivo_recusa or "",
+                rateios=rateios,
+            )
+        )
+    return linhas
+
+
+def _trechos_internos_vivos(relatorio):
+    linhas = []
+    for trecho in relatorio.trechos.all():
+        solicitado = _money(trecho.valor_calculado_clientes)
+        aprovado = Decimal("0.00") if _item_rejeitado(trecho) else _money(trecho.valor_final_clientes)
+        status, badge = _badge_item(trecho, solicitado, aprovado)
+        rateios = [
+            _ns(
+                cliente=rateio.cliente.nome,
+                km=_money(rateio.km_cliente),
+                valor_km=rateio.valor_km,
+                valor_original=_money(rateio.valor_calculado),
+                valor_final=_money(rateio.valor_final),
+                status=rateio.get_status_display(),
+                motivo=rateio.motivo_ajuste or "",
+            )
+            for rateio in trecho.rateios.all()
+        ]
+        if not rateios:
+            vinculos = list(trecho.clientes_vinculados.select_related("cliente").all())
+            rateios = [
+                _ns(cliente=vinculo.cliente.nome, km=_money(trecho.km), valor_km=trecho.valor_km_final, valor_original=solicitado, valor_final=aprovado, status="-", motivo="")
+                for vinculo in vinculos[:1]
+            ] or [_ns(cliente=_cliente_nome(relatorio.cliente), km=_money(trecho.km), valor_km=trecho.valor_km_final, valor_original=solicitado, valor_final=aprovado, status="-", motivo="")]
+        linhas.append(
+            _ns(
+                id=trecho.pk,
+                data=trecho.data,
+                origem=trecho.origem,
+                destino=trecho.destino,
+                km=_money(trecho.km),
+                km_calculado_api=_money(trecho.km_calculado_api),
+                valor_solicitado=solicitado,
+                valor_aprovado=aprovado,
+                status=status,
+                badge=badge,
+                motivo=trecho.motivo_rejeicao or trecho.motivo_recusa or "",
+                rateios=rateios,
+            )
+        )
+    return linhas
 
 
 def _montar_consulta_viva(relatorio):
@@ -556,16 +750,6 @@ def _montar_consulta_viva(relatorio):
                 )
             )
 
-        if trecho.comprovante:
-            anexos.append(
-                AnexoConsultaRelatorioDTO(
-                    tipo="Comprovante KM",
-                    descricao=descricao,
-                    url=trecho.comprovante.url,
-                    nome=trecho.comprovante.name.rsplit("/", 1)[-1],
-                )
-            )
-
     for linha in relatorio.rateio_km_excedente_clientes():
         itens.append(
             ItemConsultaRelatorioDTO(
@@ -629,6 +813,8 @@ def _montar_consulta_viva(relatorio):
         "distribuicao_clientes": resumo_financeiro_por_cliente(relatorio),
         "km_excedente": _km_excedente_vivo(relatorio),
         "mapa_trechos": _mapa_trechos_vivo(relatorio),
+        "despesas_internas": _despesas_internas_vivas(relatorio),
+        "trechos_internos": _trechos_internos_vivos(relatorio),
         "historicos": [
             _ns(
                 acao=historico.acao,

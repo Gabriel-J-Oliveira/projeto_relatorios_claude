@@ -203,6 +203,14 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.data-table .subrow td {
+  background: #f8fafc;
+  color: #475569;
+  font-size: 8.5px;
+  padding-top: 4px;
+  padding-bottom: 7px;
+}
+
 .data-table.compact th,
 .data-table.compact td {
   padding: 5px;

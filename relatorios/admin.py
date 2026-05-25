@@ -113,7 +113,6 @@ class TrechoKmInline(admin.TabularInline):
         "destino",
         "km",
         "valor_km",
-        "comprovante",
         "valor_calculado",
         "observacao",
     ]
