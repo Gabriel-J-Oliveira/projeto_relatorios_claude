@@ -13,6 +13,7 @@ from .models import (
     Adiantamento,
     TipoDocumentoComprovante,
 )
+from .validators import validar_anexo_upload
 
 class ClienteSelectWithData(forms.Select):
     """
@@ -344,7 +345,7 @@ class ItemDespesaForm(BootstrapMixin, forms.ModelForm):
         self.fields["comprovante"].widget.attrs.update(
             {
                 "class": "form-control form-control-sm text-nowrap",
-                "accept": "image/*,.pdf",
+                "accept": ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png",
             }
         )
         self.fields["tipo_documento_comprovante"].widget.attrs.update(
@@ -356,6 +357,11 @@ class ItemDespesaForm(BootstrapMixin, forms.ModelForm):
                 "placeholder": "Nº do documento",
             }
         )
+
+    def clean_comprovante(self):
+        comprovante = self.cleaned_data.get("comprovante")
+        validar_anexo_upload(comprovante)
+        return comprovante
 
 
 class BaseItemDespesaFormSet(BaseInlineFormSet):

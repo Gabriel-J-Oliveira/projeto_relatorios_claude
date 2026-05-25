@@ -140,14 +140,14 @@
       <h6 class="mb-0 fw-semibold">
         <i class="bi bi-map text-primary me-2"></i>Mapa dos trechos KM
       </h6>
-      <small class="text-muted">Rotas calculadas a partir dos endereÃ§os salvos</small>
+      <small class="text-muted">Rotas calculadas a partir dos endereços salvos</small>
     </div>
     <span class="badge rounded-pill text-bg-light border">{{ mapa_trechos_json|length }} rota(s)</span>
   </div>
   <div class="card-body">
     <div id="mapa-trechos-detail" class="mapa-trechos-km"></div>
     <div id="mapa-trechos-detail-vazio" class="text-muted small d-none">
-      Nenhum trecho com coordenadas disponÃ­veis para exibiÃ§Ã£o no mapa.
+      Nenhum trecho com coordenadas disponíveis para exibição no mapa.
     </div>
     {% if relatorio.km_excedente_interno > 0 %}
     <div class="alert alert-info border-0 shadow-sm mt-3 mb-0 py-2 small">
@@ -317,12 +317,16 @@
                 </td>
                 <td class="text-center">
                   {% if d.comprovante %}
-                  <a href="{{ d.comprovante.url }}"
-                     target="_blank"
-                     class="btn btn-sm btn-outline-success rounded-circle px-2 py-1"
-                     title="Abrir comprovante">
+                  <button type="button"
+                     class="btn btn-sm btn-outline-success rounded-circle px-2 py-1 anexo-preview-btn"
+                     title="Visualizar comprovante"
+                     aria-label="Visualizar comprovante"
+                     data-preview-url="{% url 'relatorios:despesa_comprovante_visualizar' d.pk %}"
+                     data-download-url="{% url 'relatorios:despesa_comprovante_baixar' d.pk %}"
+                     data-file-name="{{ d.comprovante.name|cut:'comprovantes/' }}"
+                     data-file-type="">
                     <i class="bi bi-paperclip"></i>
-                  </a>
+                  </button>
                   {% else %}
                   <span class="btn btn-sm btn-outline-secondary rounded-circle px-2 py-1 disabled opacity-50"
                         title="Sem comprovante">
@@ -481,7 +485,7 @@
                 <th class="ps-3 small fw-semibold text-muted">Data</th>
                 <th class="small fw-semibold text-muted">KM</th>
                 <th class="small fw-semibold text-muted">R$/KM Solicitado</th>
-                <th class="small fw-semibold text-muted">AprovaÃ§Ã£o KM</th>
+                <th class="small fw-semibold text-muted">Aprovação KM</th>
                 <th class="small fw-semibold text-muted">Total Solicitado</th>
                 <th class="small fw-semibold text-muted text-center">Rateio</th>
                 <th class="small fw-semibold text-muted text-end pe-3">Mais informações</th>
@@ -682,8 +686,8 @@
             <strong class="text-success">R$ {{ relatorio.total_km_excedente|floatformat:2 }}</strong>
           </div>
           <div class="col-md-6">
-            <span class="text-muted small d-block">ObservaÃ§Ã£o</span>
-            <span>{{ relatorio.observacao_km_excedente|default:"Sem observaÃ§Ã£o" }}</span>
+            <span class="text-muted small d-block">Observação</span>
+            <span>{{ relatorio.observacao_km_excedente|default:"Sem observação" }}</span>
           </div>
         </div>
         <div class="table-responsive border rounded">
@@ -1390,6 +1394,48 @@
     0% { background-color: rgba(255, 193, 7, .32); }
     100% { background-color: transparent; }
   }
+
+  @media (min-width: 1200px) and (max-width: 1399.98px) {
+    .mapa-trechos-km {
+      min-height: 260px;
+    }
+
+    .card-header {
+      padding-top: .75rem !important;
+      padding-bottom: .75rem !important;
+    }
+
+    .card-body {
+      padding: .9rem;
+    }
+
+    .table {
+      font-size: .82rem;
+    }
+
+    .table th,
+    .table td {
+      padding: .5rem .55rem;
+    }
+
+    .campo-aprovado-despesa,
+    .campo-aprovado-km {
+      min-width: 96px;
+      max-width: 112px;
+    }
+
+    .cliente-carousel-slides {
+      min-height: 245px;
+    }
+
+    .cliente-mini-table td {
+      padding: .38rem .5rem;
+    }
+
+    .rateio-popover-row {
+      gap: .9rem;
+    }
+  }
 </style>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1444,9 +1490,9 @@
             <div><span class="text-muted">Destino:</span> ${escapeHtml(trecho.destino)}</div>
             <div><span class="text-muted">KM calculado:</span> ${escapeHtml(trecho.km_calculado || "-")}</div>
             <div><span class="text-muted">KM informado:</span> ${escapeHtml(trecho.km_informado || "-")}</div>
-            <div><span class="text-muted">DiferenÃ§a:</span> ${escapeHtml(trecho.diferenca_percentual || "0")}%</div>
+            <div><span class="text-muted">Diferença:</span> ${escapeHtml(trecho.diferenca_percentual || "0")}%</div>
             <div><span class="text-muted">Clientes:</span> ${escapeHtml((trecho.clientes || []).join(", ") || "-")}</div>
-            ${trecho.divergente ? '<div class="badge text-bg-warning mt-2">DivergÃªncia acima de 15%</div>' : ""}
+            ${trecho.divergente ? '<div class="badge text-bg-warning mt-2">Divergência acima de 15%</div>' : ""}
           </div>`;
         const iconClass = trecho.divergente ? "mapa-pin divergente" : "mapa-pin";
         const icon = L.divIcon({

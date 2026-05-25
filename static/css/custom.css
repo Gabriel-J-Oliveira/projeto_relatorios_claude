@@ -1,8 +1,15 @@
 /* ── BASE ── */
+html {
+  min-height: 100%;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
 body {
   font-family: 'Inter', sans-serif;
   font-size: .9rem;
   overflow-x: hidden;
+  overflow-y: auto;
 }
 
 img,
@@ -202,6 +209,25 @@ textarea.form-control {
 ::-webkit-scrollbar-thumb {
   background: rgba(0,0,0,.2);
   border-radius: 10px;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 11px;
+}
+
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, .55);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, .75);
+  border: 3px solid transparent;
+  background-clip: padding-box;
 }
 
 [data-bs-theme="dark"] .table-light {
@@ -409,4 +435,26 @@ textarea.form-control {
   background-color: #fff;
   border-color: #fff;
   color: #111827;
+}
+.anexo-preview-body {
+  min-height: 60vh;
+  display: grid;
+  place-items: center;
+  background: var(--bs-tertiary-bg);
+  border-radius: .75rem;
+  overflow: hidden;
+}
+
+.anexo-preview-frame {
+  width: 100%;
+  min-height: 72vh;
+  border: 0;
+  background: var(--bs-body-bg);
+}
+
+.anexo-preview-image {
+  display: block;
+  max-width: 100%;
+  max-height: 72vh;
+  object-fit: contain;
 }

@@ -174,9 +174,9 @@ def exigir_acesso_erp(view_func):
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         if not usuario_pode_acessar_erp(request.user):
-            messages.error(request, "Seu usuÃ¡rio nÃ£o possui perfil de acesso ao ERP.")
+            messages.error(request, "Seu usuário não possui perfil de acesso ao ERP.")
             logger.warning("Acesso ERP negado para usuario id=%s.", getattr(request.user, "pk", None))
-            raise PermissionDenied("UsuÃ¡rio sem grupo ERP.")
+            raise PermissionDenied("Usuário sem grupo ERP.")
         return view_func(request, *args, **kwargs)
 
     return wrapper
@@ -186,7 +186,7 @@ def exigir_administrativo(view_func):
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         if not usuario_eh_administrativo(request.user):
-            messages.error(request, "VocÃª nÃ£o tem permissÃ£o para acessar esta Ã¡rea.")
+            messages.error(request, "Você não tem permissão para acessar esta área.")
             logger.warning("Acesso administrativo negado para usuario id=%s.", getattr(request.user, "pk", None))
             return redirect("relatorios:dashboard")
         return view_func(request, *args, **kwargs)

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Models v3 — Campo Manager
 Mudanças:
 - centro_custo movido de ItemDespesa para RelatorioTecnico
@@ -16,6 +16,7 @@ from django.utils import timezone
 from decimal import Decimal
 
 from .storage import anexos_storage
+from .validators import validar_anexo_upload
 
 
 def _valor_monetario(valor):
@@ -1015,6 +1016,10 @@ class ItemDespesa(models.Model):
                 )
         if self.data and self.data > timezone.localdate():
             erros["data"] = "Data não pode ser futura."
+        try:
+            validar_anexo_upload(self.comprovante)
+        except ValidationError as exc:
+            erros["comprovante"] = exc.messages[0] if exc.messages else str(exc)
         if self.tipo and self.data and self.valor:
             limite = PoliticaValor.limite_para(self.tipo, self.data)
             if limite and self.valor > limite:
@@ -1353,6 +1358,10 @@ class TrechoKm(models.Model):
                 )
         if self.data and self.data > timezone.localdate():
             erros["data"] = "Data não pode ser futura."
+        try:
+            validar_anexo_upload(self.comprovante)
+        except ValidationError as exc:
+            erros["comprovante"] = exc.messages[0] if exc.messages else str(exc)
         if erros:
             raise ValidationError(erros)
 
@@ -1456,6 +1465,7 @@ class AnexoRelatorio(models.Model):
             raise ValidationError("A despesa do anexo nao pertence ao relatorio.")
         if self.trecho_id and self.relatorio_id and self.trecho.relatorio_id != self.relatorio_id:
             raise ValidationError("O trecho KM do anexo nao pertence ao relatorio.")
+        validar_anexo_upload(self.arquivo)
         if self.tipo_documento == TipoDocumentoComprovante.NOTA_FISCAL and not self.numero_documento:
             raise ValidationError("Informe o número do documento para Nota Fiscal.")
 
@@ -1584,3 +1594,4 @@ class Adiantamento(models.Model):
 
     def __str__(self):
         return f"{self.get_tipo_display()} — {self.tecnico} — R$ {self.valor}"
+

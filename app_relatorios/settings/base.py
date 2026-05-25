@@ -117,6 +117,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 # Mantido separado de MEDIA_ROOT para preservar /media/ apenas para assets internos.
 ANEXOS_URL = config("ANEXOS_URL", default="/anexos/")
 ANEXOS_ROOT = Path(config("ANEXOS_ROOT", default="/home/app_relatorios_files"))
+ANEXO_MAX_UPLOAD_MB = config("ANEXO_MAX_UPLOAD_MB", default=10, cast=int)
 
 
 # Email interno / SMTP. Em desenvolvimento, dev.py pode sobrescrever para console.

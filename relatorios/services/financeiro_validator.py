@@ -240,29 +240,29 @@ def validar_integridade_km_excedente(relatorio, clientes_relatorio_ids=None):
     clientes_relatorio_ids = clientes_relatorio_ids or _clientes_relatorio_ids(relatorio)
     km_excedente = _km(relatorio.km_excedente_interno)
     if km_excedente is None:
-        erros.append("KM excedente / deslocamento interno invÃ¡lido.")
+        erros.append("KM excedente / deslocamento interno inválido.")
         return erros
     if km_excedente < 0:
-        erros.append("KM excedente / deslocamento interno nÃ£o pode ser negativo.")
+        erros.append("KM excedente / deslocamento interno não pode ser negativo.")
     if km_excedente <= 0:
         return erros
     if not clientes_relatorio_ids:
-        erros.append("KM excedente requer ao menos um cliente no relatÃ³rio.")
+        erros.append("KM excedente requer ao menos um cliente no relatório.")
         return erros
 
     rateios = relatorio.rateio_km_excedente_clientes()
     if len(rateios) != len(clientes_relatorio_ids):
-        erros.append("KM excedente nÃ£o foi distribuÃ­do para todos os clientes.")
+        erros.append("KM excedente não foi distribuído para todos os clientes.")
 
     soma_km = sum((_km(linha["km"]) for linha in rateios), Decimal("0.00"))
     if soma_km != km_excedente:
-        erros.append("Rateio de KM excedente nÃ£o fecha com o KM informado.")
+        erros.append("Rateio de KM excedente não fecha com o KM informado.")
 
     for linha in rateios:
         valor_km = _valor_km(linha["valor_km"])
         if valor_km is None or valor_km < 0:
             erros.append(
-                f"KM excedente: valor/KM invÃ¡lido para {linha['cliente'].nome}."
+                f"KM excedente: valor/KM inválido para {linha['cliente'].nome}."
             )
     return erros
 

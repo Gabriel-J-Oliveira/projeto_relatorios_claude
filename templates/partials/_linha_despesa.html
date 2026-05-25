@@ -94,6 +94,7 @@
              name="despesas-{{ idx }}-comprovante"
              id="id_despesas-{{ idx }}-comprovante"
               class="form-sm {% if form.comprovante.errors %}is-invalid{% endif %}"
+              accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
               onchange=" this.parentElement.classList.replace( 'btn-outline-secondary', 'btn-success' )">
     </label>
     <div class="d-flex gap-1 mt-1">

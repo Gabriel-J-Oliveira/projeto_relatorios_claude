@@ -1,7 +1,9 @@
 import logging
 import json
+import mimetypes
 import time
 from decimal import Decimal
+from types import SimpleNamespace
 
 from django.contrib import messages
 from django.conf import settings
@@ -11,11 +13,12 @@ from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.utils import OperationalError, ProgrammingError
 from django.db.models import Q, Sum
-from django.http import HttpResponse, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils import timezone
-from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.http import content_disposition_header, url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import ListView, TemplateView
 
@@ -42,6 +45,7 @@ from .services.clientes_relatorio_service import (
     sync_clientes_relatorio,
     sync_clientes_trecho,
 )
+from .validators import anexo_tem_tipo_permitido
 from .services.autorizacao_service import (
     exigir_acesso_erp,
     exigir_administrativo,
@@ -274,6 +278,73 @@ def _registrar_metadados_comprovante(relatorio, usuario, item, arquivo_original=
             arquivo=arquivo,
             arquivo_original=arquivo_original,
         )
+
+
+def _nome_arquivo_anexo(arquivo):
+    return (getattr(arquivo, "name", "") or "anexo").rsplit("/", 1)[-1]
+
+
+def _tipo_mime_arquivo(nome_arquivo, tipo_mime=""):
+    return tipo_mime or mimetypes.guess_type(nome_arquivo or "")[0] or "application/octet-stream"
+
+
+def _responder_arquivo_anexo(arquivo, *, nome_original="", tipo_mime="", download=False):
+    if not arquivo:
+        raise Http404("Arquivo não encontrado.")
+    nome = nome_original or _nome_arquivo_anexo(arquivo)
+    content_type = _tipo_mime_arquivo(nome, tipo_mime)
+    if not anexo_tem_tipo_permitido(nome, content_type):
+        content_type = "application/octet-stream"
+        download = True
+    try:
+        arquivo.open("rb")
+    except FileNotFoundError as exc:
+        raise Http404("Arquivo não encontrado.") from exc
+    response = FileResponse(arquivo.file, content_type=content_type)
+    response["Content-Disposition"] = content_disposition_header(
+        as_attachment=download,
+        filename=nome,
+    )
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+def _validar_acesso_relatorio_arquivo(user, relatorio):
+    if not usuario_pode_visualizar_relatorio(user, relatorio):
+        raise PermissionDenied("Você não tem permissão para acessar este anexo.")
+
+
+def _anexos_visualizacao_relatorio(relatorio):
+    anexos = []
+    for despesa in relatorio.despesas.all():
+        if not despesa.comprovante:
+            continue
+        nome = _nome_arquivo_anexo(despesa.comprovante)
+        tipo_mime = _tipo_mime_arquivo(nome)
+        anexos.append(
+            SimpleNamespace(
+                tipo="Comprovante",
+                descricao=despesa.descricao,
+                nome=nome,
+                tipo_mime=tipo_mime,
+                preview_url=reverse("relatorios:despesa_comprovante_visualizar", kwargs={"pk": despesa.pk}),
+                download_url=reverse("relatorios:despesa_comprovante_baixar", kwargs={"pk": despesa.pk}),
+            )
+        )
+    for anexo in relatorio.anexos.filter(despesa__isnull=True, trecho__isnull=True):
+        nome = anexo.nome_original or _nome_arquivo_anexo(anexo.arquivo)
+        tipo_mime = _tipo_mime_arquivo(nome, anexo.tipo_mime)
+        anexos.append(
+            SimpleNamespace(
+                tipo="Anexo",
+                descricao=anexo.observacao or anexo.nome_original,
+                nome=nome,
+                tipo_mime=tipo_mime,
+                preview_url=reverse("relatorios:anexo_visualizar", kwargs={"pk": anexo.pk}),
+                download_url=reverse("relatorios:anexo_baixar", kwargs={"pk": anexo.pk}),
+            )
+        )
+    return anexos
 
 
 def _validar_clientes_formsets(request, fs_desp, fs_km, cliente_ids_relatorio):
@@ -1491,6 +1562,60 @@ def nova_linha_km(request):
 
 @login_required
 @exigir_acesso_erp
+def anexo_visualizar_view(request, pk):
+    anexo = get_object_or_404(
+        AnexoRelatorio.objects.select_related("relatorio"),
+        pk=pk,
+    )
+    _validar_acesso_relatorio_arquivo(request.user, anexo.relatorio)
+    return _responder_arquivo_anexo(
+        anexo.arquivo,
+        nome_original=anexo.nome_original,
+        tipo_mime=anexo.tipo_mime,
+        download=False,
+    )
+
+
+@login_required
+@exigir_acesso_erp
+def anexo_baixar_view(request, pk):
+    anexo = get_object_or_404(
+        AnexoRelatorio.objects.select_related("relatorio"),
+        pk=pk,
+    )
+    _validar_acesso_relatorio_arquivo(request.user, anexo.relatorio)
+    return _responder_arquivo_anexo(
+        anexo.arquivo,
+        nome_original=anexo.nome_original,
+        tipo_mime=anexo.tipo_mime,
+        download=True,
+    )
+
+
+@login_required
+@exigir_acesso_erp
+def despesa_comprovante_visualizar_view(request, pk):
+    despesa = get_object_or_404(
+        ItemDespesa.objects.select_related("relatorio"),
+        pk=pk,
+    )
+    _validar_acesso_relatorio_arquivo(request.user, despesa.relatorio)
+    return _responder_arquivo_anexo(despesa.comprovante, download=False)
+
+
+@login_required
+@exigir_acesso_erp
+def despesa_comprovante_baixar_view(request, pk):
+    despesa = get_object_or_404(
+        ItemDespesa.objects.select_related("relatorio"),
+        pk=pk,
+    )
+    _validar_acesso_relatorio_arquivo(request.user, despesa.relatorio)
+    return _responder_arquivo_anexo(despesa.comprovante, download=True)
+
+
+@login_required
+@exigir_acesso_erp
 def relatorio_detail_view(request, pk):
     relatorio = get_object_or_404(
         _relatorios_visiveis(
@@ -1501,10 +1626,12 @@ def relatorio_detail_view(request, pk):
                 "clientes_vinculados__cliente",
                 "despesas__clientes_vinculados__cliente",
                 "despesas__rateios__cliente",
+                "despesas__anexos",
                 "trechos__clientes_vinculados__cliente",
                 "trechos__rateios__cliente",
                 "equipe__tecnico",
                 "historicos__usuario",
+                "anexos",
             ),
         ),
         pk=pk,
@@ -1559,6 +1686,7 @@ def relatorio_detail_view(request, pk):
             "pode_enviar_relatorio": usuario_pode_enviar_relatorio(request.user, relatorio),
             "inconsistencias_rateio": inconsistencias_rateio,
             "distribuicao_clientes": distribuicao_clientes,
+            "anexos_visualizacao": _anexos_visualizacao_relatorio(relatorio),
             "mapa_trechos_json": _mapa_trechos_relatorio(relatorio),
             "titulo_pagina": f"Relatório {relatorio.identificador}",
         },
@@ -1581,10 +1709,12 @@ def relatorio_consulta_view(request, pk):
                 "clientes_vinculados__cliente",
                 "despesas__clientes_vinculados__cliente",
                 "despesas__rateios__cliente",
+                "despesas__anexos",
                 "trechos__clientes_vinculados__cliente",
                 "trechos__rateios__cliente",
                 "equipe__tecnico",
                 "historicos__usuario",
+                "anexos",
             ),
         ),
         pk=pk,
@@ -1604,6 +1734,7 @@ def relatorio_consulta_view(request, pk):
             "relatorio": relatorio,
             "consulta": consulta,
             "distribuicao_clientes": consulta["distribuicao_clientes"],
+            "anexos_visualizacao": _anexos_visualizacao_relatorio(relatorio),
             "mapa_trechos_json": consulta.get("mapa_trechos", []),
             "pode_gerar_pdf_interno": usuario_pode_atuar_como_financeiro(request.user),
             "titulo_pagina": f"Consulta {consulta['relatorio'].identificador}",
@@ -1656,6 +1787,7 @@ def relatorio_reembolso_pdf_view(request, pk):
     css_path = settings.BASE_DIR / "templates" / "pdf" / "relatorio_reembolso.css"
     pdf = HTML(
         string=html,
+        encoding="utf-8",
         base_url=request.build_absolute_uri("/"),
     ).write_pdf(stylesheets=[CSS(filename=str(css_path))])
 
@@ -1831,6 +1963,7 @@ def relatorio_pdf_interno_view(request, pk):
     css_path = settings.BASE_DIR / "static" / "css" / "pdf-relatorio.css"
     pdf = HTML(
         string=html,
+        encoding="utf-8",
         base_url=request.build_absolute_uri("/"),
     ).write_pdf(stylesheets=[CSS(filename=str(css_path))])
 

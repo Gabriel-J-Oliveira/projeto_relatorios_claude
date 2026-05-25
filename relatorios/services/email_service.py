@@ -306,7 +306,7 @@ def _gerar_pdf_interno(relatorio):
     )
     css_path = settings.BASE_DIR / "static" / "css" / "pdf-relatorio.css"
     base_url = getattr(settings, "APP_BASE_URL", "") or str(settings.BASE_DIR)
-    return HTML(string=html, base_url=base_url).write_pdf(
+    return HTML(string=html, encoding="utf-8", base_url=base_url).write_pdf(
         stylesheets=[CSS(filename=str(css_path))]
     )
 

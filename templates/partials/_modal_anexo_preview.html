@@ -1,0 +1,34 @@
+<div class="modal fade" id="modalAnexoPreview" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title mb-0">Comprovante / Anexo</h5>
+          <small class="text-muted" id="anexo-preview-meta">Arquivo selecionado</small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <div id="anexo-preview-body" class="anexo-preview-body">
+          <div class="text-muted small">Selecione um anexo para visualizar.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <a href="#"
+           id="anexo-preview-download"
+           class="btn btn-outline-primary btn-sm"
+           download>
+          <i class="bi bi-download me-1"></i>Baixar
+        </a>
+        <a href="#"
+           id="anexo-preview-open"
+           class="btn btn-outline-secondary btn-sm"
+           target="_blank"
+           rel="noopener">
+          <i class="bi bi-arrows-fullscreen me-1"></i>Abrir em nova aba
+        </a>
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>

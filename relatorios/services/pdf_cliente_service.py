@@ -426,6 +426,7 @@ def _render_pdf_cliente(contexto):
     css_path = settings.BASE_DIR / "static" / "css" / "pdf_cliente.css"
     return HTML(
         string=html,
+        encoding="utf-8",
         base_url=contexto.get("base_url") or "",
     ).write_pdf(stylesheets=[CSS(filename=str(css_path))])
 

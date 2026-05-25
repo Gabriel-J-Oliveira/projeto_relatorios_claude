@@ -350,7 +350,7 @@ def _validar_aprovacao_financeira(relatorio):
         for item in list(relatorio.despesas.all()) + list(relatorio.trechos.all())
     )
     if not itens_ativos and (relatorio.km_excedente_interno or Decimal("0.00")) <= 0:
-        raise WorkflowError("N?o ? poss?vel aprovar relat?rio com todos os itens rejeitados.")
+        raise WorkflowError("Não é possível aprovar relatório com todos os itens rejeitados.")
     erros_rateio = validar_rateios_relatorio(relatorio)
     if erros_rateio:
         raise WorkflowError(erros_rateio)

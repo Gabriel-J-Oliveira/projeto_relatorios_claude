@@ -244,14 +244,14 @@
       <h6 class="mb-0 fw-semibold">
         <i class="bi bi-map text-primary me-2"></i>Mapa dos trechos KM
       </h6>
-      <small class="text-muted">Rotas congeladas no relatÃ³rio final quando disponÃ­veis</small>
+      <small class="text-muted">Rotas congeladas no relatório final quando disponíveis</small>
     </div>
     <span class="badge rounded-pill text-bg-light border">{{ mapa_trechos_json|length }} rota(s)</span>
   </div>
   <div class="card-body">
     <div id="mapa-trechos-consulta" class="mapa-trechos-km"></div>
     <div id="mapa-trechos-consulta-vazio" class="text-muted small d-none">
-      Nenhum trecho com coordenadas disponÃ­veis para exibiÃ§Ã£o no mapa.
+      Nenhum trecho com coordenadas disponíveis para exibição no mapa.
     </div>
   </div>
 </section>
@@ -274,8 +274,8 @@
         <strong class="text-success">R$ {{ consulta.km_excedente.total|floatformat:2 }}</strong>
       </div>
       <div class="col-md-6">
-        <span class="text-muted small d-block">ObservaÃ§Ã£o</span>
-        <span>{{ consulta.km_excedente.observacao|default:"Sem observaÃ§Ã£o" }}</span>
+        <span class="text-muted small d-block">Observação</span>
+        <span>{{ consulta.km_excedente.observacao|default:"Sem observação" }}</span>
       </div>
     </div>
     <div class="table-responsive consulta-table-wrap">
@@ -456,17 +456,24 @@
     <section class="card border-0 shadow-sm h-100">
       <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center">
         <h6 class="mb-0 fw-semibold">Anexos</h6>
-        <span class="badge rounded-pill text-bg-light border">{{ consulta.anexos|length }}</span>
+        <span class="badge rounded-pill text-bg-light border">{{ anexos_visualizacao|length }}</span>
       </div>
       <div class="card-body">
-        {% for anexo in consulta.anexos %}
-        <a href="{{ anexo.url }}" target="_blank" class="consulta-anexo">
+        {% for anexo in anexos_visualizacao %}
+        <button type="button"
+                class="consulta-anexo anexo-preview-btn w-100 text-start"
+                data-preview-url="{{ anexo.preview_url }}"
+                data-download-url="{{ anexo.download_url }}"
+                data-file-name="{{ anexo.nome }}"
+                data-file-type="{{ anexo.tipo_mime }}"
+                title="Visualizar {{ anexo.nome }}"
+                aria-label="Visualizar {{ anexo.nome }}">
           <i class="bi bi-paperclip"></i>
           <span>
             <strong>{{ anexo.tipo }}</strong>
             <small>{{ anexo.descricao }} · {{ anexo.nome }}</small>
           </span>
-        </a>
+        </button>
         {% empty %}
         <p class="text-muted small mb-0">Nenhum anexo disponível para consulta.</p>
         {% endfor %}
@@ -624,6 +631,7 @@
     padding: .75rem;
     border: 1px solid var(--bs-border-color);
     border-radius: .75rem;
+    background: var(--bs-body-bg);
     color: inherit;
     text-decoration: none;
   }
@@ -667,6 +675,56 @@
   .mapa-pin.divergente {
     color: #332701;
     background: var(--bs-warning);
+  }
+
+  @media (min-width: 1200px) and (max-width: 1399.98px) {
+    .consulta-hero {
+      padding: 1.15rem;
+      margin-bottom: 1rem !important;
+    }
+
+    .consulta-title {
+      font-size: 1.45rem;
+    }
+
+    .consulta-meta-grid {
+      gap: .65rem .9rem;
+    }
+
+    .consulta-status-panel {
+      min-width: 260px;
+      padding: 1rem;
+    }
+
+    .consulta-status-panel strong {
+      font-size: 1.75rem;
+    }
+
+    .consulta-kpi {
+      padding: .75rem;
+    }
+
+    .consulta-kpi strong {
+      font-size: 1rem;
+      overflow-wrap: anywhere;
+    }
+
+    .consulta-table {
+      font-size: .82rem;
+    }
+
+    .consulta-table th,
+    .consulta-table td {
+      padding: .45rem .5rem;
+    }
+
+    .mapa-trechos-km {
+      min-height: 260px;
+    }
+
+    .cliente-resumo-list > div {
+      padding: .45rem .55rem;
+    }
   }
 
   @media (max-width: 991.98px) {
@@ -762,9 +820,9 @@
             <div><span class="text-muted">Destino:</span> ${escapeHtml(trecho.destino)}</div>
             <div><span class="text-muted">KM calculado:</span> ${escapeHtml(trecho.km_calculado || "-")}</div>
             <div><span class="text-muted">KM informado:</span> ${escapeHtml(trecho.km_informado || "-")}</div>
-            <div><span class="text-muted">DiferenÃ§a:</span> ${escapeHtml(trecho.diferenca_percentual || "0")}%</div>
+            <div><span class="text-muted">Diferença:</span> ${escapeHtml(trecho.diferenca_percentual || "0")}%</div>
             <div><span class="text-muted">Clientes:</span> ${escapeHtml((trecho.clientes || []).join(", ") || "-")}</div>
-            ${trecho.divergente ? '<div class="badge text-bg-warning mt-2">DivergÃªncia acima de 15%</div>' : ""}
+            ${trecho.divergente ? '<div class="badge text-bg-warning mt-2">Divergência acima de 15%</div>' : ""}
           </div>`;
         const icon = L.divIcon({
           className: "",

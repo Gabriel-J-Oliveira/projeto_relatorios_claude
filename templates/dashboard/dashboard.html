@@ -2,13 +2,165 @@
 {% block titulo %}Dashboard{% endblock %}
 {% block page_title %}{% if dashboard_global %}Dashboard executivo{% else %}Meu dashboard{% endif %}{% endblock %}
 {% block breadcrumb %}<li class="breadcrumb-item active">Dashboard</li>{% endblock %}
+{% block page_actions %}
+<button type="button"
+        class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
+        id="dashboard-tour-start">
+  <i class="bi bi-question-circle"></i>
+  Ver guia
+</button>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@latest/dist/driver.css">
+<style>
+  .dashboard-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: .9rem;
+  }
+
+  .dashboard-kpi-card .card-body {
+    min-height: 116px;
+    padding: 1rem;
+    gap: .8rem !important;
+  }
+
+  .dashboard-kpi-icon {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    font-size: 1.15rem;
+  }
+
+  .dashboard-kpi-title {
+    min-height: 2.15em;
+    line-height: 1.18;
+  }
+
+  .dashboard-kpi-value {
+    font-size: clamp(1.15rem, 1.45vw, 1.5rem);
+    line-height: 1.12;
+    overflow-wrap: anywhere;
+  }
+
+  .dashboard-chart {
+    min-height: 240px;
+  }
+
+  @media (max-width: 1399.98px) {
+    #dashboard-filtros {
+      margin-bottom: 1rem !important;
+    }
+
+    #dashboard-filtros .card-body,
+    .dashboard-section-card .card-body {
+      padding: .9rem;
+    }
+
+    #dashboard-filtros .row {
+      --bs-gutter-x: .75rem;
+      --bs-gutter-y: .75rem;
+    }
+
+    .dashboard-kpi-grid {
+      gap: .75rem;
+    }
+
+    .dashboard-kpi-card .card-body {
+      min-height: 104px;
+      padding: .85rem;
+    }
+
+    .dashboard-kpi-icon {
+      width: 36px;
+      height: 36px;
+      flex-basis: 36px;
+      border-radius: .65rem !important;
+      font-size: 1rem;
+    }
+
+    .dashboard-kpi-title {
+      font-size: .72rem;
+    }
+
+    .dashboard-kpi-value {
+      font-size: clamp(1rem, 1.3vw, 1.32rem);
+    }
+
+    .dashboard-recentes-table {
+      font-size: .82rem;
+    }
+
+    .dashboard-recentes-table th,
+    .dashboard-recentes-table td {
+      padding: .55rem .6rem;
+    }
+  }
+
+  @media (max-width: 1199.98px) {
+    .dashboard-kpi-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .dashboard-kpi-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 479.98px) {
+    .dashboard-kpi-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .driver-popover {
+    border-radius: .9rem;
+    box-shadow: 0 1rem 2.5rem rgba(15, 23, 42, .22);
+    color: var(--bs-body-color);
+  }
+
+  .driver-popover-title {
+    font-size: 1rem;
+    letter-spacing: 0;
+  }
+
+  .driver-popover-description {
+    color: var(--bs-secondary-color);
+    font-size: .88rem;
+    line-height: 1.45;
+  }
+
+  .driver-popover-footer button {
+    border-radius: .5rem !important;
+    font-size: .82rem !important;
+    text-shadow: none !important;
+  }
+
+  .driver-popover-next-btn,
+  .driver-popover-done-btn {
+    background: var(--bs-primary) !important;
+    border-color: var(--bs-primary) !important;
+    color: #fff !important;
+  }
+
+  .driver-popover-prev-btn,
+  .driver-popover-close-btn {
+    background: var(--bs-body-bg) !important;
+    border-color: var(--bs-border-color) !important;
+    color: var(--bs-body-color) !important;
+  }
+</style>
+{% endblock %}
 
 {% block content %}
 <div id="dashboard-root"
      data-dashboard-url="{% url 'relatorios:dashboard_dados' %}"
      data-dashboard-global="{% if dashboard_global %}true{% else %}false{% endif %}">
 
-  <form method="get" class="card border-0 shadow-sm mb-4" id="dashboard-filtros">
+  <form method="get" class="card border-0 shadow-sm mb-4" id="dashboard-filtros" data-tour="dashboard-filtros">
     <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center justify-content-between gap-2 flex-wrap">
       <div class="d-flex align-items-center gap-2">
         <i class="bi bi-funnel text-primary"></i>
@@ -71,18 +223,17 @@
     </div>
   </form>
 
-  <div class="row g-3 mb-4" id="dashboard-kpis">
+  <div class="dashboard-kpi-grid mb-4" id="dashboard-kpis" data-tour="dashboard-kpis">
     {% for card in cards %}
-    <div class="col-12 col-md-6 col-xxl-2">
-      <div class="card border-0 shadow-sm h-100">
+    <div class="min-w-0">
+      <div class="card border-0 shadow-sm h-100 dashboard-kpi-card">
         <div class="card-body d-flex align-items-center gap-3">
-          <div class="d-flex align-items-center justify-content-center rounded-3 bg-{{ card.cor }}-subtle text-{{ card.cor }}"
-               style="width:48px;height:48px;font-size:1.35rem;flex-shrink:0">
+          <div class="dashboard-kpi-icon d-flex align-items-center justify-content-center rounded-3 bg-{{ card.cor }}-subtle text-{{ card.cor }}">
             <i class="bi {{ card.icone }}"></i>
           </div>
           <div class="min-w-0">
-            <p class="small text-muted fw-medium mb-1">{{ card.titulo }}</p>
-            <h4 class="fw-bold mb-0 text-body-emphasis" data-kpi="{{ card.id }}">{{ card.valor }}</h4>
+            <p class="dashboard-kpi-title small text-muted fw-medium mb-1">{{ card.titulo }}</p>
+            <h4 class="dashboard-kpi-value fw-bold mb-0 text-body-emphasis" data-kpi="{{ card.id }}">{{ card.valor }}</h4>
           </div>
         </div>
       </div>
@@ -92,7 +243,7 @@
 
   <div class="row g-3 mb-4">
     <div class="col-12 col-xl-8">
-      <div class="card border-0 shadow-sm h-100">
+      <div class="card border-0 shadow-sm h-100 dashboard-section-card" data-tour="dashboard-relatorios-recentes">
         <div class="card-header bg-transparent border-bottom d-flex align-items-center justify-content-between py-3">
           <h6 class="mb-0 fw-semibold"><i class="bi bi-clock-history text-primary me-2"></i>Relatórios recentes</h6>
           <a href="{% url 'relatorios:relatorio_create' %}" class="btn btn-primary btn-sm">
@@ -102,7 +253,7 @@
         <div class="card-body p-0">
           {% if relatorios_recentes %}
           <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table table-hover align-middle mb-0 dashboard-recentes-table">
               <thead class="table-light">
                 <tr>
                   <th class="ps-4 small text-muted">Relatório</th>
@@ -139,7 +290,7 @@
       </div>
     </div>
     <div class="col-12 col-xl-4">
-      <div class="card border-0 shadow-sm h-100">
+      <div class="card border-0 shadow-sm h-100 dashboard-section-card" data-tour="dashboard-status">
         <div class="card-header bg-transparent border-bottom py-3">
           <h6 class="mb-0 fw-semibold"><i class="bi bi-pie-chart text-success me-2"></i>Status dos relatórios</h6>
         </div>
@@ -153,7 +304,7 @@
 
   <div class="row g-3 mb-4">
     <div class="col-12 col-xl-6">
-      <div class="card border-0 shadow-sm h-100">
+      <div class="card border-0 shadow-sm h-100 dashboard-section-card" data-tour="dashboard-gastos-cliente">
         <div class="card-header bg-transparent border-bottom py-3">
           <h6 class="mb-0 fw-semibold"><i class="bi bi-building text-primary me-2"></i>Gastos por cliente</h6>
         </div>
@@ -164,7 +315,7 @@
       </div>
     </div>
     <div class="col-12 col-xl-6">
-      <div class="card border-0 shadow-sm h-100">
+      <div class="card border-0 shadow-sm h-100 dashboard-section-card" data-tour="dashboard-relatorios-tecnico">
         <div class="card-header bg-transparent border-bottom py-3">
           <h6 class="mb-0 fw-semibold">
             <i class="bi {% if dashboard_global %}bi-person-lines-fill{% else %}bi-list-check{% endif %} text-warning me-2"></i>
@@ -181,7 +332,7 @@
 
   <div class="row g-3">
     <div class="col-12 col-xl-5">
-      <div class="card border-0 shadow-sm h-100">
+      <div class="card border-0 shadow-sm h-100 dashboard-section-card" data-tour="dashboard-km-tecnico">
         <div class="card-header bg-transparent border-bottom py-3">
           <h6 class="mb-0 fw-semibold">
             <i class="bi bi-speedometer2 text-info me-2"></i>
@@ -195,7 +346,7 @@
       </div>
     </div>
     <div class="col-12 col-xl-7">
-      <div class="card border-0 shadow-sm h-100">
+      <div class="card border-0 shadow-sm h-100 dashboard-section-card" data-tour="dashboard-evolucao-financeira">
         <div class="card-header bg-transparent border-bottom py-3">
           <h6 class="mb-0 fw-semibold"><i class="bi bi-graph-up-arrow text-primary me-2"></i>Evolução financeira</h6>
         </div>
@@ -211,6 +362,9 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script src="https://cdn.jsdelivr.net/npm/driver.js@latest/dist/driver.js.iife.js"></script>
+{% load static %}
+<script defer src="{% static 'js/dashboard_tour.js' %}"></script>
 {{ dashboard_data|json_script:"dashboard-data-inicial" }}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
@@ -220,6 +374,10 @@ document.addEventListener("DOMContentLoaded", function () {
   const charts = {};
   const moeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
   const texto = document.documentElement.getAttribute("data-bs-theme") === "dark" ? "#e5e7eb" : "#374151";
+  const compacto = window.innerWidth <= 1399;
+  const alturas = compacto
+    ? { status: 250, cliente: 270, relatorios: 270, km: 255, evolucao: 265 }
+    : { status: 310, cliente: 330, relatorios: 330, km: 300, evolucao: 310 };
 
   function hasSeries(values) {
     if (!values) return false;
@@ -268,7 +426,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const evolucao = data.charts.evolucao_financeira;
     renderChart("chart-evolucao-financeira", {
       ...baseOptions(),
-      chart: { ...baseOptions().chart, type: "area", height: 310 },
+      chart: { ...baseOptions().chart, type: "area", height: alturas.evolucao },
       stroke: { curve: "smooth", width: 2 },
       fill: { type: "gradient", gradient: { opacityFrom: .28, opacityTo: .03 } },
       colors: ["#0d6efd", "#198754", "#dc3545"],
@@ -280,7 +438,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const status = data.charts.status_relatorios;
     renderChart("chart-status-relatorios", {
       ...baseOptions(),
-      chart: { ...baseOptions().chart, type: "donut", height: 310 },
+      chart: { ...baseOptions().chart, type: "donut", height: alturas.status },
       labels: status.labels,
       series: status.series,
       colors: status.colors,
@@ -290,7 +448,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const clientes = data.charts.gastos_por_cliente;
     renderChart("chart-gastos-cliente", {
       ...baseOptions(),
-      chart: { ...baseOptions().chart, type: "bar", height: 330 },
+      chart: { ...baseOptions().chart, type: "bar", height: alturas.cliente },
       plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
       series: [{ name: "Aprovado", data: clientes.series }],
       xaxis: { categories: clientes.labels, labels: { formatter: value => moeda.format(value) } },
@@ -303,7 +461,7 @@ document.addEventListener("DOMContentLoaded", function () {
       : [{ name: "Relatórios", data: relatorios.series || [] }];
     renderChart("chart-relatorios-tecnico", {
       ...baseOptions(),
-      chart: { ...baseOptions().chart, type: data.escopo === "global" ? "bar" : "donut", height: 330 },
+      chart: { ...baseOptions().chart, type: data.escopo === "global" ? "bar" : "donut", height: alturas.relatorios },
       plotOptions: data.escopo === "global" ? { bar: { horizontal: true, borderRadius: 4 } } : undefined,
       labels: data.escopo === "global" ? undefined : relatorios.labels,
       series: data.escopo === "global" ? relatorioSeries : relatorios.series,
@@ -316,7 +474,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const kmGlobal = data.escopo === "global";
     renderChart("chart-km-tecnico", {
       ...baseOptions(),
-      chart: { ...baseOptions().chart, type: kmGlobal ? "bar" : "area", height: 300 },
+      chart: { ...baseOptions().chart, type: kmGlobal ? "bar" : "area", height: alturas.km },
       stroke: { curve: "smooth", width: 2 },
       series: kmGlobal ? [{ name: "KM", data: km.series }] : km.series,
       xaxis: { categories: km.labels },
