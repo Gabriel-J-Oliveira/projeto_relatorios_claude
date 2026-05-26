@@ -89,6 +89,7 @@ from .services.pdf_cliente_service import (
 from .services.pdf_interno_service import montar_contexto_pdf_interno
 from .services.maps_service import MapsServiceError, buscar_endereco, calcular_rota
 from .services.dashboard_service import get_dashboard_context, get_dashboard_data
+from .services.help_center_service import contexto_central_ajuda, obter_artigo
 from .forms import (
     AdiantamentoForm,
     ClienteForm,
@@ -105,6 +106,26 @@ from .forms import (
 logger = logging.getLogger(__name__)
 
 BLOQUEIO_POS_APROVACAO = {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
+
+
+@login_required
+@exigir_acesso_erp
+def ajuda_index_view(request):
+    termo = (request.GET.get("q") or "").strip()
+    return render(
+        request,
+        "ajuda/index.html",
+        contexto_central_ajuda(request.user, termo),
+    )
+
+
+@login_required
+@exigir_acesso_erp
+def ajuda_artigo_view(request, slug):
+    artigo = obter_artigo(request.user, slug)
+    if not artigo:
+        raise Http404("Artigo de ajuda não encontrado.")
+    return render(request, "ajuda/artigo.html", artigo)
 
 
 @login_required

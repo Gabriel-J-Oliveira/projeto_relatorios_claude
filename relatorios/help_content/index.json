@@ -1,0 +1,298 @@
+{
+  "categories": [
+    {
+      "slug": "primeiros-passos",
+      "title": "Primeiros passos",
+      "description": "Conceitos iniciais para começar a usar o sistema com segurança.",
+      "icon": "bi-compass"
+    },
+    {
+      "slug": "dashboard",
+      "title": "Dashboard",
+      "description": "Indicadores, filtros, gráficos e leitura dos principais números.",
+      "icon": "bi-speedometer2"
+    },
+    {
+      "slug": "relatorios",
+      "title": "Relatórios",
+      "description": "Criação, consulta, edição, envio e correção de relatórios.",
+      "icon": "bi-file-earmark-text"
+    },
+    {
+      "slug": "clientes-motivos",
+      "title": "Clientes e motivos",
+      "description": "Seleção de clientes e preenchimento do motivo da viagem por cliente.",
+      "icon": "bi-buildings"
+    },
+    {
+      "slug": "despesas-comprovantes",
+      "title": "Despesas e comprovantes",
+      "description": "Lançamento de despesas, anexos e validações de documentos.",
+      "icon": "bi-receipt"
+    },
+    {
+      "slug": "km-deslocamentos",
+      "title": "KM e deslocamentos",
+      "description": "Trechos, mapas, cálculo automático de rota e KM excedente.",
+      "icon": "bi-signpost-split"
+    },
+    {
+      "slug": "rateio",
+      "title": "Rateio",
+      "description": "Distribuição de despesas e cálculo de KM por cliente.",
+      "icon": "bi-diagram-3"
+    },
+    {
+      "slug": "conferencia-financeira",
+      "title": "Conferência financeira",
+      "description": "Análise, ajustes, rejeições e aprovação pelo financeiro.",
+      "icon": "bi-shield-check"
+    },
+    {
+      "slug": "pdfs-documentos",
+      "title": "PDFs e documentos",
+      "description": "Geração e consulta de documentos oficiais do relatório.",
+      "icon": "bi-filetype-pdf"
+    },
+    {
+      "slug": "duvidas-frequentes",
+      "title": "Dúvidas frequentes",
+      "description": "Respostas rápidas para dúvidas comuns de operação.",
+      "icon": "bi-question-circle"
+    }
+  ],
+  "articles": [
+    {
+      "slug": "criar-relatorio",
+      "title": "Como criar um relatório",
+      "category": "relatorios",
+      "profile": ["tecnico", "financeiro", "admin"],
+      "tags": ["relatorio", "novo", "cadastro", "rascunho"],
+      "path": "tecnico/criar-relatorio.md",
+      "summary": "Aprenda a iniciar um relatório e preencher os dados gerais.",
+      "important": true,
+      "quick_link": true,
+      "tour_url": "/relatorios/novo/?tour=1"
+    },
+    {
+      "slug": "selecionar-clientes",
+      "title": "Como selecionar clientes",
+      "category": "clientes-motivos",
+      "profile": ["tecnico", "financeiro", "admin"],
+      "tags": ["cliente", "multi-cliente", "seleção"],
+      "path": "tecnico/selecionar-clientes.md",
+      "summary": "Entenda como vincular um ou mais clientes ao relatório.",
+      "important": true
+    },
+    {
+      "slug": "informar-motivo-cliente",
+      "title": "Como informar motivo da viagem por cliente",
+      "category": "clientes-motivos",
+      "profile": ["tecnico", "financeiro", "admin"],
+      "tags": ["motivo", "cliente", "obrigatorio"],
+      "path": "tecnico/informar-motivo-cliente.md",
+      "summary": "Cada cliente do relatório precisa ter um motivo de viagem informado.",
+      "important": true
+    },
+    {
+      "slug": "adicionar-despesa",
+      "title": "Como adicionar despesa",
+      "category": "despesas-comprovantes",
+      "profile": ["tecnico", "financeiro", "admin"],
+      "tags": ["despesa", "valor", "comprovante", "rateio"],
+      "path": "tecnico/adicionar-despesa.md",
+      "summary": "Veja como registrar despesas e vincular clientes.",
+      "important": true
+    },
+    {
+      "slug": "anexar-comprovante",
+      "title": "Como anexar comprovante",
+      "category": "despesas-comprovantes",
+      "profile": ["tecnico", "financeiro", "admin"],
+      "tags": ["comprovante", "anexo", "pdf", "jpg", "png"],
+      "path": "tecnico/anexar-comprovante.md",
+      "summary": "Formatos aceitos e boas práticas para anexar comprovantes.",
+      "quick_link": true
+    },
+    {
+      "slug": "adicionar-km",
+      "title": "Como adicionar trecho de KM",
+      "category": "km-deslocamentos",
+      "profile": ["tecnico", "financeiro", "admin"],
+      "tags": ["km", "trecho", "origem", "destino"],
+      "path": "tecnico/adicionar-km.md",
+      "summary": "Registre deslocamentos com origem, destino e clientes vinculados."
+    },
+    {
+      "slug": "mapa-calculo-rota",
+      "title": "Como usar o mapa e cálculo automático de rota",
+      "category": "km-deslocamentos",
+      "profile": ["tecnico", "financeiro", "admin"],
+      "tags": ["mapa", "rota", "osrm", "endereco"],
+      "path": "tecnico/mapa-calculo-rota.md",
+      "summary": "O sistema calcula KM sugerido a partir dos endereços quando possível.",
+      "quick_link": true
+    },
+    {
+      "slug": "km-excedente-interno",
+      "title": "Como informar KM excedente interno",
+      "category": "km-deslocamentos",
+      "profile": ["tecnico", "financeiro", "admin"],
+      "tags": ["km excedente", "deslocamento interno"],
+      "path": "tecnico/km-excedente-interno.md",
+      "summary": "Use para deslocamentos internos que não pertencem a um trecho específico."
+    },
+    {
+      "slug": "enviar-conferencia",
+      "title": "Como enviar para conferência",
+      "category": "relatorios",
+      "profile": ["tecnico", "financeiro", "admin"],
+      "tags": ["enviar", "conferencia", "validacao"],
+      "path": "tecnico/enviar-conferencia.md",
+      "summary": "Checklist antes de enviar o relatório ao financeiro.",
+      "important": true
+    },
+    {
+      "slug": "corrigir-ajuste",
+      "title": "Como corrigir relatório em ajuste",
+      "category": "relatorios",
+      "profile": ["tecnico", "financeiro", "admin"],
+      "tags": ["ajuste", "correcao", "reenviar"],
+      "path": "tecnico/corrigir-ajuste.md",
+      "summary": "Como revisar uma solicitação de ajuste e reenviar o relatório."
+    },
+    {
+      "slug": "analisar-relatorio",
+      "title": "Como analisar relatório em conferência",
+      "category": "conferencia-financeira",
+      "profile": ["financeiro", "admin"],
+      "tags": ["financeiro", "conferencia", "analise"],
+      "path": "financeiro/analisar-relatorio.md",
+      "summary": "Fluxo recomendado para conferência financeira.",
+      "important": true
+    },
+    {
+      "slug": "visualizar-comprovantes",
+      "title": "Como visualizar comprovantes",
+      "category": "despesas-comprovantes",
+      "profile": ["financeiro", "admin"],
+      "tags": ["comprovante", "preview", "download"],
+      "path": "financeiro/visualizar-comprovantes.md",
+      "summary": "Abra comprovantes em modal, nova aba ou download."
+    },
+    {
+      "slug": "ajustar-valores",
+      "title": "Como ajustar valor aprovado",
+      "category": "conferencia-financeira",
+      "profile": ["financeiro", "admin"],
+      "tags": ["valor aprovado", "ajuste", "financeiro"],
+      "path": "financeiro/ajustar-valores.md",
+      "summary": "Ajuste valores aprovados sem alterar o lançamento original."
+    },
+    {
+      "slug": "rejeitar-item",
+      "title": "Como rejeitar ou reativar item",
+      "category": "conferencia-financeira",
+      "profile": ["financeiro", "admin"],
+      "tags": ["rejeitar", "reativar", "item"],
+      "path": "financeiro/rejeitar-item.md",
+      "summary": "Rejeite despesas ou trechos mantendo rastreabilidade."
+    },
+    {
+      "slug": "ajustar-rateio",
+      "title": "Como ajustar rateio",
+      "category": "rateio",
+      "profile": ["financeiro", "admin"],
+      "tags": ["rateio", "cliente", "valor", "motivo"],
+      "path": "financeiro/ajustar-rateio.md",
+      "summary": "Ajuste rateios mantendo consistência matemática e justificativa.",
+      "important": true
+    },
+    {
+      "slug": "solicitar-ajuste",
+      "title": "Como solicitar ajuste",
+      "category": "conferencia-financeira",
+      "profile": ["financeiro", "admin"],
+      "tags": ["solicitar ajuste", "tecnico", "workflow"],
+      "path": "financeiro/solicitar-ajuste.md",
+      "summary": "Devolva o relatório ao técnico com orientação clara."
+    },
+    {
+      "slug": "aprovar-relatorio",
+      "title": "Como aprovar relatório",
+      "category": "conferencia-financeira",
+      "profile": ["financeiro", "admin"],
+      "tags": ["aprovar", "snapshot", "finalizar"],
+      "path": "financeiro/aprovar-relatorio.md",
+      "summary": "Finalize o relatório e congele o snapshot financeiro.",
+      "important": true
+    },
+    {
+      "slug": "rejeitar-relatorio",
+      "title": "Como rejeitar relatório definitivamente",
+      "category": "conferencia-financeira",
+      "profile": ["financeiro", "admin"],
+      "tags": ["rejeitar relatório", "definitivo"],
+      "path": "financeiro/rejeitar-relatorio.md",
+      "summary": "Use a rejeição definitiva somente quando não houver correção possível."
+    },
+    {
+      "slug": "gerar-pdfs",
+      "title": "Como gerar PDFs",
+      "category": "pdfs-documentos",
+      "profile": ["financeiro", "admin"],
+      "tags": ["pdf", "zip", "cliente", "interno"],
+      "path": "financeiro/gerar-pdfs.md",
+      "summary": "Gere PDF interno e PDFs individuais por cliente."
+    },
+    {
+      "slug": "dashboard",
+      "title": "Como usar o dashboard",
+      "category": "dashboard",
+      "profile": ["tecnico", "financeiro", "admin"],
+      "tags": ["dashboard", "indicadores", "graficos", "filtros"],
+      "path": "geral/dashboard.md",
+      "summary": "Entenda KPIs, filtros e gráficos conforme seu perfil.",
+      "quick_link": true,
+      "tour_url": "/dashboard/?tour=1"
+    },
+    {
+      "slug": "relatorios-list",
+      "title": "Como consultar relatórios",
+      "category": "relatorios",
+      "profile": ["tecnico", "financeiro", "admin"],
+      "tags": ["listar", "consulta", "filtros", "ordenar"],
+      "path": "geral/relatorios-list.md",
+      "summary": "Use filtros, busca, ordenação e ações da listagem.",
+      "quick_link": true,
+      "tour_url": "/relatorios/?tour=1"
+    },
+    {
+      "slug": "status-relatorio",
+      "title": "Entendendo os status do relatório",
+      "category": "duvidas-frequentes",
+      "profile": ["tecnico", "financeiro", "admin"],
+      "tags": ["status", "rascunho", "aprovado", "rejeitado"],
+      "path": "geral/status-relatorio.md",
+      "summary": "Saiba o significado de cada status no fluxo."
+    },
+    {
+      "slug": "formatos-anexos",
+      "title": "Formatos permitidos de anexos",
+      "category": "duvidas-frequentes",
+      "profile": ["tecnico", "financeiro", "admin"],
+      "tags": ["anexo", "pdf", "jpg", "png", "limite"],
+      "path": "geral/formatos-anexos.md",
+      "summary": "Arquivos aceitos e principais cuidados no upload."
+    },
+    {
+      "slug": "duvidas-frequentes",
+      "title": "Dúvidas frequentes",
+      "category": "duvidas-frequentes",
+      "profile": ["tecnico", "financeiro", "admin"],
+      "tags": ["faq", "duvidas", "ajuda"],
+      "path": "geral/duvidas-frequentes.md",
+      "summary": "Respostas curtas para dúvidas comuns."
+    }
+  ]
+}

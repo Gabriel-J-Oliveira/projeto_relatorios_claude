@@ -12,6 +12,14 @@
   </li>
   <li class="breadcrumb-item active">{{ titulo_pagina }}</li>
 {% endblock %}
+{% block page_actions %}
+<button type="button"
+        class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
+        id="relatorio-form-tour-start">
+  <i class="bi bi-question-circle"></i>
+  Ver guia
+</button>
+{% endblock %}
 {% block content %}
   <div x-data="formRelatorio('{{ valor_km_padrao }}')" x-init="init()">
   <div class="row justify-content-center">
@@ -71,6 +79,7 @@
                         id="tab-dados-btn"
                         data-bs-toggle="tab"
                         data-bs-target="#tab-dados"
+                        data-tour="relatorio-aba-dados"
                         type="button">
                   <i class="bi bi-clipboard-data"></i>
                   <span>Dados Gerais</span>
@@ -83,6 +92,7 @@
                         id="tab-despesas-btn"
                         data-bs-toggle="tab"
                         data-bs-target="#tab-despesas"
+                        data-tour="relatorio-aba-despesas"
                         type="button">
                   <i class="bi bi-receipt"></i>
                   <span>Despesas</span>
@@ -97,6 +107,7 @@
                         id="tab-km-btn"
                         data-bs-toggle="tab"
                         data-bs-target="#tab-km"
+                        data-tour="relatorio-aba-km"
                         type="button">
                   <i class="bi bi-geo-alt"></i>
                   <span>KM</span>
@@ -109,6 +120,7 @@
                         id="tab-resumo-btn"
                         data-bs-toggle="tab"
                         data-bs-target="#tab-resumo"
+                        data-tour="relatorio-aba-resumo"
                         type="button">
                   <i class="bi bi-calculator"></i>
                   <span>Resumo</span>
@@ -117,7 +129,7 @@
             </ul>
 
             {% if resumo_erros %}
-              <div class="alert alert-danger border-0 shadow-sm mb-4">
+              <div class="alert alert-danger border-0 shadow-sm mb-4" data-tour="resumo-alertas">
                 <div class="d-flex align-items-center mb-2">
                   <i class="bi bi-exclamation-octagon-fill me-2"></i>
                   <strong>Não foi possível salvar o relatório</strong>
@@ -148,7 +160,7 @@
 
                 <div class="row g-3">
                   {# Número / Status #}
-                  <div class="col-md-4">
+                  <div class="col-md-4" data-tour="relatorio-numero">
                     <label class="form-label fw-medium small text-muted">Número</label>
                     {{ form.numero }}
                     <div class="form-text small">Gerado automaticamente ao enviar para conferência.</div>
@@ -157,7 +169,7 @@
                     {% endif %}
                   </div>
 
-                  <div class="col-md-4">
+                  <div class="col-md-4" data-tour="relatorio-centro-custo">
                     <label class="form-label fw-medium small text-muted">
                       Centro de Custo
                       <span class="fw-normal opacity-75">(aplica-se a todas as despesas)</span>
@@ -165,7 +177,7 @@
                     {{ form.centro_custo }}
                   </div>
 
-                  <div class="col-md-4">
+                  <div class="col-md-4" data-tour="relatorio-tipo">
                     <label class="form-label fw-medium small text-muted">Tipo de relatório</label>
                     {{ form.tipo_relatorio }}
                     {% if form.tipo_relatorio.errors %}
@@ -174,7 +186,7 @@
                   </div>
 
                   {# Cliente / Responsável #}
-                  <div class="col-md-6">
+                  <div class="col-md-6" data-tour="relatorio-clientes">
                     <label class="form-label fw-medium small text-muted">Clientes *</label>
                     <input type="hidden"
                            name="clientes_relatorio"
@@ -205,7 +217,7 @@
                     <div class="invalid-feedback d-block small erro-clientes-relatorio"></div>
                   </div>
 
-                  <div class="col-md-6">
+                  <div class="col-md-6" data-tour="relatorio-tecnicos">
                     <label class="form-label fw-medium small text-muted">Técnicos *</label>
                     <div class="d-none">
                       {{ form.tecnico_responsavel }}
@@ -241,7 +253,7 @@
                     <div class="invalid-feedback d-block small erro-tecnicos-relatorio"></div>
                   </div>
 
-                  <div class="col-12">
+                  <div class="col-12" data-tour="relatorio-motivo-clientes">
                     <div class="border rounded-2 bg-body-tertiary p-3">
                       <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
                         <div>
@@ -255,22 +267,22 @@
                   </div>
 
                   {# Localidade #}
-                  <div class="col-md-5">
+                  <div class="col-md-5" data-tour="relatorio-cidade-uf">
                     <label class="form-label fw-medium small text-muted">Cidade de Atendimento *</label>
                     {{ form.cidade_atendimento }}
                   </div>
 
-                  <div class="col-md-2">
+                  <div class="col-md-2" data-tour="relatorio-uf">
                     <label class="form-label fw-medium small text-muted">UF</label>
                     {{ form.uf_atendimento }}
                   </div>
 
-                  <div class="col-md-2">
+                  <div class="col-md-2" data-tour="relatorio-localidade">
                     <label class="form-label fw-medium small text-muted">Localidade</label>
                     {{ form.tipo_localidade }}
                   </div>
 
-                  <div class="col-md-3">
+                  <div class="col-md-3" data-tour="relatorio-adiantamento">
                     <label class="form-label fw-medium small text-muted">Adiantamento (R$)</label>
                     <div class="input-group input-group-sm">
                       <span class="input-group-text bg-light border-end-0">R$</span>
@@ -279,7 +291,7 @@
                   </div>
 
                   {# Período #}
-                  <div class="col-md-3">
+                  <div class="col-md-3" data-tour="relatorio-periodo">
                     <label class="form-label fw-medium small text-muted">Data Início *</label>
                     {{ form.data_inicio }}
                     {% if form.data_inicio.errors %}
@@ -287,7 +299,7 @@
                     {% endif %}
                   </div>
 
-                  <div class="col-md-3">
+                  <div class="col-md-3" data-tour="relatorio-periodo-fim">
                     <label class="form-label fw-medium small text-muted">Data Fim *</label>
                     {{ form.data_fim }}
                     {% if form.data_fim.errors %}
@@ -319,12 +331,12 @@
               {# ABA 2 — DESPESAS                           #}
               {# ══════════════════════════════════════════ #}
               <div class="tab-pane fade" id="tab-despesas">
-                <div>
+                <div data-tour="despesas-linhas">
                   <h6 class="mb-0 fw-semibold">Despesas itemizadas</h6>
                   <small class="text-muted">Uma linha por gasto, como na planilha.</small>
                 </div>
 
-                <div class="table-responsive">
+                <div class="table-responsive" data-tour="despesas-linhas-tabela">
                   <table class="table table-sm align-top mb-0 table-hover" id="tabela-despesas">
                     <thead class="table-light border-bottom">
                       <tr>
@@ -360,6 +372,7 @@
                 <div class="p-3 bg-light border-top d-flex align-items-center justify-content-between">
                   <button type="button"
                           id="btn-adicionar-despesa"
+                          data-tour="despesas-adicionar"
                           class="btn btn-sm btn-primary d-flex align-items-center gap-2 px-3">
                     <i class="bi bi-plus-circle"></i> Adicionar Despesa
                   </button>
@@ -380,7 +393,7 @@
                   </div>
                 </div>
 
-                <div class="table-responsive">
+                <div class="table-responsive" data-tour="km-origem-destino">
                   <table class="table table-sm align-top mb-0 table-hover" id="tabela-km">
                     <thead class="table-light border-bottom">
                       <tr>
@@ -419,7 +432,7 @@
                   </table>
                 </div>
 
-                <div class="border-top bg-body px-3 py-3">
+                <div class="border-top bg-body px-3 py-3" data-tour="km-mapa">
                   <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                     <div>
                       <h6 class="mb-0 fw-semibold">
@@ -447,7 +460,7 @@
                        class="alert alert-info border-0 shadow-sm mt-3 mb-0 py-2 small d-none"></div>
                 </div>
 
-                <div class="border-top px-3 py-3 bg-body">
+                <div class="border-top px-3 py-3 bg-body" data-tour="km-excedente">
                   <div class="row g-3 justify-content-end">
                     <div class="col-12 col-md-4">
                       <div class="mb-3">
@@ -477,6 +490,7 @@
                 <div class="p-3 bg-light border-top d-flex align-items-center justify-content-between">
                   <button type="button"
                           id="btn-adicionar-km"
+                          data-tour="km-adicionar"
                           class="btn btn-sm btn-primary d-flex align-items-center gap-2 px-3">
                     <i class="bi bi-plus-circle"></i> Adicionar trecho
                   </button>
@@ -492,7 +506,7 @@
               {# ABA 4 — RESUMO                             #}
               {# ══════════════════════════════════════════ #}
               <div class="tab-pane fade p-4" id="tab-resumo">
-                <div class="row g-4">
+                <div class="row g-4" data-tour="resumo-cards">
                   {# Técnico #}
                   <div class="col-md-4">
                     <div class="card border-0 bg-body-tertiary shadow-none rounded-3 h-100">
@@ -577,7 +591,7 @@
 
             {# /tab-content #}
             {# ── RODAPÉ DE AÇÕES ── #}
-            <div class="d-flex justify-content-between align-items-center mt-3 py-3 px-4 bg-border rounded shadow-sm border">
+            <div class="d-flex justify-content-between align-items-center mt-3 py-3 px-4 bg-border rounded shadow-sm border" data-tour="resumo-acoes">
               <div class="d-flex gap-2">
                 <a href="{% url 'relatorios:relatorio_list' %}"
                    class="btn btn-outline-secondary btn-sm">
@@ -597,6 +611,7 @@
                 <button type="submit"
                         name="acao"
                         id="btn-enviar-rascunho"
+                        data-tour="resumo-salvar"
                         value="rascunho"
                         class="btn btn-secondary btn-sm">
                   <i class="bi bi-save me-1"></i>{{ salvar_rascunho }}
@@ -606,6 +621,7 @@
                         id="btn-enviar-relatorio"
                         class="btn btn-primary btn-sm"
                         name="acao"
+                        data-tour="resumo-enviar"
                         value="enviar">
                   <i class="bi bi-check-lg me-1"></i>{{ enviar }}
                 </button>
@@ -967,6 +983,7 @@
           {# /x-data #}
         {% endblock %}
         {% block extra_css %}
+          <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@latest/dist/driver.css">
           <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
           <style>
     .col-data, .col-data-input { min-width: 105px; }
@@ -1039,11 +1056,44 @@
     .km-mapa-excedente-grid .km-excedente-col {
       min-width: 0;
     }
+    .driver-popover {
+      border-radius: .9rem;
+      box-shadow: 0 1rem 2.5rem rgba(15, 23, 42, .22);
+      color: var(--bs-body-color);
+    }
+    .driver-popover-title {
+      font-size: 1rem;
+      letter-spacing: 0;
+    }
+    .driver-popover-description {
+      color: var(--bs-secondary-color);
+      font-size: .88rem;
+      line-height: 1.45;
+    }
+    .driver-popover-footer button {
+      border-radius: .5rem !important;
+      font-size: .82rem !important;
+      text-shadow: none !important;
+    }
+    .driver-popover-next-btn,
+    .driver-popover-done-btn {
+      background: var(--bs-primary) !important;
+      border-color: var(--bs-primary) !important;
+      color: #fff !important;
+    }
+    .driver-popover-prev-btn,
+    .driver-popover-close-btn {
+      background: var(--bs-body-bg) !important;
+      border-color: var(--bs-border-color) !important;
+      color: var(--bs-body-color) !important;
+    }
           </style>
         {% endblock %}
         {% block extra_js %}
           {{ motivos_clientes_relatorio|json_script:"motivos-clientes-relatorio-data" }}
           <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+          <script src="https://cdn.jsdelivr.net/npm/driver.js@latest/dist/driver.js.iife.js"></script>
+          <script defer src="{% static 'js/relatorio_form_tour.js' %}"></script>
           <script>
   /* ═══════════════════════════════════════════════════════════════
     CONTROLE DO FORMULÁRIO — Single Save sem HTMX

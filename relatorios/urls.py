@@ -5,6 +5,8 @@ app_name = "relatorios"
 
 urlpatterns = [
     path("completar-cadastro/", views.completar_cadastro_view, name="completar_cadastro"),
+    path("ajuda/", views.ajuda_index_view, name="ajuda_index"),
+    path("ajuda/<slug:slug>/", views.ajuda_artigo_view, name="ajuda_artigo"),
     path("dashboard/", views.DashboardView.as_view(), name="dashboard"),
     path("dashboard/dados/", views.dashboard_dados_json, name="dashboard_dados"),
 

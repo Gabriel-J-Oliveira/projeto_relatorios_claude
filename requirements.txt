@@ -8,6 +8,7 @@ gunicorn==23.0.0
 psycopg[binary]>=3.2,<4
 python-decouple==3.8
 requests>=2.32,<3
+markdown>=3.6
 sqlparse==0.5.5
 tzdata==2026.2
 whitenoise==6.12.0

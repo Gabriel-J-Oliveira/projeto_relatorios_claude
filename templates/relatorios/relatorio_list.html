@@ -9,7 +9,15 @@
 {% endblock %}
 
 {% block page_actions %}
-  <a href="{% url 'relatorios:relatorio_create' %}" class="btn btn-primary btn-sm d-flex align-items-center gap-1">
+  <button type="button"
+          class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
+          id="relatorios-list-tour-start">
+    <i class="bi bi-question-circle"></i>
+    Ver guia
+  </button>
+  <a href="{% url 'relatorios:relatorio_create' %}"
+     class="btn btn-primary btn-sm d-flex align-items-center gap-1"
+     data-tour="relatorios-list-novo">
     <i class="bi bi-plus-lg"></i> Novo Relatório
   </a>
 {% endblock %}
@@ -17,10 +25,10 @@
 {% block content %}
 
 <!-- Filtros -->
-<div class="card border-0 shadow-sm mb-3">
+<div class="card border-0 shadow-sm mb-3" data-tour="relatorios-list-filtros">
   <div class="card-body py-2">
     <form method="get" class="row g-2 align-items-end">
-      <div class="col-12 col-md-3">
+      <div class="col-12 col-md-3" data-tour="relatorios-list-busca">
         {{ form_filtro.busca.label_tag }}
         {{ form_filtro.busca }}
       </div>
@@ -32,7 +40,7 @@
         {{ form_filtro.cliente.label_tag }}
         {{ form_filtro.cliente }}
       </div>
-      <div class="col-6 col-md-2">
+      <div class="col-6 col-md-2" data-tour="relatorios-list-status">
         {{ form_filtro.status.label_tag }}
         {{ form_filtro.status }}
       </div>
@@ -57,7 +65,7 @@
 </div>
 
 <!-- Tabela -->
-<div class="card border-0 shadow-sm">
+<div class="card border-0 shadow-sm" data-tour="relatorios-list-tabela">
   <div class="card-header bg-transparent border-bottom py-2 d-flex align-items-center justify-content-between">
     <div class="d-flex align-items-center gap-2">
       <i class="bi bi-table text-primary"></i>
@@ -83,7 +91,7 @@
         </colgroup>
         <thead class="table-light">
           <tr>
-            <th class="ps-4 py-2 fw-semibold text-muted small">
+            <th class="ps-4 py-2 fw-semibold text-muted small" data-tour="relatorios-list-numero">
               <a href="{{ numero_sort_url }}" class="text-muted text-decoration-none d-inline-flex align-items-center gap-1">
                 Número
                 {% if sort_atual == "numero" %}
@@ -93,13 +101,13 @@
                 {% endif %}
               </a>
             </th>
-            <th class="py-2 fw-semibold text-muted small">Cliente</th>
+            <th class="py-2 fw-semibold text-muted small" data-tour="relatorios-list-clientes">Cliente</th>
             <th class="py-2 fw-semibold text-muted small">Técnico</th>
             <th class="py-2 fw-semibold text-muted small">Período</th>
             <th class="py-2 fw-semibold text-muted small">KM</th>
             <th class="py-2 fw-semibold text-muted small">Total</th>
-            <th class="py-2 fw-semibold text-muted small">Status</th>
-            <th class="py-2 fw-semibold text-muted small text-end pe-4">Ações</th>
+            <th class="py-2 fw-semibold text-muted small" data-tour="relatorios-list-status-coluna">Status</th>
+            <th class="py-2 fw-semibold text-muted small text-end pe-4" data-tour="relatorios-list-acoes">Ações</th>
           </tr>
         </thead>
         <tbody>
@@ -111,7 +119,7 @@
                 {{ r.identificador }}
               </a>
             </td>
-            <td data-label="Cliente">
+            <td data-label="Cliente" data-tour="relatorios-list-clientes-linha">
               {% with cliente_principal=r.cliente_principal_exibicao clientes_secundarios=r.clientes_secundarios_exibicao %}
               <div class="small fw-medium text-nowrap">
                 {{ cliente_principal.nome|default:"Não informado" }}
@@ -156,12 +164,12 @@
             </td>
             <td class="small" data-label="KM">{{ r.total_km_percorrido }} km</td>
             <td class="small" data-label="Total">R$ {{ r.total_despesas|floatformat:2 }}</td>
-            <td data-label="Status">
+            <td data-label="Status" data-tour="relatorios-list-status-linha">
               <span class="badge bg-{{ r.status_badge_cor }}-subtle text-{{ r.status_badge_cor }} rounded-pill px-3">
                 {{ r.get_status_display }}
               </span>
             </td>
-            <td class="text-end pe-4" data-label="Ações">
+            <td class="text-end pe-4" data-label="Ações" data-tour="relatorios-list-acoes-linha">
               <div class="d-flex gap-1 justify-content-end">
                 <a href="{% if r.status == 'aprovado' or r.status == 'rejeitado' %}{% url 'relatorios:relatorio_consulta' r.pk %}{% else %}{% url 'relatorios:relatorio_detail' r.pk %}{% endif %}"
                    class="btn btn-sm btn-outline-secondary" title="Ver">
@@ -190,7 +198,7 @@
 
     <!-- Paginação -->
     {% if is_paginated %}
-    <div class="card-footer bg-transparent border-top py-3 d-flex justify-content-center">
+    <div class="card-footer bg-transparent border-top py-3 d-flex justify-content-center" data-tour="relatorios-list-paginacao">
       <nav>
         <ul class="pagination pagination-sm mb-0 gap-1">
           {% if page_obj.has_previous %}
@@ -230,6 +238,7 @@
   </div>
 </div>
 
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@latest/dist/driver.css">
 <style>
   .popover.rateio-popover {
     --bs-popover-max-width: 380px;
@@ -358,8 +367,48 @@
       flex-wrap: wrap;
     }
   }
+
+  .driver-popover {
+    border-radius: .9rem;
+    box-shadow: 0 1rem 2.5rem rgba(15, 23, 42, .22);
+    color: var(--bs-body-color);
+  }
+
+  .driver-popover-title {
+    font-size: 1rem;
+    letter-spacing: 0;
+  }
+
+  .driver-popover-description {
+    color: var(--bs-secondary-color);
+    font-size: .88rem;
+    line-height: 1.45;
+  }
+
+  .driver-popover-footer button {
+    border-radius: .5rem !important;
+    font-size: .82rem !important;
+    text-shadow: none !important;
+  }
+
+  .driver-popover-next-btn,
+  .driver-popover-done-btn {
+    background: var(--bs-primary) !important;
+    border-color: var(--bs-primary) !important;
+    color: #fff !important;
+  }
+
+  .driver-popover-prev-btn,
+  .driver-popover-close-btn {
+    background: var(--bs-body-bg) !important;
+    border-color: var(--bs-border-color) !important;
+    color: var(--bs-body-color) !important;
+  }
 </style>
 
+<script src="https://cdn.jsdelivr.net/npm/driver.js@latest/dist/driver.js.iife.js"></script>
+{% load static %}
+<script defer src="{% static 'js/relatorios_list_tour.js' %}"></script>
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll('[data-bs-toggle="popover"]').forEach(function (el) {

@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ article.title }}{% endblock %}
+{% block page_title %}{{ article.title }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'relatorios:ajuda_index' %}" class="text-decoration-none">Ajuda</a>
+</li>
+<li class="breadcrumb-item active">{{ article.title }}</li>
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'relatorios:ajuda_index' %}" class="btn btn-sm btn-outline-secondary">
+  <i class="bi bi-arrow-left me-1"></i>Voltar para Central
+</a>
+{% if article.tour_url %}
+<a href="{{ article.tour_url }}" class="btn btn-sm btn-outline-primary">
+  <i class="bi bi-question-circle me-1"></i>Abrir guia da tela
+</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<style>
+  .help-article-content h1 {
+    font-size: 1.65rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+  }
+
+  .help-article-content h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-top: 1.5rem;
+    margin-bottom: .65rem;
+    color: var(--bs-emphasis-color);
+  }
+
+  .help-article-content p,
+  .help-article-content li {
+    color: var(--bs-secondary-color);
+    line-height: 1.65;
+  }
+
+  .help-article-content ul {
+    padding-left: 1.2rem;
+  }
+</style>
+
+<div class="row g-4">
+  <main class="col-lg-8 col-xl-9">
+    <article class="card border-0 shadow-sm">
+      <div class="card-body p-4 p-lg-5">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+          {% if category %}
+          <span class="badge bg-primary-subtle text-primary">
+            <i class="bi {{ category.icon }} me-1"></i>{{ category.title }}
+          </span>
+          {% endif %}
+          {% for profile in article.profile %}
+          <span class="badge bg-body-tertiary text-body-secondary">{{ profile }}</span>
+          {% endfor %}
+        </div>
+
+        <p class="lead text-muted">{{ article.summary }}</p>
+
+        <div class="d-flex flex-wrap gap-1 mb-4">
+          {% for tag in article.tags %}
+          <span class="badge bg-secondary-subtle text-secondary">#{{ tag }}</span>
+          {% endfor %}
+        </div>
+
+        <div class="help-article-content">
+          {{ html }}
+        </div>
+      </div>
+    </article>
+  </main>
+
+  <aside class="col-lg-4 col-xl-3">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-transparent border-bottom">
+        <h6 class="fw-semibold mb-0">Artigos relacionados</h6>
+      </div>
+      <div class="list-group list-group-flush">
+        {% for item in related %}
+        <a href="{% url 'relatorios:ajuda_artigo' item.slug %}" class="list-group-item list-group-item-action">
+          <div class="fw-semibold small">{{ item.title }}</div>
+          <div class="text-muted small">{{ item.summary }}</div>
+        </a>
+        {% empty %}
+        <div class="list-group-item text-muted small">Nenhum artigo relacionado disponível.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <h6 class="fw-semibold">Precisa de outro processo?</h6>
+        <p class="text-muted small">Volte para a Central de Ajuda e pesquise por palavras-chave como despesa, KM, rateio ou PDF.</p>
+        <a href="{% url 'relatorios:ajuda_index' %}" class="btn btn-sm btn-primary w-100">
+          Ir para a Central
+        </a>
+      </div>
+    </div>
+  </aside>
+</div>
+{% endblock %}

@@ -29,7 +29,7 @@
     </div>
     <div class="text-warning small aviso-deslocamento"></div>
   </td>
-  <td class="p-1 pt-3 position-relative">
+  <td class="p-1 pt-3 position-relative" data-tour="km-origem-destino">
     <input type="text"
            name="trechos-{{ idx }}-origem"
            id="id_trechos-{{ idx }}-origem"
@@ -59,7 +59,7 @@
       {% if form.origem.errors %}{{ form.origem.errors.0 }}{% endif %}
     </div>
   </td>
-  <td class="p-1 pt-3 position-relative">
+  <td class="p-1 pt-3 position-relative" data-tour="km-origem-destino">
     <input type="text"
            name="trechos-{{ idx }}-destino"
            id="id_trechos-{{ idx }}-destino"
@@ -119,7 +119,7 @@
            value="{{ form.fonte_calculo_rota.value|default:'' }}">
     {{ form.rota_geojson }}
   </td>
-  <td class="p-1 pt-3">
+  <td class="p-1 pt-3" data-tour="km-divergencia">
     <input type="hidden"
            name="trechos-{{ idx }}-valor_km"
            id="id_trechos-{{ idx }}-valor_km"
@@ -136,7 +136,7 @@
     R$ 0,00
     <div class="text-warning fw-normal small aviso-km-multicliente"></div>
   </td>
-  <td class="p-1 pt-3">
+  <td class="p-1 pt-3" data-tour="km-clientes">
     <input type="text"
            name="trechos-{{ idx }}-observacao"
            id="id_trechos-{{ idx }}-observacao"

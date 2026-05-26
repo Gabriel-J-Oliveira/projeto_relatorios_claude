@@ -141,8 +141,10 @@
 
     const driverObj = driverFactory({
       showProgress: true,
-      allowClose: true,
+      allowClose: false,
+      overlayClickBehavior: function () {},
       disableActiveInteraction: true,
+      showButtons: ["previous", "next", "close"],
       stagePadding: 8,
       stageRadius: 12,
       nextBtnText: "Próximo",
