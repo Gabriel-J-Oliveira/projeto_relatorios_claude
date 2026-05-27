@@ -1,6 +1,10 @@
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+import logging
 
-from relatorios.models import StatusFinanceiroItem
+from relatorios.models import ItemDespesa, StatusFinanceiroItem
+
+
+logger = logging.getLogger(__name__)
 
 
 CENTAVO = Decimal("0.01")
@@ -25,6 +29,10 @@ def _km(valor):
 
 def _valor_km(valor):
     return _decimal(valor, DECIMAL_VALOR_KM)
+
+
+def _numero_documento_normalizado(valor):
+    return " ".join(str(valor or "").strip().split()).upper()
 
 
 def _ativo(item):
@@ -267,6 +275,42 @@ def validar_integridade_km_excedente(relatorio, clientes_relatorio_ids=None):
     return erros
 
 
+def validar_documentos_unicos_relatorio(relatorio):
+    erros = []
+    vistos = {}
+    despesas = list(relatorio.despesas.all())
+    for despesa in despesas:
+        numero = _numero_documento_normalizado(despesa.numero_documento_comprovante)
+        if not numero:
+            continue
+        if numero in vistos:
+            erros.append(
+                f"Despesa {despesa.pk}: ja existe uma despesa cadastrada com este numero de nota/documento."
+            )
+            logger.warning(
+                "numero_documento_duplicado_relatorio relatorio_id=%s despesa_id=%s numero=%s",
+                relatorio.pk,
+                despesa.pk,
+                numero,
+            )
+        vistos[numero] = despesa.pk
+
+        duplicados = ItemDespesa.objects.filter(
+            numero_documento_comprovante__iexact=numero
+        ).exclude(pk=despesa.pk)
+        if duplicados.exists():
+            erros.append(
+                f"Despesa {despesa.pk}: ja existe uma despesa cadastrada com este numero de nota/documento."
+            )
+            logger.warning(
+                "numero_documento_duplicado_global relatorio_id=%s despesa_id=%s numero=%s",
+                relatorio.pk,
+                despesa.pk,
+                numero,
+            )
+    return erros
+
+
 def validar_integridade_financeira_relatorio(relatorio):
     erros = []
     clientes_relatorio_ids = _clientes_relatorio_ids(relatorio)
@@ -275,6 +319,7 @@ def validar_integridade_financeira_relatorio(relatorio):
 
     for despesa in relatorio.despesas.all():
         erros.extend(validar_integridade_despesa(despesa, clientes_relatorio_ids))
+    erros.extend(validar_documentos_unicos_relatorio(relatorio))
 
     for trecho in relatorio.trechos.all():
         erros.extend(validar_integridade_trecho(trecho, clientes_relatorio_ids))

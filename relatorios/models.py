@@ -28,6 +28,21 @@ def _tipo_mime_por_nome(nome_arquivo):
     return tipo_mime or "application/octet-stream"
 
 
+def valor_km_control_sul():
+    try:
+        from relatorios.services.politica_valor_service import valor_km_control_sul as _valor
+
+        return _valor()
+    except Exception:
+        return Decimal(str(getattr(settings, "VALOR_KM_CONTROLSUL", "1.35"))).quantize(
+            Decimal("0.01")
+        )
+
+
+def _numero_documento_normalizado(valor):
+    return " ".join(str(valor or "").strip().split()).upper()
+
+
 # ─────────────────────────────────────────────────────────────────
 # CHOICES
 # ─────────────────────────────────────────────────────────────────
@@ -74,6 +89,7 @@ class TipoEventoHistorico(models.TextChoices):
 class TipoLocalidade(models.TextChoices):
     CAPITAL = "capital", "Capital"
     INTERIOR = "interior", "Interior"
+    FRONTEIRA = "fronteira", "Fronteira"
 
 
 class TipoDespesa(models.TextChoices):
@@ -259,12 +275,36 @@ class Cliente(models.Model):
 
 
 class PoliticaValor(models.Model):
+    class TipoPolitica(models.TextChoices):
+        GERAL = "geral", "Geral"
+        REFEICAO = "refeicao", "Refeição"
+        PASSAGEM = "passagem", "Passagem"
+        HOSPEDAGEM = "hospedagem", "Hospedagem"
+        KM_DIARIO = "km_diario", "KM diário / Uber / Táxi"
+        VALOR_KM = "valor_km", "Valor KM"
+
+    chave = models.CharField("Chave da política", max_length=80, blank=True, db_index=True)
+    tipo_politica = models.CharField(
+        "Tipo da política",
+        max_length=20,
+        choices=TipoPolitica.choices,
+        default=TipoPolitica.GERAL,
+    )
     tipo_despesa = models.CharField(
         "Tipo de despesa",
         max_length=30,
         choices=TipoDespesa.choices,
         blank=True,
     )
+    tipo_localidade = models.CharField(
+        "Tipo de localidade",
+        max_length=12,
+        choices=TipoLocalidade.choices,
+        blank=True,
+    )
+    cidade = models.CharField("Cidade", max_length=80, blank=True)
+    origem = models.CharField("Origem", max_length=80, blank=True)
+    destino = models.CharField("Destino", max_length=80, blank=True)
     descricao = models.CharField("Descrição", max_length=100)
     limite_valor = models.DecimalField(
         "Limite de valor (R$)",
@@ -290,22 +330,35 @@ class PoliticaValor(models.Model):
         ordering = ["-vigencia_inicio"]
 
     def __str__(self):
-        return f"{self.descricao} — {self.limite_valor or self.valor_km}"
+        chave = f"{self.chave} - " if self.chave else ""
+        return f"{chave}{self.descricao} — {self.limite_valor or self.valor_km}"
 
     @classmethod
-    def limite_para(cls, tipo_despesa, data):
+    def limite_para(cls, tipo_despesa, data, tipo_localidade=""):
+        from relatorios.services.politica_valor_service import resolver_politica_despesa
+
+        politica = resolver_politica_despesa(
+            tipo_despesa=tipo_despesa,
+            data=data,
+            tipo_localidade=tipo_localidade,
+        )
+        return politica.valor if politica else None
+
+    @classmethod
+    def vigente_por_chave(cls, chave, data):
         p = (
             cls.objects.filter(
-                tipo_despesa=tipo_despesa,
+                chave=chave,
                 ativo=True,
                 vigencia_inicio__lte=data,
             )
             .filter(
                 models.Q(vigencia_fim__isnull=True) | models.Q(vigencia_fim__gte=data)
             )
+            .order_by("-vigencia_inicio")
             .first()
         )
-        return p.limite_valor if p else None
+        return p
 
     @classmethod
     def valor_km_vigente(cls, data):
@@ -578,6 +631,20 @@ class RelatorioTecnico(models.Model):
         total += self.total_km_excedente
         return _valor_monetario(total)
 
+    @property
+    def total_km_reembolso_tecnico(self):
+        total = Decimal("0.00")
+        for trecho in self.trechos.all():
+            if trecho.rejeitado or trecho.status_financeiro == StatusFinanceiroItem.REJEITADO:
+                continue
+            total += trecho.valor_reembolso_tecnico
+        total += self.total_km_excedente_reembolso_tecnico
+        return _valor_monetario(total)
+
+    @property
+    def total_km_excesso_reducao_clientes(self):
+        return _valor_monetario(self.total_km - self.total_km_reembolso_tecnico)
+
     def rateio_km_excedente_clientes(self):
         km_total = self.km_excedente_interno or Decimal("0.00")
         clientes = list(self.clientes_exibicao())
@@ -593,12 +660,18 @@ class RelatorioTecnico(models.Model):
                 km_cliente = (km_total - acumulado).quantize(Decimal("0.01"))
             acumulado += km_cliente
             valor_km = cliente.valor_km or Decimal("0.00")
+            valor_reembolso = valor_km_control_sul()
             linhas.append(
                 {
                     "cliente": cliente,
                     "km": km_cliente,
                     "valor_km": valor_km,
                     "valor_calculado": _valor_monetario(km_cliente * valor_km),
+                    "valor_km_control_sul": valor_reembolso,
+                    "valor_reembolso_tecnico": _valor_monetario(km_cliente * valor_reembolso),
+                    "excesso_reducao": _valor_monetario(
+                        (km_cliente * valor_km) - (km_cliente * valor_reembolso)
+                    ),
                 }
             )
         return linhas
@@ -608,6 +681,15 @@ class RelatorioTecnico(models.Model):
         return _valor_monetario(
             sum(
                 (linha["valor_calculado"] for linha in self.rateio_km_excedente_clientes()),
+                Decimal("0.00"),
+            )
+        )
+
+    @property
+    def total_km_excedente_reembolso_tecnico(self):
+        return _valor_monetario(
+            sum(
+                (linha["valor_reembolso_tecnico"] for linha in self.rateio_km_excedente_clientes()),
                 Decimal("0.00"),
             )
         )
@@ -657,7 +739,7 @@ class RelatorioTecnico(models.Model):
     @property
     def saldo(self):
         return _valor_monetario(
-            self.total_despesas_tecnico + self.total_km - self.valor_adiantamento
+            self.total_despesas_tecnico + self.total_km_reembolso_tecnico - self.valor_adiantamento
         )
 
     @property
@@ -672,6 +754,8 @@ class RelatorioTecnico(models.Model):
         return _valor_monetario(
             self.total_aprovado
             - _valor_monetario(total_empresa_aprovado)
+            - self.total_km
+            + self.total_km_reembolso_tecnico
             - self.valor_adiantamento
         )
 
@@ -1005,6 +1089,55 @@ class ItemDespesa(models.Model):
             and self.valor_aprovado != self.valor
         )
 
+    @property
+    def valor_politica(self):
+        politica = self.politica_aplicavel
+        return politica.valor if politica else None
+
+    @property
+    def politica_aplicavel(self):
+        if not self.tipo or not self.data:
+            return None
+        from relatorios.services.politica_valor_service import resolver_politica_despesa
+
+        relatorio = self.relatorio if self.relatorio_id else None
+        return resolver_politica_despesa(
+            tipo_despesa=self.tipo,
+            data=self.data,
+            tipo_localidade=getattr(relatorio, "tipo_localidade", ""),
+            cidade=getattr(relatorio, "cidade_atendimento", ""),
+            descricao=self.descricao,
+            valor_informado=self.valor,
+        )
+
+    @property
+    def excesso_politica(self):
+        limite = self.valor_politica
+        if limite is None:
+            return Decimal("0.00")
+        return _valor_monetario(max(self.valor - limite, Decimal("0.00")))
+
+    @property
+    def acima_politica(self):
+        return self.excesso_politica > Decimal("0.00")
+
+    @property
+    def politica_localidade_label(self):
+        politica = self.politica_aplicavel
+        if politica:
+            return politica.descricao
+        return "Sem politica definida"
+
+    @property
+    def politica_chave(self):
+        politica = self.politica_aplicavel
+        return politica.chave if politica else ""
+
+    @property
+    def politica_tipo(self):
+        politica = self.politica_aplicavel
+        return politica.tipo_politica if politica else ""
+
     def clean(self):
         erros = {}
         if self.relatorio_id and self.data:
@@ -1020,13 +1153,10 @@ class ItemDespesa(models.Model):
             validar_anexo_upload(self.comprovante)
         except ValidationError as exc:
             erros["comprovante"] = exc.messages[0] if exc.messages else str(exc)
-        if self.tipo and self.data and self.valor:
-            limite = PoliticaValor.limite_para(self.tipo, self.data)
-            if limite and self.valor > limite:
-                erros["valor"] = (
-                    f"Limite para {self.get_tipo_display()} é "
-                    f"R$ {limite:.2f}. Informado: R$ {self.valor:.2f}."
-                )
+        numero_normalizado = _numero_documento_normalizado(self.numero_documento_comprovante)
+        if self.numero_documento_comprovante and self.numero_documento_comprovante != numero_normalizado:
+            self.numero_documento_comprovante = numero_normalizado
+
         if (
             self.tipo_documento_comprovante == TipoDocumentoComprovante.NOTA_FISCAL
             and not self.numero_documento_comprovante
@@ -1034,6 +1164,16 @@ class ItemDespesa(models.Model):
             erros["numero_documento_comprovante"] = (
                 "Informe o número do documento para Nota Fiscal."
             )
+        if numero_normalizado:
+            duplicados = ItemDespesa.objects.filter(
+                numero_documento_comprovante__iexact=numero_normalizado
+            )
+            if self.pk:
+                duplicados = duplicados.exclude(pk=self.pk)
+            if duplicados.exists():
+                erros["numero_documento_comprovante"] = (
+                    "Já existe uma despesa cadastrada com este número de nota/documento."
+                )
         if erros:
             raise ValidationError(erros)
 
@@ -1278,6 +1418,20 @@ class TrechoKm(models.Model):
         return _valor_monetario(self.km * self.valor_km_final)
 
     @property
+    def valor_km_control_sul(self):
+        return valor_km_control_sul()
+
+    @property
+    def valor_reembolso_tecnico(self):
+        if self.rejeitado or self.status_financeiro == StatusFinanceiroItem.REJEITADO:
+            return Decimal("0.00")
+        return _valor_monetario(self.km * self.valor_km_control_sul)
+
+    @property
+    def excesso_reducao_km(self):
+        return _valor_monetario(self.valor_final_clientes - self.valor_reembolso_tecnico)
+
+    @property
     def valor_calculado_clientes(self):
         calculos = list(self.rateios.all())
         if not calculos:
@@ -1337,8 +1491,8 @@ class TrechoKm(models.Model):
             self.calculado_em = timezone.now()
 
     def save(self, *args, **kwargs):
-        if not self.valor_km and self.data:
-            self.valor_km = PoliticaValor.valor_km_vigente(self.data)
+        if not self.valor_km:
+            self.valor_km = valor_km_control_sul()
         self.atualizar_dados_geograficos()
         self.valor_calculado = (self.km * self.valor_km).quantize(Decimal("0.01"))
         super().save(*args, **kwargs)
@@ -1551,6 +1705,18 @@ class TrechoRateioKM(models.Model):
 
     def __str__(self):
         return f"{self.trecho_id} - {self.cliente} - R$ {self.valor_final}"
+
+    @property
+    def valor_km_control_sul(self):
+        return valor_km_control_sul()
+
+    @property
+    def valor_reembolso_tecnico(self):
+        return _valor_monetario((self.km_cliente or Decimal("0.00")) * self.valor_km_control_sul)
+
+    @property
+    def excesso_reducao(self):
+        return _valor_monetario((self.valor_final or Decimal("0.00")) - self.valor_reembolso_tecnico)
 
 
 class TipoAdiantamento(models.TextChoices):

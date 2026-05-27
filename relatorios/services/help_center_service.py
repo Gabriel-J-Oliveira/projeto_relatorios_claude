@@ -1,6 +1,7 @@
 import html
 import json
 import logging
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -208,6 +209,11 @@ def render_markdown(content):
         )
     else:
         rendered = _render_markdown_basico(safe_content)
+    rendered = re.sub(
+        r"\[INSERIR IMAGEM:\s*(.*?)\]",
+        r'<span class="help-placeholder"><i class="bi bi-image me-1"></i>INSERIR IMAGEM: \1</span>',
+        rendered,
+    )
     return mark_safe(rendered)
 
 
@@ -226,6 +232,13 @@ def _render_markdown_basico(content):
             html_lines.append(f"<h1>{stripped[2:]}</h1>")
         elif stripped.startswith("## "):
             html_lines.append(f"<h2>{stripped[3:]}</h2>")
+        elif stripped.startswith("!["):
+            match = re.match(r"!\[(.*?)\]\((.*?)\)", stripped)
+            if match:
+                alt, src = match.groups()
+                html_lines.append(f'<p><img src="{src}" alt="{alt}"></p>')
+            else:
+                html_lines.append(f"<p>{stripped}</p>")
         elif stripped.startswith("- "):
             if not in_list:
                 html_lines.append("<ul>")

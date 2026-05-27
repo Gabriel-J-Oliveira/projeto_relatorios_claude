@@ -1,0 +1,43 @@
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Data</th>
+      <th>Documento</th>
+      <th>Descricao</th>
+      <th>Tipo</th>
+      <th class="amount">Solicitado</th>
+      <th class="amount">Politica</th>
+      <th class="amount">Aprovado</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for despesa in despesas %}
+    <tr class="{% if despesa.rejeitado %}row-rejected{% elif despesa.badge == 'warning' %}row-adjusted{% endif %}">
+      <td>#{{ despesa.item_id }}</td>
+      <td>{{ despesa.data|date:"d/m/Y"|default:"-" }}</td>
+      <td>{{ despesa.numero_documento }}</td>
+      <td>
+        {{ despesa.descricao }}
+        {% if despesa.clientes_rateio and despesa.clientes_rateio != "-" %}
+        <small>Rateio: {{ despesa.clientes_rateio }}</small>
+        {% endif %}
+      </td>
+      <td>{{ despesa.tipo }}</td>
+      <td class="amount">R$ {{ despesa.solicitado|floatformat:2 }}</td>
+      <td class="amount">
+        {% if despesa.valor_politica %}
+          {{ despesa.politica_descricao }}<br>R$ {{ despesa.valor_politica|floatformat:2 }}
+        {% else %}
+          -
+        {% endif %}
+      </td>
+      <td class="amount">R$ {{ despesa.aprovado|floatformat:2 }}</td>
+      <td><span class="badge badge-{{ despesa.badge }}">{{ despesa.status }}</span></td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="9" class="empty">{{ empty_text }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>

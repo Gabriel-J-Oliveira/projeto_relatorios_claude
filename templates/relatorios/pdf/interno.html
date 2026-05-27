@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
   <meta charset="utf-8">
-  <title>Relatório Financeiro Interno {{ pdf.relatorio.identificador }}</title>
+  <title>Relatorio de Despesa de Viagem - Via da Contabilidade {{ pdf.relatorio.identificador }}</title>
 </head>
 <body>
   <header class="pdf-header">
@@ -10,302 +10,186 @@
       <div class="brand-mark">CS</div>
       <div>
         <div class="company">{{ empresa }}</div>
-        <h1>Relatório Financeiro Interno</h1>
+        <h1>Relatorio de Despesa de Viagem</h1>
+        <div class="company">Via da Contabilidade</div>
       </div>
     </div>
     <div class="header-meta">
-      <div class="label">Relatório</div>
+      <div class="label">Relatorio</div>
       <div class="number">{{ pdf.relatorio.identificador }}</div>
       <span class="status status-{{ pdf.relatorio.status }}">{{ pdf.relatorio.status_label }}</span>
     </div>
   </header>
 
   <section class="section">
-    <h2>Dados do relatório</h2>
+    <h2>Dados do relatorio</h2>
     <div class="meta-grid">
       <div>
-        <span class="label">Técnico(s)</span>
-        <strong>
-          {{ pdf.relatorio.tecnico_principal }}
-          {% if pdf.relatorio.tecnico_extra_count %}+{{ pdf.relatorio.tecnico_extra_count }}{% endif %}
-        </strong>
-        {% if pdf.relatorio.tecnicos|length > 1 %}
-          <small>{% for tecnico in pdf.relatorio.tecnicos %}{{ tecnico.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}</small>
-        {% endif %}
-      </div>
-      <div>
         <span class="label">Cliente(s)</span>
-        <strong>
-          {{ pdf.relatorio.cliente_principal }}
-          {% if pdf.relatorio.cliente_extra_count %}+{{ pdf.relatorio.cliente_extra_count }}{% endif %}
-        </strong>
+        <strong>{{ pdf.relatorio.cliente_principal }}{% if pdf.relatorio.cliente_extra_count %} +{{ pdf.relatorio.cliente_extra_count }}{% endif %}</strong>
         {% if pdf.relatorio.clientes|length > 1 %}
-          <small>{% for cliente in pdf.relatorio.clientes %}{{ cliente.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}</small>
+        <small>{% for cliente in pdf.relatorio.clientes %}{{ cliente.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}</small>
         {% endif %}
       </div>
       <div>
-        <span class="label">Período</span>
-        <strong>{{ pdf.relatorio.data_inicio|date:"d/m/Y" }} a {{ pdf.relatorio.data_fim|date:"d/m/Y" }}</strong>
+        <span class="label">Tecnico(s)</span>
+        <strong>{{ pdf.relatorio.tecnico_principal }}{% if pdf.relatorio.tecnico_extra_count %} +{{ pdf.relatorio.tecnico_extra_count }}{% endif %}</strong>
+        {% if pdf.relatorio.tecnicos|length > 1 %}
+        <small>{% for tecnico in pdf.relatorio.tecnicos %}{{ tecnico.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}</small>
+        {% endif %}
       </div>
       <div>
-        <span class="label">Emissão</span>
-        <strong>{{ pdf.emitido_em|date:"d/m/Y H:i" }}</strong>
-      </div>
-      <div>
-        <span class="label">Aprovação</span>
-        <strong>{{ pdf.relatorio.aprovado_em|date:"d/m/Y H:i"|default:"-" }}</strong>
-      </div>
-      <div>
-        <span class="label">Aprovador</span>
-        <strong>{{ pdf.relatorio.aprovado_por|default:"-" }}</strong>
-      </div>
-      <div>
-        <span class="label">Atendimento</span>
+        <span class="label">Cidade</span>
         <strong>{{ pdf.relatorio.cidade_atendimento }}/{{ pdf.relatorio.uf_atendimento }}</strong>
       </div>
       <div>
-        <span class="label">Centro de custo</span>
-        <strong>{{ pdf.relatorio.centro_custo|default:"-" }}</strong>
+        <span class="label">Periodo</span>
+        <strong>{{ pdf.relatorio.data_inicio|date:"d/m/Y" }} a {{ pdf.relatorio.data_fim|date:"d/m/Y" }}</strong>
       </div>
       <div>
-        <span class="label">Número oficial</span>
-        <strong>{{ pdf.relatorio.numero }}</strong>
+        <span class="label">Emissao</span>
+        <strong>{{ pdf.emitido_em|date:"d/m/Y H:i" }}</strong>
+      </div>
+      <div>
+        <span class="label">Aprovacao</span>
+        <strong>{{ pdf.relatorio.aprovado_em|date:"d/m/Y H:i"|default:"-" }}</strong>
       </div>
     </div>
   </section>
 
   <section class="section">
-    <div class="section-title-row">
-      <h2>Resumo financeiro</h2>
-      {% if pdf.totais.diferenca_removida > 0 %}
-        <span class="badge badge-warning">Divergência financeira</span>
-      {% endif %}
-    </div>
-    <div class="summary-grid">
-      <div class="summary-card">
-        <span>Total solicitado</span>
-        <strong>R$ {{ pdf.totais.total_solicitado|floatformat:2 }}</strong>
-      </div>
-      <div class="summary-card approved">
-        <span>Total aprovado</span>
-        <strong>R$ {{ pdf.totais.total_aprovado|floatformat:2 }}</strong>
-      </div>
-      <div class="summary-card removed">
-        <span>Diferença removida</span>
-        <strong>R$ {{ pdf.totais.diferenca_removida|floatformat:2 }}</strong>
-      </div>
-      <div class="summary-card">
-        <span>Adiantamento</span>
-        <strong>R$ {{ pdf.totais.valor_adiantamento|floatformat:2 }}</strong>
-      </div>
-      <div class="summary-card balance">
-        <span>Saldo final</span>
-        <strong>R$ {{ pdf.totais.saldo_aprovado|floatformat:2 }}</strong>
-      </div>
+    <h2>Resumo contabil</h2>
+    <div class="summary-grid accounting-summary">
+      <div class="summary-card"><span>Pago pelo tecnico</span><strong>R$ {{ pdf.total_pago_tecnico|floatformat:2 }}</strong></div>
+      <div class="summary-card"><span>Pago pela empresa</span><strong>R$ {{ pdf.total_pago_empresa|floatformat:2 }}</strong></div>
+      <div class="summary-card"><span>KM a cobrar cliente</span><strong>R$ {{ pdf.total_km_cobrar_cliente|floatformat:2 }}</strong></div>
+      <div class="summary-card"><span>Adiantamento</span><strong>R$ {{ pdf.totais.valor_adiantamento|floatformat:2 }}</strong></div>
+      <div class="summary-card balance"><span>Ressarcir tecnico</span><strong>R$ {{ pdf.total_reembolso_tecnico|floatformat:2 }}</strong></div>
     </div>
   </section>
 
   <section class="section">
-    <h2>Distribuição por cliente</h2>
+    <h2>Distribuicao por cliente</h2>
     <table class="data-table compact">
       <thead>
         <tr>
           <th>Cliente</th>
-          <th class="amount">KM</th>
           <th class="amount">Despesas</th>
-          <th class="amount">Solicitado</th>
+          <th class="amount">KM</th>
           <th class="amount">Aprovado</th>
-          <th class="amount">Diferença</th>
-          <th>Status</th>
+          <th class="amount">Diferenca</th>
         </tr>
       </thead>
       <tbody>
         {% for resumo in pdf.distribuicao_clientes %}
-          <tr class="{% if resumo.tem_divergencia %}row-adjusted{% endif %}">
-            <td>{{ resumo.cliente }}</td>
-            <td class="amount">{{ resumo.km_total|floatformat:2 }}</td>
-            <td class="amount">R$ {{ resumo.despesas_solicitadas|floatformat:2 }}</td>
-            <td class="amount">R$ {{ resumo.total_solicitado|floatformat:2 }}</td>
-            <td class="amount">R$ {{ resumo.total_aprovado|floatformat:2 }}</td>
-            <td class="amount">R$ {{ resumo.diferenca_removida|floatformat:2 }}</td>
-            <td>{{ resumo.status_financeiro }}</td>
-          </tr>
-        {% empty %}
-          <tr><td colspan="7" class="empty">Nenhum cliente consolidado.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </section>
-
-  <section class="section">
-    <h2>Despesas</h2>
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Data</th>
-          <th>Tipo</th>
-          <th>Descrição</th>
-          <th>Nº doc.</th>
-          <th class="amount">Solicitado</th>
-          <th class="amount">Aprovado</th>
-          <th>Status</th>
-          <th>Motivo recusa</th>
+        <tr class="{% if resumo.tem_divergencia %}row-adjusted{% endif %}">
+          <td>
+            {{ resumo.cliente }}
+            {% if resumo.motivo_viagem %}
+              <small>Motivo: {{ resumo.motivo_viagem }}</small>
+            {% endif %}
+          </td>
+          <td class="amount">R$ {{ resumo.despesas_solicitadas|floatformat:2 }}</td>
+          <td class="amount">{{ resumo.km_total|floatformat:2 }}</td>
+          <td class="amount">R$ {{ resumo.total_aprovado|floatformat:2 }}</td>
+          <td class="amount">R$ {{ resumo.diferenca_removida|floatformat:2 }}</td>
         </tr>
-      </thead>
-      <tbody>
-        {% for despesa in pdf.despesas %}
-          <tr class="{% if despesa.rejeitado %}row-rejected{% elif despesa.badge == 'warning' %}row-adjusted{% endif %}">
-            <td>#{{ despesa.item_id }}</td>
-            <td>{{ despesa.data|date:"d/m/Y"|default:"-" }}</td>
-            <td>{{ despesa.tipo }}</td>
-            <td>{{ despesa.descricao }}</td>
-            <td>{{ despesa.numero_documento }}</td>
-            <td class="amount">R$ {{ despesa.solicitado|floatformat:2 }}</td>
-            <td class="amount">R$ {{ despesa.aprovado|floatformat:2 }}</td>
-            <td><span class="badge badge-{{ despesa.badge }}">{{ despesa.status }}</span></td>
-            <td>{{ despesa.motivo }}</td>
-          </tr>
-          <tr class="subrow">
-            <td></td>
-            <td colspan="8">
-              <strong>Rateio:</strong>
-              {% for rateio in despesa.rateios %}
-                {{ rateio.cliente }} — solicitado R$ {{ rateio.valor_original|floatformat:2 }} / aprovado R$ {{ rateio.valor_final|floatformat:2 }}{% if rateio.motivo %} ({{ rateio.motivo }}){% endif %}{% if not forloop.last %}; {% endif %}
-              {% empty %}
-                {{ despesa.clientes_rateio }}
-              {% endfor %}
-            </td>
-          </tr>
         {% empty %}
-          <tr><td colspan="9" class="empty">Nenhuma despesa registrada.</td></tr>
+        <tr><td colspan="5" class="empty">Nenhum cliente consolidado.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </section>
 
   <section class="section">
-    <h2>Trechos KM</h2>
+    <h2>Despesas pagas pelo tecnico</h2>
+    {% include "relatorios/pdf/partials/_interno_despesas_table.html" with despesas=pdf.despesas_tecnico empty_text="Nenhuma despesa paga pelo tecnico." %}
+  </section>
+
+  <section class="section">
+    <h2>Despesas pagas pela empresa</h2>
+    {% include "relatorios/pdf/partials/_interno_despesas_table.html" with despesas=pdf.despesas_empresa empty_text="Nenhuma despesa paga pela empresa." %}
+  </section>
+
+  <section class="section">
+    <h2>Quilometragem</h2>
     <table class="data-table">
       <thead>
         <tr>
-          <th>ID</th>
           <th>Data</th>
-          <th>Origem</th>
-          <th>Destino</th>
-          <th class="amount">KM informado</th>
-          <th class="amount">KM API</th>
-          <th class="amount">Total solicitado</th>
-          <th class="amount">Total aprovado</th>
+          <th>Trecho</th>
+          <th class="amount">KM</th>
+          <th class="amount">Pagar tecnico</th>
+          <th class="amount">Cobrar cliente</th>
+          <th class="amount">Excesso/reducao</th>
           <th>Status</th>
-          <th>Motivo recusa</th>
         </tr>
       </thead>
       <tbody>
         {% for trecho in pdf.trechos %}
-          <tr class="{% if trecho.rejeitado %}row-rejected{% elif trecho.badge == 'warning' %}row-adjusted{% endif %}">
-            <td>#{{ trecho.item_id }}</td>
-            <td>{{ trecho.data|date:"d/m/Y"|default:"-" }}</td>
-            <td>{{ trecho.origem }}</td>
-            <td>{{ trecho.destino }}</td>
-            <td class="amount">{{ trecho.km|floatformat:2 }}</td>
-            <td class="amount">{{ trecho.km_calculado_api|floatformat:2 }}</td>
-            <td class="amount">R$ {{ trecho.solicitado|floatformat:2 }}</td>
-            <td class="amount">R$ {{ trecho.total_final|floatformat:2 }}</td>
-            <td><span class="badge badge-{{ trecho.badge }}">{{ trecho.status }}</span></td>
-            <td>{{ trecho.motivo }}</td>
-          </tr>
-          <tr class="subrow">
-            <td></td>
-            <td colspan="9">
-              <strong>Clientes:</strong>
-              {% for rateio in trecho.rateios %}
-                {{ rateio.cliente }} — {{ rateio.km|floatformat:2 }} km x R$ {{ rateio.valor_km|floatformat:2 }} = R$ {{ rateio.valor_final|floatformat:2 }}{% if rateio.motivo %} ({{ rateio.motivo }}){% endif %}{% if not forloop.last %}; {% endif %}
-              {% empty %}
-                Sem cálculo por cliente registrado.
-              {% endfor %}
-            </td>
-          </tr>
+        <tr class="{% if trecho.rejeitado %}row-rejected{% elif trecho.badge == 'warning' %}row-adjusted{% endif %}">
+          <td>{{ trecho.data|date:"d/m/Y"|default:"-" }}</td>
+          <td>{{ trecho.origem }} -> {{ trecho.destino }}</td>
+          <td class="amount">{{ trecho.km|floatformat:2 }}</td>
+          <td class="amount">R$ {{ trecho.valor_reembolso_tecnico|floatformat:2 }}</td>
+          <td class="amount">R$ {{ trecho.total_final|floatformat:2 }}</td>
+          <td class="amount">R$ {{ trecho.excesso_reducao|floatformat:2 }}</td>
+          <td><span class="badge badge-{{ trecho.badge }}">{{ trecho.status }}</span></td>
+        </tr>
         {% empty %}
-          <tr><td colspan="10" class="empty">Nenhum trecho KM registrado.</td></tr>
+        <tr><td colspan="7" class="empty">Nenhum trecho KM registrado.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </section>
 
-  {% if pdf.avisos %}
   <section class="section page-break-avoid">
-    <h2>Atenções identificadas</h2>
-    <ul class="notice-list">
-      {% for aviso in pdf.avisos %}
-        <li>{{ aviso }}</li>
-      {% endfor %}
-    </ul>
+    <h2>Lancamento contabil por categoria</h2>
+    <table class="data-table compact">
+      <thead>
+        <tr>
+          <th>Categoria</th>
+          <th class="amount">Pago tecnico</th>
+          <th class="amount">Pago empresa</th>
+          <th class="amount">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for linha in pdf.lancamentos_contabeis %}
+        <tr>
+          <td>{{ linha.categoria }}</td>
+          <td class="amount">R$ {{ linha.tecnico|floatformat:2 }}</td>
+          <td class="amount">R$ {{ linha.empresa|floatformat:2 }}</td>
+          <td class="amount">R$ {{ linha.total|floatformat:2 }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="empty">Nenhum lancamento contabil.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </section>
-  {% endif %}
 
   <section class="section page-break-avoid">
-    <h2>Justificativas financeiras</h2>
+    <h2>Justificativas importantes</h2>
     <div class="note-grid">
       {% for justificativa in pdf.justificativas %}
-        <div class="note">
-          <strong>{{ justificativa.titulo }}</strong>
-          <p>{{ justificativa.texto }}</p>
-        </div>
+      <div class="note">
+        <strong>{{ justificativa.titulo }}</strong>
+        <p>{{ justificativa.texto }}</p>
+      </div>
       {% empty %}
-        <p class="empty">Nenhuma justificativa financeira registrada.</p>
+      <p class="empty">Nenhuma justificativa financeira registrada.</p>
       {% endfor %}
     </div>
   </section>
 
-  <section class="section page-break-avoid">
-    <h2>Histórico resumido</h2>
-    <table class="data-table compact">
-      <thead>
-        <tr>
-          <th>Data/hora</th>
-          <th>Usuário</th>
-          <th>Evento</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for historico in pdf.historicos %}
-          <tr>
-            <td>{{ historico.data_hora|date:"d/m/Y H:i" }}</td>
-            <td>{{ historico.usuario }}</td>
-            <td>{{ historico.acao }}</td>
-          </tr>
-        {% empty %}
-          <tr><td colspan="3" class="empty">Nenhuma movimentação registrada.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </section>
-
-  <section class="section page-break-avoid">
-    <h2>Anexos listados</h2>
-    {% if pdf.anexos %}
-      <table class="data-table compact">
-        <thead>
-          <tr>
-            <th>Data</th>
-            <th>Descrição</th>
-            <th>Arquivo</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for anexo in pdf.anexos %}
-            <tr>
-              <td>{{ anexo.data|date:"d/m/Y"|default:"-" }}</td>
-              <td>{{ anexo.descricao }}</td>
-              <td>{{ anexo.arquivo }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    {% else %}
-      <p class="empty">Nenhum comprovante anexado ao relatório.</p>
-    {% endif %}
+  <section class="section page-break-avoid signature-section">
+    <p>Declaro que o valor a ressarcir ao tecnico constante neste relatorio corresponde aos gastos aprovados conforme conferencia financeira.</p>
+    <div class="signature-grid">
+      <div><span></span><strong>Tecnico / colaborador</strong></div>
+      <div><span></span><strong>Coordenador ou Departamento Financeiro</strong></div>
+      <div><span></span><strong>Data</strong></div>
+    </div>
   </section>
 
   <footer class="document-footer">

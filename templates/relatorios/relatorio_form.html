@@ -64,6 +64,7 @@
                 data-inicio="{{ instance.data_inicio|date:'Y-m-d'|default:'' }}"
                 data-fim="{{ instance.data_fim|date:'Y-m-d'|default:'' }}"
                 data-valor-km-cliente="{{ valor_km_padrao|default:0 }}"
+                data-politica-url="{% url 'relatorios:politica_despesa' %}"
                 novalidate>
             {% csrf_token %}
 
@@ -167,14 +168,6 @@
                     {% if form.numero.errors %}
                       <div class="text-danger small mt-1">{{ form.numero.errors.0 }}</div>
                     {% endif %}
-                  </div>
-
-                  <div class="col-md-4" data-tour="relatorio-centro-custo">
-                    <label class="form-label fw-medium small text-muted">
-                      Centro de Custo
-                      <span class="fw-normal opacity-75">(aplica-se a todas as despesas)</span>
-                    </label>
-                    {{ form.centro_custo }}
                   </div>
 
                   <div class="col-md-4" data-tour="relatorio-tipo">
@@ -1440,6 +1433,67 @@
     return Number.isFinite(numero) ? numero : 0;
   }
 
+  function formatMoney(valor) {
+    return "R$ " + Number(valor || 0).toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+
+  async function atualizarPoliticaDespesa(linha) {
+    if (!linha?.classList.contains("linha-despesa")) return;
+    const form = document.getElementById("form-relatorio");
+    const info = linha.querySelector(".politica-despesa-info");
+    if (!form || !info) return;
+    const tipo = linha.querySelector('[name$="-tipo"]')?.value || "";
+    const data = linha.querySelector('[name$="-data"]')?.value || "";
+    const descricao = linha.querySelector('[name$="-descricao"]')?.value || "";
+    const cidade = document.getElementById("id_cidade_atendimento")?.value || "";
+    const tipoLocalidade = document.getElementById("id_tipo_localidade")?.value || "";
+    const valor = normalizarNumero(linha.querySelector(".campo-valor-desp")?.value);
+    const chave = `${tipo}|${data}|${tipoLocalidade}|${cidade}|${descricao}|${valor}`;
+    if (info.dataset.policyKey === chave) return;
+    info.dataset.policyKey = chave;
+
+    if (!tipo || !data) {
+      info.textContent = "Sem politica definida";
+      info.className = "small mt-1 politica-despesa-info text-muted";
+      return;
+    }
+
+    const url = new URL(form.dataset.politicaUrl || "/politica-despesa/", window.location.origin);
+    url.searchParams.set("tipo", tipo);
+    url.searchParams.set("data", data);
+    url.searchParams.set("tipo_localidade", tipoLocalidade);
+    url.searchParams.set("cidade", cidade);
+    url.searchParams.set("descricao", descricao);
+    url.searchParams.set("valor", String(valor));
+    try {
+      const response = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+      const payload = await response.json();
+      const limite = normalizarNumero(payload?.data?.limite);
+      if (!payload.success || !limite) {
+        info.textContent = "Sem politica definida";
+        info.className = "small mt-1 politica-despesa-info text-muted";
+        return;
+      }
+      const excedeu = valor > limite;
+      info.textContent = excedeu
+        ? `${payload.data.descricao}: ${formatMoney(limite)}. Excesso: ${formatMoney(valor - limite)}`
+        : `${payload.data.descricao}: ${formatMoney(limite)}`;
+      info.className = excedeu
+        ? "small mt-1 politica-despesa-info alert alert-warning py-1 px-2 mb-0"
+        : "small mt-1 politica-despesa-info text-muted";
+      if (excedeu) {
+        const aviso = linha.querySelector(".aviso-inline");
+        if (aviso) aviso.textContent = "Este valor excede a politica vigente. O financeiro podera aplicar o valor da politica na conferencia.";
+      }
+    } catch (error) {
+      info.textContent = "Sem politica definida";
+      info.className = "small mt-1 politica-despesa-info text-muted";
+    }
+  }
+
   function formatarDecimalCampo(campo, casas = 2) {
     if (!campo || !String(campo.value || "").trim()) return;
     const valor = normalizarNumero(campo.value);
@@ -2407,6 +2461,7 @@ async function adicionarLinhaKm() {
       const quem = tr.querySelector(".campo-quem-pagou")?.value || "tecnico";
       if (quem === "tecnico") totalTec += val;
       else totalEmp += val;
+      atualizarPoliticaDespesa(tr);
     });
 
     let totalKmPx = 0, totalKmKm = 0;
@@ -2657,6 +2712,10 @@ function validarKmGlobal() {
         recalcular();
         atualizarMapaFormulario();
       });
+    document.getElementById("id_tipo_localidade")
+      ?.addEventListener("change", recalcular);
+    document.getElementById("id_cidade_atendimento")
+      ?.addEventListener("input", recalcular);
     document.querySelector("[name='km_excedente_interno']")
       ?.addEventListener("blur", event => {
         formatarDecimalCampo(event.target, 2);

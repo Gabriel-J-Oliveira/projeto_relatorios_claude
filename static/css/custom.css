@@ -28,6 +28,7 @@ svg {
 
 #main-content {
   min-width: 0;
+  padding-top: 58px;
 }
 
 .app-main {
@@ -145,7 +146,11 @@ svg {
 /* ── NAVBAR ── */
 header.navbar {
   min-height: 58px;
-  z-index: 1020;
+  left: 260px;
+  position: fixed !important;
+  right: 0;
+  top: 0;
+  z-index: 1040;
 }
 
 .navbar-content {
@@ -291,6 +296,10 @@ body::-webkit-scrollbar-thumb:hover {
     padding: 1.25rem 1.5rem;
   }
 
+  header.navbar {
+    left: 236px;
+  }
+
   .card-header {
     padding-left: 1rem;
     padding-right: 1rem;
@@ -298,6 +307,10 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 @media (max-width: 1199.98px) {
+  header.navbar {
+    left: 0;
+  }
+
   #sidebar {
     position: fixed;
     left: 0;
@@ -306,6 +319,7 @@ body::-webkit-scrollbar-thumb:hover {
     transform: translateX(-100%);
     box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, .18);
     transition: transform .2s ease;
+    z-index: 1050;
   }
 
   body.sidebar-open #sidebar {

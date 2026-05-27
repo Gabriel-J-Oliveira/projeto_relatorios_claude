@@ -57,12 +57,6 @@
         "Selecione o tipo do relatório conforme o objetivo do atendimento, como operacional ou institucional."
       ),
       step(
-        '[data-tour="relatorio-centro-custo"]',
-        "#tab-dados-btn",
-        "Centro de custo",
-        "Informe a classificação ou centro de custo relacionado ao relatório."
-      ),
-      step(
         '[data-tour="relatorio-cidade-uf"]',
         "#tab-dados-btn",
         "Cidade, UF e localidade",

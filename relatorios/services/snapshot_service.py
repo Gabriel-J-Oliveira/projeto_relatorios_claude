@@ -124,6 +124,9 @@ def _rateio_km_payload(rateio):
         "km_final": _decimal(rateio.km_final),
         "km_cliente": _decimal(rateio.km_cliente),
         "valor_km": _decimal(rateio.valor_km),
+        "valor_km_control_sul": _decimal(rateio.valor_km_control_sul),
+        "valor_reembolso_tecnico": _decimal(rateio.valor_reembolso_tecnico),
+        "excesso_reducao": _decimal(rateio.excesso_reducao),
         "valor_calculado": _decimal(rateio.valor_calculado),
         "valor_rateado": _decimal(rateio.valor_rateado),
         "valor_final": _decimal(rateio.valor_final),
@@ -137,6 +140,7 @@ def _rateio_km_payload(rateio):
 
 
 def _despesa_payload(despesa):
+    valor_politica = despesa.valor_politica
     return {
         "id": despesa.pk,
         "ordem": despesa.ordem,
@@ -147,6 +151,20 @@ def _despesa_payload(despesa):
         "valor_solicitado": _decimal(despesa.valor),
         "valor_aprovado": _decimal(despesa.valor_aprovado),
         "valor_final": _decimal(despesa.valor_final),
+        "valor_politica": _decimal(valor_politica),
+        "politica_chave": despesa.politica_chave,
+        "politica_tipo": despesa.politica_tipo,
+        "politica_descricao": despesa.politica_localidade_label,
+        "excesso_politica": _decimal(despesa.excesso_politica),
+        "acima_politica": bool(despesa.acima_politica),
+        "politica_aplicada_manual": bool(
+            valor_politica
+            and despesa.valor_aprovado is not None
+            and despesa.valor_aprovado == valor_politica
+            and despesa.valor > valor_politica
+        ),
+        "politica_localidade": despesa.relatorio.tipo_localidade if despesa.relatorio_id else "",
+        "politica_localidade_label": despesa.politica_localidade_label,
         "quem_pagou": despesa.quem_pagou,
         "quem_pagou_label": despesa.get_quem_pagou_display(),
         "status_financeiro": despesa.status_financeiro,
@@ -196,7 +214,9 @@ def _trecho_payload(trecho):
         "rota_geojson": trecho.rota_geojson or {},
         "km_divergente_rota": trecho.km_divergente_rota,
         "valor_km": _decimal(trecho.valor_km),
-        "valor_km_aprovado": _decimal(trecho.valor_km_aprovado),
+        "valor_km_control_sul": _decimal(trecho.valor_km_control_sul),
+        "valor_reembolso_tecnico": _decimal(trecho.valor_reembolso_tecnico),
+        "excesso_reducao": _decimal(trecho.excesso_reducao_km),
         "valor_km_final": _decimal(trecho.valor_km_final),
         "valor_calculado": _decimal(trecho.valor_calculado_clientes),
         "valor_final": _decimal(trecho.valor_final_clientes),
@@ -227,6 +247,9 @@ def _km_excedente_payload(relatorio):
                 "cliente_nome": cliente.nome,
                 "km": _decimal(linha["km"]),
                 "valor_km": _decimal(linha["valor_km"]),
+                "valor_km_control_sul": _decimal(linha["valor_km_control_sul"]),
+                "valor_reembolso_tecnico": _decimal(linha["valor_reembolso_tecnico"]),
+                "excesso_reducao": _decimal(linha["excesso_reducao"]),
                 "valor_calculado": _decimal(linha["valor_calculado"]),
                 "valor_final": _decimal(linha["valor_calculado"]),
             }
@@ -249,6 +272,8 @@ def _distribuicao_payload(relatorio):
                 "motivo_viagem": resumo.motivo_viagem,
                 "km_total": _decimal(resumo.km_total),
                 "valor_km_solicitado": _decimal(resumo.valor_km_solicitado),
+                "valor_km_reembolso_tecnico": _decimal(resumo.valor_km_reembolso_tecnico),
+                "excesso_reducao_km": _decimal(resumo.excesso_reducao_km),
                 "despesas_solicitadas": _decimal(resumo.despesas_solicitadas),
                 "total_solicitado": _decimal(resumo.total_solicitado),
                 "total_aprovado": _decimal(resumo.total_aprovado),
@@ -347,7 +372,6 @@ def construir_snapshot_financeiro(relatorio, usuario=None):
             "status_label": relatorio.get_status_display(),
             "tipo_relatorio": relatorio.tipo_relatorio,
             "tipo_relatorio_label": relatorio.get_tipo_relatorio_display(),
-            "centro_custo": relatorio.centro_custo,
             "cidade_atendimento": relatorio.cidade_atendimento,
             "uf_atendimento": relatorio.uf_atendimento,
             "tipo_localidade": relatorio.tipo_localidade,
@@ -377,6 +401,8 @@ def construir_snapshot_financeiro(relatorio, usuario=None):
             "total_despesas_empresa": _decimal(relatorio.total_despesas_empresa),
             "total_despesas": _decimal(relatorio.total_despesas),
             "total_km": _decimal(relatorio.total_km),
+            "total_km_reembolso_tecnico": _decimal(relatorio.total_km_reembolso_tecnico),
+            "total_km_excesso_reducao_clientes": _decimal(relatorio.total_km_excesso_reducao_clientes),
             "total_km_percorrido": _decimal(relatorio.total_km_percorrido),
             "total_solicitado": _decimal(relatorio.total_solicitado),
             "total_aprovado_despesas": _decimal(relatorio.total_aprovado_despesas),

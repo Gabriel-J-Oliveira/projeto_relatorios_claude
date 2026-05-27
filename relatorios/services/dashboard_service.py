@@ -85,15 +85,12 @@ def filtros_dashboard(user, params):
     hoje = timezone.localdate()
     inicio_padrao = hoje - timedelta(days=365)
     status = (params.get("status") or "").strip()
-    centro_custo = (params.get("centro_custo") or "").strip()
-
     filtros = {
         "data_inicio": _parse_date(params.get("data_inicio")) or inicio_padrao,
         "data_fim": _parse_date(params.get("data_fim")) or hoje,
         "cliente": None,
         "tecnico": None,
         "status": status,
-        "centro_custo": centro_custo,
     }
 
     try:
@@ -142,8 +139,6 @@ def get_dashboard_queryset(user, filtros):
         qs = qs.filter(data_inicio__lte=data_fim)
     if filtros.get("status"):
         qs = qs.filter(status=filtros["status"])
-    if filtros.get("centro_custo"):
-        qs = qs.filter(centro_custo__icontains=filtros["centro_custo"])
     if filtros.get("cliente"):
         cliente_id = filtros["cliente"]
         qs = qs.filter(
@@ -435,7 +430,6 @@ def serializar_filtros(filtros):
         "cliente": filtros.get("cliente") or "",
         "tecnico": filtros.get("tecnico") or "",
         "status": filtros.get("status") or "",
-        "centro_custo": filtros.get("centro_custo") or "",
     }
 
 

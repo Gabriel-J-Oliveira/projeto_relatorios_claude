@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal
 
 from django import forms
@@ -14,6 +15,13 @@ from .models import (
     TipoDocumentoComprovante,
 )
 from .validators import validar_anexo_upload
+
+
+logger = logging.getLogger(__name__)
+
+
+def _normalizar_numero_documento(valor):
+    return " ".join(str(valor or "").strip().split()).upper()
 
 class ClienteSelectWithData(forms.Select):
     """
@@ -139,7 +147,6 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
             "data_inicio",
             "data_fim",
             "motivo",
-            "centro_custo",
             "tipo_relatorio",
             "valor_adiantamento",
             "km_excedente_interno",
@@ -168,13 +175,8 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
             "km_excedente_interno": forms.TextInput(),
             "observacao_km_excedente": forms.Textarea(attrs={"rows": 2}),
         }
-        labels = {
-            "centro_custo": "Centro de Custo / Classificacao",
-            "tipo_relatorio": "Tipo de relatorio",
-        }
-        help_texts = {
-            "centro_custo": "Será aplicado a todas as despesas deste relatório."
-        }
+        labels = {"tipo_relatorio": "Tipo de relatorio"}
+
 
     def __init__(self, *args, **kwargs):
         kwargs.pop("numero_sugerido", None)
@@ -196,9 +198,6 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         self.fields["observacao_km_excedente"].required = False
         if self.instance and self.instance.pk and not self.instance.numero:
             self.fields["numero"].initial = "Rascunho"
-        self.fields["centro_custo"].widget.attrs[
-            "placeholder"
-        ] = "Ex: Manutenção, Instalação, Comercial..."
         self.fields["tipo_relatorio"].widget.attrs.update(
             {"class": "form-select form-select-sm"}
         )
@@ -370,6 +369,7 @@ class BaseItemDespesaFormSet(BaseInlineFormSet):
             return
 
         relatorio = self.instance
+        documentos_vistos = {}
 
         for form in self.forms:
             if not hasattr(form, "cleaned_data"):
@@ -419,6 +419,44 @@ class BaseItemDespesaFormSet(BaseInlineFormSet):
                     "numero_documento_comprovante",
                     "Informe o número do documento para Nota Fiscal.",
                 )
+
+            numero_normalizado = _normalizar_numero_documento(numero_documento)
+            if numero_normalizado:
+                form.cleaned_data["numero_documento_comprovante"] = numero_normalizado
+                form.instance.numero_documento_comprovante = numero_normalizado
+                if numero_normalizado in documentos_vistos:
+                    form.add_error(
+                        "numero_documento_comprovante",
+                        "Ja existe uma despesa cadastrada com este numero de nota/documento.",
+                    )
+                    documentos_vistos[numero_normalizado].add_error(
+                        "numero_documento_comprovante",
+                        "Ja existe uma despesa cadastrada com este numero de nota/documento.",
+                    )
+                    logger.warning(
+                        "numero_documento_duplicado_formset relatorio_id=%s numero=%s",
+                        getattr(relatorio, "pk", None),
+                        numero_normalizado,
+                    )
+                else:
+                    documentos_vistos[numero_normalizado] = form
+
+                duplicados = ItemDespesa.objects.filter(
+                    numero_documento_comprovante__iexact=numero_normalizado
+                )
+                if form.instance.pk:
+                    duplicados = duplicados.exclude(pk=form.instance.pk)
+                if duplicados.exists():
+                    form.add_error(
+                        "numero_documento_comprovante",
+                        "Ja existe uma despesa cadastrada com este numero de nota/documento.",
+                    )
+                    logger.warning(
+                        "numero_documento_duplicado_banco relatorio_id=%s despesa_id=%s numero=%s",
+                        getattr(relatorio, "pk", None),
+                        getattr(form.instance, "pk", None),
+                        numero_normalizado,
+                    )
 
             if data and relatorio and relatorio.data_inicio and relatorio.data_fim:
                 if data < relatorio.data_inicio or data > relatorio.data_fim:

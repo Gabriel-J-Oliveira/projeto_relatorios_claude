@@ -13,7 +13,6 @@ from relatorios.models import (
     StatusRelatorio,
     TipoAdiantamento,
     TipoEventoHistorico,
-    TrechoKm,
 )
 from relatorios.services.autorizacao_service import (
     usuario_pode_atuar_como_financeiro,
@@ -23,7 +22,6 @@ from relatorios.services.historico_service import registrar_evento
 from relatorios.services.rateio_service import (
     RateioError,
     garantir_rateio_despesa,
-    garantir_rateio_trecho,
     garantir_rateios_relatorio,
     validar_rateios_relatorio,
 )
@@ -226,9 +224,7 @@ def _registrar_adiantamento_do_relatorio(relatorio):
 
 def _salvar_valores_aprovados(post_data, relatorio, usuario, consolidar=False):
     despesas = list(relatorio.despesas.select_for_update())
-    trechos = list(relatorio.trechos.select_for_update())
     novos_valores_despesas = []
-    novos_valores_trechos = []
 
     for despesa in despesas:
         nome_campo = f"despesa_{despesa.pk}_valor_aprovado"
@@ -249,28 +245,6 @@ def _salvar_valores_aprovados(post_data, relatorio, usuario, consolidar=False):
             and despesa.valor_aprovado != valor_aprovado
         )
         novos_valores_despesas.append((despesa, valor_aprovado, registrar_alteracao))
-
-    for trecho in trechos:
-        if trecho.tem_multiplos_clientes:
-            continue
-        nome_campo = f"trecho_{trecho.pk}_valor_km_aprovado"
-        valor_postado = post_data.get(nome_campo)
-        valor_postado_preenchido = str(valor_postado or "").strip() != ""
-        if trecho.rejeitado or trecho.status_financeiro == StatusFinanceiroItem.REJEITADO:
-            valor_km_aprovado = Decimal("0.00") if consolidar else trecho.valor_km_aprovado
-        else:
-            valor_km_aprovado = _parse_decimal_financeiro(valor_postado)
-        if consolidar and valor_km_aprovado is None:
-            valor_km_aprovado = trecho.valor_km.quantize(Decimal("0.01"))
-        registrar_alteracao = (
-            valor_postado_preenchido
-            and valor_km_aprovado is not None
-            and valor_km_aprovado != trecho.valor_km.quantize(Decimal("0.01"))
-        ) or (
-            trecho.valor_km_aprovado is not None
-            and trecho.valor_km_aprovado != valor_km_aprovado
-        )
-        novos_valores_trechos.append((trecho, valor_km_aprovado, registrar_alteracao))
 
     for despesa, valor_aprovado, registrar_alteracao in novos_valores_despesas:
         if despesa.valor_aprovado != valor_aprovado:
@@ -299,32 +273,6 @@ def _salvar_valores_aprovados(post_data, relatorio, usuario, consolidar=False):
                 },
             )
 
-    for trecho, valor_km_aprovado, registrar_alteracao in novos_valores_trechos:
-        if trecho.valor_km_aprovado != valor_km_aprovado:
-            valor_anterior = trecho.valor_km_aprovado
-            trecho.valor_km_aprovado = valor_km_aprovado
-            trecho.save(update_fields=["valor_km_aprovado"])
-            try:
-                garantir_rateio_trecho(trecho)
-            except RateioError as exc:
-                raise WorkflowError(f"Trecho KM {trecho.pk}: {exc}") from exc
-            if not registrar_alteracao:
-                continue
-            registrar_evento(
-                relatorio,
-                usuario,
-                TipoEventoHistorico.VALOR_ALTERADO,
-                (
-                    f"Valor por KM aprovado do trecho {trecho.pk} alterado de "
-                    f"{_formatar_moeda(valor_anterior)} para {_formatar_moeda(valor_km_aprovado)}."
-                ),
-                {
-                    "tipo_item": "trecho",
-                    "item_id": trecho.pk,
-                    "valor_anterior": str(valor_anterior or ""),
-                    "valor_novo": str(valor_km_aprovado or ""),
-                },
-            )
 
 
 def _validar_aprovacao_financeira(relatorio):

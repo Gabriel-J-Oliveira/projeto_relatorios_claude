@@ -118,6 +118,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 ANEXOS_URL = config("ANEXOS_URL", default="/anexos/")
 ANEXOS_ROOT = Path(config("ANEXOS_ROOT", default="/home/app_relatorios_files"))
 ANEXO_MAX_UPLOAD_MB = config("ANEXO_MAX_UPLOAD_MB", default=10, cast=int)
+VALOR_KM_CONTROLSUL = config("VALOR_KM_CONTROLSUL", default="1.35")
 
 
 # Email interno / SMTP. Em desenvolvimento, dev.py pode sobrescrever para console.
@@ -168,6 +169,25 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = config(
     default=False,
     cast=bool,
 )
+
+# Protecoes HTTP parametrizaveis por ambiente. HTTPS/HSTS ficam desligados por
+# padrao para nao quebrar desenvolvimento local; habilite no .env de producao.
+SESSION_COOKIE_SECURE = config("SESSION_COOKIE_SECURE", default=False, cast=bool)
+CSRF_COOKIE_SECURE = config("CSRF_COOKIE_SECURE", default=False, cast=bool)
+SESSION_COOKIE_HTTPONLY = config("SESSION_COOKIE_HTTPONLY", default=True, cast=bool)
+SESSION_COOKIE_SAMESITE = config("SESSION_COOKIE_SAMESITE", default="Lax")
+CSRF_COOKIE_SAMESITE = config("CSRF_COOKIE_SAMESITE", default="Lax")
+SECURE_CONTENT_TYPE_NOSNIFF = config("SECURE_CONTENT_TYPE_NOSNIFF", default=True, cast=bool)
+X_FRAME_OPTIONS = config("X_FRAME_OPTIONS", default="DENY")
+SECURE_REFERRER_POLICY = config("SECURE_REFERRER_POLICY", default="same-origin")
+SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", default=False, cast=bool)
+SECURE_HSTS_SECONDS = config("SECURE_HSTS_SECONDS", default=0, cast=int)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = config(
+    "SECURE_HSTS_INCLUDE_SUBDOMAINS",
+    default=False,
+    cast=bool,
+)
+SECURE_HSTS_PRELOAD = config("SECURE_HSTS_PRELOAD", default=False, cast=bool)
 
 
 # Cache operacional. Em producao multiworker pode ser substituido por Redis/Memcached
@@ -400,6 +420,11 @@ LOGGING = {
             "level": "WARNING",
             "propagate": False,
         },
+        "security": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
         "django_auth_ldap": {
             "handlers": ["console"],
             "level": "DEBUG" if LDAP_AUTH_ENABLED and APP_LOG_LEVEL == "DEBUG" else "INFO",
@@ -478,6 +503,7 @@ if LOG_FILES_ENABLED:
     LOGGING["loggers"]["django"]["handlers"] = ["console", "app_file", "errors_file"]
     LOGGING["loggers"]["django.request"]["handlers"] = ["console", "errors_file"]
     LOGGING["loggers"]["django.security"]["handlers"] = ["console", "security_file", "errors_file"]
+    LOGGING["loggers"]["security"]["handlers"] = ["console", "security_file", "errors_file"]
     LOGGING["loggers"]["relatorios"]["handlers"] = ["console", "app_file", "errors_file"]
     LOGGING["loggers"]["relatorios.middleware"]["handlers"] = ["console", "security_file", "errors_file"]
     LOGGING["loggers"]["relatorios.services.identidade"]["handlers"] = ["console", "security_file", "errors_file"]

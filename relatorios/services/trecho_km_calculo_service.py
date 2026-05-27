@@ -131,11 +131,7 @@ class TrechoKMCalculoService:
                 continue
 
             cliente = clientes_por_id[cliente_id]
-            valor_km = (
-                _valor_km(trecho.valor_km_final)
-                if total_clientes == 1
-                else _valor_km_cliente(cliente, trecho)
-            )
+            valor_km = _valor_km_cliente(cliente, trecho)
             km_cliente = Decimal("0.0") if rejeitado else _km(trecho.km)
             valor_calculado = Decimal("0.00") if rejeitado else _money(km_cliente * valor_km)
 
@@ -173,17 +169,11 @@ class TrechoKMCalculoService:
             calculo_pre = atuais_pre.get(int(item["cliente_id"]))
             if not calculo_pre:
                 continue
-            if "valor_km" in item:
-                houve_alteracao = (
-                    houve_alteracao
-                    or calculo_pre.valor_km != _valor_km(item.get("valor_km"))
-                )
-            else:
-                houve_alteracao = (
-                    houve_alteracao
-                    or calculo_pre.valor_final
-                    != _money(item.get("valor_final", item.get("valor_rateado")))
-                )
+            houve_alteracao = (
+                houve_alteracao
+                or calculo_pre.valor_final
+                != _money(item.get("valor_final", item.get("valor_rateado")))
+            )
         if houve_alteracao and not motivo:
             raise RateioError("Informe o motivo da alteracao manual do KM.")
 
@@ -198,35 +188,25 @@ class TrechoKMCalculoService:
                 if cliente_id not in atuais:
                     raise RateioError("Cliente invalido para o calculo deste trecho.")
                 calculo = atuais[cliente_id]
-                valor_km_anterior = calculo.valor_km
                 valor_anterior = calculo.valor_final
-                if "valor_km" in item:
-                    valor_km_novo = _valor_km(item.get("valor_km"))
-                    valor_novo = _money(calculo.km_cliente * valor_km_novo)
-                else:
-                    valor_km_novo = calculo.valor_km
-                    valor_novo = _money(item.get("valor_final", item.get("valor_rateado")))
+                valor_novo = _money(item.get("valor_final", item.get("valor_rateado")))
                 status = StatusRateio.APPROVED if aprovar else (
                     StatusRateio.ADJUSTED
-                    if valor_anterior != valor_novo or valor_km_anterior != valor_km_novo
+                    if valor_anterior != valor_novo
                     else calculo.status
                 )
-                calculo.valor_km = valor_km_novo
-                calculo.valor_calculado = valor_novo
                 calculo.valor_final = valor_novo
                 calculo.valor_rateado = valor_novo
                 calculo.status = status
-                if valor_anterior != valor_novo or valor_km_anterior != valor_km_novo or aprovar:
+                if valor_anterior != valor_novo or aprovar:
                     calculo.alterado_por = usuario
                     if motivo:
                         calculo.motivo_ajuste = motivo
                 calculo.save()
-                if valor_anterior != valor_novo or valor_km_anterior != valor_km_novo:
+                if valor_anterior != valor_novo:
                     alteracoes.append(
                         {
                             "cliente_id": cliente_id,
-                            "valor_km_anterior": str(valor_km_anterior),
-                            "valor_km_novo": str(valor_km_novo),
                             "valor_anterior": str(valor_anterior),
                             "valor_novo": str(valor_novo),
                         }
@@ -293,6 +273,9 @@ def serializar_calculo_trecho(calculo):
         "valor_km": str(calculo.valor_km),
         "valor_calculado": str(calculo.valor_calculado),
         "valor_final": str(calculo.valor_final),
+        "valor_km_control_sul": str(calculo.valor_km_control_sul),
+        "valor_reembolso_tecnico": str(calculo.valor_reembolso_tecnico),
+        "excesso_reducao": str(calculo.excesso_reducao),
         "status": calculo.status,
         "status_label": calculo.get_status_display(),
     }

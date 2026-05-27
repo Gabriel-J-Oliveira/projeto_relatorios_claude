@@ -117,6 +117,10 @@ def _snapshot_distribuicao(payload):
                 motivo_viagem=resumo.get("motivo_viagem") or cliente.get("motivo_viagem") or "",
                 km_total=_decimal(resumo.get("km_total")),
                 valor_km_solicitado=_decimal(resumo.get("valor_km_solicitado")),
+                valor_km_reembolso_tecnico=_decimal(
+                    resumo.get("valor_km_reembolso_tecnico")
+                ),
+                excesso_reducao_km=_decimal(resumo.get("excesso_reducao_km")),
                 despesas_solicitadas=_decimal(resumo.get("despesas_solicitadas")),
                 total_solicitado=_decimal(resumo.get("total_solicitado")),
                 total_aprovado=_decimal(resumo.get("total_aprovado")),
@@ -402,6 +406,16 @@ def _despesas_internas_snapshot(payload):
                 status=status,
                 badge=badge,
                 motivo=despesa.get("motivo_rejeicao") or despesa.get("motivo_recusa") or "",
+                tipo_documento=despesa.get("tipo_documento_comprovante_label") or "",
+                numero_documento=despesa.get("numero_documento_comprovante") or "",
+                valor_politica=_money(despesa.get("valor_politica"))
+                if despesa.get("valor_politica") is not None
+                else None,
+                excesso_politica=_money(despesa.get("excesso_politica")),
+                acima_politica=bool(despesa.get("acima_politica")),
+                politica_localidade=despesa.get("politica_descricao")
+                or despesa.get("politica_localidade_label")
+                or "",
                 rateios=_rateios_despesa_snapshot(despesa, payload),
             )
         )
@@ -416,6 +430,9 @@ def _rateios_trecho_snapshot(trecho, payload):
                 cliente=rateio.get("cliente_nome") or "Nao informado",
                 km=_money(rateio.get("km_cliente") or rateio.get("km_final")),
                 valor_km=Decimal(str(rateio.get("valor_km") or "0.00")),
+                valor_km_control_sul=Decimal(str(rateio.get("valor_km_control_sul") or "1.35")),
+                valor_reembolso_tecnico=_money(rateio.get("valor_reembolso_tecnico")),
+                excesso_reducao=_money(rateio.get("excesso_reducao")),
                 valor_original=_money(rateio.get("valor_calculado")),
                 valor_final=_money(rateio.get("valor_final")),
                 status=rateio.get("status_label") or rateio.get("status") or "-",
@@ -428,7 +445,14 @@ def _rateios_trecho_snapshot(trecho, payload):
         _ns(
             cliente=cliente.get("nome") or "Nao informado",
             km=_money(trecho.get("km")),
-            valor_km=Decimal(str(trecho.get("valor_km_final") or trecho.get("valor_km") or "0.00")),
+            valor_km=Decimal(
+                str(trecho.get("valor_km_final") or trecho.get("valor_km") or "0.00")
+            ),
+            valor_km_control_sul=Decimal(
+                str(trecho.get("valor_km_control_sul") or "1.35")
+            ),
+            valor_reembolso_tecnico=_money(trecho.get("valor_reembolso_tecnico")),
+            excesso_reducao=_money(trecho.get("excesso_reducao")),
             valor_original=_money(trecho.get("valor_calculado")),
             valor_final=_money(trecho.get("valor_final")),
             status="-",
@@ -610,6 +634,16 @@ def _despesas_internas_vivas(relatorio):
                 status=status,
                 badge=badge,
                 motivo=despesa.motivo_rejeicao or despesa.motivo_recusa or "",
+                tipo_documento=despesa.get_tipo_documento_comprovante_display()
+                if despesa.tipo_documento_comprovante
+                else "",
+                numero_documento=despesa.numero_documento_comprovante,
+                valor_politica=_money(despesa.valor_politica)
+                if despesa.valor_politica is not None
+                else None,
+                excesso_politica=_money(despesa.excesso_politica),
+                acima_politica=bool(despesa.acima_politica),
+                politica_localidade=despesa.politica_localidade_label,
                 rateios=rateios,
             )
         )
@@ -627,6 +661,9 @@ def _trechos_internos_vivos(relatorio):
                 cliente=rateio.cliente.nome,
                 km=_money(rateio.km_cliente),
                 valor_km=rateio.valor_km,
+                valor_km_control_sul=rateio.valor_km_control_sul,
+                valor_reembolso_tecnico=_money(rateio.valor_reembolso_tecnico),
+                excesso_reducao=_money(rateio.excesso_reducao),
                 valor_original=_money(rateio.valor_calculado),
                 valor_final=_money(rateio.valor_final),
                 status=rateio.get_status_display(),
@@ -637,9 +674,9 @@ def _trechos_internos_vivos(relatorio):
         if not rateios:
             vinculos = list(trecho.clientes_vinculados.select_related("cliente").all())
             rateios = [
-                _ns(cliente=vinculo.cliente.nome, km=_money(trecho.km), valor_km=trecho.valor_km_final, valor_original=solicitado, valor_final=aprovado, status="-", motivo="")
+                _ns(cliente=vinculo.cliente.nome, km=_money(trecho.km), valor_km=trecho.valor_km_final, valor_km_control_sul=trecho.valor_km_control_sul, valor_reembolso_tecnico=_money(trecho.valor_reembolso_tecnico), excesso_reducao=_money(trecho.excesso_reducao_km), valor_original=solicitado, valor_final=aprovado, status="-", motivo="")
                 for vinculo in vinculos[:1]
-            ] or [_ns(cliente=_cliente_nome(relatorio.cliente), km=_money(trecho.km), valor_km=trecho.valor_km_final, valor_original=solicitado, valor_final=aprovado, status="-", motivo="")]
+            ] or [_ns(cliente=_cliente_nome(relatorio.cliente), km=_money(trecho.km), valor_km=trecho.valor_km_final, valor_km_control_sul=trecho.valor_km_control_sul, valor_reembolso_tecnico=_money(trecho.valor_reembolso_tecnico), excesso_reducao=_money(trecho.excesso_reducao_km), valor_original=solicitado, valor_final=aprovado, status="-", motivo="")]
         linhas.append(
             _ns(
                 id=trecho.pk,

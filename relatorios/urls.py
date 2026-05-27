@@ -9,6 +9,7 @@ urlpatterns = [
     path("ajuda/<slug:slug>/", views.ajuda_artigo_view, name="ajuda_artigo"),
     path("dashboard/", views.DashboardView.as_view(), name="dashboard"),
     path("dashboard/dados/", views.dashboard_dados_json, name="dashboard_dados"),
+    path("politica-despesa/", views.politica_despesa_json, name="politica_despesa"),
 
     # Relatórios
     path("relatorios/", views.RelatorioListView.as_view(), name="relatorio_list"),
@@ -22,6 +23,7 @@ urlpatterns = [
     path("relatorios/<int:pk>/editar/", views.relatorio_form_view, name="relatorio_update"),
     path("relatorios/<int:pk>/duplicar/", views.relatorio_duplicate_view, name="relatorio_duplicate"),
     path("relatorios/<int:pk>/status/<str:status>/", views.relatorio_status_view, name="relatorio_status"),
+    path("relatorios/<int:pk>/financeiro/valores/", views.relatorio_valores_financeiros_json, name="relatorio_valores_financeiros"),
     path(
         "relatorios/<int:pk>/itens/<str:tipo>/<int:item_pk>/<str:acao>/",
         views.relatorio_item_financeiro_view,

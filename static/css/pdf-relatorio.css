@@ -134,6 +134,10 @@ h2 {
   grid-template-columns: repeat(5, 1fr);
 }
 
+.accounting-summary {
+  grid-template-columns: repeat(5, 1fr);
+}
+
 .meta-grid strong,
 .summary-card strong {
   color: #111827;
@@ -146,6 +150,13 @@ h2 {
   font-size: 8px;
   line-height: 1.35;
   margin-top: 3px;
+}
+
+.data-table small {
+  color: #6b7280;
+  display: block;
+  font-size: 7.5px;
+  margin-top: 2px;
 }
 
 .summary-card {
@@ -327,4 +338,29 @@ h2 {
   justify-content: space-between;
   margin-top: 16px;
   padding-top: 8px;
+}
+
+.signature-section p {
+  margin: 0 0 18px;
+}
+
+.signature-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr 1fr 1fr;
+  margin-top: 20px;
+}
+
+.signature-grid span {
+  border-top: 1px solid #111827;
+  display: block;
+  height: 12px;
+}
+
+.signature-grid strong {
+  color: #374151;
+  display: block;
+  font-size: 8px;
+  text-align: center;
+  text-transform: uppercase;
 }

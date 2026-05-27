@@ -64,15 +64,20 @@ class ClienteAdmin(admin.ModelAdmin):
 @admin.register(PoliticaValor)
 class PoliticaValorAdmin(admin.ModelAdmin):
     list_display = [
+        "chave",
         "descricao",
+        "tipo_politica",
         "tipo_despesa",
+        "tipo_localidade",
+        "cidade",
         "limite_valor",
         "valor_km",
         "vigencia_inicio",
         "vigencia_fim",
         "ativo",
     ]
-    list_filter = ["ativo", "tipo_despesa"]
+    list_filter = ["ativo", "tipo_politica", "tipo_despesa", "tipo_localidade", "cidade"]
+    search_fields = ["chave", "descricao", "cidade", "origem", "destino"]
     list_editable = ["ativo"]
 
 
@@ -228,7 +233,7 @@ class RelatorioTecnicoAdmin(admin.ModelAdmin):
                     ("cidade_atendimento", "uf_atendimento", "tipo_localidade"),
                     ("data_inicio", "data_fim"),
                     "motivo",
-                    ("centro_custo", "tipo_relatorio"),
+                    "tipo_relatorio",
                 ),
             },
         ),

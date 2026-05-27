@@ -23,7 +23,8 @@
            id="id_despesas-{{ idx }}-data"
            value="{% if form.data.value %}{{ form.data.value|date:'Y-m-d'|default:form.data.value }}{% endif %}"
            max="{% now 'Y-m-d' %}"
-           class="form-control form-control-sm {% if form.data.errors %}is-invalid{% endif %}">
+           class="form-control form-control-sm {% if form.data.errors %}is-invalid{% endif %}"
+           onchange="recalcular()">
     <div class="invalid-feedback d-block small erro-inline">
       {% if form.data.errors %}{{ form.data.errors.0 }}{% endif %}
     </div>
@@ -31,7 +32,8 @@
   <td class="p-1 pt-3 col-md-1" data-tour="despesas-data-tipo">
     <select name="despesas-{{ idx }}-tipo"
             id="id_despesas-{{ idx }}-tipo"
-            class="form-select form-select-sm {% if form.tipo.errors %}is-invalid{% endif %}">
+            class="form-select form-select-sm {% if form.tipo.errors %}is-invalid{% endif %}"
+            onchange="recalcular()">
       {% for value, label in form.fields.tipo.choices %}
         <option value="{{ value }}"
                 {% if form.tipo.value == value %}selected{% endif %}>{{ label }}</option>
@@ -65,6 +67,10 @@
            oninput="recalcular()">
     <div class="invalid-feedback d-block small erro-inline">
       {% if form.valor.errors %}{{ form.valor.errors.0 }}{% endif %}
+    </div>
+    <div class="small mt-1 politica-despesa-info text-muted"
+         data-policy-empty="Sem politica definida">
+      Sem politica definida
     </div>
     <div class="text-warning small aviso-inline"></div>
   </td>

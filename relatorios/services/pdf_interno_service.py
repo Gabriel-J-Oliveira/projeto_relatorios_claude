@@ -105,7 +105,6 @@ def _relatorio_snapshot(payload):
         aprovado_por=(assinatura.get("aprovado_por") or {}).get("nome") or "",
         cidade_atendimento=relatorio.get("cidade_atendimento") or "",
         uf_atendimento=relatorio.get("uf_atendimento") or "",
-        centro_custo=relatorio.get("centro_custo") or "-",
         clientes=clientes,
         tecnicos=tecnicos,
         cliente_principal=clientes[0].nome if clientes else "Não informado",
@@ -138,6 +137,9 @@ def _distribuicao_snapshot(payload):
                 total_solicitado=_money(item.get("total_solicitado")),
                 total_aprovado=_money(item.get("total_aprovado")),
                 diferenca_removida=_money(item.get("diferenca_removida")),
+                motivo_viagem=item.get("motivo_viagem")
+                or cliente.get("motivo_viagem")
+                or "",
                 status_financeiro=item.get("status_financeiro") or "Sem itens",
                 tem_divergencia=bool(item.get("tem_divergencia")),
             )
@@ -162,8 +164,19 @@ def _despesas_snapshot(payload):
                 item_id=despesa.get("id"),
                 data=_date(despesa.get("data")),
                 tipo=despesa.get("tipo_label") or despesa.get("tipo") or "-",
+                tipo_codigo=despesa.get("tipo") or "",
                 descricao=despesa.get("descricao") or "-",
+                quem_pagou=despesa.get("quem_pagou") or "tecnico",
+                quem_pagou_label=despesa.get("quem_pagou_label") or "",
                 numero_documento=despesa.get("numero_documento_comprovante") or "-",
+                valor_politica=_money(despesa.get("valor_politica"))
+                if despesa.get("valor_politica") is not None
+                else None,
+                politica_descricao=despesa.get("politica_descricao")
+                or despesa.get("politica_localidade_label")
+                or "",
+                excesso_politica=_money(despesa.get("excesso_politica")),
+                acima_politica=bool(despesa.get("acima_politica")),
                 clientes_rateio=_texto_clientes_rateio(rateios) if rateios else ", ".join(
                     cliente.get("nome") for cliente in despesa.get("clientes") or [] if cliente.get("nome")
                 ) or "-",
@@ -206,6 +219,8 @@ def _trechos_snapshot(payload):
                 km=_money(trecho.get("km")),
                 km_calculado_api=_money(trecho.get("km_calculado_api")),
                 solicitado=solicitado,
+                valor_reembolso_tecnico=_money(trecho.get("valor_reembolso_tecnico")),
+                excesso_reducao=_money(trecho.get("excesso_reducao")),
                 total_final=_money(aprovado),
                 status=status,
                 badge=badge,
@@ -293,6 +308,10 @@ def _avisos_snapshot(payload):
             avisos.append(f"Despesa sem comprovante: {despesa.get('descricao') or despesa.get('id')}.")
         if despesa.get("rejeitado"):
             avisos.append(f"Despesa rejeitada: {despesa.get('descricao') or despesa.get('id')}.")
+        if despesa.get("acima_politica"):
+            avisos.append(
+                f"Despesa acima da politica: {despesa.get('descricao') or despesa.get('id')}."
+            )
         if any(rateio.get("status") == "adjusted" for rateio in despesa.get("rateios") or []):
             avisos.append(f"Rateio ajustado em despesa: {despesa.get('descricao') or despesa.get('id')}.")
     for trecho in payload.get("trechos_km") or []:
@@ -334,7 +353,6 @@ def _relatorio_vivo(relatorio):
         aprovado_por=(relatorio.aprovado_por.get_full_name() or relatorio.aprovado_por.username) if relatorio.aprovado_por else "",
         cidade_atendimento=relatorio.cidade_atendimento,
         uf_atendimento=relatorio.uf_atendimento,
-        centro_custo=relatorio.centro_custo or "-",
         clientes=clientes,
         tecnicos=tecnicos,
         cliente_principal=clientes[0].nome if clientes else "Não informado",
@@ -363,6 +381,7 @@ def _distribuicao_viva(relatorio):
             total_solicitado=resumo.total_solicitado,
             total_aprovado=resumo.total_aprovado,
             diferenca_removida=resumo.diferenca_removida,
+            motivo_viagem=getattr(resumo, "motivo_viagem", "") or "",
             status_financeiro=resumo.status_financeiro,
             tem_divergencia=resumo.tem_divergencia,
         )
@@ -386,8 +405,17 @@ def _despesas_vivas(relatorio):
                 item_id=despesa.pk,
                 data=despesa.data,
                 tipo=despesa.get_tipo_display(),
+                tipo_codigo=despesa.tipo,
                 descricao=despesa.descricao,
+                quem_pagou=despesa.quem_pagou,
+                quem_pagou_label=despesa.get_quem_pagou_display(),
                 numero_documento=despesa.numero_documento_comprovante or "-",
+                valor_politica=_money(despesa.valor_politica)
+                if despesa.valor_politica is not None
+                else None,
+                politica_descricao=despesa.politica_localidade_label,
+                excesso_politica=_money(despesa.excesso_politica),
+                acima_politica=bool(despesa.acima_politica),
                 clientes_rateio="; ".join(
                     f"{rateio.cliente.nome}: R$ {rateio.valor_final:.2f}".replace(".", ",")
                     for rateio in rateios
@@ -431,6 +459,8 @@ def _trechos_vivos(relatorio):
                 km=trecho.km,
                 km_calculado_api=trecho.km_calculado_api or Decimal("0.00"),
                 solicitado=solicitado,
+                valor_reembolso_tecnico=_money(trecho.valor_reembolso_tecnico),
+                excesso_reducao=_money(trecho.excesso_reducao_km),
                 total_final=_money(aprovado),
                 status=status,
                 badge=badge,
@@ -472,6 +502,72 @@ def _justificativas_vivas(relatorio):
             if rateio.motivo_ajuste:
                 justificativas.append(_ns(titulo=f"Rateio KM: {trecho.origem} -> {trecho.destino}", texto=rateio.motivo_ajuste))
     return justificativas
+
+
+def _categoria_contabil(tipo):
+    mapa = {
+        "alimentacao": "Alimentacao",
+        "hospedagem": "Hotel",
+        "transporte": "Taxi/Uber/Passagem",
+        "pedagio": "Pedagio",
+        "combustivel": "Veiculos",
+        "estacionamento": "Veiculos",
+    }
+    return mapa.get(tipo, "Outros")
+
+
+def _aplicar_visao_contabil(pdf):
+    despesas = list(pdf.despesas or [])
+    pdf.despesas_tecnico = [
+        despesa for despesa in despesas if getattr(despesa, "quem_pagou", "tecnico") == "tecnico"
+    ]
+    pdf.despesas_empresa = [
+        despesa for despesa in despesas if getattr(despesa, "quem_pagou", "tecnico") == "empresa"
+    ]
+
+    categorias = {}
+
+    def linha_categoria(nome):
+        if nome not in categorias:
+            categorias[nome] = {"categoria": nome, "tecnico": Decimal("0.00"), "empresa": Decimal("0.00")}
+        return categorias[nome]
+
+    for despesa in despesas:
+        linha = linha_categoria(_categoria_contabil(getattr(despesa, "tipo_codigo", "") or ""))
+        destino = "empresa" if getattr(despesa, "quem_pagou", "tecnico") == "empresa" else "tecnico"
+        linha[destino] += _money(getattr(despesa, "aprovado", Decimal("0.00")))
+
+    trechos_aprovados = [t for t in pdf.trechos if not getattr(t, "rejeitado", False)]
+    km_tecnico = sum(
+        (_money(getattr(t, "valor_reembolso_tecnico", 0)) for t in trechos_aprovados),
+        Decimal("0.00"),
+    )
+    km_cliente = sum(
+        (_money(getattr(t, "total_final", 0)) for t in trechos_aprovados),
+        Decimal("0.00"),
+    )
+    if km_tecnico or km_cliente:
+        linha = linha_categoria("Quilometragem")
+        linha["tecnico"] += km_tecnico
+        linha["empresa"] += Decimal("0.00")
+        pdf.total_km_cobrar_cliente = km_cliente
+    else:
+        pdf.total_km_cobrar_cliente = Decimal("0.00")
+
+    pdf.total_pago_tecnico = sum((_money(d.aprovado) for d in pdf.despesas_tecnico), Decimal("0.00"))
+    pdf.total_pago_empresa = sum((_money(d.aprovado) for d in pdf.despesas_empresa), Decimal("0.00"))
+    pdf.total_reembolso_tecnico = _money(pdf.total_pago_tecnico + km_tecnico - pdf.totais.valor_adiantamento)
+    pdf.lancamentos_contabeis = [
+        _ns(
+            categoria=item["categoria"],
+            tecnico=_money(item["tecnico"]),
+            empresa=_money(item["empresa"]),
+            total=_money(item["tecnico"] + item["empresa"]),
+        )
+        for item in categorias.values()
+        if item["tecnico"] or item["empresa"]
+    ]
+    return pdf
 
 
 def montar_contexto_pdf_interno(relatorio, emitido_em, usuario_gerador=None, avisos_financeiro=None):
@@ -521,4 +617,4 @@ def montar_contexto_pdf_interno(relatorio, emitido_em, usuario_gerador=None, avi
 
     pdf.emitido_em = emitido_em
     pdf.usuario_gerador = usuario_gerador
-    return pdf
+    return _aplicar_visao_contabil(pdf)

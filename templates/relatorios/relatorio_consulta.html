@@ -161,20 +161,36 @@
             <td class="ps-4">#{{ despesa.id }}</td>
             <td>{{ despesa.data|date:"d/m/Y"|default:"-" }}</td>
             <td>{{ despesa.tipo }}</td>
-            <td>{{ despesa.descricao }}</td>
+            <td>
+              {{ despesa.descricao }}
+              {% if despesa.numero_documento %}
+                <div class="small text-muted">{{ despesa.tipo_documento|default:"Documento" }} nº {{ despesa.numero_documento }}</div>
+              {% endif %}
+            </td>
             <td class="text-end">R$ {{ despesa.valor_solicitado|floatformat:2 }}</td>
             <td class="text-end fw-semibold">R$ {{ despesa.valor_aprovado|floatformat:2 }}</td>
-            <td class="text-end pe-4"><span class="badge rounded-pill text-bg-{{ despesa.badge }}">{{ despesa.status }}</span></td>
+            <td class="text-end pe-4">
+              {% if despesa.acima_politica %}
+              <span class="badge rounded-pill text-bg-warning me-1">Acima da politica</span>
+              {% endif %}
+              <span class="badge rounded-pill text-bg-{{ despesa.badge }}">{{ despesa.status }}</span>
+            </td>
           </tr>
           <tr class="bg-body-tertiary">
             <td></td>
             <td colspan="6" class="small">
               <span class="text-muted fw-semibold me-2">Rateio:</span>
               {% for rateio in despesa.rateios %}
-                <span class="badge rounded-pill text-bg-light border me-1 mb-1">{{ rateio.cliente }}: R$ {{ rateio.valor_original|floatformat:2 }} / R$ {{ rateio.valor_final|floatformat:2 }}</span>
+                <span class="badge rounded-pill text-bg-light border me-1 mb-1">Item #{{ despesa.id }} — {{ rateio.cliente }}: R$ {{ rateio.valor_original|floatformat:2 }} / R$ {{ rateio.valor_final|floatformat:2 }}</span>
               {% empty %}
                 <span class="text-muted">Sem rateio registrado.</span>
               {% endfor %}
+              {% if despesa.valor_politica %}
+              <span class="badge rounded-pill text-bg-warning border me-1 mb-1">
+                Politica {{ despesa.politica_localidade }}: R$ {{ despesa.valor_politica|floatformat:2 }}
+                {% if despesa.acima_politica %} / excesso R$ {{ despesa.excesso_politica|floatformat:2 }}{% endif %}
+              </span>
+              {% endif %}
               {% if despesa.motivo %}<span class="text-danger ms-2">{{ despesa.motivo }}</span>{% endif %}
             </td>
           </tr>
@@ -222,7 +238,10 @@
             <td colspan="6" class="small">
               <span class="text-muted fw-semibold me-2">Clientes:</span>
               {% for rateio in trecho.rateios %}
-                <span class="badge rounded-pill text-bg-light border me-1 mb-1">{{ rateio.cliente }}: {{ rateio.km|floatformat:2 }} km x R$ {{ rateio.valor_km|floatformat:2 }} = R$ {{ rateio.valor_final|floatformat:2 }}</span>
+                <span class="badge rounded-pill text-bg-light border me-1 mb-1">
+                  {{ rateio.cliente }}: {{ rateio.km|floatformat:2 }} km x R$ {{ rateio.valor_km|floatformat:2 }} = R$ {{ rateio.valor_final|floatformat:2 }}
+                  {% if rateio.excesso_reducao > 0 %}(excesso R$ {{ rateio.excesso_reducao|floatformat:2 }}){% elif rateio.excesso_reducao < 0 %}(redução R$ {{ rateio.excesso_reducao|floatformat:2 }}){% endif %}
+                </span>
               {% empty %}
                 <span class="text-muted">Sem cálculo por cliente registrado.</span>
               {% endfor %}
@@ -344,6 +363,8 @@
             {% endif %}
             <div class="cliente-resumo-list">
               <div><span>KM</span><strong>{{ resumo.km_total|floatformat:2 }} km</strong></div>
+              <div><span>Reembolso tecnico KM</span><strong>R$ {{ resumo.valor_km_reembolso_tecnico|floatformat:2 }}</strong></div>
+              <div><span>Excesso/reducao KM</span><strong class="{% if resumo.excesso_reducao_km > 0 %}text-success{% elif resumo.excesso_reducao_km < 0 %}text-danger{% endif %}">R$ {{ resumo.excesso_reducao_km|floatformat:2 }}</strong></div>
               <div><span>Despesas</span><strong>R$ {{ resumo.despesas_solicitadas|floatformat:2 }}</strong></div>
               <div><span>Solicitado</span><strong>R$ {{ resumo.total_solicitado|floatformat:2 }}</strong></div>
               <div><span>Aprovado</span><strong>R$ {{ resumo.total_aprovado|floatformat:2 }}</strong></div>

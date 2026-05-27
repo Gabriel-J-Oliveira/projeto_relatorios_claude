@@ -18,6 +18,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.utils.http import content_disposition_header, url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import ListView, TemplateView
@@ -28,6 +29,7 @@ from .models import (
     Cliente,
     ItemDespesa,
     PerfilUsuario,
+    PoliticaValor,
     RelatorioTecnico,
     RelatorioTecnicoEquipe,
     StatusFinanceiroItem,
@@ -35,6 +37,7 @@ from .models import (
     Tecnico,
     TipoEventoHistorico,
     TrechoKm,
+    valor_km_control_sul,
 )
 from .services.historico_service import registrar_evento
 from .services.clientes_relatorio_service import (
@@ -67,6 +70,7 @@ from .services.workflow_service import (
     rejeitar_relatorio,
     relatorio_bloqueado as workflow_relatorio_bloqueado,
     solicitar_ajuste,
+    _salvar_valores_aprovados,
 )
 from .services.rateio_service import (
     RateioError,
@@ -80,6 +84,7 @@ from .services.rateio_service import (
 from .services.resumo_cliente_service import resumo_financeiro_por_cliente
 from .services.consulta_relatorio_service import montar_consulta_relatorio
 from .services.financeiro_validator import validar_integridade_financeira_relatorio
+from .services.financeiro_detail_service import montar_payload_financeiro_por_id
 from .services.pdf_cliente_service import (
     PdfClienteError,
     gerar_pdf_cliente,
@@ -104,8 +109,29 @@ from .forms import (
 )
 
 logger = logging.getLogger(__name__)
+security_logger = logging.getLogger("security")
 
 BLOQUEIO_POS_APROVACAO = {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
+
+
+def _client_ip(request):
+    forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if forwarded_for:
+        return forwarded_for.split(",", 1)[0].strip()
+    return request.META.get("REMOTE_ADDR", "")
+
+
+def _registrar_bloqueio_seguranca(request, mensagem, **extra):
+    security_logger.warning(
+        "%s usuario=%s username=%s ip=%s metodo=%s path=%s extra=%s",
+        mensagem,
+        getattr(request.user, "pk", None),
+        getattr(request.user, "username", ""),
+        _client_ip(request),
+        request.method,
+        request.path,
+        extra,
+    )
 
 
 @login_required
@@ -330,8 +356,14 @@ def _responder_arquivo_anexo(arquivo, *, nome_original="", tipo_mime="", downloa
     return response
 
 
-def _validar_acesso_relatorio_arquivo(user, relatorio):
+def _validar_acesso_relatorio_arquivo(user, relatorio, request=None):
     if not usuario_pode_visualizar_relatorio(user, relatorio):
+        if request is not None:
+            _registrar_bloqueio_seguranca(
+                request,
+                "Acesso a arquivo bloqueado",
+                relatorio_id=getattr(relatorio, "pk", None),
+            )
         raise PermissionDenied("Você não tem permissão para acessar este anexo.")
 
 
@@ -449,7 +481,6 @@ def _duplicar_relatorio(original, usuario=None):
         data_inicio=original.data_inicio,
         data_fim=original.data_fim,
         motivo=original.motivo,
-        centro_custo=original.centro_custo,
         tipo_relatorio=original.tipo_relatorio,
         valor_adiantamento=original.valor_adiantamento or Decimal("0.00"),
         km_excedente_interno=original.km_excedente_interno or Decimal("0.00"),
@@ -538,7 +569,7 @@ def _duplicar_relatorio(original, usuario=None):
             fonte_calculo_rota=trecho.fonte_calculo_rota,
             calculado_em=trecho.calculado_em,
             rota_geojson=trecho.rota_geojson or {},
-            valor_km=trecho.valor_km,
+            valor_km=valor_km_control_sul(),
             valor_km_aprovado=None,
             comprovante=None,
             observacao=trecho.observacao,
@@ -760,11 +791,7 @@ def _itens_pdf_reembolso(relatorio):
         )
 
     for trecho in relatorio.trechos.all():
-        valor_km = trecho.valor_km_aprovado
-        if valor_km is None:
-            valor = trecho.valor_calculado
-        else:
-            valor = (trecho.km * valor_km).quantize(Decimal("0.01"))
+        valor = trecho.valor_final
         valor = (valor or Decimal("0.00")).quantize(Decimal("0.01"))
         if valor <= 0:
             continue
@@ -783,6 +810,58 @@ def _itens_pdf_reembolso(relatorio):
 
 def _usuario_pode_aprovar_financeiro(user):
     return usuario_pode_atuar_como_financeiro(user)
+
+
+@require_GET
+@login_required
+def politica_despesa_json(request):
+    tipo = (request.GET.get("tipo") or "").strip()
+    data_txt = (request.GET.get("data") or "").strip()
+    tipo_localidade = (request.GET.get("tipo_localidade") or "").strip()
+    if not tipo or not data_txt:
+        return JsonResponse(
+            {"success": True, "data": {"limite": None, "mensagem": "Sem politica definida"}}
+        )
+    data_ref = parse_date(data_txt)
+    if not data_ref:
+        return JsonResponse(
+            {"success": False, "error": "Data invalida para consultar politica."},
+            status=400,
+        )
+    from relatorios.services.politica_valor_service import resolver_politica_despesa
+
+    politica = resolver_politica_despesa(
+        tipo_despesa=tipo,
+        data=data_ref,
+        tipo_localidade=tipo_localidade,
+        cidade=(request.GET.get("cidade") or "").strip(),
+        descricao=(request.GET.get("descricao") or "").strip(),
+        valor_informado=request.GET.get("valor") or "0",
+    )
+    if politica is None:
+        logger.warning(
+            "politica_despesa_nao_encontrada tipo=%s data=%s localidade=%s usuario=%s",
+            tipo,
+            data_txt,
+            tipo_localidade,
+            getattr(request.user, "pk", None),
+        )
+        return JsonResponse(
+            {"success": True, "data": {"limite": None, "mensagem": "Sem politica definida"}}
+        )
+    return JsonResponse(
+        {
+            "success": True,
+            "data": {
+                "chave": politica.chave,
+                "descricao": politica.descricao,
+                "limite": str(politica.valor),
+                "excede": politica.excede,
+                "excesso": str(politica.excesso),
+                "mensagem": f"{politica.descricao} - R$ {politica.valor:.2f}",
+            },
+        }
+    )
 
 
 def _relatorio_bloqueado(relatorio):
@@ -875,6 +954,27 @@ def _avisos_financeiro(relatorio):
 
         if despesa.valor and despesa.valor > Decimal("300.00") and not observacoes:
             despesas_altas_sem_observacao.append((idx, despesa))
+
+        if despesa.acima_politica:
+            avisos.append(
+                {
+                    "tipo": "despesa_acima_politica",
+                    "mensagem": (
+                        f"Despesa {idx} acima da politica vigente. "
+                        f"Solicitado R$ {despesa.valor:.2f}; politica R$ {despesa.valor_politica:.2f}."
+                    ),
+                    "linha_id": linha_id,
+                    "linha_ids": [linha_id],
+                    "icone": "bi-exclamation-triangle",
+                }
+            )
+            logger.info(
+                "despesa_acima_politica relatorio=%s despesa=%s valor=%s politica=%s",
+                relatorio.pk,
+                despesa.pk,
+                despesa.valor,
+                despesa.valor_politica,
+            )
 
         if not despesa.comprovante:
             despesas_sem_comprovante.append((idx, despesa))
@@ -1581,6 +1681,7 @@ def nova_linha_km(request):
 # ─────────────────────────────────────────────
 
 
+@require_GET
 @login_required
 @exigir_acesso_erp
 def anexo_visualizar_view(request, pk):
@@ -1588,7 +1689,7 @@ def anexo_visualizar_view(request, pk):
         AnexoRelatorio.objects.select_related("relatorio"),
         pk=pk,
     )
-    _validar_acesso_relatorio_arquivo(request.user, anexo.relatorio)
+    _validar_acesso_relatorio_arquivo(request.user, anexo.relatorio, request)
     return _responder_arquivo_anexo(
         anexo.arquivo,
         nome_original=anexo.nome_original,
@@ -1597,6 +1698,7 @@ def anexo_visualizar_view(request, pk):
     )
 
 
+@require_GET
 @login_required
 @exigir_acesso_erp
 def anexo_baixar_view(request, pk):
@@ -1604,7 +1706,7 @@ def anexo_baixar_view(request, pk):
         AnexoRelatorio.objects.select_related("relatorio"),
         pk=pk,
     )
-    _validar_acesso_relatorio_arquivo(request.user, anexo.relatorio)
+    _validar_acesso_relatorio_arquivo(request.user, anexo.relatorio, request)
     return _responder_arquivo_anexo(
         anexo.arquivo,
         nome_original=anexo.nome_original,
@@ -1613,6 +1715,7 @@ def anexo_baixar_view(request, pk):
     )
 
 
+@require_GET
 @login_required
 @exigir_acesso_erp
 def despesa_comprovante_visualizar_view(request, pk):
@@ -1620,10 +1723,11 @@ def despesa_comprovante_visualizar_view(request, pk):
         ItemDespesa.objects.select_related("relatorio"),
         pk=pk,
     )
-    _validar_acesso_relatorio_arquivo(request.user, despesa.relatorio)
+    _validar_acesso_relatorio_arquivo(request.user, despesa.relatorio, request)
     return _responder_arquivo_anexo(despesa.comprovante, download=False)
 
 
+@require_GET
 @login_required
 @exigir_acesso_erp
 def despesa_comprovante_baixar_view(request, pk):
@@ -1631,7 +1735,7 @@ def despesa_comprovante_baixar_view(request, pk):
         ItemDespesa.objects.select_related("relatorio"),
         pk=pk,
     )
-    _validar_acesso_relatorio_arquivo(request.user, despesa.relatorio)
+    _validar_acesso_relatorio_arquivo(request.user, despesa.relatorio, request)
     return _responder_arquivo_anexo(despesa.comprovante, download=True)
 
 
@@ -1768,6 +1872,7 @@ def relatorio_consulta_view(request, pk):
 # ─────────────────────────────────────────────
 
 
+@require_GET
 @login_required
 @exigir_acesso_erp
 def relatorio_reembolso_pdf_view(request, pk):
@@ -1844,6 +1949,7 @@ def _redirect_pdf_cliente_error(relatorio):
     return redirect("relatorios:relatorio_detail", pk=relatorio.pk)
 
 
+@require_GET
 @login_required
 @exigir_acesso_erp
 def relatorio_cliente_pdf_view(request, pk, cliente_id):
@@ -1878,6 +1984,7 @@ def relatorio_cliente_pdf_view(request, pk, cliente_id):
     return response
 
 
+@require_GET
 @login_required
 @exigir_acesso_erp
 def relatorio_clientes_pdf_view(request, pk):
@@ -1922,6 +2029,7 @@ def relatorio_clientes_pdf_view(request, pk):
     return response
 
 
+@require_GET
 @login_required
 @exigir_financeiro
 def relatorio_pdf_interno_view(request, pk):
@@ -2131,6 +2239,7 @@ def relatorio_import_detail_json(request, pk):
 
 @login_required
 @require_GET
+@exigir_acesso_erp
 def mapa_buscar_endereco_json(request):
     query = (request.GET.get("q") or "").strip()
     if not query:
@@ -2159,6 +2268,7 @@ def mapa_buscar_endereco_json(request):
 
 @login_required
 @require_GET
+@exigir_acesso_erp
 def mapa_calcular_rota_json(request):
     campos = ("origem_lat", "origem_lon", "destino_lat", "destino_lon")
     parametros = {campo: request.GET.get(campo) for campo in campos}
@@ -2311,6 +2421,13 @@ def relatorio_item_financeiro_view(request, pk, tipo, item_pk, acao):
                         "motivo": motivo,
                     },
                 )
+                logger.info(
+                    "Item financeiro rejeitado. relatorio=%s tipo=%s item=%s usuario=%s",
+                    relatorio.pk,
+                    tipo,
+                    item.pk,
+                    getattr(request.user, "pk", None),
+                )
                 mensagem_sucesso = "Item removido do reembolso."
 
             else:
@@ -2344,9 +2461,17 @@ def relatorio_item_financeiro_view(request, pk, tipo, item_pk, acao):
                         "item_id": item.pk,
                     },
                 )
+                logger.info(
+                    "Item financeiro reativado. relatorio=%s tipo=%s item=%s usuario=%s",
+                    relatorio.pk,
+                    tipo,
+                    item.pk,
+                    getattr(request.user, "pk", None),
+                )
                 mensagem_sucesso = "Item restaurado para o reembolso."
 
         if espera_json:
+            payload_financeiro = montar_payload_financeiro_por_id(pk)
             return JsonResponse(
                 {
                     "success": True,
@@ -2359,6 +2484,7 @@ def relatorio_item_financeiro_view(request, pk, tipo, item_pk, acao):
                         item.valor_final if tipo == "despesa" else item.valor_final_clientes
                     ),
                     "message": mensagem_sucesso,
+                    "financeiro": payload_financeiro,
                 }
             )
         messages.success(request, mensagem_sucesso)
@@ -2446,6 +2572,7 @@ def relatorio_rateio_financeiro_json(request, pk, tipo, item_pk):
                 "success": True,
                 "rateios": [serializar_rateio(rateio) for rateio in rateios],
                 "message": "Rateio salvo com sucesso.",
+                "financeiro": montar_payload_financeiro_por_id(pk),
             }
         )
     except RateioError as exc:
@@ -2470,6 +2597,12 @@ def relatorio_status_view(request, pk, status):
         )
         if status == StatusRelatorio.CONFERENCIA:
             if not usuario_pode_enviar_relatorio(request.user, relatorio_atual):
+                _registrar_bloqueio_seguranca(
+                    request,
+                    "Envio de relatorio bloqueado",
+                    relatorio_id=pk,
+                    status=status,
+                )
                 messages.error(request, "Você não tem permissão para enviar este relatório.")
                 return redirect("relatorios:relatorio_detail", pk=pk)
             relatorio = enviar_para_conferencia(pk, usuario_historico)
@@ -2478,6 +2611,12 @@ def relatorio_status_view(request, pk, status):
             StatusRelatorio.REJEITADO,
             StatusRelatorio.APROVADO,
         } and not usuario_pode_atuar_como_financeiro(request.user):
+            _registrar_bloqueio_seguranca(
+                request,
+                "Acao financeira de workflow bloqueada",
+                relatorio_id=pk,
+                status=status,
+            )
             messages.error(request, "Você não tem permissão para executar esta ação financeira.")
             return redirect("relatorios:relatorio_detail", pk=pk)
         elif status == StatusRelatorio.AJUSTE:
@@ -2518,6 +2657,57 @@ def relatorio_status_view(request, pk, status):
     if getattr(relatorio, "_email_warning", ""):
         messages.warning(request, relatorio._email_warning)
     return redirect("relatorios:relatorio_detail", pk=pk)
+
+
+@require_POST
+@login_required
+@exigir_financeiro
+def relatorio_valores_financeiros_json(request, pk):
+    try:
+        with transaction.atomic():
+            relatorio = get_object_or_404(
+                RelatorioTecnico.objects.select_for_update(),
+                pk=pk,
+            )
+            if _relatorio_bloqueado(relatorio):
+                return JsonResponse(
+                    {
+                        "success": False,
+                        "errors": ["Relatorio aprovado ou rejeitado esta bloqueado."],
+                    },
+                    status=400,
+                )
+            _salvar_valores_aprovados(request.POST, relatorio, request.user, consolidar=False)
+            garantir_rateios_relatorio(relatorio)
+            logger.info(
+                "Valores financeiros atualizados. relatorio=%s usuario=%s",
+                relatorio.pk,
+                getattr(request.user, "pk", None),
+            )
+
+        return JsonResponse(
+            {
+                "success": True,
+                "message": "Valores financeiros atualizados.",
+                "financeiro": montar_payload_financeiro_por_id(pk),
+            }
+        )
+    except (WorkflowError, RateioError) as exc:
+        detalhe = exc.args[0] if exc.args else str(exc)
+        erros = detalhe if isinstance(detalhe, list) else [str(detalhe)]
+        logger.warning(
+            "Atualizacao financeira bloqueada. relatorio=%s usuario=%s erros=%s",
+            pk,
+            getattr(request.user, "pk", None),
+            erros,
+        )
+        return JsonResponse({"success": False, "errors": erros}, status=400)
+    except Exception as exc:
+        logger.exception("Erro ao salvar valores financeiros do relatorio %s: %s", pk, exc)
+        return JsonResponse(
+            {"success": False, "errors": ["Erro interno ao salvar valores financeiros."]},
+            status=500,
+        )
 
 
 # ─────────────────────────────────────────────

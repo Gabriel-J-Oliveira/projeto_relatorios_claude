@@ -29,6 +29,8 @@ class ClienteResumoFinanceiroDTO:
     motivo_viagem: str = ""
     km_total: Decimal = Decimal("0.00")
     valor_km_solicitado: Decimal = Decimal("0.00")
+    valor_km_reembolso_tecnico: Decimal = Decimal("0.00")
+    excesso_reducao_km: Decimal = Decimal("0.00")
     despesas_solicitadas: Decimal = Decimal("0.00")
     total_solicitado: Decimal = Decimal("0.00")
     total_aprovado: Decimal = Decimal("0.00")
@@ -137,10 +139,12 @@ def resumo_financeiro_por_cliente(relatorio):
             if calculo:
                 resumo.km_total += calculo.km_cliente
                 resumo.valor_km_solicitado += _money(calculo.valor_calculado)
+                resumo.valor_km_reembolso_tecnico += _money(calculo.valor_reembolso_tecnico)
                 resumo.total_aprovado += _money(calculo.valor_final)
             elif not trecho.rejeitado and trecho.status_financeiro != "rejeitado":
                 resumo.km_total += trecho.km
                 resumo.valor_km_solicitado += _money(trecho.valor_calculado)
+                resumo.valor_km_reembolso_tecnico += _money(trecho.valor_reembolso_tecnico)
                 resumo.total_aprovado += _money(trecho.valor_final)
             if trecho.rejeitado or trecho.status_financeiro == "rejeitado":
                 resumo.itens_rejeitados += 1
@@ -156,12 +160,17 @@ def resumo_financeiro_por_cliente(relatorio):
             resumos[cliente.pk] = resumo
         resumo.km_total += linha["km"]
         resumo.valor_km_solicitado += _money(linha["valor_calculado"])
+        resumo.valor_km_reembolso_tecnico += _money(linha["valor_reembolso_tecnico"])
         resumo.total_aprovado += _money(linha["valor_calculado"])
 
     for resumo in resumos.values():
         resumo.km_total = Decimal(resumo.km_total or "0").quantize(Decimal("0.01"))
         resumo.despesas_solicitadas = _money(resumo.despesas_solicitadas)
         resumo.valor_km_solicitado = _money(resumo.valor_km_solicitado)
+        resumo.valor_km_reembolso_tecnico = _money(resumo.valor_km_reembolso_tecnico)
+        resumo.excesso_reducao_km = _money(
+            resumo.valor_km_solicitado - resumo.valor_km_reembolso_tecnico
+        )
         _marcar_status(resumo)
 
     lista = sorted(resumos.values(), key=lambda resumo: resumo.cliente.nome)

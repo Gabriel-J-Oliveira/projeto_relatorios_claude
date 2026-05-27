@@ -1,22 +1,33 @@
 .env
+*.env
 .env.*
 !.env.example
 
 db.sqlite3
+*.sqlite3
 data.json
+app_relatorios/settings/cookies.txt
+cookies.txt
 
 __pycache__/
 *.py[cod]
-*.sqlite3
 
 venv/
 .venv/
 
 logs/*
 !logs/.gitkeep
+*.log
 
 media/*
 !media/.gitkeep
+uploads/
+comprovantes/
+backups/
+backup/
+*.dump
+*.backup
+*.bak
 
 staticfiles/
 
@@ -24,4 +35,3 @@ staticfiles/
 app_relatorios/settings/dev.py
 app_relatorios/settings/local.py
 app_relatorios/settings/*.local.py
-

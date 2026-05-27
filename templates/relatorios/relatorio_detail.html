@@ -169,9 +169,13 @@
 
 <form method="post"
       id="form-valores-aprovados-financeiro"
+      data-save-url="{% url 'relatorios:relatorio_valores_financeiros' relatorio.pk %}"
       data-total-solicitado="{{ relatorio.total_solicitado|unlocalize }}"
       data-adiantamento="{{ relatorio.valor_adiantamento|unlocalize }}">
   {% csrf_token %}
+  <div id="feedback-valores-financeiros"
+       class="alert alert-danger border-0 shadow-sm small d-none"
+       role="alert"></div>
 
 <div class="row g-3">
 
@@ -255,10 +259,6 @@
             {% endif %}
           </dd>
 
-          {% if relatorio.centro_custo %}
-          <dt class="col-sm-4 text-muted fw-medium">Área / C. Custo</dt>
-          <dd class="col-sm-8">{{ relatorio.centro_custo }}</dd>
-          {% endif %}
         </dl>
       </div>
     </div>
@@ -303,9 +303,12 @@
                     {{ d.get_tipo_display }}
                   </span>
                   {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
-                  <span class="badge bg-danger-subtle text-danger small ms-1">REJEITADO</span>
+                  <span class="badge bg-danger-subtle text-danger small ms-1 js-item-rejeitado-badge">REJEITADO</span>
                   {% elif d.valor_ajustado %}
-                  <span class="badge bg-warning-subtle text-warning small ms-1">Valor ajustado</span>
+                  <span class="badge bg-warning-subtle text-warning small ms-1 js-item-ajustado-badge">Valor ajustado</span>
+                  {% endif %}
+                  {% if d.acima_politica %}
+                  <span class="badge text-bg-warning small ms-1">Acima da politica</span>
                   {% endif %}
                 </td>
                 <td class="small">
@@ -324,6 +327,15 @@
                          data-status-financeiro="{% if d.rejeitado %}rejeitado{% else %}{{ d.status_financeiro }}{% endif %}"
                          {% if not superadmin_django %}{% if not pode_atuar_financeiro or relatorio.status == 'aprovado' or relatorio.status == 'rejeitado' or d.rejeitado or d.status_financeiro == 'rejeitado' %}disabled{% endif %}{% endif %}>
                   <div class="small text-muted mt-1">Final: <span class="total-aprovado-despesa-linha">R$ {{ d.valor_final|floatformat:2 }}</span></div>
+                  {% if d.valor_politica %}
+                  <button type="button"
+                          class="btn btn-link btn-sm p-0 mt-1 aplicar-politica-despesa"
+                          data-target="despesa_{{ d.pk }}_valor_aprovado"
+                          data-valor-politica="{{ d.valor_politica }}"
+                          {% if not pode_atuar_financeiro or relatorio.status == 'aprovado' or relatorio.status == 'rejeitado' or d.rejeitado or d.status_financeiro == 'rejeitado' %}disabled{% endif %}>
+                    Aplicar politica
+                  </button>
+                  {% endif %}
                 </td>
                 <td class="text-center">
                   {% if d.comprovante %}
@@ -376,40 +388,51 @@
                       <span class="text-muted">Pago por</span>
                       <div class="fw-semibold">{{ d.get_quem_pagou_display }}</div>
                     </div>
-                    <div class="col-md-2"><span class="text-muted">Centro de custo</span><div class="fw-semibold">{{ relatorio.centro_custo|default:"?" }}</div></div>
+                    {% if d.numero_documento_comprovante %}
+                    <div class="col-md-2">
+                      <span class="text-muted">Documento</span>
+                      <div class="fw-semibold">{{ d.get_tipo_documento_comprovante_display|default:"Documento" }} nº {{ d.numero_documento_comprovante }}</div>
+                    </div>
+                    {% endif %}
                     <div class="col-md-2">
                       <span class="text-muted">Valor final</span>
                       <div class="fw-semibold text-success total-aprovado-despesa-linha">R$ {{ d.valor_final|floatformat:2 }}</div>
                     </div>
+                    <div class="col-md-3">
+                      <span class="text-muted">Politica</span>
+                      {% if d.valor_politica %}
+                      <div class="{% if d.acima_politica %}alert alert-warning py-1 px-2 mb-0{% else %}fw-semibold{% endif %}">
+                        R$ {{ d.valor_politica|floatformat:2 }} / {{ d.politica_localidade_label }}
+                        {% if d.acima_politica %}
+                        <div class="small">Excesso: R$ {{ d.excesso_politica|floatformat:2 }}</div>
+                        {% endif %}
+                      </div>
+                      {% else %}
+                      <div class="fw-semibold text-muted">Sem politica definida</div>
+                      {% endif %}
+                    </div>
                     <div class="col-md-2">
                       <span class="text-muted">Status</span>
                       <div>
-                        {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
-                        <span class="badge bg-danger-subtle text-danger small">REJEITADO</span>
-                        {% elif d.valor_ajustado %}
-                        <span class="badge bg-warning-subtle text-warning small">Valor ajustado</span>
-                        {% else %}
-                        <span class="badge bg-success-subtle text-success small">Ativo</span>
-                        {% endif %}
+                        <span class="badge bg-danger-subtle text-danger small js-status-rejeitado {% if not d.rejeitado and d.status_financeiro != 'rejeitado' %}d-none{% endif %}">REJEITADO</span>
+                        <span class="badge bg-warning-subtle text-warning small js-status-ajustado {% if d.rejeitado or d.status_financeiro == 'rejeitado' or not d.valor_ajustado %}d-none{% endif %}">Valor ajustado</span>
+                        <span class="badge bg-success-subtle text-success small js-status-ativo {% if d.rejeitado or d.status_financeiro == 'rejeitado' or d.valor_ajustado %}d-none{% endif %}">Ativo</span>
                       </div>
                     </div>
                     <div class="col-md-2 text-md-end">
                       {% if pode_alterar_itens_financeiros %}
-                        {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
                         <button type="submit"
                                 form="form-restaurar-despesa-{{ d.pk }}"
-                                class="btn btn-sm btn-primary">
+                                class="btn btn-sm btn-primary js-btn-restaurar {% if not d.rejeitado and d.status_financeiro != 'rejeitado' %}d-none{% endif %}">
                           <i class="bi bi-arrow-counterclockwise me-1"></i>Reativar item
                         </button>
-                        {% else %}
                         <button type="button"
-                                class="btn btn-sm btn-outline-danger"
+                                class="btn btn-sm btn-outline-danger js-btn-rejeitar {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}d-none{% endif %}"
                                 data-bs-toggle="modal"
                                 data-bs-target="#modal-rejeitar-despesa-{{ d.pk }}"
                                 data-tour="detail-despesa-remover">
                           <i class="bi bi-x-circle me-1"></i>Remover do reembolso
                         </button>
-                        {% endif %}
                       {% endif %}
                     </div>
                     <div class="col-12">
@@ -498,9 +521,9 @@
               <tr>
                 <th class="ps-3 small fw-semibold text-muted">Data</th>
                 <th class="small fw-semibold text-muted">KM</th>
-                <th class="small fw-semibold text-muted">R$/KM Solicitado</th>
+                <th class="small fw-semibold text-muted">Valor/KM ControlSul</th>
                 <th class="small fw-semibold text-muted">Aprovação KM</th>
-                <th class="small fw-semibold text-muted">Total Solicitado</th>
+                <th class="small fw-semibold text-muted">Cobranca clientes</th>
                 <th class="small fw-semibold text-muted text-center">Rateio</th>
                 <th class="small fw-semibold text-muted text-end pe-3">Mais informações</th>
               </tr>
@@ -514,7 +537,7 @@
                   class="linha-trecho {% if t.rejeitado or t.status_financeiro == 'rejeitado' %}item-rejeitado-forte{% endif %}">
                 <td class="ps-3 small text-muted">{{ t.data|date:"d/m/Y"|default:"A preencher" }}</td>
                 <td class="small">{{ t.km }} km</td>
-                <td class="small text-muted">R$ {{ t.valor_km|floatformat:2 }}</td>
+                <td class="small text-muted">R$ {{ t.valor_km_control_sul|floatformat:2 }}</td>
                 <td class="small text-muted">
                   Gerenciado no rateio
                 </td>
@@ -583,15 +606,19 @@
                       <div class="fw-semibold text-success total-aprovado-km-linha">R$ {{ t.valor_final_clientes|floatformat:2 }}</div>
                     </div>
                     <div class="col-md-2">
+                      <span class="text-muted">Reembolso tecnico</span>
+                      <div class="fw-semibold">R$ {{ t.valor_reembolso_tecnico|floatformat:2 }}</div>
+                    </div>
+                    <div class="col-md-2">
+                      <span class="text-muted">Excesso/reducao</span>
+                      <div class="fw-semibold {% if t.excesso_reducao_km > 0 %}text-success{% elif t.excesso_reducao_km < 0 %}text-danger{% endif %}">R$ {{ t.excesso_reducao_km|floatformat:2 }}</div>
+                    </div>
+                    <div class="col-md-2">
                       <span class="text-muted">Status</span>
                       <div>
-                        {% if t.rejeitado or t.status_financeiro == 'rejeitado' %}
-                        <span class="badge bg-danger-subtle text-danger small">REJEITADO</span>
-                        {% elif t.valor_ajustado %}
-                        <span class="badge bg-warning-subtle text-warning small">Valor ajustado</span>
-                        {% else %}
-                        <span class="badge bg-success-subtle text-success small">Ativo</span>
-                        {% endif %}
+                        <span class="badge bg-danger-subtle text-danger small js-status-rejeitado {% if not t.rejeitado and t.status_financeiro != 'rejeitado' %}d-none{% endif %}">REJEITADO</span>
+                        <span class="badge bg-warning-subtle text-warning small js-status-ajustado {% if t.rejeitado or t.status_financeiro == 'rejeitado' or not t.valor_ajustado %}d-none{% endif %}">Valor ajustado</span>
+                        <span class="badge bg-success-subtle text-success small js-status-ativo {% if t.rejeitado or t.status_financeiro == 'rejeitado' or t.valor_ajustado %}d-none{% endif %}">Ativo</span>
                         {% if t.km_divergente_rota %}
                         <div class="mt-1">
                           <span class="badge bg-warning-subtle text-warning small" data-tour="detail-km-divergencia">
@@ -603,21 +630,18 @@
                     </div>
                     <div class="col-md-2 text-md-end">
                       {% if pode_alterar_itens_financeiros %}
-                        {% if t.rejeitado or t.status_financeiro == 'rejeitado' %}
                         <button type="submit"
                                 form="form-restaurar-trecho-{{ t.pk }}"
-                                class="btn btn-sm btn-primary">
+                                class="btn btn-sm btn-primary js-btn-restaurar {% if not t.rejeitado and t.status_financeiro != 'rejeitado' %}d-none{% endif %}">
                           <i class="bi bi-arrow-counterclockwise me-1"></i>Reativar item
                         </button>
-                        {% else %}
                         <button type="button"
-                                class="btn btn-sm btn-outline-danger"
+                                class="btn btn-sm btn-outline-danger js-btn-rejeitar {% if t.rejeitado or t.status_financeiro == 'rejeitado' %}d-none{% endif %}"
                                 data-bs-toggle="modal"
                                 data-bs-target="#modal-rejeitar-trecho-{{ t.pk }}"
                                 data-tour="detail-km-remover">
                           <i class="bi bi-x-circle me-1"></i>Remover do reembolso
                         </button>
-                        {% endif %}
                       {% endif %}
                     </div>
                     <div class="col-12">
@@ -632,7 +656,7 @@
                               <tr>
                                 <th class="small text-muted">Cliente</th>
                                 <th class="small text-muted text-end">KM</th>
-                                <th class="small text-muted text-end">Valor/KM</th>
+                                <th class="small text-muted text-end">Valor/KM contratado</th>
                                 <th class="small text-muted text-end">Automatico</th>
                                 <th class="small text-muted text-end">Final</th>
                                 <th class="small text-muted">Status</th>
@@ -860,7 +884,8 @@
         <div class="cliente-carousel-slides">
           {% for resumo in distribuicao_clientes.clientes %}
           <div class="cliente-carousel-slide {% if not forloop.first %}d-none{% endif %}"
-               data-cliente-slide="{{ forloop.counter0 }}">
+               data-cliente-slide="{{ forloop.counter0 }}"
+               data-cliente-id="{{ resumo.cliente.pk }}">
             <div class="d-flex align-items-center justify-content-between mb-2">
               {% if resumo.tem_divergencia %}
               <span class="badge bg-danger-subtle text-danger">Divergência</span>
@@ -877,33 +902,43 @@
                 <tbody>
                   <tr>
                     <td class="text-muted">KM total</td>
-                    <td class="text-end fw-semibold">{{ resumo.km_total|floatformat:2 }} km</td>
+                    <td class="text-end fw-semibold" data-cliente-field="km_total">{{ resumo.km_total|floatformat:2 }} km</td>
                   </tr>
                   <tr>
                     <td class="text-muted">Valor KM solicitado</td>
-                    <td class="text-end fw-semibold">R$ {{ resumo.valor_km_solicitado|floatformat:2 }}</td>
+                    <td class="text-end fw-semibold" data-cliente-field="valor_km_solicitado">R$ {{ resumo.valor_km_solicitado|floatformat:2 }}</td>
+                  </tr>
+                  <tr>
+                    <td class="text-muted">Reembolso tecnico KM</td>
+                    <td class="text-end fw-semibold" data-cliente-field="valor_km_reembolso_tecnico">R$ {{ resumo.valor_km_reembolso_tecnico|floatformat:2 }}</td>
+                  </tr>
+                  <tr>
+                    <td class="text-muted">Excesso/reducao KM</td>
+                    <td class="text-end fw-semibold {% if resumo.excesso_reducao_km > 0 %}text-success{% elif resumo.excesso_reducao_km < 0 %}text-danger{% endif %}" data-cliente-field="excesso_reducao_km">
+                      R$ {{ resumo.excesso_reducao_km|floatformat:2 }}
+                    </td>
                   </tr>
                   <tr>
                     <td class="text-muted">Despesas solicitadas</td>
-                    <td class="text-end fw-semibold">R$ {{ resumo.despesas_solicitadas|floatformat:2 }}</td>
+                    <td class="text-end fw-semibold" data-cliente-field="despesas_solicitadas">R$ {{ resumo.despesas_solicitadas|floatformat:2 }}</td>
                   </tr>
                   <tr>
                     <td class="text-muted">Total solicitado</td>
-                    <td class="text-end fw-bold">R$ {{ resumo.total_solicitado|floatformat:2 }}</td>
+                    <td class="text-end fw-bold" data-cliente-field="total_solicitado">R$ {{ resumo.total_solicitado|floatformat:2 }}</td>
                   </tr>
                   <tr>
                     <td class="text-muted">Total aprovado</td>
-                    <td class="text-end fw-bold text-success">R$ {{ resumo.total_aprovado|floatformat:2 }}</td>
+                    <td class="text-end fw-bold text-success" data-cliente-field="total_aprovado">R$ {{ resumo.total_aprovado|floatformat:2 }}</td>
                   </tr>
                   <tr>
                     <td class="text-muted">Diferença removida</td>
-                    <td class="text-end fw-semibold {% if resumo.diferenca_removida > 0 %}text-danger{% endif %}">
+                    <td class="text-end fw-semibold {% if resumo.diferenca_removida > 0 %}text-danger{% endif %}" data-cliente-field="diferenca_removida">
                       R$ {{ resumo.diferenca_removida|floatformat:2 }}
                     </td>
                   </tr>
                   <tr>
                     <td class="text-muted">Itens rejeitados</td>
-                    <td class="text-end fw-semibold">{{ resumo.itens_rejeitados }}</td>
+                    <td class="text-end fw-semibold" data-cliente-field="itens_rejeitados">{{ resumo.itens_rejeitados }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -1024,6 +1059,7 @@
                 <th>Cliente</th>
                 <th>Valor automático</th>
                 <th>Valor final</th>
+                <th>Excesso/reducao</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -1098,9 +1134,10 @@
               <tr>
                 <th>Cliente</th>
                 <th>KM automático</th>
-                <th>Valor/KM aprovado</th>
+                <th>Valor/KM contratado</th>
                 <th>Valor automático</th>
                 <th>Valor final</th>
+                <th>Excesso/reducao</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -1109,22 +1146,19 @@
               <tr>
                 <td class="small">{{ r.cliente.nome }}</td>
                 <td class="small text-muted">{{ r.km_cliente|floatformat:2 }} km</td>
+                <td class="small text-muted">R$ {{ r.valor_km|floatformat:2 }}</td>
+                <td class="small text-muted">R$ {{ r.valor_calculado|floatformat:2 }}</td>
                 <td>
                   <input type="text"
                          inputmode="decimal"
-                         class="form-control form-control-sm rateio-valor-km campo-moeda"
+                         class="form-control form-control-sm rateio-valor-final campo-moeda"
                          data-cliente-id="{{ r.cliente_id }}"
-                         data-original="{{ r.valor_km|unlocalize }}"
-                         data-km="{{ r.km_cliente|unlocalize }}"
-                         value="{{ r.valor_km|unlocalize }}"
+                         data-original="{{ r.valor_final|unlocalize }}"
+                         value="{{ r.valor_final|unlocalize }}"
                          {% if not pode_alterar_itens_financeiros or t.rejeitado or t.status_financeiro == 'rejeitado' %}disabled{% endif %}>
                 </td>
-                <td class="small text-muted">R$ {{ r.valor_calculado|floatformat:2 }}</td>
-                <td>
-                  <span class="fw-semibold rateio-valor-final-linha"
-                        data-original="{{ r.valor_final|unlocalize }}">
-                    R$ {{ r.valor_final|floatformat:2 }}
-                  </span>
+                <td class="small {% if r.excesso_reducao > 0 %}text-success{% elif r.excesso_reducao < 0 %}text-danger{% else %}text-muted{% endif %}">
+                  R$ {{ r.excesso_reducao|floatformat:2 }}
                 </td>
                 <td><span class="badge text-bg-light">{{ r.get_status_display }}</span></td>
               </tr>
@@ -1154,7 +1188,6 @@
 
 {% if pode_alterar_itens_financeiros %}
   {% for d in relatorio.despesas.all %}
-    {% if d.rejeitado or d.status_financeiro == 'rejeitado' %}
     <form id="form-restaurar-despesa-{{ d.pk }}"
           method="post"
           data-item-financeiro-form
@@ -1163,7 +1196,6 @@
           action="{% url 'relatorios:relatorio_item_financeiro' relatorio.pk 'despesa' d.pk 'restaurar' %}">
       {% csrf_token %}
     </form>
-    {% else %}
     <div class="modal fade" id="modal-rejeitar-despesa-{{ d.pk }}" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
@@ -1198,11 +1230,9 @@
         </div>
       </div>
     </div>
-    {% endif %}
   {% endfor %}
 
   {% for t in relatorio.trechos.all %}
-    {% if t.rejeitado or t.status_financeiro == 'rejeitado' %}
     <form id="form-restaurar-trecho-{{ t.pk }}"
           method="post"
           data-item-financeiro-form
@@ -1211,7 +1241,6 @@
           action="{% url 'relatorios:relatorio_item_financeiro' relatorio.pk 'trecho' t.pk 'restaurar' %}">
       {% csrf_token %}
     </form>
-    {% else %}
     <div class="modal fade" id="modal-rejeitar-trecho-{{ t.pk }}" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
@@ -1246,7 +1275,6 @@
         </div>
       </div>
     </div>
-    {% endif %}
   {% endfor %}
 {% endif %}
 
@@ -1595,6 +1623,24 @@
       return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
     }
 
+    function setText(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    }
+
+    function mostrarFeedbackFinanceiro(mensagem, tipo) {
+      const feedback = document.getElementById("feedback-valores-financeiros");
+      if (!feedback) return;
+      if (!mensagem) {
+        feedback.classList.add("d-none");
+        feedback.textContent = "";
+        return;
+      }
+      feedback.classList.remove("d-none", "alert-danger", "alert-success", "alert-warning");
+      feedback.classList.add(`alert-${tipo || "danger"}`);
+      feedback.textContent = mensagem;
+    }
+
     function formatarDecimalCampo(input, casas = 2) {
       if (!input || !String(input.value || "").trim()) return;
       input.value = parseMoney(input.value).toFixed(casas).replace(".", ",");
@@ -1619,6 +1665,9 @@
         const valor = inputFinanceiroAtivo(input) ? valorAprovadoInput(input, original) : 0;
         totalDespesas += valor;
         const linha = input.closest("tr");
+        const itemId = linha?.dataset.itemId;
+        const modalRateio = itemId ? document.getElementById(`modal-rateio-despesa-${itemId}`) : null;
+        if (modalRateio) modalRateio.dataset.rateioTotal = String(valor.toFixed(2));
         const destinos = [
           ...Array.from(linha?.querySelectorAll(".total-aprovado-despesa-linha") || []),
           ...Array.from(linha?.nextElementSibling?.querySelectorAll(".total-aprovado-despesa-linha") || []),
@@ -1670,13 +1719,194 @@
       }
     }
 
+    function aplicarResumoGlobal(resumo) {
+      if (!resumo) return;
+      setText("total-aprovado-despesas", formatMoney(parseMoney(resumo.total_aprovado_despesas)));
+      setText("total-aprovado-km", formatMoney(parseMoney(resumo.total_aprovado_km)));
+      setText("total-aprovado-financeiro", formatMoney(parseMoney(resumo.total_aprovado)));
+      setText("diferenca-removida-financeiro", formatMoney(parseMoney(resumo.diferenca_removida)));
+      const saldoEl = document.getElementById("saldo-aprovado-financeiro");
+      if (saldoEl) {
+        const saldo = parseMoney(resumo.saldo_aprovado);
+        saldoEl.textContent = formatMoney(saldo);
+        saldoEl.classList.toggle("text-success", saldo >= 0);
+        saldoEl.classList.toggle("text-danger", saldo < 0);
+      }
+      const formFinanceiro = document.getElementById("form-valores-aprovados-financeiro");
+      if (formFinanceiro) {
+        formFinanceiro.dataset.totalSolicitado = resumo.total_solicitado || formFinanceiro.dataset.totalSolicitado || "0";
+        formFinanceiro.dataset.adiantamento = resumo.adiantamento || formFinanceiro.dataset.adiantamento || "0";
+      }
+    }
+
+    function atualizarBotoesItem(linha, rejeitado) {
+      const detalhes = linha?.nextElementSibling;
+      [linha, detalhes].forEach(function (container) {
+        if (!container) return;
+        container.querySelectorAll(".js-btn-restaurar").forEach(btn => btn.classList.toggle("d-none", !rejeitado));
+        container.querySelectorAll(".js-btn-rejeitar").forEach(btn => btn.classList.toggle("d-none", rejeitado));
+        container.querySelectorAll(".js-status-rejeitado").forEach(el => el.classList.toggle("d-none", !rejeitado));
+        container.querySelectorAll(".js-status-ativo").forEach(el => el.classList.toggle("d-none", rejeitado));
+        container.querySelectorAll(".js-status-ajustado").forEach(el => el.classList.add("d-none"));
+      });
+    }
+
+    function aplicarItemFinanceiro(item) {
+      const linha = document.querySelector(`[data-item-tipo="${item.tipo}"][data-item-id="${item.id}"]`);
+      if (!linha) return;
+      const rejeitado = Boolean(item.rejeitado);
+      linha.classList.toggle("item-rejeitado-forte", rejeitado);
+      linha.querySelectorAll(".campo-aprovado-despesa, .campo-aprovado-km").forEach(function (input) {
+        input.disabled = rejeitado;
+        input.dataset.statusFinanceiro = item.status_financeiro || "";
+      });
+      atualizarBotoesItem(linha, rejeitado);
+
+      if (item.tipo === "despesa") {
+        const valorFinal = parseMoney(item.valor_final);
+        linha.querySelectorAll(".total-aprovado-despesa-linha").forEach(el => el.textContent = formatMoney(valorFinal));
+        linha.nextElementSibling?.querySelectorAll(".total-aprovado-despesa-linha").forEach(el => el.textContent = formatMoney(valorFinal));
+        const input = linha.querySelector(".campo-aprovado-despesa");
+        if (input) input.dataset.valorFinalOriginal = item.valor_final || "0";
+        const modal = document.getElementById(`modal-rateio-despesa-${item.id}`);
+        if (modal) {
+          modal.dataset.rateioTotal = item.valor_final || "0";
+          (item.rateios || []).forEach(function (rateio) {
+            const valorInput = modal.querySelector(`.rateio-valor[data-cliente-id="${rateio.cliente_id}"]`);
+            if (valorInput) {
+              valorInput.value = String(rateio.valor_final || "0").replace(".", ",");
+              valorInput.dataset.original = rateio.valor_final || "0";
+              formatarDecimalCampo(valorInput, 2);
+            }
+          });
+          validarRateioModal(modal);
+        }
+      } else {
+        const valorFinal = parseMoney(item.valor_final);
+        linha.nextElementSibling?.querySelectorAll(".total-aprovado-km-linha").forEach(el => el.textContent = formatMoney(valorFinal));
+        const modal = document.getElementById(`modal-rateio-trecho-${item.id}`);
+        if (modal) {
+          modal.dataset.rateioTotal = item.valor_final || "0";
+          (item.rateios || []).forEach(function (rateio) {
+            const valorFinalInput = modal.querySelector(`.rateio-valor-final[data-cliente-id="${rateio.cliente_id}"]`);
+            if (valorFinalInput) {
+              valorFinalInput.value = String(rateio.valor_final || "0").replace(".", ",");
+              valorFinalInput.dataset.original = rateio.valor_final || "0";
+              formatarDecimalCampo(valorFinalInput, 2);
+            }
+          });
+          validarRateioModal(modal);
+        }
+      }
+    }
+
+    function aplicarResumoClientes(resumoClientes) {
+      if (!resumoClientes || !Array.isArray(resumoClientes.clientes)) return;
+      resumoClientes.clientes.forEach(function (cliente) {
+        const slide = document.querySelector(`[data-cliente-slide][data-cliente-id="${cliente.cliente_id}"]`);
+        if (!slide) return;
+        const valores = {
+          km_total: `${Number.parseFloat(cliente.km_total || "0").toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} km`,
+          valor_km_solicitado: formatMoney(parseMoney(cliente.valor_km_solicitado)),
+          valor_km_reembolso_tecnico: formatMoney(parseMoney(cliente.valor_km_reembolso_tecnico)),
+          excesso_reducao_km: formatMoney(parseMoney(cliente.excesso_reducao_km)),
+          despesas_solicitadas: formatMoney(parseMoney(cliente.despesas_solicitadas)),
+          total_solicitado: formatMoney(parseMoney(cliente.total_solicitado)),
+          total_aprovado: formatMoney(parseMoney(cliente.total_aprovado)),
+          diferenca_removida: formatMoney(parseMoney(cliente.diferenca_removida)),
+          itens_rejeitados: String(cliente.itens_rejeitados || 0),
+        };
+        Object.entries(valores).forEach(function ([campo, valor]) {
+          const el = slide.querySelector(`[data-cliente-field="${campo}"]`);
+          if (el) el.textContent = valor;
+        });
+        const diff = slide.querySelector('[data-cliente-field="diferenca_removida"]');
+        if (diff) diff.classList.toggle("text-danger", parseMoney(cliente.diferenca_removida) > 0);
+        const excessoReducao = slide.querySelector('[data-cliente-field="excesso_reducao_km"]');
+        if (excessoReducao) {
+          const valor = parseMoney(cliente.excesso_reducao_km);
+          excessoReducao.classList.toggle("text-success", valor > 0);
+          excessoReducao.classList.toggle("text-danger", valor < 0);
+        }
+      });
+    }
+
+    function atualizarPopoversRateio(itens, tipo) {
+      (itens || []).forEach(function (item) {
+        const modal = document.getElementById(`modal-rateio-${tipo === "despesa" ? "despesa" : "trecho"}-${item.id}`);
+        const botao = modal ? document.querySelector(`[data-rateio-modal="#${modal.id}"]`) : null;
+        if (!botao) return;
+        const rows = (item.rateios || []).map(function (rateio) {
+          return `<div class='rateio-popover-row'><span class='rateio-popover-cliente'>${rateio.cliente}</span><strong class='rateio-popover-valor'>${formatMoney(parseMoney(rateio.valor_final))}</strong></div>`;
+        }).join("") || "<span class='text-muted'>Rateio nao gerado.</span>";
+        botao.dataset.bsContent = rows;
+        const instance = bootstrap.Popover.getInstance(botao);
+        if (instance) {
+          instance.setContent({ ".popover-body": rows });
+        }
+      });
+    }
+
+    function aplicarPayloadFinanceiro(financeiro) {
+      if (!financeiro) return;
+      aplicarResumoGlobal(financeiro.resumo_global);
+      (financeiro.despesas || []).forEach(aplicarItemFinanceiro);
+      (financeiro.trechos || []).forEach(aplicarItemFinanceiro);
+      aplicarResumoClientes(financeiro.resumo_clientes);
+      atualizarPopoversRateio(financeiro.despesas || [], "despesa");
+      atualizarPopoversRateio(financeiro.trechos || [], "trecho");
+    }
+
+    let salvandoValoresFinanceiros = false;
+    async function salvarValoresFinanceiros() {
+      const formFinanceiro = document.getElementById("form-valores-aprovados-financeiro");
+      if (!formFinanceiro?.dataset.saveUrl || salvandoValoresFinanceiros) return;
+      salvandoValoresFinanceiros = true;
+      try {
+        const response = await fetch(formFinanceiro.dataset.saveUrl, {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": formFinanceiro.querySelector("[name=csrfmiddlewaretoken]")?.value || "",
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          credentials: "same-origin",
+          body: new FormData(formFinanceiro),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error((data.errors || ["Erro ao salvar valores financeiros."]).join(" "));
+        }
+        aplicarPayloadFinanceiro(data.financeiro);
+        mostrarFeedbackFinanceiro("");
+      } catch (error) {
+        console.warn("Falha ao salvar valores financeiros", error);
+        mostrarFeedbackFinanceiro(error.message || "Não foi possível salvar os valores financeiros.");
+      } finally {
+        salvandoValoresFinanceiros = false;
+      }
+    }
+
     document.querySelectorAll(".campo-aprovado-despesa, .campo-aprovado-km").forEach(function (input) {
       formatarDecimalCampo(input, 2);
       input.addEventListener("input", atualizarTotaisFinanceiros);
-      input.addEventListener("change", atualizarTotaisFinanceiros);
+      input.addEventListener("change", function () {
+        atualizarTotaisFinanceiros();
+        salvarValoresFinanceiros();
+      });
       input.addEventListener("blur", function () {
         formatarDecimalCampo(input, 2);
         atualizarTotaisFinanceiros();
+        salvarValoresFinanceiros();
+      });
+    });
+    document.querySelectorAll(".aplicar-politica-despesa").forEach(function (button) {
+      button.addEventListener("click", function () {
+        const input = document.querySelector(`[name="${button.dataset.target}"]`);
+        if (!input || button.disabled) return;
+        input.value = String(button.dataset.valorPolitica || "").replace(".", ",");
+        formatarDecimalCampo(input, 2);
+        atualizarTotaisFinanceiros();
+        salvarValoresFinanceiros();
       });
     });
     atualizarTotaisFinanceiros();
@@ -1707,16 +1937,13 @@
       const total = parseMoney(modal.dataset.rateioTotal);
       const tipo = modal.dataset.rateioTipo;
       const valores = Array.from(modal.querySelectorAll(".rateio-valor"));
-      const valoresKm = Array.from(modal.querySelectorAll(".rateio-valor-km"));
+      const valoresKm = Array.from(modal.querySelectorAll(".rateio-valor-final"));
       const kms = Array.from(modal.querySelectorAll(".rateio-km"));
       const feedback = modal.querySelector(".rateio-feedback");
       const botoes = modal.querySelectorAll(".rateio-salvar");
       const somaValoresKm = valoresKm.reduce((acc, input) => {
-        const valorLinha = parseMoney(input.value) * parseMoney(input.dataset.km || "0");
+        const valorLinha = parseMoney(input.value);
         const valorArredondado = Math.round(valorLinha * 100) / 100;
-        const linha = input.closest("tr");
-        const finalLinha = linha?.querySelector(".rateio-valor-final-linha");
-        if (finalLinha) finalLinha.textContent = formatMoney(valorArredondado);
         return acc + valorArredondado;
       }, 0);
       const soma = tipo === "trecho"
@@ -1772,14 +1999,14 @@
       modal.addEventListener("shown.bs.modal", function () {
         validarRateioModal(modal);
       });
-      modal.querySelectorAll(".rateio-valor, .rateio-valor-km, .rateio-km, .rateio-motivo").forEach(function (input) {
+      modal.querySelectorAll(".rateio-valor, .rateio-valor-final, .rateio-km, .rateio-motivo").forEach(function (input) {
         input.addEventListener("input", function () {
           validarRateioModal(modal);
         });
         input.addEventListener("blur", function () {
           if (input.classList.contains("rateio-km")) {
             formatarDecimalCampo(input, 2);
-          } else if (input.classList.contains("rateio-valor") || input.classList.contains("rateio-valor-km")) {
+          } else if (input.classList.contains("rateio-valor") || input.classList.contains("rateio-valor-final")) {
             formatarDecimalCampo(input, 2);
           }
           validarRateioModal(modal);
@@ -1794,7 +2021,7 @@
             motivo: modal.querySelector(".rateio-motivo")?.value || "",
             rateios: Array.from(modal.querySelectorAll("tbody tr")).map(row => {
               const valor = row.querySelector(".rateio-valor");
-              const valorKm = row.querySelector(".rateio-valor-km");
+              const valorKm = row.querySelector(".rateio-valor-final");
               const km = row.querySelector(".rateio-km");
               const item = {
                 cliente_id: valor?.dataset.clienteId || valorKm?.dataset.clienteId || km?.dataset.clienteId,
@@ -1802,7 +2029,7 @@
               if (tipo === "despesa") {
                 item.valor_final = valor.value;
               } else {
-                item.valor_km = valorKm.value;
+                item.valor_final = valorKm.value;
               }
               return item;
             }),
@@ -1836,16 +2063,11 @@
                   formatarDecimalCampo(valorInput, 2);
                 }
               } else {
-                const valorKmInput = linha.querySelector(".rateio-valor-km");
-                const valorFinalLinha = linha.querySelector(".rateio-valor-final-linha");
-                if (valorKmInput) {
-                  valorKmInput.value = String(rateio.valor_km || "").replace(".", ",");
-                  valorKmInput.dataset.original = rateio.valor_km || "0";
-                  formatarDecimalCampo(valorKmInput, 2);
-                }
-                if (valorFinalLinha && rateio.valor_final) {
-                  valorFinalLinha.textContent = formatMoney(parseMoney(rateio.valor_final));
-                  valorFinalLinha.dataset.original = rateio.valor_final;
+                const valorFinalInput = linha.querySelector(".rateio-valor-final");
+                if (valorFinalInput) {
+                  valorFinalInput.value = String(rateio.valor_final || "").replace(".", ",");
+                  valorFinalInput.dataset.original = rateio.valor_final || "0";
+                  formatarDecimalCampo(valorFinalInput, 2);
                 }
               }
             });
@@ -1855,7 +2077,7 @@
               feedback.className = "rateio-feedback small mt-3 text-success";
               feedback.textContent = "Rateio salvo com sucesso.";
             }
-            atualizarTotaisFinanceiros();
+            aplicarPayloadFinanceiro(data.financeiro);
           } catch (error) {
             const feedback = modal.querySelector(".rateio-feedback");
             if (feedback) {
@@ -1897,9 +2119,10 @@
               input.disabled = Boolean(data.rejeitado);
               input.dataset.statusFinanceiro = data.status_financeiro || "";
             });
+            atualizarBotoesItem(linha, Boolean(data.rejeitado));
           }
           bootstrap.Modal.getInstance(form.closest(".modal"))?.hide();
-          atualizarTotaisFinanceiros();
+          aplicarPayloadFinanceiro(data.financeiro);
         } catch (error) {
           alert(error.message);
         } finally {
