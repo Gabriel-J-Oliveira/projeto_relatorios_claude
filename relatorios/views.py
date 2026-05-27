@@ -155,6 +155,32 @@ def ajuda_artigo_view(request, slug):
 
 
 @login_required
+@require_POST
+def marcar_tour_guiado_visto(request):
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (TypeError, ValueError, UnicodeDecodeError):
+        payload = request.POST
+
+    chave = str(payload.get("tour") or "").strip()
+    chaves_permitidas = {
+        "dashboardTourVisto:v1",
+        "relatorioFormTourVisto:v1",
+        "relatoriosListTourVisto:v1",
+        "relatorioDetailTourVisto:v1",
+    }
+    if chave not in chaves_permitidas:
+        return JsonResponse({"success": False, "error": "Tour invalido."}, status=400)
+
+    perfil, _criado = PerfilUsuario.objects.get_or_create(usuario=request.user)
+    vistos = dict(perfil.tours_guiados_vistos or {})
+    vistos[chave] = timezone.now().isoformat()
+    perfil.tours_guiados_vistos = vistos
+    perfil.save(update_fields=["tours_guiados_vistos", "atualizado_em"])
+    return JsonResponse({"success": True})
+
+
+@login_required
 def completar_cadastro_view(request):
     perfil, _criado = PerfilUsuario.objects.get_or_create(usuario=request.user)
     next_url = request.GET.get("next") or request.POST.get("next") or ""

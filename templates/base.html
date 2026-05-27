@@ -15,7 +15,10 @@
   <script defer src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js"></script>
   {% block extra_css %}{% endblock %}
 </head>
-<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+      data-user-id="{% if request.user.is_authenticated %}{{ request.user.pk }}{% else %}anon{% endif %}"
+      data-tours-vistos="{{ tours_guiados_vistos_json|default:'{}'|escape }}"
+      data-tour-seen-url="{% url 'relatorios:marcar_tour_guiado_visto' %}">
 
 <div class="app-shell d-flex" id="app-wrapper">
   {% include "partials/_sidebar.html" %}

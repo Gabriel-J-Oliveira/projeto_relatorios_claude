@@ -166,6 +166,11 @@ class PerfilUsuario(models.Model):
         blank=True,
         db_index=True,
     )
+    tours_guiados_vistos = models.JSONField(
+        "Tours guiados vistos",
+        default=dict,
+        blank=True,
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 

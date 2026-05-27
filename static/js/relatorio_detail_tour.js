@@ -1,6 +1,39 @@
 (function () {
   const STORAGE_KEY = "relatorioDetailTourVisto:v1";
 
+  function storageKey() {
+    const userId = document.body?.dataset?.userId || "anon";
+    return `${STORAGE_KEY}:${userId}`;
+  }
+
+  function seenOnServer() {
+    try {
+      const seen = JSON.parse(document.body?.dataset?.toursVistos || "{}");
+      return Boolean(seen[STORAGE_KEY]);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function csrfToken() {
+    const match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : "";
+  }
+
+  function syncSeen() {
+    const url = document.body?.dataset?.tourSeenUrl;
+    if (!url || !window.fetch) return;
+    window.fetch(url, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrfToken(),
+      },
+      body: JSON.stringify({ tour: STORAGE_KEY }),
+    }).catch(function () {});
+  }
+
   function getDriverFactory() {
     return window.driver && window.driver.js && window.driver.js.driver;
   }
@@ -11,15 +44,19 @@
 
   function markSeen() {
     try {
-      window.localStorage.setItem(STORAGE_KEY, "true");
+      window.localStorage.setItem(storageKey(), "true");
+      const seen = JSON.parse(document.body?.dataset?.toursVistos || "{}");
+      seen[STORAGE_KEY] = true;
+      document.body.dataset.toursVistos = JSON.stringify(seen);
     } catch (error) {
       // Sem localStorage disponível, apenas não persiste o estado do tour.
     }
+    syncSeen();
   }
 
   function hasSeen() {
     try {
-      return window.localStorage.getItem(STORAGE_KEY) === "true";
+      return seenOnServer() || window.localStorage.getItem(storageKey()) === "true";
     } catch (error) {
       return true;
     }
@@ -261,7 +298,7 @@
       nextBtnText: "Próximo",
       prevBtnText: "Voltar",
       doneBtnText: "Finalizar",
-      closeBtnText: "Pular",
+      closeBtnText: "Finalizar",
       popoverClass: "relatorio-detail-driver-popover",
       steps,
       onHighlightStarted: function (_element, currentStep) {
@@ -273,6 +310,7 @@
     });
 
     if (force || !hasSeen()) {
+      if (!force) markSeen();
       driverObj.drive();
     }
   }
