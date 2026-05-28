@@ -7,6 +7,7 @@ from django.db.models import Sum
 from .models import (
     Tecnico,
     Cliente,
+    Municipio,
     PoliticaValor,
     RelatorioTecnico,
     RelatorioSnapshotFinanceiro,
@@ -57,6 +58,23 @@ class ClienteAdmin(admin.ModelAdmin):
 
 
 # ─────────────────────────────────────────────
+@admin.register(Municipio)
+class MunicipioAdmin(admin.ModelAdmin):
+    list_display = [
+        "nome",
+        "uf",
+        "uf_nome",
+        "codigo_ibge",
+        "eh_capital",
+        "tipo_localidade_padrao",
+        "ativo",
+    ]
+    list_filter = ["ativo", "uf", "eh_capital", "tipo_localidade_padrao"]
+    search_fields = ["nome", "nome_normalizado", "codigo_ibge", "aliases"]
+    list_editable = ["tipo_localidade_padrao", "ativo"]
+    readonly_fields = ["nome_normalizado", "criado_em", "atualizado_em"]
+
+
 # POLITICA DE VALORES
 # ─────────────────────────────────────────────
 
@@ -174,6 +192,7 @@ class RelatorioTecnicoAdmin(admin.ModelAdmin):
         "status",
         "tipo_relatorio",
         "tipo_localidade",
+        "municipio_atendimento",
         "tecnico_responsavel",
         "cliente",
     ]
@@ -230,7 +249,14 @@ class RelatorioTecnicoAdmin(admin.ModelAdmin):
                 "fields": (
                     "cliente",
                     ("tecnico_responsavel",),
+                    "municipio_atendimento",
                     ("cidade_atendimento", "uf_atendimento", "tipo_localidade"),
+                    (
+                        "cidade_atendimento_normalizada",
+                        "uf_atendimento_normalizada",
+                        "tipo_localidade_calculada",
+                    ),
+                    ("localidade_override", "motivo_override_localidade"),
                     ("data_inicio", "data_fim"),
                     "motivo",
                     "tipo_relatorio",

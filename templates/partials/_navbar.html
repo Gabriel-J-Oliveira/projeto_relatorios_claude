@@ -21,6 +21,17 @@
       <div class="vr d-none d-lg-inline mx-1"></div>
 
       <!-- Toggle tema claro/escuro -->
+      {% if request.user.is_authenticated %}
+      <button class="btn btn-sm btn-outline-secondary d-none d-md-inline-flex align-items-center gap-1"
+              type="button"
+              data-bs-toggle="modal"
+              data-bs-target="#modalReportarProblema">
+        <i class="bi bi-bug"></i>
+        <span>Reportar problema</span>
+      </button>
+      {% endif %}
+
+      <!-- Toggle tema claro/escuro -->
       <button class="btn btn-sm btn-outline-secondary rounded-circle"
               id="theme-toggle"
               title="Alternar tema"
@@ -53,6 +64,17 @@
           <i class="bi bi-chevron-down small text-muted"></i>
         </button>
         <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-1">
+          {% if request.user.is_authenticated %}
+          <li>
+            <button class="dropdown-item d-flex align-items-center gap-2"
+                    type="button"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modalReportarProblema">
+              <i class="bi bi-bug text-muted"></i> Reportar problema
+            </button>
+          </li>
+          <li><hr class="dropdown-divider" /></li>
+          {% endif %}
           <li>
             <a class="dropdown-item d-flex align-items-center gap-2" href="/admin/">
               <i class="bi bi-person-circle text-muted"></i> Perfil

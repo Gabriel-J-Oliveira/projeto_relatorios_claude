@@ -13,6 +13,7 @@ from .models import (
     Cliente,
     Adiantamento,
     TipoDocumentoComprovante,
+    Municipio,
 )
 from .validators import validar_anexo_upload
 
@@ -135,12 +136,18 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         ),
         help_text="Segure Ctrl (ou Cmd) para selecionar múltiplos.",
     )
+    municipio_atendimento = forms.ModelChoiceField(
+        queryset=Municipio.objects.filter(ativo=True).order_by("nome", "uf"),
+        required=False,
+        widget=forms.HiddenInput(),
+    )
 
     class Meta:
         model = RelatorioTecnico
         fields = [
             "numero",
             "tecnico_responsavel",
+            "municipio_atendimento",
             "cidade_atendimento",
             "uf_atendimento",
             "tipo_localidade",
@@ -193,6 +200,30 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         self.fields["numero"].widget.attrs["placeholder"] = "Gerado no envio"
         self.fields["numero"].help_text = "Gerado automaticamente ao enviar para conferência."
         self.fields["motivo"].required = False
+        self.fields["cidade_atendimento"].required = False
+        self.fields["uf_atendimento"].required = False
+        self.fields["tipo_localidade"].required = False
+        self.fields["cidade_atendimento"].widget.attrs.update(
+            {
+                "autocomplete": "off",
+                "placeholder": "Digite e selecione uma cidade oficial",
+                "data-municipio-label": (
+                    self.instance.municipio_atendimento.label
+                    if self.instance
+                    and self.instance.pk
+                    and self.instance.municipio_atendimento_id
+                    else ""
+                ),
+            }
+        )
+        self.fields["uf_atendimento"].widget.attrs.update({"readonly": "readonly"})
+        self.fields["tipo_localidade"].widget.attrs.update(
+            {
+                "data-auto-localidade": "true",
+                "tabindex": "-1",
+                "style": "pointer-events: none;",
+            }
+        )
         self.fields["valor_adiantamento"].required = False
         self.fields["km_excedente_interno"].required = False
         self.fields["observacao_km_excedente"].required = False
@@ -251,6 +282,29 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
             self.add_error("data_inicio", "Data início não pode ser futura.")
         if fim and fim > hoje:
             self.add_error("data_fim", "Data fim não pode ser futura.")
+        municipio = cd.get("municipio_atendimento")
+        cidade = (cd.get("cidade_atendimento") or "").strip()
+        if municipio:
+            cd["cidade_atendimento"] = municipio.nome
+            cd["uf_atendimento"] = municipio.uf
+            cd["tipo_localidade"] = municipio.tipo_localidade_padrao
+        elif cidade:
+            from .models import normalizar_texto_busca
+
+            cidade_base = cidade.split("/")[0].strip()
+            uf_base = cidade.split("/", 1)[1].strip().upper() if "/" in cidade else ""
+            qs = Municipio.objects.filter(
+                ativo=True,
+                nome_normalizado=normalizar_texto_busca(cidade_base),
+            )
+            if uf_base:
+                qs = qs.filter(uf=uf_base)
+            if qs.count() == 1:
+                municipio = qs.first()
+                cd["municipio_atendimento"] = municipio
+                cd["cidade_atendimento"] = municipio.nome
+                cd["uf_atendimento"] = municipio.uf
+                cd["tipo_localidade"] = municipio.tipo_localidade_padrao
         resp = cd.get("tecnico_responsavel")
         equipe = cd.get("tecnicos_equipe", [])
         if resp and resp in equipe:

@@ -28,6 +28,7 @@ from .models import (
     AnexoRelatorio,
     Cliente,
     ItemDespesa,
+    Municipio,
     PerfilUsuario,
     PoliticaValor,
     RelatorioTecnico,
@@ -40,6 +41,7 @@ from .models import (
     valor_km_control_sul,
 )
 from .services.historico_service import registrar_evento
+from .services.email_service import EmailNotificacaoError, enviar_report_suporte
 from .services.clientes_relatorio_service import (
     normalizar_ids_clientes,
     obter_clientes_relatorio,
@@ -178,6 +180,54 @@ def marcar_tour_guiado_visto(request):
     perfil.tours_guiados_vistos = vistos
     perfil.save(update_fields=["tours_guiados_vistos", "atualizado_em"])
     return JsonResponse({"success": True})
+
+
+@login_required
+@require_POST
+def suporte_reportar_view(request):
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (TypeError, ValueError, UnicodeDecodeError):
+        payload = request.POST
+
+    tipo = str(payload.get("tipo") or "").strip().lower()
+    assunto = " ".join(str(payload.get("assunto") or "").replace("\r", " ").replace("\n", " ").split())
+    descricao = str(payload.get("descricao") or "").strip()
+    pagina_atual = str(payload.get("pagina_atual") or "").strip()[:1000]
+
+    if tipo not in {"problema", "sugestao"}:
+        logger.warning("Report suporte invalido: tipo=%s usuario=%s", tipo, request.user.pk)
+        return JsonResponse({"success": False, "error": "Selecione um tipo válido."}, status=400)
+    if not assunto or len(assunto) > 150:
+        return JsonResponse({"success": False, "error": "Informe um assunto com até 150 caracteres."}, status=400)
+    if len(descricao) < 10 or len(descricao) > 3000:
+        return JsonResponse({"success": False, "error": "Informe uma descrição entre 10 e 3000 caracteres."}, status=400)
+
+    try:
+        enviar_report_suporte(
+            request.user,
+            tipo,
+            assunto,
+            descricao,
+            pagina_atual=pagina_atual,
+            request=request,
+        )
+    except EmailNotificacaoError:
+        logger.exception(
+            "Falha ao enviar report de suporte usuario=%s tipo=%s assunto=%s",
+            request.user.pk,
+            tipo,
+            assunto,
+        )
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Não foi possível enviar a mensagem. Tente novamente ou contate o suporte.",
+            },
+            status=502,
+        )
+
+    return JsonResponse({"success": True, "message": "Mensagem enviada com sucesso."})
 
 
 @login_required
@@ -501,9 +551,12 @@ def _duplicar_relatorio(original, usuario=None):
     novo = RelatorioTecnico(
         cliente=original.cliente,
         tecnico_responsavel=original.tecnico_responsavel,
+        municipio_atendimento=original.municipio_atendimento,
         cidade_atendimento=original.cidade_atendimento,
         uf_atendimento=original.uf_atendimento,
         tipo_localidade=original.tipo_localidade,
+        localidade_override=original.localidade_override,
+        motivo_override_localidade=original.motivo_override_localidade,
         data_inicio=original.data_inicio,
         data_fim=original.data_fim,
         motivo=original.motivo,
@@ -844,6 +897,12 @@ def politica_despesa_json(request):
     tipo = (request.GET.get("tipo") or "").strip()
     data_txt = (request.GET.get("data") or "").strip()
     tipo_localidade = (request.GET.get("tipo_localidade") or "").strip()
+    municipio = None
+    municipio_id = (request.GET.get("municipio_id") or "").strip()
+    if municipio_id:
+        municipio = Municipio.objects.filter(pk=municipio_id, ativo=True).first()
+        if municipio:
+            tipo_localidade = municipio.tipo_localidade_padrao
     if not tipo or not data_txt:
         return JsonResponse(
             {"success": True, "data": {"limite": None, "mensagem": "Sem politica definida"}}
@@ -861,6 +920,7 @@ def politica_despesa_json(request):
         data=data_ref,
         tipo_localidade=tipo_localidade,
         cidade=(request.GET.get("cidade") or "").strip(),
+        municipio=municipio,
         descricao=(request.GET.get("descricao") or "").strip(),
         valor_informado=request.GET.get("valor") or "0",
     )
@@ -888,6 +948,41 @@ def politica_despesa_json(request):
             },
         }
     )
+
+
+@require_GET
+@login_required
+def municipios_buscar_json(request):
+    termo = (request.GET.get("q") or "").strip()
+    if len(termo) < 2:
+        return JsonResponse({"success": True, "data": []})
+
+    from .models import normalizar_texto_busca
+
+    termo_norm = normalizar_texto_busca(termo)
+    qs = Municipio.objects.filter(ativo=True)
+    if len(termo_norm) == 2:
+        qs = qs.filter(uf__iexact=termo_norm)
+    else:
+        qs = qs.filter(
+            Q(nome_normalizado__icontains=termo_norm)
+            | Q(nome__icontains=termo)
+            | Q(uf__iexact=termo)
+        )
+    dados = [
+        {
+            "id": municipio.pk,
+            "codigo_ibge": municipio.codigo_ibge,
+            "nome": municipio.nome,
+            "uf": municipio.uf,
+            "uf_nome": municipio.uf_nome,
+            "tipo_localidade": municipio.tipo_localidade_padrao,
+            "tipo_localidade_label": municipio.get_tipo_localidade_padrao_display(),
+            "label": municipio.label,
+        }
+        for municipio in qs.order_by("nome", "uf")[:20]
+    ]
+    return JsonResponse({"success": True, "data": dados})
 
 
 def _relatorio_bloqueado(relatorio):
@@ -1342,6 +1437,15 @@ def relatorio_form_view(request, pk=None):
             #   "enviar"   → botão Salvar relatório (ou confirmação do modal)
             acao = request.POST.get("acao", "rascunho")
             relatorio = form.save(commit=False)
+            if acao != "rascunho" and not relatorio.municipio_atendimento_id:
+                form.add_error(
+                    "cidade_atendimento",
+                    "Selecione uma cidade válida da lista para aplicar corretamente a política de valores.",
+                )
+                form_ok = False
+                resumo_erros.append(
+                    "Selecione uma cidade oficial para enviar o relatório à conferência."
+                )
 
             relatorio = preparar_rascunho_para_salvar(relatorio, instance)
 

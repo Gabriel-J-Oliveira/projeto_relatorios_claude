@@ -208,6 +208,67 @@ def enviar_email_base(
     return enviados
 
 
+def _limpar_assunto_email(valor):
+    return " ".join(str(valor or "").replace("\r", " ").replace("\n", " ").split())
+
+
+def enviar_report_suporte(usuario, tipo, assunto, descricao, pagina_atual="", request=None):
+    tipo_label = {"problema": "Problema", "sugestao": "Sugestão"}.get(tipo, tipo)
+    assunto_limpo = _limpar_assunto_email(assunto)[:150]
+    user_agent = request.META.get("HTTP_USER_AGENT", "")[:500] if request else ""
+    ip = ""
+    if request:
+        forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
+        ip = (forwarded.split(",")[0] if forwarded else request.META.get("REMOTE_ADDR", ""))[:80]
+
+    corpo = "\n".join(
+        [
+            "Olá.",
+            "",
+            "Um usuário enviou um reporte pelo sistema de reembolsos.",
+            "",
+            f"Tipo: {tipo_label}",
+            f"Assunto: {assunto_limpo}",
+            f"Usuário: {(usuario.get_full_name() or usuario.username) if usuario else 'Não informado'}",
+            f"Username: {getattr(usuario, 'username', '')}",
+            f"E-mail: {getattr(usuario, 'email', '') or 'Não informado'}",
+            f"User ID: {getattr(usuario, 'pk', '')}",
+            f"Página: {pagina_atual or 'Não informada'}",
+            f"Data/hora: {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M:%S')}",
+            "",
+            "Descrição:",
+            str(descricao or "").strip(),
+            "",
+            "Informações técnicas:",
+            f"Path: {request.path if request else ''}",
+            f"IP: {ip}",
+            f"User agent: {user_agent}",
+            "",
+            "Mensagem automática do sistema de relatórios.",
+        ]
+    )
+    logger.info(
+        "Enviando report de suporte tipo=%s usuario=%s assunto=%s pagina=%s",
+        tipo,
+        getattr(usuario, "pk", None),
+        assunto_limpo,
+        pagina_atual,
+    )
+    enviados = enviar_email_base(
+        f"[Sistema de Reembolso] [{tipo_label}] {assunto_limpo}",
+        corpo,
+        ["infrati@controlsul.com.br"],
+        tipo_email="suporte_report",
+    )
+    logger.info(
+        "Report de suporte enviado tipo=%s usuario=%s assunto=%s",
+        tipo,
+        getattr(usuario, "pk", None),
+        assunto_limpo,
+    )
+    return enviados
+
+
 def _corpo_base(relatorio, mensagem):
     return "\n".join(
         [

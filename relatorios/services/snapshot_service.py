@@ -372,10 +372,25 @@ def construir_snapshot_financeiro(relatorio, usuario=None):
             "status_label": relatorio.get_status_display(),
             "tipo_relatorio": relatorio.tipo_relatorio,
             "tipo_relatorio_label": relatorio.get_tipo_relatorio_display(),
+            "municipio_atendimento": (
+                {
+                    "id": relatorio.municipio_atendimento_id,
+                    "codigo_ibge": relatorio.municipio_atendimento.codigo_ibge,
+                    "nome": relatorio.municipio_atendimento.nome,
+                    "uf": relatorio.municipio_atendimento.uf,
+                    "uf_nome": relatorio.municipio_atendimento.uf_nome,
+                    "tipo_localidade": relatorio.municipio_atendimento.tipo_localidade_padrao,
+                    "tipo_localidade_label": relatorio.municipio_atendimento.get_tipo_localidade_padrao_display(),
+                }
+                if relatorio.municipio_atendimento_id
+                else None
+            ),
             "cidade_atendimento": relatorio.cidade_atendimento,
             "uf_atendimento": relatorio.uf_atendimento,
-            "tipo_localidade": relatorio.tipo_localidade,
+            "tipo_localidade": relatorio.tipo_localidade_efetiva,
             "tipo_localidade_label": relatorio.get_tipo_localidade_display(),
+            "localidade_override": relatorio.localidade_override,
+            "motivo_override_localidade": relatorio.motivo_override_localidade,
             "data_inicio": _date(relatorio.data_inicio),
             "data_fim": _date(relatorio.data_fim),
             "motivo": "",

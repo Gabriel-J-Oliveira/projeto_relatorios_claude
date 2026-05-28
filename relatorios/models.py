@@ -7,6 +7,7 @@ Mudanças:
 """
 
 import mimetypes
+import unicodedata
 
 from django.db import models
 from django.conf import settings
@@ -41,6 +42,12 @@ def valor_km_control_sul():
 
 def _numero_documento_normalizado(valor):
     return " ".join(str(valor or "").strip().split()).upper()
+
+
+def normalizar_texto_busca(valor):
+    texto = unicodedata.normalize("NFKD", str(valor or ""))
+    texto = "".join(ch for ch in texto if not unicodedata.combining(ch))
+    return " ".join(texto.lower().strip().split())
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -274,6 +281,47 @@ class Cliente(models.Model):
         return self.cidade or self.uf or "-"
 
 
+class Municipio(models.Model):
+    codigo_ibge = models.CharField("Código IBGE", max_length=7, unique=True)
+    nome = models.CharField("Município", max_length=120)
+    nome_normalizado = models.CharField("Nome normalizado", max_length=120, db_index=True)
+    uf = models.CharField("UF", max_length=2, choices=UF.choices, db_index=True)
+    uf_nome = models.CharField("Nome da UF", max_length=80)
+    eh_capital = models.BooleanField("É capital", default=False)
+    tipo_localidade_padrao = models.CharField(
+        "Localidade padrão",
+        max_length=12,
+        choices=TipoLocalidade.choices,
+        default=TipoLocalidade.INTERIOR,
+    )
+    aliases = models.JSONField("Aliases", default=list, blank=True)
+    ativo = models.BooleanField("Ativo", default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Município"
+        verbose_name_plural = "Municípios"
+        ordering = ["nome", "uf"]
+        indexes = [
+            models.Index(fields=["uf", "nome_normalizado"]),
+            models.Index(fields=["ativo", "nome_normalizado"]),
+        ]
+
+    def __str__(self):
+        return f"{self.nome}/{self.uf}"
+
+    def save(self, *args, **kwargs):
+        self.nome_normalizado = normalizar_texto_busca(self.nome)
+        if self.eh_capital and self.tipo_localidade_padrao == TipoLocalidade.INTERIOR:
+            self.tipo_localidade_padrao = TipoLocalidade.CAPITAL
+        super().save(*args, **kwargs)
+
+    @property
+    def label(self):
+        return f"{self.nome}/{self.uf}"
+
+
 # ─────────────────────────────────────────────────────────────────
 # POLÍTICA DE VALORES
 # ─────────────────────────────────────────────────────────────────
@@ -424,6 +472,32 @@ class RelatorioTecnico(models.Model):
     )
 
     # Atendimento
+    municipio_atendimento = models.ForeignKey(
+        Municipio,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="relatorios_atendimento",
+        verbose_name="Município de atendimento",
+    )
+    cidade_atendimento_normalizada = models.CharField(
+        "Cidade normalizada",
+        max_length=120,
+        blank=True,
+    )
+    uf_atendimento_normalizada = models.CharField(
+        "UF normalizada",
+        max_length=2,
+        blank=True,
+    )
+    tipo_localidade_calculada = models.CharField(
+        "Localidade calculada",
+        max_length=12,
+        choices=TipoLocalidade.choices,
+        blank=True,
+    )
+    localidade_override = models.BooleanField("Localidade alterada manualmente", default=False)
+    motivo_override_localidade = models.TextField("Motivo da alteração de localidade", blank=True)
     cidade_atendimento = models.CharField("Cidade de atendimento", max_length=100)
     uf_atendimento = models.CharField(
         "UF",
@@ -513,6 +587,45 @@ class RelatorioTecnico(models.Model):
 
     def __str__(self):
         return f"{self.identificador} — {self.cliente}"
+
+    def sincronizar_municipio_atendimento(self):
+        municipio = self.municipio_atendimento
+        if not municipio:
+            self.cidade_atendimento_normalizada = normalizar_texto_busca(self.cidade_atendimento)
+            self.uf_atendimento_normalizada = self.uf_atendimento or ""
+            self.tipo_localidade_calculada = self.tipo_localidade or ""
+            return
+        self.cidade_atendimento = municipio.nome
+        self.uf_atendimento = municipio.uf
+        self.cidade_atendimento_normalizada = municipio.nome_normalizado
+        self.uf_atendimento_normalizada = municipio.uf
+        self.tipo_localidade_calculada = municipio.tipo_localidade_padrao
+        if not self.localidade_override:
+            self.tipo_localidade = municipio.tipo_localidade_padrao
+
+    @property
+    def tipo_localidade_efetiva(self):
+        if self.localidade_override and self.tipo_localidade:
+            return self.tipo_localidade
+        if self.municipio_atendimento_id:
+            return self.municipio_atendimento.tipo_localidade_padrao
+        return self.tipo_localidade
+
+    @property
+    def cidade_politica(self):
+        if self.municipio_atendimento_id:
+            return self.municipio_atendimento.nome
+        return self.cidade_atendimento
+
+    @property
+    def uf_politica(self):
+        if self.municipio_atendimento_id:
+            return self.municipio_atendimento.uf
+        return self.uf_atendimento
+
+    def save(self, *args, **kwargs):
+        self.sincronizar_municipio_atendimento()
+        super().save(*args, **kwargs)
 
     @property
     def identificador(self):
@@ -1109,8 +1222,9 @@ class ItemDespesa(models.Model):
         return resolver_politica_despesa(
             tipo_despesa=self.tipo,
             data=self.data,
-            tipo_localidade=getattr(relatorio, "tipo_localidade", ""),
-            cidade=getattr(relatorio, "cidade_atendimento", ""),
+            tipo_localidade=getattr(relatorio, "tipo_localidade_efetiva", ""),
+            cidade=getattr(relatorio, "cidade_politica", ""),
+            municipio=getattr(relatorio, "municipio_atendimento", None),
             descricao=self.descricao,
             valor_informado=self.valor,
         )

@@ -1,0 +1,63 @@
+{% if request.user.is_authenticated %}
+<div class="modal fade" id="modalReportarProblema" tabindex="-1" aria-labelledby="modalReportarProblemaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalReportarProblemaLabel">
+          <i class="bi bi-bug me-2 text-primary"></i>Reportar problema ou sugestão
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <form id="form-reportar-problema"
+            data-report-url="{% url 'relatorios:suporte_reportar' %}"
+            novalidate>
+        <div class="modal-body">
+          <div class="alert d-none mb-3" id="reportar-problema-feedback" role="alert"></div>
+
+          <div class="mb-3">
+            <label for="reportar-tipo" class="form-label small fw-semibold text-muted">Tipo *</label>
+            <select class="form-select form-select-sm" id="reportar-tipo" name="tipo" required>
+              <option value="">Selecione</option>
+              <option value="problema">Problema</option>
+              <option value="sugestao">Sugestão</option>
+            </select>
+            <div class="invalid-feedback">Selecione o tipo.</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="reportar-assunto" class="form-label small fw-semibold text-muted">Assunto *</label>
+            <input type="text"
+                   class="form-control form-control-sm"
+                   id="reportar-assunto"
+                   name="assunto"
+                   maxlength="150"
+                   required>
+            <div class="invalid-feedback">Informe um assunto com até 150 caracteres.</div>
+          </div>
+
+          <div class="mb-0">
+            <label for="reportar-descricao" class="form-label small fw-semibold text-muted">Descrição *</label>
+            <textarea class="form-control form-control-sm"
+                      id="reportar-descricao"
+                      name="descricao"
+                      rows="5"
+                      minlength="10"
+                      maxlength="3000"
+                      placeholder="Descreva o que aconteceu ou qual melhoria você sugere."
+                      required></textarea>
+            <div class="form-text">Mínimo de 10 caracteres. Não informe senhas, tokens ou dados sensíveis.</div>
+            <div class="invalid-feedback">Informe uma descrição com pelo menos 10 caracteres.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-sm btn-primary" id="btn-enviar-report">
+            <span class="spinner-border spinner-border-sm me-1 d-none" aria-hidden="true"></span>
+            <span class="btn-label">Enviar</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}

@@ -245,6 +245,12 @@
             <span class="badge bg-body-tertiary text-muted ms-1">
               {{ relatorio.get_tipo_localidade_display }}
             </span>
+            {% if relatorio.municipio_atendimento_id %}
+              <span class="badge bg-success-subtle text-success ms-1">Município oficial</span>
+            {% endif %}
+            {% if relatorio.localidade_override %}
+              <span class="badge bg-warning-subtle text-warning ms-1">Localidade alterada</span>
+            {% endif %}
           </dd>
 
           <dt class="col-sm-4 text-muted fw-medium">Período</dt>

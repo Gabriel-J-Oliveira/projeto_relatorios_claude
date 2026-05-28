@@ -107,9 +107,14 @@ def resolver_politica_despesa(
     data,
     tipo_localidade="",
     cidade="",
+    municipio=None,
     descricao="",
     valor_informado=None,
 ):
+    if municipio is not None:
+        cidade = getattr(municipio, "nome", "") or cidade
+        tipo_localidade = tipo_localidade or getattr(municipio, "tipo_localidade_padrao", "")
+
     texto = f"{cidade} {descricao}"
     chave = ""
 

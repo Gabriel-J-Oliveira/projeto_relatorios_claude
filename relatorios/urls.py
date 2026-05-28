@@ -7,10 +7,12 @@ urlpatterns = [
     path("completar-cadastro/", views.completar_cadastro_view, name="completar_cadastro"),
     path("ajuda/", views.ajuda_index_view, name="ajuda_index"),
     path("ajuda/<slug:slug>/", views.ajuda_artigo_view, name="ajuda_artigo"),
+    path("suporte/reportar/", views.suporte_reportar_view, name="suporte_reportar"),
     path("tours/marcar-visto/", views.marcar_tour_guiado_visto, name="marcar_tour_guiado_visto"),
     path("dashboard/", views.DashboardView.as_view(), name="dashboard"),
     path("dashboard/dados/", views.dashboard_dados_json, name="dashboard_dados"),
     path("politica-despesa/", views.politica_despesa_json, name="politica_despesa"),
+    path("municipios/buscar/", views.municipios_buscar_json, name="municipios_buscar"),
 
     # Relatórios
     path("relatorios/", views.RelatorioListView.as_view(), name="relatorio_list"),
