@@ -139,6 +139,7 @@ def _campos_api_para_update():
         "sincronizado_em",
         "origem_api",
         "hash_dados_api",
+        "valor_km_pendente_api_novo",
     ]
 
 
@@ -173,6 +174,7 @@ def criar_ou_atualizar_cliente(dados, dry_run=False, force=False):
             },
             origem_api=True,
             sincronizado_em=agora,
+            valor_km_pendente_api_novo=True,
         )
         cliente.save()
         logger.info("Cliente criado pela API sem valor_km local. cliente_id=%s cnpj_cpf=%s", cliente.pk, cliente.cnpj_cpf)

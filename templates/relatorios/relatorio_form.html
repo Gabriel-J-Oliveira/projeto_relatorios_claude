@@ -1027,6 +1027,22 @@
     .endereco-sugestao:hover {
       background: var(--bs-tertiary-bg);
     }
+    #municipio-sugestoes {
+      left: .75rem;
+      max-height: 260px;
+      overflow-y: auto;
+      right: .75rem;
+      top: calc(100% - 1.15rem);
+      width: auto !important;
+      z-index: 3050 !important;
+    }
+    .motivo-cliente-card .border {
+      padding: .45rem .55rem !important;
+    }
+    .motivo-cliente-textarea {
+      min-height: 46px;
+      resize: vertical;
+    }
     .linha-trecho.km-divergente {
       box-shadow: inset 3px 0 0 var(--bs-warning);
     }
@@ -1224,7 +1240,7 @@
             <textarea name="motivo_cliente_${id}"
                       class="form-control form-control-sm motivo-cliente-textarea"
                       data-cliente-id="${id}"
-                      rows="2"
+                      rows="1"
                       placeholder="Descreva o motivo da viagem para este cliente">${valor}</textarea>
             <div class="text-danger small mt-1 motivo-cliente-erro d-none">Informe o motivo da viagem.</div>
           </div>
@@ -1487,6 +1503,16 @@
     box.classList.add("d-none");
   }
 
+  function normalizarMunicipioBusca(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[\/,-]/g, " ")
+      .replace(/\s+/g, " ")
+      .toLowerCase()
+      .trim();
+  }
+
   function aplicarMunicipioAtendimento(municipio) {
     if (!municipio) return;
     const municipioInput = document.getElementById("id_municipio_atendimento");
@@ -1494,7 +1520,10 @@
     const ufInput = document.getElementById("id_uf_atendimento");
     const localidadeInput = document.getElementById("id_tipo_localidade");
     if (municipioInput) municipioInput.value = municipio.id;
-    if (cidadeInput) cidadeInput.value = municipio.label || `${municipio.nome}/${municipio.uf}`;
+    if (cidadeInput) {
+      cidadeInput.value = municipio.label || `${municipio.nome}/${municipio.uf}`;
+      cidadeInput.classList.remove("is-invalid");
+    }
     if (ufInput) ufInput.value = municipio.uf;
     if (localidadeInput) localidadeInput.value = municipio.tipo_localidade;
     limparSugestoesMunicipio();
@@ -1507,7 +1536,13 @@
     box.innerHTML = "";
     municipiosEncontrados = lista || [];
     if (!municipiosEncontrados.length) {
-      box.classList.add("d-none");
+      const cidadeInput = document.getElementById("id_cidade_atendimento");
+      if (cidadeInput?.value?.trim().length >= 2) {
+        box.innerHTML = '<div class="list-group-item small text-muted">Nenhuma cidade encontrada. Verifique se a base de municípios foi importada.</div>';
+        box.classList.remove("d-none");
+      } else {
+        box.classList.add("d-none");
+      }
       return;
     }
     municipiosEncontrados.forEach(municipio => {
@@ -1557,15 +1592,17 @@
       return;
     }
     const lista = municipiosEncontrados.length ? municipiosEncontrados : await buscarMunicipiosAtendimento(texto);
-    const normalizar = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const alvo = normalizarMunicipioBusca(texto);
     const exatos = lista.filter(m => {
-      const label = normalizar(m.label);
-      const nome = normalizar(m.nome);
-      const alvo = normalizar(texto);
-      return label === alvo || nome === alvo;
+      const label = normalizarMunicipioBusca(m.label);
+      const nome = normalizarMunicipioBusca(m.nome);
+      const nomeUf = normalizarMunicipioBusca(`${m.nome} ${m.uf}`);
+      return label === alvo || nome === alvo || nomeUf === alvo;
     });
     if (exatos.length === 1) {
       aplicarMunicipioAtendimento(exatos[0]);
+    } else if (lista.length === 1) {
+      aplicarMunicipioAtendimento(lista[0]);
     } else if (!municipioInput.value) {
       cidadeInput.classList.add("is-invalid");
     }
@@ -2688,6 +2725,15 @@ function validarKmGlobal() {
           }
         });
         campoAdiantamento?.addEventListener("input", recalcular);
+        const campoKmExcedente = document.querySelector("[name='km_excedente_interno']");
+        campoKmExcedente?.addEventListener("focus", event => {
+          const valor = (event.target.value || "").trim();
+          if (["0", "0,00", "0.00", "00,00"].includes(valor)) {
+            event.target.value = "";
+          } else {
+            event.target.select?.();
+          }
+        });
         document.querySelector("[name='km_excedente_interno']")
           ?.addEventListener("input", () => {
             recalcular();
@@ -2919,7 +2965,8 @@ function validarKmGlobal() {
       if (!validarDocumentosComprovanteFrontend(form)) {
         invalido = true;
       }
-      if (acaoSubmit !== "rascunho" && !document.getElementById("id_municipio_atendimento")?.value) {
+      const cidadeAtendimentoTexto = document.getElementById("id_cidade_atendimento")?.value?.trim();
+      if (acaoSubmit !== "rascunho" && !document.getElementById("id_municipio_atendimento")?.value && !cidadeAtendimentoTexto) {
         invalido = true;
         document.getElementById("id_cidade_atendimento")?.classList.add("is-invalid");
       }

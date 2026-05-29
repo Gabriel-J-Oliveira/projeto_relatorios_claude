@@ -25,7 +25,7 @@ def permissoes_erp(request):
     pode_configurar_valor_km = usuario_pode_configurar_valor_km(user)
     if pode_configurar_valor_km:
         try:
-            qs_pendentes = clientes_pendentes_valor_km(user)
+            qs_pendentes = clientes_pendentes_valor_km(user, apenas_api_novos=True)
             clientes_sem_valor_km_count = qs_pendentes.count()
             clientes_sem_valor_km = list(qs_pendentes[:20])
         except Exception:

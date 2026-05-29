@@ -18,6 +18,8 @@ from .models import (
     Adiantamento,
     AnexoRelatorio,
     PerfilUsuario,
+    Setor,
+    UsuarioSetorImportado,
 )
 
 
@@ -31,16 +33,49 @@ logger = logging.getLogger(__name__)
 
 @admin.register(PerfilUsuario)
 class PerfilUsuarioAdmin(admin.ModelAdmin):
-    list_display = ["usuario", "cadastro_confirmado_em", "atualizado_em"]
-    search_fields = ["usuario__username", "usuario__first_name", "usuario__last_name", "usuario__email"]
+    list_display = ["usuario", "setor", "funcao_setor", "setor_confirmado", "setor_origem", "cadastro_confirmado_em", "atualizado_em"]
+    list_filter = ["setor", "setor_confirmado", "setor_origem"]
+    search_fields = ["usuario__username", "usuario__first_name", "usuario__last_name", "usuario__email", "funcao_setor"]
+    readonly_fields = ["criado_em", "atualizado_em", "setor_atualizado_em", "setor_atualizado_por"]
+
+
+@admin.register(Setor)
+class SetorAdmin(admin.ModelAdmin):
+    list_display = ["nome", "slug", "ativo", "atualizado_em"]
+    list_filter = ["ativo"]
+    search_fields = ["nome", "slug"]
+    prepopulated_fields = {"slug": ("nome",)}
     readonly_fields = ["criado_em", "atualizado_em"]
+
+
+@admin.register(UsuarioSetorImportado)
+class UsuarioSetorImportadoAdmin(admin.ModelAdmin):
+    list_display = [
+        "nome",
+        "setor",
+        "funcao",
+        "ativo",
+        "status",
+        "usuario_vinculado",
+        "tecnico_vinculado",
+        "aplicado_em",
+    ]
+    list_filter = ["ativo", "status", "setor"]
+    search_fields = [
+        "nome",
+        "nome_normalizado",
+        "funcao",
+        "usuario_vinculado__username",
+        "tecnico_vinculado__nome",
+    ]
+    readonly_fields = ["nome_normalizado", "aplicado_em", "criado_em", "atualizado_em"]
 
 
 @admin.register(Tecnico)
 class TecnicoAdmin(admin.ModelAdmin):
-    list_display = ["nome", "email", "telefone", "ativo"]
-    list_filter = ["ativo"]
-    search_fields = ["nome", "email"]
+    list_display = ["nome", "email", "setor", "funcao_setor", "setor_confirmado", "telefone", "ativo"]
+    list_filter = ["ativo", "setor", "setor_confirmado", "setor_origem"]
+    search_fields = ["nome", "email", "funcao_setor"]
     list_editable = ["ativo"]
 
 

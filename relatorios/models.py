@@ -50,6 +50,12 @@ def normalizar_texto_busca(valor):
     return " ".join(texto.lower().strip().split())
 
 
+def normalizar_nome_pessoa(nome):
+    texto = normalizar_texto_busca(nome)
+    texto = "".join(ch if ch.isalnum() or ch.isspace() else " " for ch in texto)
+    return " ".join(texto.split())
+
+
 # ─────────────────────────────────────────────────────────────────
 # CHOICES
 # ─────────────────────────────────────────────────────────────────
@@ -156,6 +162,36 @@ class UF(models.TextChoices):
     TO = "TO", "Tocantins"
 
 
+class OrigemSetorUsuario(models.TextChoices):
+    IMPORTACAO = "importacao", "Importação"
+    AD = "ad", "AD"
+    USUARIO = "usuario", "Usuário"
+    ADMIN = "admin", "Admin"
+
+
+class StatusImportacaoSetor(models.TextChoices):
+    PENDENTE = "pendente", "Pendente"
+    APLICADO = "aplicado", "Aplicado"
+    AMBIGUO = "ambiguo", "Ambíguo"
+    INATIVO = "inativo", "Inativo"
+
+
+class Setor(models.Model):
+    nome = models.CharField("Nome", max_length=120, unique=True)
+    slug = models.SlugField("Slug", max_length=140, unique=True)
+    ativo = models.BooleanField("Ativo", default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Setor"
+        verbose_name_plural = "Setores"
+        ordering = ["nome"]
+
+    def __str__(self):
+        return self.nome
+
+
 # ─────────────────────────────────────────────────────────────────
 # TECNICO
 # ─────────────────────────────────────────────────────────────────
@@ -178,6 +214,35 @@ class PerfilUsuario(models.Model):
         default=dict,
         blank=True,
     )
+    setor = models.ForeignKey(
+        Setor,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="perfis",
+        verbose_name="Setor",
+    )
+    funcao_setor = models.CharField("Função/cargo", max_length=100, blank=True)
+    setor_confirmado = models.BooleanField("Setor confirmado", default=False)
+    setor_origem = models.CharField(
+        "Origem do setor",
+        max_length=20,
+        choices=OrigemSetorUsuario.choices,
+        blank=True,
+    )
+    setor_atualizado_em = models.DateTimeField(
+        "Setor atualizado em",
+        null=True,
+        blank=True,
+    )
+    setor_atualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="perfis_setor_atualizados",
+        verbose_name="Setor atualizado por",
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
@@ -193,6 +258,35 @@ class Tecnico(models.Model):
     nome = models.CharField("Nome completo", max_length=150)
     email = models.EmailField("E-mail", unique=True)
     telefone = models.CharField("Telefone", max_length=20, blank=True)
+    setor = models.ForeignKey(
+        Setor,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tecnicos",
+        verbose_name="Setor",
+    )
+    funcao_setor = models.CharField("Função/cargo", max_length=100, blank=True)
+    setor_confirmado = models.BooleanField("Setor confirmado", default=False)
+    setor_origem = models.CharField(
+        "Origem do setor",
+        max_length=20,
+        choices=OrigemSetorUsuario.choices,
+        blank=True,
+    )
+    setor_atualizado_em = models.DateTimeField(
+        "Setor atualizado em",
+        null=True,
+        blank=True,
+    )
+    setor_atualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tecnicos_setor_atualizados",
+        verbose_name="Setor atualizado por",
+    )
     ativo = models.BooleanField("Ativo", default=True)
     criado_em = models.DateTimeField(auto_now_add=True)
 
@@ -203,6 +297,62 @@ class Tecnico(models.Model):
 
     def __str__(self):
         return self.nome
+
+
+class UsuarioSetorImportado(models.Model):
+    ativo = models.BooleanField("Ativo", default=True)
+    nome = models.CharField("Nome", max_length=150)
+    nome_normalizado = models.CharField("Nome normalizado", max_length=160, db_index=True)
+    setor = models.ForeignKey(
+        Setor,
+        on_delete=models.PROTECT,
+        related_name="usuarios_importados",
+        verbose_name="Setor",
+    )
+    funcao = models.CharField("Função", max_length=100, blank=True)
+    aplicado_em = models.DateTimeField("Aplicado em", null=True, blank=True)
+    usuario_vinculado = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="setores_importados",
+        verbose_name="Usuário vinculado",
+    )
+    tecnico_vinculado = models.ForeignKey(
+        "Tecnico",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="setores_importados",
+        verbose_name="Técnico vinculado",
+    )
+    status = models.CharField(
+        "Status",
+        max_length=20,
+        choices=StatusImportacaoSetor.choices,
+        default=StatusImportacaoSetor.PENDENTE,
+        db_index=True,
+    )
+    observacao = models.TextField("Observação", blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Usuário/setor importado"
+        verbose_name_plural = "Usuários/setores importados"
+        ordering = ["nome"]
+        indexes = [
+            models.Index(fields=["nome_normalizado", "ativo"]),
+            models.Index(fields=["status", "ativo"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.nome_normalizado = normalizar_nome_pessoa(self.nome)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.nome} - {self.setor}"
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -312,6 +462,11 @@ class Cliente(models.Model):
         related_name="clientes_valor_km_atualizados",
     )
     valor_km_observacao = models.TextField("Observacao do valor KM", blank=True)
+    valor_km_pendente_api_novo = models.BooleanField(
+        "Valor KM pendente desde importacao API",
+        default=False,
+        db_index=True,
+    )
 
     criado_em = models.DateTimeField(auto_now_add=True)
     api_created_at = models.DateTimeField("Criado na API", blank=True, null=True)

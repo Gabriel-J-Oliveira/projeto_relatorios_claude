@@ -104,6 +104,7 @@ from .services.pdf_interno_service import montar_contexto_pdf_interno
 from .services.maps_service import MapsServiceError, buscar_endereco, calcular_rota
 from .services.dashboard_service import get_dashboard_context, get_dashboard_data
 from .services.help_center_service import contexto_central_ajuda, obter_artigo
+from .services.setores_service import aplicar_setor_manual_perfil
 from .forms import (
     AdiantamentoForm,
     ClienteForm,
@@ -238,6 +239,21 @@ def suporte_reportar_view(request):
 
 
 @login_required
+def perfil_usuario_view(request):
+    perfil, _criado = PerfilUsuario.objects.select_related("setor").get_or_create(usuario=request.user)
+    tipo_usuario = "Administrador" if usuario_eh_administrativo(request.user) else "Usuário"
+    return render(
+        request,
+        "registration/perfil_usuario.html",
+        {
+            "perfil": perfil,
+            "tipo_usuario": tipo_usuario,
+            "titulo_pagina": "Meu perfil",
+        },
+    )
+
+
+@login_required
 @require_POST
 def clientes_valor_km_salvar_view(request):
     try:
@@ -325,12 +341,19 @@ def completar_cadastro_view(request):
     next_url = request.GET.get("next") or request.POST.get("next") or ""
 
     if request.method == "POST":
-        form = CompletarCadastroUsuarioForm(request.POST, user=request.user)
+        form = CompletarCadastroUsuarioForm(request.POST, user=request.user, perfil=perfil)
         if form.is_valid():
             request.user.first_name = form.cleaned_data["first_name"].strip()
             request.user.last_name = form.cleaned_data["last_name"].strip()
             request.user.email = form.cleaned_data["email"]
             request.user.save(update_fields=["first_name", "last_name", "email"])
+            aplicar_setor_manual_perfil(
+                request.user,
+                setor=form.cleaned_data["setor"],
+                funcao_setor=form.cleaned_data.get("funcao_setor", ""),
+                atualizado_por=request.user,
+            )
+            perfil.refresh_from_db()
             perfil.cadastro_confirmado_em = timezone.now()
             perfil.save(update_fields=["cadastro_confirmado_em", "atualizado_em"])
             messages.success(request, "Dados cadastrais confirmados com sucesso.")
@@ -342,7 +365,7 @@ def completar_cadastro_view(request):
                 return redirect(next_url)
             return redirect("relatorios:dashboard")
     else:
-        form = CompletarCadastroUsuarioForm(user=request.user)
+        form = CompletarCadastroUsuarioForm(user=request.user, perfil=perfil)
 
     return render(
         request,
@@ -1066,16 +1089,20 @@ def municipios_buscar_json(request):
 
     from .models import normalizar_texto_busca
 
-    termo_norm = normalizar_texto_busca(termo)
+    termo_limpo = termo.replace("/", " ").replace(",", " ")
+    partes = termo_limpo.split()
+    uf_informada = ""
+    if len(partes) > 1 and len(partes[-1]) == 2:
+        uf_informada = partes[-1].upper()
+        termo_limpo = " ".join(partes[:-1]) or termo_limpo
+    termo_norm = normalizar_texto_busca(termo_limpo)
     qs = Municipio.objects.filter(ativo=True)
-    if len(termo_norm) == 2:
-        qs = qs.filter(uf__iexact=termo_norm)
-    else:
-        qs = qs.filter(
-            Q(nome_normalizado__icontains=termo_norm)
-            | Q(nome__icontains=termo)
-            | Q(uf__iexact=termo)
-        )
+    filtros = Q(nome_normalizado__icontains=termo_norm) | Q(nome__icontains=termo)
+    if len(termo.strip()) == 2:
+        filtros |= Q(uf__iexact=termo)
+    qs = qs.filter(filtros)
+    if uf_informada:
+        qs = qs.filter(uf__iexact=uf_informada)
     dados = [
         {
             "id": municipio.pk,
@@ -2969,57 +2996,63 @@ class TecnicoListView(AdministrativoMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        qs = Tecnico.objects.all()
+        qs = Tecnico.objects.select_related("setor").all()
         busca = self.request.GET.get("busca", "").strip()
         if busca:
-            qs = qs.filter(Q(nome__icontains=busca) | Q(email__icontains=busca))
+            qs = qs.filter(
+                Q(nome__icontains=busca)
+                | Q(email__icontains=busca)
+                | Q(setor__nome__icontains=busca)
+                | Q(funcao_setor__icontains=busca)
+            )
         return qs
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["titulo_pagina"] = "Técnicos"
         ctx["busca"] = self.request.GET.get("busca", "")
+        ctx["tecnicos_total_filtrado"] = ctx["paginator"].count if ctx.get("paginator") else len(ctx.get("tecnicos", []))
+        ctx["tecnicos_qtd_pagina"] = len(ctx.get("tecnicos", []))
         return ctx
 
 
 @login_required
 @exigir_administrativo
-def tecnico_form_view(request, pk=None):
-    instance = get_object_or_404(Tecnico, pk=pk) if pk else None
-    form = TecnicoForm(request.POST or None, instance=instance)
-    if form.is_valid():
-        t = form.save()
-        messages.success(request, f"Técnico {t.nome} salvo!")
-        return redirect("relatorios:tecnico_list")
+def tecnico_detail_view(request, pk):
+    tecnico = get_object_or_404(Tecnico.objects.select_related("setor"), pk=pk)
+    usuario = None
+    if tecnico.email:
+        from django.contrib.auth import get_user_model
+
+        usuario = get_user_model().objects.filter(email__iexact=tecnico.email).first()
+    tipo_usuario = "Administrador" if usuario and usuario_eh_administrativo(usuario) else "Usuário"
     return render(
         request,
-        "tecnicos/tecnico_form.html",
+        "tecnicos/tecnico_detail.html",
         {
-            "form": form,
-            "instance": instance,
-            "titulo_pagina": "Editar Técnico" if instance else "Novo Técnico",
-            "salvar_rascunho": "Salvar rascunho",
-            "enviar": "Salvar alterações" if instance else "Cadastrar",
+            "tecnico": tecnico,
+            "usuario_vinculado": usuario,
+            "tipo_usuario": tipo_usuario,
+            "titulo_pagina": "Detalhe do técnico",
         },
     )
 
 
 @login_required
 @exigir_administrativo
+def tecnico_form_view(request, pk=None):
+    if pk:
+        messages.info(request, "Os dados de técnicos são sincronizados pelo AD. Esta tela é somente leitura.")
+        return redirect("relatorios:tecnico_detail", pk=pk)
+    messages.warning(request, "O cadastro de técnicos é realizado automaticamente a partir do AD.")
+    return redirect("relatorios:tecnico_list")
+
+
+@login_required
+@exigir_administrativo
 def tecnico_delete_view(request, pk):
-    tecnico = get_object_or_404(Tecnico, pk=pk)
-    if request.method == "POST":
-        tecnico.delete()
-        messages.success(request, "Técnico removido.")
-        return redirect("relatorios:tecnico_list")
-    return render(
-        request,
-        "tecnicos/tecnico_confirm_delete.html",
-        {
-            "object": tecnico,
-            "titulo_pagina": "Excluir Técnico",
-        },
-    )
+    messages.warning(request, "Técnicos não são removidos manualmente; o status deve vir da sincronização do AD.")
+    return redirect("relatorios:tecnico_detail", pk=pk)
 
 
 # ─────────────────────────────────────────────
@@ -3057,6 +3090,8 @@ class ClienteListView(AdministrativoMixin, ListView):
         ctx["titulo_pagina"] = "Clientes"
         ctx["busca"] = self.request.GET.get("busca", "")
         ctx["valor_km_filtro"] = self.request.GET.get("valor_km", "")
+        ctx["clientes_total_filtrado"] = ctx["paginator"].count if ctx.get("paginator") else len(ctx.get("clientes", []))
+        ctx["clientes_qtd_pagina"] = len(ctx.get("clientes", []))
         return ctx
 
 

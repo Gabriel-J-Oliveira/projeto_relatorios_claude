@@ -55,7 +55,7 @@ def obter_notificacoes_usuario(usuario):
             )
 
         qtd_clientes_sem_km = (
-            clientes_pendentes_valor_km(usuario).count()
+            clientes_pendentes_valor_km(usuario, apenas_api_novos=True).count()
             if usuario_pode_configurar_valor_km(usuario)
             else 0
         )

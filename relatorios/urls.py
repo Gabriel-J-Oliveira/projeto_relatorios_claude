@@ -5,6 +5,7 @@ app_name = "relatorios"
 
 urlpatterns = [
     path("completar-cadastro/", views.completar_cadastro_view, name="completar_cadastro"),
+    path("perfil/", views.perfil_usuario_view, name="perfil_usuario"),
     path("ajuda/", views.ajuda_index_view, name="ajuda_index"),
     path("ajuda/<slug:slug>/", views.ajuda_artigo_view, name="ajuda_artigo"),
     path("suporte/reportar/", views.suporte_reportar_view, name="suporte_reportar"),
@@ -48,6 +49,7 @@ urlpatterns = [
 
     # Técnicos
     path("tecnicos/", views.TecnicoListView.as_view(), name="tecnico_list"),
+    path("tecnicos/<int:pk>/", views.tecnico_detail_view, name="tecnico_detail"),
     path("tecnicos/novo/", views.tecnico_form_view, name="tecnico_create"),
     path("tecnicos/<int:pk>/editar/", views.tecnico_form_view, name="tecnico_update"),
     path("tecnicos/<int:pk>/excluir/", views.tecnico_delete_view, name="tecnico_delete"),

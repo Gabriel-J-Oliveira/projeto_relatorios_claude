@@ -60,7 +60,9 @@
 <div class="card border-0 shadow-sm">
   <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center gap-2">
     <i class="bi bi-building text-primary"></i>
-    <h6 class="mb-0 fw-semibold">{{ clientes.count }} cliente{{ clientes.count|pluralize }} cadastrado{{ clientes.count|pluralize }}</h6>
+    <h6 class="mb-0 fw-semibold">
+      Exibindo {{ clientes_qtd_pagina }} cliente{{ clientes_qtd_pagina|pluralize }} de {{ clientes_total_filtrado }} cadastrado{{ clientes_total_filtrado|pluralize }}
+    </h6>
   </div>
   <div class="card-body p-0">
     {% if clientes %}

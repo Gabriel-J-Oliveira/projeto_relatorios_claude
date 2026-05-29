@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block titulo %}Meu perfil{% endblock %}
+{% block page_title %}Meu perfil{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a>
+  </li>
+  <li class="breadcrumb-item active">Meu perfil</li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-7 col-xl-6">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <div class="d-flex align-items-center gap-3 mb-4">
+          <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold"
+               style="width:64px;height:64px;font-size:1.35rem;">
+            {{ request.user.get_short_name|default:request.user.username|first|upper }}
+          </div>
+          <div>
+            <h5 class="mb-1 fw-semibold">{{ request.user.get_full_name|default:request.user.username }}</h5>
+            <span class="badge text-bg-primary rounded-pill">{{ tipo_usuario }}</span>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <div class="border rounded-2 p-3 h-100">
+              <div class="text-muted small mb-1">Nome completo</div>
+              <div class="fw-semibold">{{ request.user.get_full_name|default:"-" }}</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="border rounded-2 p-3 h-100">
+              <div class="text-muted small mb-1">Tipo de usuário</div>
+              <div class="fw-semibold">{{ tipo_usuario }}</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="border rounded-2 p-3 h-100">
+              <div class="text-muted small mb-1">Setor</div>
+              <div class="fw-semibold">{{ perfil.setor.nome|default:"Não informado" }}</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="border rounded-2 p-3 h-100">
+              <div class="text-muted small mb-1">E-mail</div>
+              <div class="fw-semibold text-break">{{ request.user.email|default:"Não informado" }}</div>
+            </div>
+          </div>
+          {% if perfil.funcao_setor %}
+          <div class="col-12">
+            <div class="border rounded-2 p-3">
+              <div class="text-muted small mb-1">Função</div>
+              <div class="fw-semibold">{{ perfil.funcao_setor }}</div>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block titulo %}Técnico{% endblock %}
+{% block page_title %}Técnico{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a>
+  </li>
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:tecnico_list' %}" class="text-decoration-none">Técnicos</a>
+  </li>
+  <li class="breadcrumb-item active">{{ tecnico.nome }}</li>
+{% endblock %}
+
+{% block page_actions %}
+  <a href="{% url 'relatorios:tecnico_list' %}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Voltar
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8 col-xl-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <div class="d-flex align-items-center gap-3 mb-4">
+          <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center fw-bold"
+               style="width:64px;height:64px;font-size:1.35rem;">
+            {{ tecnico.nome|first|upper }}
+          </div>
+          <div>
+            <h5 class="mb-1 fw-semibold">{{ tecnico.nome }}</h5>
+            <span class="badge {% if tecnico.ativo %}text-bg-success{% else %}text-bg-secondary{% endif %} rounded-pill">
+              {% if tecnico.ativo %}Ativo{% else %}Inativo{% endif %}
+            </span>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <div class="border rounded-2 p-3 h-100">
+              <div class="text-muted small mb-1">Nome completo</div>
+              <div class="fw-semibold">{{ tecnico.nome }}</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="border rounded-2 p-3 h-100">
+              <div class="text-muted small mb-1">Usuário/login</div>
+              <div class="fw-semibold">{{ usuario_vinculado.username|default:"-" }}</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="border rounded-2 p-3 h-100">
+              <div class="text-muted small mb-1">Tipo/perfil</div>
+              <div class="fw-semibold">{{ tipo_usuario }}</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="border rounded-2 p-3 h-100">
+              <div class="text-muted small mb-1">Setor</div>
+              <div class="fw-semibold">{{ tecnico.setor.nome|default:"Não informado" }}</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="border rounded-2 p-3 h-100">
+              <div class="text-muted small mb-1">E-mail</div>
+              <div class="fw-semibold text-break">{{ tecnico.email|default:"Não informado" }}</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="border rounded-2 p-3 h-100">
+              <div class="text-muted small mb-1">Último login</div>
+              <div class="fw-semibold">
+                {% if usuario_vinculado and usuario_vinculado.last_login %}
+                  {{ usuario_vinculado.last_login|date:"d/m/Y H:i" }}
+                {% else %}
+                  -
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% if tecnico.funcao_setor %}
+          <div class="col-12">
+            <div class="border rounded-2 p-3">
+              <div class="text-muted small mb-1">Função</div>
+              <div class="fw-semibold">{{ tecnico.funcao_setor }}</div>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

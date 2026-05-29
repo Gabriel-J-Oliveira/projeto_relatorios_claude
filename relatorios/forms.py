@@ -14,6 +14,7 @@ from .models import (
     Adiantamento,
     TipoDocumentoComprovante,
     Municipio,
+    Setor,
 )
 from .validators import validar_anexo_upload
 
@@ -97,15 +98,37 @@ class CompletarCadastroUsuarioForm(BootstrapMixin, forms.Form):
             "invalid": "Informe um e-mail válido.",
         },
     )
+    setor = forms.ModelChoiceField(
+        label="Setor",
+        queryset=Setor.objects.none(),
+        required=True,
+        empty_label="Selecione seu setor",
+        error_messages={"required": "Selecione seu setor."},
+    )
+    funcao_setor = forms.CharField(
+        label="Função",
+        max_length=100,
+        required=False,
+        help_text="Opcional. Ex.: Colaborador, Líder, Coordenador.",
+    )
 
-    def __init__(self, *args, user=None, **kwargs):
+    def __init__(self, *args, user=None, perfil=None, **kwargs):
         self.user = user
+        self.perfil = perfil
         initial = kwargs.pop("initial", {}) or {}
         if user is not None:
             initial.setdefault("first_name", user.first_name)
             initial.setdefault("last_name", user.last_name)
             initial.setdefault("email", user.email)
+        if perfil is not None:
+            initial.setdefault("setor", perfil.setor_id)
+            initial.setdefault("funcao_setor", perfil.funcao_setor)
         super().__init__(*args, initial=initial, **kwargs)
+        self.fields["setor"].queryset = Setor.objects.filter(ativo=True).order_by("nome")
+        self.fields["funcao_setor"].widget.attrs.setdefault(
+            "placeholder",
+            "Ex.: Colaborador, Lider, Coordenador",
+        )
 
     def clean_email(self):
         email = (self.cleaned_data["email"] or "").strip().lower()
@@ -831,7 +854,7 @@ class RelatorioFiltroForm(BootstrapMixin, forms.Form):
 class TecnicoForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = Tecnico
-        fields = ["nome", "email", "telefone", "ativo"]
+        fields = ["nome", "email", "telefone", "setor", "funcao_setor", "ativo"]
 
 
 class ClienteForm(BootstrapMixin, forms.ModelForm):

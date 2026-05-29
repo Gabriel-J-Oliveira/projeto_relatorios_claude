@@ -25,12 +25,15 @@ def usuario_pode_configurar_valor_km(user):
     )
 
 
-def clientes_pendentes_valor_km(usuario=None):
+def clientes_pendentes_valor_km(usuario=None, apenas_api_novos=False):
     if usuario is not None and not usuario_pode_configurar_valor_km(usuario):
         return Cliente.objects.none()
-    return Cliente.objects.filter(ativo=True).filter(
+    qs = Cliente.objects.filter(ativo=True).filter(
         Q(valor_km__isnull=True) | Q(valor_km__lte=0)
     ).order_by("nome_fantasia", "razao_social", "nome")
+    if apenas_api_novos:
+        qs = qs.filter(valor_km_pendente_api_novo=True)
+    return qs
 
 
 def normalizar_valor_km(valor):
@@ -63,6 +66,7 @@ def salvar_valor_km_cliente(cliente, valor_km, usuario, observacao=""):
         return False
 
     cliente.valor_km = valor_novo
+    cliente.valor_km_pendente_api_novo = False
     cliente.valor_km_atualizado_em = timezone.now()
     cliente.valor_km_atualizado_por = usuario
     if observacao is not None:
@@ -73,6 +77,7 @@ def salvar_valor_km_cliente(cliente, valor_km, usuario, observacao=""):
             "valor_km_atualizado_em",
             "valor_km_atualizado_por",
             "valor_km_observacao",
+            "valor_km_pendente_api_novo",
         ]
     )
     logger.info(
