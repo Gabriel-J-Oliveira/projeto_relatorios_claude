@@ -30,7 +30,9 @@
         <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
           Lembrar depois
         </button>
-        <a href="{% url 'relatorios:cliente_list' %}?valor_km=pendente" class="btn btn-warning btn-sm text-dark">
+        <a href="{% url 'relatorios:cliente_list' %}?valor_km=pendente"
+           class="btn btn-warning btn-sm text-dark"
+           data-clientes-valor-km-link>
           <i class="bi bi-list-check me-1"></i>Ver clientes pendentes
         </a>
       </div>

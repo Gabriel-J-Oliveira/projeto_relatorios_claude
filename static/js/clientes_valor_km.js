@@ -23,6 +23,21 @@
     document.querySelectorAll("[data-open-clientes-valor-km]").forEach(btn => {
       btn.addEventListener("click", abrirModal);
     });
+    document.querySelectorAll("[data-clientes-valor-km-link]").forEach(link => {
+      link.addEventListener("click", () => {
+        const instance = bootstrap.Modal.getInstance(modal);
+        if (instance) instance.hide();
+        document.body.classList.remove("modal-open");
+        document.querySelectorAll(".modal-backdrop").forEach(backdrop => backdrop.remove());
+      });
+    });
+    const path = window.location.pathname.replace(/\/+$/, "/");
+    const params = new URLSearchParams(window.location.search);
+    const estaNaCorrecaoPendencias = path.endsWith("/clientes/")
+      && params.get("valor_km") === "pendente";
+    if (estaNaCorrecaoPendencias || path.endsWith("/clientes/")) {
+      return;
+    }
     const pendencias = parseInt(modal.dataset.pendencias || "0", 10);
     if (pendencias > 0 && sessionStorage.getItem("clientesValorKmLembrarDepois") !== "1") {
       setTimeout(abrirModal, 500);
