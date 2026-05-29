@@ -43,6 +43,11 @@
   async function salvarValorKmLinha(button) {
     const row = button.closest("[data-cliente-row]");
     if (!row) return;
+    const url = row.dataset.valorKmUrl;
+    if (!url) {
+      feedback(row, "Cliente inválido para edição de valor KM.", false);
+      return;
+    }
     const input = row.querySelector("[data-cliente-valor-km-input]");
     const valor = input?.value || "";
     if (!valor.trim()) {
@@ -53,7 +58,7 @@
     const htmlOriginal = button.innerHTML;
     button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
     try {
-      const response = await fetch(row.dataset.valorKmUrl, {
+      const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -83,6 +88,12 @@
 
   function iniciarEdicaoRapida() {
     document.querySelectorAll("[data-save-cliente-valor-km]").forEach(button => {
+      const row = button.closest("[data-cliente-row]");
+      if (!row?.dataset.valorKmUrl) {
+        button.disabled = true;
+        button.title = "Cliente inválido para edição de valor KM.";
+        return;
+      }
       button.addEventListener("click", () => salvarValorKmLinha(button));
     });
   }

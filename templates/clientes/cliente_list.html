@@ -67,7 +67,7 @@
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0">
         <thead class="table-light">
-          <tr data-cliente-row data-valor-km-url="{% url 'relatorios:cliente_valor_km_salvar' c.pk %}">
+          <tr>
             <th class="ps-4 py-3 fw-semibold text-muted small">Cliente</th>
             <th class="py-3 fw-semibold text-muted small">CNPJ / CPF</th>
             <th class="py-3 fw-semibold text-muted small">Localização</th>
@@ -80,7 +80,7 @@
         </thead>
         <tbody>
           {% for c in clientes %}
-          <tr>
+          <tr data-cliente-row{% if c.pk %} data-valor-km-url="{% url 'relatorios:cliente_valor_km_salvar' c.pk %}"{% endif %}>
             <td class="ps-4">
               <div class="d-flex align-items-center gap-2">
                 <div class="d-flex align-items-center justify-content-center rounded-circle bg-success-subtle text-success fw-bold"
@@ -103,7 +103,7 @@
               {% if c.telefone %}{{ c.telefone }}{% elif c.contato %}{{ c.contato }}{% else %}—{% endif %}
             </td>
             <td style="min-width: 190px;">
-              {% if valor_km_filtro == "pendente" and pode_configurar_valor_km %}
+              {% if valor_km_filtro == "pendente" and pode_configurar_valor_km and c.pk %}
                 <div class="input-group input-group-sm">
                   <input type="number"
                          min="0.01"
@@ -138,14 +138,16 @@
             </td>
             <td class="text-end pe-4">
               <div class="d-flex gap-1 justify-content-end">
-                <a href="{% url 'relatorios:cliente_update' c.pk %}"
-                   class="btn btn-sm btn-outline-primary" title="Editar">
-                  <i class="bi bi-pencil"></i>
-                </a>
-                <a href="{% url 'relatorios:cliente_delete' c.pk %}"
-                   class="btn btn-sm btn-outline-danger" title="Excluir">
-                  <i class="bi bi-trash"></i>
-                </a>
+                {% if c.pk %}
+                  <a href="{% url 'relatorios:cliente_update' c.pk %}"
+                     class="btn btn-sm btn-outline-primary" title="Editar">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                  <a href="{% url 'relatorios:cliente_delete' c.pk %}"
+                     class="btn btn-sm btn-outline-danger" title="Excluir">
+                    <i class="bi bi-trash"></i>
+                  </a>
+                {% endif %}
               </div>
             </td>
           </tr>
