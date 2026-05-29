@@ -133,8 +133,11 @@ def validar_relatorio_para_envio(relatorio):
 
     erros.extend(validar_valores_negativos(relatorio))
     erros.extend(validar_motivos_clientes_relatorio(relatorio))
-    erros.extend(erros_clientes_sem_valor_km_relatorio(relatorio))
-    erros.extend(validar_integridade_financeira_relatorio(relatorio))
+    erros.extend(
+        erro
+        for erro in validar_integridade_financeira_relatorio(relatorio)
+        if "valor/KM" not in erro
+    )
 
     return ResultadoValidacaoOperacional.falha(erros)
 

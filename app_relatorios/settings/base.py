@@ -471,6 +471,11 @@ LOGGING = {
             "level": APP_LOG_LEVEL,
             "propagate": False,
         },
+        "relatorios.clientes.valor_km": {
+            "handlers": ["console"],
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
         "relatorios.services.maps_service": {
             "handlers": ["console"],
             "level": APP_LOG_LEVEL,
@@ -532,6 +537,7 @@ if LOG_FILES_ENABLED:
     LOGGING["loggers"]["relatorios.services.clientes_api_service"]["handlers"] = ["console", "app_file", "errors_file"]
     LOGGING["loggers"]["relatorios.services.clientes_sync_service"]["handlers"] = ["console", "app_file", "errors_file"]
     LOGGING["loggers"]["relatorios.importacao_valor_km"]["handlers"] = ["console", "app_file", "errors_file"]
+    LOGGING["loggers"]["relatorios.clientes.valor_km"]["handlers"] = ["console", "app_file", "errors_file"]
     LOGGING["loggers"]["relatorios.services.maps_service"]["handlers"] = ["console", "maps_file", "errors_file"]
     LOGGING["loggers"]["relatorios.services.pdf_cliente_service"]["handlers"] = ["console", "pdfs_file", "errors_file"]
     LOGGING["loggers"]["relatorios.services.pdf_interno_service"]["handlers"] = ["console", "pdfs_file", "errors_file"]

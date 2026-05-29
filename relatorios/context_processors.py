@@ -1,7 +1,14 @@
 import json
 
 from relatorios.services.autorizacao_service import permissoes_usuario
-from relatorios.services.clientes_valor_km_service import clientes_pendentes_valor_km
+from relatorios.services.clientes_valor_km_service import (
+    clientes_pendentes_valor_km,
+    usuario_pode_configurar_valor_km,
+)
+from relatorios.services.notificacoes_service import (
+    obter_notificacoes_usuario,
+    total_notificacoes,
+)
 
 
 def permissoes_erp(request):
@@ -15,7 +22,8 @@ def permissoes_erp(request):
     permissoes = permissoes_usuario(user)
     clientes_sem_valor_km = []
     clientes_sem_valor_km_count = 0
-    if permissoes.get("financeiro"):
+    pode_configurar_valor_km = usuario_pode_configurar_valor_km(user)
+    if pode_configurar_valor_km:
         try:
             qs_pendentes = clientes_pendentes_valor_km(user)
             clientes_sem_valor_km_count = qs_pendentes.count()
@@ -23,6 +31,10 @@ def permissoes_erp(request):
         except Exception:
             clientes_sem_valor_km = []
             clientes_sem_valor_km_count = 0
+    try:
+        notificacoes = obter_notificacoes_usuario(user)
+    except Exception:
+        notificacoes = []
 
     return {
         "permissoes_erp": permissoes,
@@ -30,4 +42,7 @@ def permissoes_erp(request):
         "tours_guiados_vistos_json": json.dumps(tours_guiados_vistos),
         "clientes_sem_valor_km": clientes_sem_valor_km,
         "clientes_sem_valor_km_count": clientes_sem_valor_km_count,
+        "pode_configurar_valor_km": pode_configurar_valor_km,
+        "notificacoes_usuario": notificacoes,
+        "notificacoes_usuario_total": total_notificacoes(notificacoes),
     }

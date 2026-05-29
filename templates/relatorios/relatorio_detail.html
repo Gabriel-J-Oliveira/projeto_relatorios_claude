@@ -77,6 +77,24 @@
   </span>
 </div>
 
+{% if pode_atuar_financeiro and clientes_sem_valor_km_relatorio %}
+<div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2 shadow-sm">
+  <div>
+    <i class="bi bi-speedometer2 me-2"></i>
+    Este relatório possui cliente(s) sem valor de KM cadastrado:
+    <strong>
+      {% for cliente in clientes_sem_valor_km_relatorio %}
+        {{ cliente.nome_exibicao }}{% if not forloop.last %}, {% endif %}
+      {% endfor %}
+    </strong>.
+    Preencha antes da aprovação.
+  </div>
+  <a href="{% url 'relatorios:cliente_list' %}?valor_km=pendente" class="btn btn-sm btn-warning text-dark">
+    Corrigir valor de KM
+  </a>
+</div>
+{% endif %}
+
 {% if relatorio.motivo_rejeicao and relatorio.status == 'ajuste_pendente' %}
 <div class="alert alert-warning border-0 shadow-sm mb-4">
   <div class="d-flex align-items-center gap-2 mb-2">

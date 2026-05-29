@@ -14,7 +14,7 @@ from relatorios.services.autorizacao_service import (
 )
 
 
-logger = logging.getLogger("relatorios.views.clientes")
+logger = logging.getLogger("relatorios.clientes.valor_km")
 
 
 def usuario_pode_configurar_valor_km(user):
@@ -132,6 +132,6 @@ def clientes_relatorio_sem_valor_km(relatorio):
 def erros_clientes_sem_valor_km_relatorio(relatorio):
     pendentes = clientes_relatorio_sem_valor_km(relatorio)
     return [
-        f"Nao e possivel enviar/aprovar o relatorio: o cliente {cliente.nome_exibicao} nao possui valor de KM configurado."
+        f"Nao e possivel aprovar este relatorio: o cliente {cliente.nome_exibicao} nao possui valor padrao de KM cadastrado."
         for cliente in pendentes
     ]

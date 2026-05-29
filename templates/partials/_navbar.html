@@ -22,14 +22,59 @@
 
       <!-- Toggle tema claro/escuro -->
       {% if request.user.is_authenticated %}
-      {% if permissoes_erp.financeiro and clientes_sem_valor_km_count %}
-      <button class="btn btn-sm btn-warning d-none d-md-inline-flex align-items-center gap-1"
-              type="button"
-              data-open-clientes-valor-km>
-        <i class="bi bi-speedometer2"></i>
-        <span>Clientes sem valor KM: {{ clientes_sem_valor_km_count }}</span>
-      </button>
-      {% endif %}
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary rounded-circle position-relative"
+                type="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+                title="Notificações"
+                style="width: 34px; height: 34px;">
+          <i class="bi bi-bell"></i>
+          {% if notificacoes_usuario_total %}
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                  style="font-size:.65rem;">
+              {{ notificacoes_usuario_total }}
+            </span>
+          {% endif %}
+        </button>
+        <div class="dropdown-menu dropdown-menu-end shadow border-0 mt-2 p-0 overflow-hidden"
+             style="width:min(380px, calc(100vw - 1.5rem));">
+          <div class="px-3 py-2 border-bottom bg-body-tertiary d-flex align-items-center justify-content-between">
+            <span class="fw-semibold small">Notificações</span>
+            {% if notificacoes_usuario_total %}
+              <span class="badge text-bg-primary rounded-pill">{{ notificacoes_usuario_total }}</span>
+            {% endif %}
+          </div>
+          {% if notificacoes_usuario %}
+            <div class="list-group list-group-flush">
+              {% for notificacao in notificacoes_usuario %}
+                <a href="{{ notificacao.url }}"
+                   class="list-group-item list-group-item-action py-3">
+                  <div class="d-flex gap-3">
+                    <div class="rounded-circle bg-{{ notificacao.nivel }}-subtle text-{{ notificacao.nivel }} d-flex align-items-center justify-content-center flex-shrink-0"
+                         style="width:34px;height:34px;">
+                      <i class="bi {{ notificacao.icone }}"></i>
+                    </div>
+                    <div class="min-w-0 flex-grow-1">
+                      <div class="d-flex align-items-start justify-content-between gap-2">
+                        <div class="fw-semibold small text-body">{{ notificacao.titulo }}</div>
+                        <span class="badge text-bg-{{ notificacao.nivel }} rounded-pill">{{ notificacao.quantidade }}</span>
+                      </div>
+                      <div class="text-muted small mt-1">{{ notificacao.mensagem }}</div>
+                    </div>
+                  </div>
+                </a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="text-center text-muted small py-4 px-3">
+              <i class="bi bi-check-circle fs-4 d-block mb-2"></i>
+              Nenhuma notificação no momento.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
       <button class="btn btn-sm btn-outline-secondary d-none d-md-inline-flex align-items-center gap-1"
               type="button"
               data-bs-toggle="modal"
@@ -73,16 +118,6 @@
         </button>
         <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-1">
           {% if request.user.is_authenticated %}
-          {% if permissoes_erp.financeiro and clientes_sem_valor_km_count %}
-          <li>
-            <button class="dropdown-item d-flex align-items-center gap-2"
-                    type="button"
-                    data-open-clientes-valor-km>
-              <i class="bi bi-speedometer2 text-warning"></i>
-              Clientes sem valor KM: {{ clientes_sem_valor_km_count }}
-            </button>
-          </li>
-          {% endif %}
           <li>
             <button class="dropdown-item d-flex align-items-center gap-2"
                     type="button"

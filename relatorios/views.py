@@ -51,7 +51,12 @@ from .services.clientes_relatorio_service import (
     sync_clientes_relatorio,
     sync_clientes_trecho,
 )
-from .services.clientes_valor_km_service import salvar_valores_km_clientes
+from .services.clientes_valor_km_service import (
+    clientes_pendentes_valor_km,
+    clientes_relatorio_sem_valor_km,
+    salvar_valor_km_cliente,
+    salvar_valores_km_clientes,
+)
 from .validators import anexo_tem_tipo_permitido
 from .services.autorizacao_service import (
     exigir_acesso_erp,
@@ -267,6 +272,49 @@ def clientes_valor_km_salvar_view(request):
             "success": True,
             "message": f"{atualizados} valor(es) de KM atualizado(s) com sucesso.",
             "atualizados": atualizados,
+        }
+    )
+
+
+@login_required
+@require_POST
+def cliente_valor_km_salvar_view(request, pk):
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (TypeError, ValueError, UnicodeDecodeError):
+        payload = request.POST
+
+    cliente = get_object_or_404(Cliente, pk=pk, ativo=True)
+    try:
+        salvar_valor_km_cliente(
+            cliente,
+            payload.get("valor_km"),
+            request.user,
+            payload.get("observacao", "Listagem de clientes"),
+        )
+    except PermissionDenied:
+        logger.warning("Tentativa sem permissao de salvar valor_km usuario=%s cliente=%s", request.user.pk, pk)
+        return JsonResponse(
+            {"success": False, "error": "Voce nao tem permissao para alterar valor de KM."},
+            status=403,
+        )
+    except ValidationError as exc:
+        mensagens = exc.messages if hasattr(exc, "messages") else [str(exc)]
+        return JsonResponse({"success": False, "error": " ".join(mensagens)}, status=400)
+    except Exception as exc:
+        logger.exception("Erro ao salvar valor KM do cliente %s: %s", pk, exc)
+        return JsonResponse(
+            {"success": False, "error": "Nao foi possivel salvar o valor. Tente novamente."},
+            status=500,
+        )
+
+    pendentes = clientes_pendentes_valor_km(request.user).count()
+    return JsonResponse(
+        {
+            "success": True,
+            "message": "Valor de KM salvo com sucesso.",
+            "valor_km": str(cliente.valor_km),
+            "pendentes": pendentes,
         }
     )
 
@@ -1974,6 +2022,11 @@ def relatorio_detail_view(request, pk):
         .get(pk=relatorio.pk)
     )
     distribuicao_clientes = resumo_financeiro_por_cliente(relatorio)
+    clientes_sem_valor_km_relatorio = (
+        clientes_relatorio_sem_valor_km(relatorio)
+        if usuario_pode_atuar_como_financeiro(request.user)
+        else []
+    )
 
     return render(
         request,
@@ -1999,6 +2052,7 @@ def relatorio_detail_view(request, pk):
             "superadmin_django": usuario_eh_superadmin(request.user),
             "pode_enviar_relatorio": usuario_pode_enviar_relatorio(request.user, relatorio),
             "inconsistencias_rateio": inconsistencias_rateio,
+            "clientes_sem_valor_km_relatorio": clientes_sem_valor_km_relatorio,
             "distribuicao_clientes": distribuicao_clientes,
             "anexos_visualizacao": _anexos_visualizacao_relatorio(relatorio),
             "mapa_trechos_json": _mapa_trechos_relatorio(relatorio),
@@ -2982,6 +3036,9 @@ class ClienteListView(AdministrativoMixin, ListView):
     def get_queryset(self):
         qs = Cliente.objects.all().order_by("nome_fantasia", "razao_social", "nome")
         busca = self.request.GET.get("busca", "").strip()
+        valor_km = self.request.GET.get("valor_km", "").strip()
+        if valor_km == "pendente":
+            qs = qs.filter(ativo=True).filter(Q(valor_km__isnull=True) | Q(valor_km__lte=0))
         if busca:
             busca_digits = re.sub(r"\D+", "", busca)
             qs = qs.filter(
@@ -2999,6 +3056,7 @@ class ClienteListView(AdministrativoMixin, ListView):
         ctx = super().get_context_data(**kwargs)
         ctx["titulo_pagina"] = "Clientes"
         ctx["busca"] = self.request.GET.get("busca", "")
+        ctx["valor_km_filtro"] = self.request.GET.get("valor_km", "")
         return ctx
 
 
