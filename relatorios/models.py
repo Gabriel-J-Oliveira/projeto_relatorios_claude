@@ -210,6 +210,16 @@ class Tecnico(models.Model):
 # ─────────────────────────────────────────────────────────────────
 class Cliente(models.Model):
     nome = models.CharField("Nome / Razão Social", max_length=200)
+    razao_social = models.CharField(
+        "Razao social",
+        max_length=200,
+        blank=True,
+    )
+    nome_fantasia = models.CharField(
+        "Nome fantasia",
+        max_length=200,
+        blank=True,
+    )
 
     cnpj_cpf = models.CharField(
         "CNPJ / CPF",
@@ -225,6 +235,11 @@ class Cliente(models.Model):
         blank=True,
         null=True,
     )
+    cep = models.CharField(
+        "CEP",
+        max_length=12,
+        blank=True,
+    )
 
     uf = models.CharField(
         "UF",
@@ -232,6 +247,26 @@ class Cliente(models.Model):
         choices=UF.choices,
         blank=True,
         null=True,
+    )
+    logradouro = models.CharField(
+        "Logradouro",
+        max_length=200,
+        blank=True,
+    )
+    numero = models.CharField(
+        "Numero",
+        max_length=30,
+        blank=True,
+    )
+    bairro = models.CharField(
+        "Bairro",
+        max_length=100,
+        blank=True,
+    )
+    complemento = models.CharField(
+        "Complemento",
+        max_length=150,
+        blank=True,
     )
 
     contato = models.CharField(
@@ -263,8 +298,37 @@ class Cliente(models.Model):
         blank=True,
         null=True,
     )
+    valor_km_atualizado_em = models.DateTimeField(
+        "Valor KM atualizado em",
+        blank=True,
+        null=True,
+    )
+    valor_km_atualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="Valor KM atualizado por",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="clientes_valor_km_atualizados",
+    )
+    valor_km_observacao = models.TextField("Observacao do valor KM", blank=True)
 
     criado_em = models.DateTimeField(auto_now_add=True)
+    api_created_at = models.DateTimeField("Criado na API", blank=True, null=True)
+    api_updated_at = models.DateTimeField("Atualizado na API", blank=True, null=True)
+    sincronizado_em = models.DateTimeField(
+        "Sincronizado em",
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+    origem_api = models.BooleanField("Origem API", default=False, db_index=True)
+    hash_dados_api = models.CharField(
+        "Hash dos dados da API",
+        max_length=64,
+        blank=True,
+        db_index=True,
+    )
 
     class Meta:
         verbose_name = "Cliente"
@@ -272,7 +336,11 @@ class Cliente(models.Model):
         ordering = ["nome"]
 
     def __str__(self):
-        return self.nome
+        return self.nome_exibicao
+
+    @property
+    def nome_exibicao(self):
+        return self.nome_fantasia or self.razao_social or self.nome
 
     @property
     def cidade_uf(self):

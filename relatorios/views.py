@@ -1,6 +1,7 @@
 import logging
 import json
 import mimetypes
+import re
 import time
 from decimal import Decimal
 from types import SimpleNamespace
@@ -9,7 +10,7 @@ from django.contrib import messages
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.utils import OperationalError, ProgrammingError
 from django.db.models import Q, Sum
@@ -50,6 +51,7 @@ from .services.clientes_relatorio_service import (
     sync_clientes_relatorio,
     sync_clientes_trecho,
 )
+from .services.clientes_valor_km_service import salvar_valores_km_clientes
 from .validators import anexo_tem_tipo_permitido
 from .services.autorizacao_service import (
     exigir_acesso_erp,
@@ -231,6 +233,45 @@ def suporte_reportar_view(request):
 
 
 @login_required
+@require_POST
+def clientes_valor_km_salvar_view(request):
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (TypeError, ValueError, UnicodeDecodeError):
+        payload = {}
+
+    itens = payload.get("clientes") or []
+    if not isinstance(itens, list):
+        return JsonResponse({"success": False, "error": "Payload invalido."}, status=400)
+
+    try:
+        atualizados = salvar_valores_km_clientes(itens, request.user)
+    except PermissionDenied:
+        logger.warning("Tentativa sem permissao de salvar valor_km usuario=%s", request.user.pk)
+        return JsonResponse(
+            {"success": False, "error": "Voce nao tem permissao para alterar valor de KM."},
+            status=403,
+        )
+    except ValidationError as exc:
+        mensagens = exc.messages if hasattr(exc, "messages") else [str(exc)]
+        return JsonResponse({"success": False, "error": " ".join(mensagens)}, status=400)
+    except Exception as exc:
+        logger.exception("Erro ao salvar valores KM de clientes: %s", exc)
+        return JsonResponse(
+            {"success": False, "error": "Nao foi possivel salvar os valores. Tente novamente."},
+            status=500,
+        )
+
+    return JsonResponse(
+        {
+            "success": True,
+            "message": f"{atualizados} valor(es) de KM atualizado(s) com sucesso.",
+            "atualizados": atualizados,
+        }
+    )
+
+
+@login_required
 def completar_cadastro_view(request):
     perfil, _criado = PerfilUsuario.objects.get_or_create(usuario=request.user)
     next_url = request.GET.get("next") or request.POST.get("next") or ""
@@ -310,15 +351,33 @@ def _form_has_content(form) -> bool:
     return any(v not in (None, "", [], ()) for v in values)
 
 
+def _clientes_queryset_selecao():
+    return Cliente.objects.filter(ativo=True).order_by(
+        "nome_fantasia",
+        "razao_social",
+        "nome",
+    )
+
+
+def _nome_cliente(cliente):
+    if not cliente:
+        return "Nao informado"
+    return getattr(cliente, "nome_exibicao", None) or cliente.nome
+
+
 def _clientes_selecionados_do_request(request, instance=None):
     if request.method == "POST":
         ids = normalizar_ids_clientes(request.POST.get("clientes_relatorio"))
-        nomes = list(Cliente.objects.filter(pk__in=ids).order_by("nome").values_list("nome", flat=True))
+        clientes_por_id = {
+            cliente.pk: _nome_cliente(cliente)
+            for cliente in Cliente.objects.filter(pk__in=ids)
+        }
+        nomes = [clientes_por_id[cliente_id] for cliente_id in ids if cliente_id in clientes_por_id]
         return ids, nomes
 
     if instance:
         clientes = list(obter_clientes_relatorio(instance))
-        return [cliente.pk for cliente in clientes], [cliente.nome for cliente in clientes]
+        return [cliente.pk for cliente in clientes], [_nome_cliente(cliente) for cliente in clientes]
 
     return [], []
 
@@ -1264,9 +1323,13 @@ class RelatorioListView(AcessoErpMixin, ListView):
                 qs = qs.filter(data_fim__lte=cd["data_fim"])
             if cd.get("busca"):
                 q = cd["busca"]
+                q_digits = re.sub(r"\D+", "", q)
                 qs = qs.filter(
                     Q(numero__icontains=q)
                     | Q(cliente__nome__icontains=q)
+                    | Q(cliente__razao_social__icontains=q)
+                    | Q(cliente__nome_fantasia__icontains=q)
+                    | Q(cliente__cnpj_cpf__icontains=q_digits or q)
                     | Q(tecnico_responsavel__nome__icontains=q)
                     | Q(cidade_atendimento__icontains=q)
                 )
@@ -1599,9 +1662,7 @@ def relatorio_form_view(request, pk=None):
                             "fs_desp": fs_desp,
                             "fs_km": fs_km,
                             "instance": instance,
-                            "clientes_importacao": Cliente.objects.filter(
-                                ativo=True
-                            ).order_by("nome"),
+                            "clientes_importacao": _clientes_queryset_selecao(),
                             "tecnicos_importacao": Tecnico.objects.filter(
                                 ativo=True
                             ).order_by("nome"),
@@ -1631,9 +1692,7 @@ def relatorio_form_view(request, pk=None):
                             "fs_desp": fs_desp,
                             "fs_km": fs_km,
                             "instance": instance,
-                            "clientes_importacao": Cliente.objects.filter(
-                                ativo=True
-                            ).order_by("nome"),
+                            "clientes_importacao": _clientes_queryset_selecao(),
                             "tecnicos_importacao": Tecnico.objects.filter(
                                 ativo=True
                             ).order_by("nome"),
@@ -1696,7 +1755,7 @@ def relatorio_form_view(request, pk=None):
             "fs_desp": fs_desp,
             "fs_km": fs_km,
             "instance": instance,
-            "clientes_importacao": Cliente.objects.filter(ativo=True).order_by("nome"),
+            "clientes_importacao": _clientes_queryset_selecao(),
             "tecnicos_importacao": Tecnico.objects.filter(ativo=True).order_by("nome"),
             "titulo_pagina": (
                 f"Editar Relatório {instance.identificador}" if instance else "Novo Relatório"
@@ -2269,9 +2328,13 @@ def relatorio_import_list_json(request):
     if data_fim:
         qs = qs.filter(data_fim__lte=data_fim)
     if busca:
+        busca_digits = re.sub(r"\D+", "", busca)
         qs = qs.filter(
             Q(numero__icontains=busca)
             | Q(cliente__nome__icontains=busca)
+            | Q(cliente__razao_social__icontains=busca)
+            | Q(cliente__nome_fantasia__icontains=busca)
+            | Q(cliente__cnpj_cpf__icontains=busca_digits or busca)
             | Q(tecnico_responsavel__nome__icontains=busca)
             | Q(cidade_atendimento__icontains=busca)
             | Q(motivo__icontains=busca)
@@ -2284,7 +2347,7 @@ def relatorio_import_list_json(request):
             "id": relatorio.pk,
             "numero": relatorio.identificador,
             "data": _formatar_data(relatorio.data_inicio),
-            "cliente": relatorio.cliente.nome,
+            "cliente": _nome_cliente(relatorio.cliente),
             "tecnico": relatorio.tecnico_responsavel.nome,
             "status": relatorio.get_status_display(),
             "total": _formatar_moeda(relatorio.total_despesas),
@@ -2917,13 +2980,18 @@ class ClienteListView(AdministrativoMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        qs = Cliente.objects.all()
+        qs = Cliente.objects.all().order_by("nome_fantasia", "razao_social", "nome")
         busca = self.request.GET.get("busca", "").strip()
         if busca:
+            busca_digits = re.sub(r"\D+", "", busca)
             qs = qs.filter(
                 Q(nome__icontains=busca)
+                | Q(razao_social__icontains=busca)
+                | Q(nome_fantasia__icontains=busca)
                 | Q(cnpj_cpf__icontains=busca)
+                | Q(cnpj_cpf__icontains=busca_digits)
                 | Q(cidade__icontains=busca)
+                | Q(uf__icontains=busca)
             )
         return qs
 

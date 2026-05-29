@@ -122,7 +122,7 @@
             <td data-label="Cliente" data-tour="relatorios-list-clientes-linha">
               {% with cliente_principal=r.cliente_principal_exibicao clientes_secundarios=r.clientes_secundarios_exibicao %}
               <div class="small fw-medium text-nowrap">
-                {{ cliente_principal.nome|default:"Não informado" }}
+                {{ cliente_principal.nome_exibicao|default:cliente_principal.nome|default:"Não informado" }}
                 {% if clientes_secundarios %}
                 <span class="badge bg-primary rounded-pill ms-1"
                       role="button"
@@ -131,7 +131,7 @@
                       data-bs-trigger="hover focus click"
                       data-bs-html="true"
                       data-bs-title="Clientes do relatório"
-                      data-bs-content="<div class='popover-lista-vinculos'><div>{{ cliente_principal.nome }}</div>{% for cliente in clientes_secundarios %}<div>{{ cliente.nome }}</div>{% endfor %}</div>">
+                      data-bs-content="<div class='popover-lista-vinculos'><div>{{ cliente_principal.nome_exibicao|default:cliente_principal.nome }}</div>{% for cliente in clientes_secundarios %}<div>{{ cliente.nome_exibicao|default:cliente.nome }}</div>{% endfor %}</div>">
                   +{{ clientes_secundarios|length }}
                 </span>
                 {% endif %}

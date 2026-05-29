@@ -120,6 +120,12 @@ ANEXOS_ROOT = Path(config("ANEXOS_ROOT", default="/home/app_relatorios_files"))
 ANEXO_MAX_UPLOAD_MB = config("ANEXO_MAX_UPLOAD_MB", default=10, cast=int)
 VALOR_KM_CONTROLSUL = config("VALOR_KM_CONTROLSUL", default="1.35")
 
+# Integracao de clientes ControlSul. O token deve vir apenas do ambiente.
+CLIENTES_API_URL = config("CLIENTES_API_URL", default="https://api.controlsul.com/clients")
+CLIENTES_API_TOKEN = config("CLIENTES_API_TOKEN", default="")
+CLIENTES_API_TIMEOUT = config("CLIENTES_API_TIMEOUT", default=30, cast=int)
+CLIENTES_API_ENABLED = config("CLIENTES_API_ENABLED", default=True, cast=bool)
+
 
 # Email interno / SMTP. Em desenvolvimento, dev.py pode sobrescrever para console.
 EMAIL_BACKEND = config(
@@ -450,6 +456,16 @@ LOGGING = {
             "level": APP_LOG_LEVEL,
             "propagate": False,
         },
+        "relatorios.services.clientes_api_service": {
+            "handlers": ["console"],
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
+        "relatorios.services.clientes_sync_service": {
+            "handlers": ["console"],
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
         "relatorios.services.maps_service": {
             "handlers": ["console"],
             "level": APP_LOG_LEVEL,
@@ -508,6 +524,8 @@ if LOG_FILES_ENABLED:
     LOGGING["loggers"]["relatorios.middleware"]["handlers"] = ["console", "security_file", "errors_file"]
     LOGGING["loggers"]["relatorios.services.identidade"]["handlers"] = ["console", "security_file", "errors_file"]
     LOGGING["loggers"]["relatorios.services.email_service"]["handlers"] = ["console", "emails_file", "errors_file"]
+    LOGGING["loggers"]["relatorios.services.clientes_api_service"]["handlers"] = ["console", "app_file", "errors_file"]
+    LOGGING["loggers"]["relatorios.services.clientes_sync_service"]["handlers"] = ["console", "app_file", "errors_file"]
     LOGGING["loggers"]["relatorios.services.maps_service"]["handlers"] = ["console", "maps_file", "errors_file"]
     LOGGING["loggers"]["relatorios.services.pdf_cliente_service"]["handlers"] = ["console", "pdfs_file", "errors_file"]
     LOGGING["loggers"]["relatorios.services.pdf_interno_service"]["handlers"] = ["console", "pdfs_file", "errors_file"]

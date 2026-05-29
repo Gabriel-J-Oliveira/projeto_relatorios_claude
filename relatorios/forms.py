@@ -790,7 +790,11 @@ class RelatorioFiltroForm(BootstrapMixin, forms.Form):
         empty_label="Todos os técnicos",
     )
     cliente = forms.ModelChoiceField(
-        queryset=Cliente.objects.filter(ativo=True),
+        queryset=Cliente.objects.filter(ativo=True).order_by(
+            "nome_fantasia",
+            "razao_social",
+            "nome",
+        ),
         required=False,
         empty_label="Todos os clientes",
     )
@@ -835,13 +839,21 @@ class ClienteForm(BootstrapMixin, forms.ModelForm):
         model = Cliente
         fields = [
             "nome",
+            "razao_social",
+            "nome_fantasia",
             "cnpj_cpf",
+            "cep",
             "cidade",
             "uf",
+            "logradouro",
+            "numero",
+            "bairro",
+            "complemento",
             "contato",
             "telefone",
             "email",
             "valor_km",
+            "valor_km_observacao",
             "ativo",
         ]
 

@@ -77,12 +77,14 @@
 {% include "partials/_modal_erros_operacionais.html" %}
 {% include "partials/_modal_anexo_preview.html" %}
 {% include "partials/_modal_reportar_problema.html" %}
+{% include "partials/_modal_clientes_valor_km.html" %}
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 {% load static %}
 <script src="{% static 'js/custom.js' %}"></script>
 <script src="{% static 'js/anexo_preview.js' %}"></script>
 <script src="{% static 'js/suporte_report.js' %}"></script>
+<script src="{% static 'js/clientes_valor_km.js' %}"></script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>

@@ -51,10 +51,31 @@ class TecnicoAdmin(admin.ModelAdmin):
 
 @admin.register(Cliente)
 class ClienteAdmin(admin.ModelAdmin):
-    list_display = ["nome", "cnpj_cpf", "cidade", "uf", "ativo"]
-    list_filter = ["ativo", "uf"]
-    search_fields = ["nome", "cnpj_cpf"]
+    list_display = [
+        "nome_exibicao_admin",
+        "cnpj_cpf",
+        "cidade",
+        "uf",
+        "valor_km",
+        "origem_api",
+        "sincronizado_em",
+        "ativo",
+    ]
+    list_filter = ["ativo", "origem_api", "uf"]
+    search_fields = ["nome", "razao_social", "nome_fantasia", "cnpj_cpf", "cidade"]
     list_editable = ["ativo"]
+    readonly_fields = [
+        "api_created_at",
+        "api_updated_at",
+        "sincronizado_em",
+        "hash_dados_api",
+        "valor_km_atualizado_em",
+        "valor_km_atualizado_por",
+    ]
+
+    @admin.display(description="Cliente", ordering="nome")
+    def nome_exibicao_admin(self, obj):
+        return obj.nome_exibicao
 
 
 # ─────────────────────────────────────────────

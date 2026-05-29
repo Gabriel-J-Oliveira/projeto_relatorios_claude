@@ -5,6 +5,9 @@ from relatorios.models import StatusFinanceiroItem, StatusRelatorio
 from relatorios.services.financeiro_validator import (
     validar_integridade_financeira_relatorio,
 )
+from relatorios.services.clientes_valor_km_service import (
+    erros_clientes_sem_valor_km_relatorio,
+)
 
 
 ESTADOS_FINAIS = {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
@@ -130,6 +133,7 @@ def validar_relatorio_para_envio(relatorio):
 
     erros.extend(validar_valores_negativos(relatorio))
     erros.extend(validar_motivos_clientes_relatorio(relatorio))
+    erros.extend(erros_clientes_sem_valor_km_relatorio(relatorio))
     erros.extend(validar_integridade_financeira_relatorio(relatorio))
 
     return ResultadoValidacaoOperacional.falha(erros)
@@ -156,6 +160,7 @@ def validar_relatorio_para_aprovacao(relatorio):
 
     erros.extend(validar_valores_negativos(relatorio))
     erros.extend(validar_motivos_clientes_relatorio(relatorio))
+    erros.extend(erros_clientes_sem_valor_km_relatorio(relatorio))
     erros.extend(validar_integridade_financeira_relatorio(relatorio))
 
     return ResultadoValidacaoOperacional.falha(erros)

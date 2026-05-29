@@ -54,6 +54,7 @@ urlpatterns = [
 
     # Clientes
     path("clientes/", views.ClienteListView.as_view(), name="cliente_list"),
+    path("clientes/valor-km/salvar/", views.clientes_valor_km_salvar_view, name="clientes_valor_km_salvar"),
     path("clientes/novo/", views.cliente_form_view, name="cliente_create"),
     path("clientes/<int:pk>/editar/", views.cliente_form_view, name="cliente_update"),
     path("clientes/<int:pk>/excluir/", views.cliente_delete_view, name="cliente_delete"),

@@ -185,7 +185,7 @@
           <select name="cliente" class="form-select form-select-sm">
             <option value="">Todos</option>
             {% for cliente in clientes_filtro %}
-              <option value="{{ cliente.pk }}" {% if filtros_dashboard.cliente|stringformat:"s" == cliente.pk|stringformat:"s" %}selected{% endif %}>{{ cliente.nome }}</option>
+              <option value="{{ cliente.pk }}" {% if filtros_dashboard.cliente|stringformat:"s" == cliente.pk|stringformat:"s" %}selected{% endif %}>{{ cliente.nome_exibicao }}</option>
             {% endfor %}
           </select>
         </div>

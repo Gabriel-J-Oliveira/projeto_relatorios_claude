@@ -439,13 +439,17 @@ def get_dashboard_context(user, params):
     qs_recentes = get_dashboard_queryset(user, filtros_dashboard(user, params)).order_by("-criado_em")[:8]
     pode_filtrar_tecnico = usuario_tem_dashboard_global(user)
     if pode_filtrar_tecnico:
-        clientes_filtro = Cliente.objects.filter(ativo=True).order_by("nome")
+        clientes_filtro = Cliente.objects.filter(ativo=True).order_by(
+            "nome_fantasia",
+            "razao_social",
+            "nome",
+        )
     else:
         qs_visivel = queryset_relatorios_visiveis(user, RelatorioTecnico.objects.all())
         clientes_filtro = Cliente.objects.filter(
             Q(relatorios_cliente__relatorio__in=qs_visivel)
             | Q(relatorios__in=qs_visivel)
-        ).filter(ativo=True).distinct().order_by("nome")
+        ).filter(ativo=True).distinct().order_by("nome_fantasia", "razao_social", "nome")
     return {
         "dashboard_data": dados,
         "dashboard_global": dados["escopo"] == "global",

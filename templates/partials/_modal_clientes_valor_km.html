@@ -1,0 +1,85 @@
+{% if request.user.is_authenticated and permissoes_erp.financeiro %}
+<div class="modal fade"
+     id="modalClientesValorKm"
+     tabindex="-1"
+     aria-hidden="true"
+     data-pendencias="{{ clientes_sem_valor_km_count|default:0 }}"
+     data-save-url="{% url 'relatorios:clientes_valor_km_salvar' %}">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-warning-subtle border-0">
+        <div>
+          <h5 class="modal-title fw-semibold">
+            <i class="bi bi-speedometer2 me-2 text-warning-emphasis"></i>
+            Clientes com valor de KM pendente
+          </h5>
+          <p class="small text-muted mb-0">
+            Alguns clientes sincronizados da API ainda não possuem valor de KM configurado.
+          </p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning small mb-3">
+          Preencha os valores para liberar o uso completo nos relatórios. Você pode lembrar depois, mas relatórios com clientes sem valor de KM não poderão ser enviados ou aprovados.
+        </div>
+        {% if clientes_sem_valor_km %}
+          <div class="table-responsive border rounded">
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Cliente</th>
+                  <th>CNPJ/CPF</th>
+                  <th>Cidade/UF</th>
+                  <th style="width: 160px;">Valor KM</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for cliente in clientes_sem_valor_km %}
+                  <tr data-cliente-valor-km-row data-cliente-id="{{ cliente.pk }}">
+                    <td>
+                      <div class="fw-semibold small">{{ cliente.nome_exibicao }}</div>
+                      {% if cliente.razao_social and cliente.razao_social != cliente.nome_exibicao %}
+                        <div class="text-muted small">{{ cliente.razao_social }}</div>
+                      {% endif %}
+                    </td>
+                    <td class="small text-muted">{{ cliente.cnpj_cpf|default:"-" }}</td>
+                    <td class="small text-muted">{{ cliente.cidade_uf }}</td>
+                    <td>
+                      <input type="number"
+                             min="0.01"
+                             step="0.01"
+                             class="form-control form-control-sm"
+                             data-cliente-valor-km-input
+                             placeholder="Ex: 1,85">
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if clientes_sem_valor_km_count > clientes_sem_valor_km|length %}
+            <p class="text-muted small mt-2 mb-0">
+              Exibindo os primeiros {{ clientes_sem_valor_km|length }} de {{ clientes_sem_valor_km_count }} clientes pendentes.
+            </p>
+          {% endif %}
+        {% else %}
+          <div class="text-center text-muted py-4">
+            <i class="bi bi-check-circle fs-2"></i>
+            <p class="mb-0 mt-2">Nenhum cliente pendente de valor KM.</p>
+          </div>
+        {% endif %}
+        <div class="invalid-feedback d-block small mt-2" id="clientes-valor-km-feedback"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
+          Lembrar depois
+        </button>
+        <button type="button" class="btn btn-primary btn-sm" id="btnSalvarClientesValorKm">
+          <i class="bi bi-check-lg me-1"></i>Salvar valores
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}

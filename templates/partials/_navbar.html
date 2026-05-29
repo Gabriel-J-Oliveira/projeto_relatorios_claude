@@ -22,6 +22,14 @@
 
       <!-- Toggle tema claro/escuro -->
       {% if request.user.is_authenticated %}
+      {% if permissoes_erp.financeiro and clientes_sem_valor_km_count %}
+      <button class="btn btn-sm btn-warning d-none d-md-inline-flex align-items-center gap-1"
+              type="button"
+              data-open-clientes-valor-km>
+        <i class="bi bi-speedometer2"></i>
+        <span>Clientes sem valor KM: {{ clientes_sem_valor_km_count }}</span>
+      </button>
+      {% endif %}
       <button class="btn btn-sm btn-outline-secondary d-none d-md-inline-flex align-items-center gap-1"
               type="button"
               data-bs-toggle="modal"
@@ -65,6 +73,16 @@
         </button>
         <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-1">
           {% if request.user.is_authenticated %}
+          {% if permissoes_erp.financeiro and clientes_sem_valor_km_count %}
+          <li>
+            <button class="dropdown-item d-flex align-items-center gap-2"
+                    type="button"
+                    data-open-clientes-valor-km>
+              <i class="bi bi-speedometer2 text-warning"></i>
+              Clientes sem valor KM: {{ clientes_sem_valor_km_count }}
+            </button>
+          </li>
+          {% endif %}
           <li>
             <button class="dropdown-item d-flex align-items-center gap-2"
                     type="button"

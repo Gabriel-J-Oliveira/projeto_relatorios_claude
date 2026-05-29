@@ -717,15 +717,23 @@
                           <tbody id="clientes-opcoes">
                             {% for cliente in clientes_importacao %}
                               <tr class="cliente-opcao-linha"
-                                  data-cliente-search="{{ cliente.nome }} {{ cliente.cidade|default:'' }} {{ cliente.cnpj_cpf|default:'' }}">
-                                <td class="small">{{ cliente.nome }}</td>
+                                  data-cliente-search="{{ cliente.nome_exibicao }} {{ cliente.razao_social|default:'' }} {{ cliente.nome|default:'' }} {{ cliente.cidade|default:'' }} {{ cliente.uf|default:'' }} {{ cliente.cnpj_cpf|default:'' }}">
+                                <td class="small">
+                                  <div class="fw-semibold">{{ cliente.nome_exibicao }}</div>
+                                  {% if cliente.razao_social and cliente.razao_social != cliente.nome_exibicao %}
+                                    <div class="text-muted small">{{ cliente.razao_social }}</div>
+                                  {% endif %}
+                                  {% if not cliente.valor_km or cliente.valor_km <= 0 %}
+                                    <span class="badge text-bg-warning mt-1">Sem valor KM</span>
+                                  {% endif %}
+                                </td>
                                 <td class="small text-muted">{{ cliente.cidade_uf|default:"-" }}</td>
                                 <td class="small text-muted">{{ cliente.cnpj_cpf|default:"-" }}</td>
                                 <td class="text-end">
                                   <button type="button"
                                           class="btn btn-outline-secondary btn-sm cliente-opcao"
                                           data-cliente-id="{{ cliente.pk }}"
-                                          data-cliente-nome="{{ cliente.nome }}"
+                                          data-cliente-nome="{{ cliente.nome_exibicao }}"
                                           data-cliente-valor-km="{{ cliente.valor_km|default:'0' }}">
                                     Selecionar
                                   </button>
@@ -840,7 +848,7 @@
                           <select class="form-select form-select-sm" id="importar-filtro-cliente">
                             <option value="">Todos</option>
                             {% for cliente in clientes_importacao %}
-                              <option value="{{ cliente.pk }}">{{ cliente.nome }}</option>
+                              <option value="{{ cliente.pk }}">{{ cliente.nome_exibicao }}</option>
                             {% endfor %}
                           </select>
                         </div>
@@ -1379,12 +1387,27 @@
     atualizarFiltroTecnicosModal();
   }
 
+  function normalizarBuscaTexto(valor) {
+    return String(valor || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[.\-/()\s]+/g, " ")
+      .toLowerCase()
+      .trim();
+  }
+
   function atualizarFiltroClientesModal() {
-    const termo = (document.getElementById("clientes-filtro-busca")?.value || "").toLowerCase();
+    const termo = normalizarBuscaTexto(document.getElementById("clientes-filtro-busca")?.value || "");
+    const termoDigitos = String(document.getElementById("clientes-filtro-busca")?.value || "").replace(/\D+/g, "");
     document.querySelectorAll(".cliente-opcao-linha").forEach(row => {
       const permitido = row.dataset.clientePermitido !== "0";
-      const texto = (row.dataset.clienteSearch || "").toLowerCase();
-      row.classList.toggle("d-none", !permitido || Boolean(termo && !texto.includes(termo)));
+      const textoOriginal = row.dataset.clienteSearch || "";
+      const texto = normalizarBuscaTexto(textoOriginal);
+      const textoDigitos = textoOriginal.replace(/\D+/g, "");
+      const encontrou = !termo
+        || texto.includes(termo)
+        || Boolean(termoDigitos && textoDigitos.includes(termoDigitos));
+      row.classList.toggle("d-none", !permitido || !encontrou);
     });
   }
 

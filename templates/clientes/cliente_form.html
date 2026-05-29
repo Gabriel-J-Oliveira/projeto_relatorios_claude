@@ -36,6 +36,17 @@
             {% endif %}
           </div>
 
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-medium small">{{ form.razao_social.label }}</label>
+              {{ form.razao_social }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium small">{{ form.nome_fantasia.label }}</label>
+              {{ form.nome_fantasia }}
+            </div>
+          </div>
+
           <!-- CNPJ/CPF -->
           <div class="mb-3">
             <label class="form-label fw-medium small">
@@ -50,13 +61,36 @@
 
           <!-- Cidade e UF -->
           <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <label class="form-label fw-medium small">{{ form.cep.label }}</label>
+              {{ form.cep }}
+            </div>
             <div class="col-md-6">
               <label class="form-label fw-medium small">{{ form.cidade.label }}</label>
               {{ form.cidade }}
             </div>
-            <div class="col-md-6">
+            <div class="col-md-2">
               <label class="form-label fw-medium small">{{ form.uf.label }}</label>
               {{ form.uf }}
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-medium small">{{ form.logradouro.label }}</label>
+              {{ form.logradouro }}
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-medium small">{{ form.numero.label }}</label>
+              {{ form.numero }}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-medium small">{{ form.bairro.label }}</label>
+              {{ form.bairro }}
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-medium small">{{ form.complemento.label }}</label>
+              {{ form.complemento }}
             </div>
           </div>
 
