@@ -82,7 +82,7 @@ python manage.py vincular_clientes_locais_api
 python manage.py vincular_clientes_locais_api --mostrar-sem-correspondencia
 ```
 
-Importar tabela manual de valor KM:
+Importar tabela manual/legada de valor KM com matching assistido:
 
 ```bash
 python manage.py importar_valor_km_clientes caminho/arquivo.csv --dry-run
@@ -101,6 +101,39 @@ ou:
 ```csv
 cliente,valor_km
 AGROPECUARIA VALE DO CABACAL S/A,1.85
+```
+
+Opcoes principais:
+
+```bash
+python manage.py importar_valor_km_clientes tabela.csv --dry-run --limite 20
+python manage.py importar_valor_km_clientes tabela.csv --confirmar --threshold-auto 95 --threshold-pendente 85
+python manage.py importar_valor_km_clientes tabela.csv --confirmar --sobrescrever
+python manage.py importar_valor_km_clientes tabela.csv --confirmar --mapeamento imports/valor_km/mapeamento_valor_km_clientes.csv
+```
+
+Regras:
+
+- sem `--confirmar`, nada e gravado;
+- `--dry-run` gera os relatorios sem alterar o banco;
+- por padrao, cliente que ja possui `valor_km` nao e sobrescrito;
+- `--sobrescrever` permite alterar valor existente;
+- match automatico ocorre por CNPJ/CPF, nome normalizado exato ou fuzzy com score alto;
+- matches duvidosos ficam para revisao manual;
+- clientes novos nao sao criados por esse command.
+
+Arquivos gerados em `imports/valor_km/saida/`:
+
+- `valor_km_matches_automaticos.csv`
+- `valor_km_pendentes_revisao.csv`
+- `valor_km_nao_encontrados.csv`
+- `valor_km_resultado_importacao.csv`
+
+Mapeamento manual opcional:
+
+```csv
+cliente_csv,cliente_id,valor_km
+AGRÍCOLA URTIGÃO,123,1.68
 ```
 
 ## Agendamento
