@@ -193,7 +193,7 @@ def ajuda_artigo_editar_view(request, slug):
         raise PermissionDenied("Usuário sem permissão para editar a Central de Ajuda.")
 
     artigo = materializar_artigo_arquivo(slug, request.user)
-    if not artigo:
+    if not artigo or not artigo.ativo:
         raise Http404("Artigo de ajuda não encontrado.")
 
     if request.method == "POST":
@@ -228,10 +228,16 @@ def ajuda_artigo_excluir_view(request, slug):
         )
         raise PermissionDenied("Usuário sem permissão para excluir artigos da Central de Ajuda.")
 
-    artigo = get_object_or_404(ArtigoAjuda.objects.select_related("categoria"), slug=slug)
+    artigo = materializar_artigo_arquivo(slug, request.user)
+    if not artigo:
+        raise Http404("Artigo de ajuda não encontrado.")
     titulo = artigo.titulo
     categoria_slug = artigo.categoria.slug if artigo.categoria_id else ""
-    artigo.delete()
+    artigo.artigos_relacionados.clear()
+    artigo.relacionado_em.clear()
+    artigo.ativo = False
+    artigo.atualizado_por = request.user
+    artigo.save(update_fields=["ativo", "atualizado_por", "atualizado_em"])
     help_logger.info(
         "Artigo da ajuda excluido. usuario=%s artigo_slug=%s artigo_titulo=%s",
         request.user.pk,

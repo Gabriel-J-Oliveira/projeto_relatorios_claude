@@ -191,6 +191,7 @@ def listar_artigos(user):
     db_slugs = set()
 
     if _db_seguro():
+        db_slugs = set(ArtigoAjuda.objects.values_list("slug", flat=True))
         db_articles = (
             ArtigoAjuda.objects.filter(ativo=True, categoria__ativo=True)
             .select_related("categoria")
@@ -198,7 +199,6 @@ def listar_artigos(user):
         )
         for article in db_articles:
             item = _article_from_model(article)
-            db_slugs.add(item.slug)
             if artigo_visivel_para_usuario(item, user):
                 articles.append(item)
 

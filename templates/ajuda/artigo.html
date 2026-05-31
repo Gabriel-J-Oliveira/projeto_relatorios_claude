@@ -23,11 +23,9 @@
 <a href="{% url 'relatorios:ajuda_artigo_editar' article.slug %}" class="btn btn-sm btn-outline-primary">
   <i class="bi bi-pencil-square me-1"></i>Editar
 </a>
-{% if article.db_id %}
 <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalExcluirArtigoAjuda">
   <i class="bi bi-trash me-1"></i>Excluir
 </button>
-{% endif %}
 {% endif %}
 {% if category %}
 <a href="{% url 'relatorios:ajuda_categoria' category.slug %}" class="btn btn-sm btn-outline-secondary">
@@ -113,7 +111,7 @@
   }
 </style>
 
-{% if can_edit_help and article.db_id %}
+{% if can_edit_help %}
 <div class="modal fade" id="modalExcluirArtigoAjuda" tabindex="-1" aria-labelledby="modalExcluirArtigoAjudaLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
