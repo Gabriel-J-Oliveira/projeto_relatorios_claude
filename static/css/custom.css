@@ -1,5 +1,7 @@
 /* ── BASE ── */
 html {
+  --app-navbar-height: 58px;
+  --app-sidebar-width: 260px;
   min-height: 100%;
   overflow-y: scroll;
   scrollbar-gutter: stable;
@@ -28,11 +30,13 @@ svg {
 
 #main-content {
   min-width: 0;
-  padding-top: 58px;
+  margin-left: var(--app-sidebar-width);
+  padding-top: var(--app-navbar-height);
+  width: calc(100% - var(--app-sidebar-width));
 }
 
 .app-main {
-  min-height: calc(100vh - 58px);
+  min-height: calc(100vh - var(--app-navbar-height));
   padding: clamp(1rem, 1.5vw, 2rem) clamp(1.5rem, 2vw, 2.5rem);
 }
 
@@ -67,13 +71,15 @@ svg {
 
 /* ── SIDEBAR ── */
 #sidebar {
-  width: 260px;
-  min-height: 100vh;
-  max-height: 100vh;
+  bottom: 0;
+  left: 0;
+  width: var(--app-sidebar-width);
+  min-height: 100dvh;
+  max-height: 100dvh;
   overflow-y: auto;
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 1030;
+  z-index: 1035;
   transition: width 0.25s ease;
 }
 
@@ -145,8 +151,8 @@ svg {
 
 /* ── NAVBAR ── */
 header.navbar {
-  min-height: 58px;
-  left: 260px;
+  min-height: var(--app-navbar-height);
+  left: var(--app-sidebar-width);
   position: fixed !important;
   right: 0;
   top: 0;
@@ -159,7 +165,7 @@ header.navbar {
 
 /* ── UTILITÁRIOS ── */
 .bg-body-secondary {
-  min-height: calc(100vh - 58px);
+  min-height: calc(100vh - var(--app-navbar-height));
 }
 
 .table-responsive {
@@ -265,12 +271,12 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 @media (min-width: 1600px) {
-  body {
-    font-size: .94rem;
+  html {
+    --app-sidebar-width: 280px;
   }
 
-  #sidebar {
-    width: 280px;
+  body {
+    font-size: .94rem;
   }
 
   .sidebar-brand-logo {
@@ -284,8 +290,8 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 @media (max-width: 1399.98px) {
-  #sidebar {
-    width: 236px;
+  html {
+    --app-sidebar-width: 236px;
   }
 
   .sidebar-brand-logo {
@@ -296,10 +302,6 @@ body::-webkit-scrollbar-thumb:hover {
     padding: 1.25rem 1.5rem;
   }
 
-  header.navbar {
-    left: 236px;
-  }
-
   .card-header {
     padding-left: 1rem;
     padding-right: 1rem;
@@ -307,11 +309,21 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 @media (max-width: 1199.98px) {
+  html {
+    --app-sidebar-width: 0px;
+  }
+
+  #main-content {
+    margin-left: 0;
+    width: 100%;
+  }
+
   header.navbar {
     left: 0;
   }
 
   #sidebar {
+    bottom: 0;
     position: fixed;
     left: 0;
     top: 0;

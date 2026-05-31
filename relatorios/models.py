@@ -1,5 +1,5 @@
 ﻿"""
-Models v3 — Campo Manager
+Models v3 — Relatórios de Viagem
 Mudanças:
 - centro_custo movido de ItemDespesa para RelatorioTecnico
 - campo reembolsavel removido de ItemDespesa
