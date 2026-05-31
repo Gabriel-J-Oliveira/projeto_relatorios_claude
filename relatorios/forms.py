@@ -183,8 +183,9 @@ class ArtigoAjudaForm(BootstrapMixin, forms.ModelForm):
         self.fields["formato"].initial = FormatoArtigoAjuda.HTML
         self.fields["tags_texto"].initial = ", ".join(self.instance.tags_lista) if self.instance.pk else ""
         self.fields["publico_para"].initial = self.instance.publico_lista if self.instance.pk else [PublicoArtigoAjuda.TODOS]
+        self.fields["publico_para"].widget.attrs["class"] = "form-check-input"
         for name in ["ativo", "importante", "link_rapido"]:
-            self.fields[name].widget.attrs.setdefault("class", "form-check-input")
+            self.fields[name].widget.attrs["class"] = "form-check-input"
 
     def clean_tags_texto(self):
         texto = self.cleaned_data.get("tags_texto") or ""

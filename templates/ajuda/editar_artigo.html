@@ -24,87 +24,173 @@
 
 {% block content %}
 <style>
-  .help-editor-card {
-    max-width: 1180px;
+  .help-edit-shell {
+    max-width: 1280px;
+  }
+
+  .help-field-card,
+  .help-settings-card,
+  .help-content-card {
+    border: 1px solid var(--bs-border-color);
+    border-radius: .85rem;
+  }
+
+  .help-settings-card {
+    position: sticky;
+    top: 80px;
+  }
+
+  .help-toggle-list {
+    display: grid;
+    gap: .65rem;
+  }
+
+  .help-switch-row {
+    align-items: center;
+    border: 1px solid var(--bs-border-color);
+    border-radius: .7rem;
+    display: flex;
+    gap: .65rem;
+    margin: 0;
+    padding: .65rem .75rem;
+  }
+
+  .help-switch-row .form-check-input {
+    flex: 0 0 auto;
+    margin: 0;
+  }
+
+  .help-switch-row .form-check-label {
+    color: var(--bs-body-color);
+    font-size: .92rem;
+    line-height: 1.2;
+  }
+
+  .help-content-card .card-header {
+    background: var(--bs-body-bg);
+    border-bottom-color: var(--bs-border-color);
   }
 
   .tox-tinymce {
     border-color: var(--bs-border-color) !important;
     border-radius: .75rem !important;
   }
+
+  .tox .tox-edit-area__iframe {
+    background: var(--bs-body-bg) !important;
+  }
+
+  @media (max-width: 991.98px) {
+    .help-settings-card {
+      position: static;
+    }
+  }
 </style>
 
-<form method="post" class="card border-0 shadow-sm help-editor-card">
+<form method="post" class="help-edit-shell">
   {% csrf_token %}
-  <div class="card-body p-4">
-    {% if form.non_field_errors %}
-    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
-    {% endif %}
 
-    <div class="row g-3">
-      <div class="col-lg-8">
-        <label class="form-label fw-semibold" for="{{ form.titulo.id_for_label }}">Título</label>
-        {{ form.titulo }}
-        {{ form.titulo.errors }}
-      </div>
-      <div class="col-lg-4">
-        <label class="form-label fw-semibold" for="{{ form.categoria.id_for_label }}">Categoria</label>
-        {{ form.categoria }}
-        {{ form.categoria.errors }}
-      </div>
-      <div class="col-12">
-        <label class="form-label fw-semibold" for="{{ form.resumo.id_for_label }}">Resumo</label>
-        {{ form.resumo }}
-        {{ form.resumo.errors }}
-      </div>
-      <div class="col-lg-8">
-        <label class="form-label fw-semibold" for="{{ form.tags_texto.id_for_label }}">Tags</label>
-        {{ form.tags_texto }}
-        <div class="form-text">{{ form.tags_texto.help_text }}</div>
-        {{ form.tags_texto.errors }}
-      </div>
-      <div class="col-lg-4">
-        <label class="form-label fw-semibold">Opções</label>
-        <div class="d-flex flex-wrap gap-3 small">
-          <label class="form-check">
-            {{ form.ativo }} <span class="form-check-label">Ativo</span>
-          </label>
-          <label class="form-check">
-            {{ form.importante }} <span class="form-check-label">Importante</span>
-          </label>
-          <label class="form-check">
-            {{ form.link_rapido }} <span class="form-check-label">Link rápido</span>
-          </label>
+  {% if form.non_field_errors %}
+  <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  <div class="row g-4 align-items-start">
+    <main class="col-lg-8 col-xl-9">
+      <section class="card shadow-sm help-field-card mb-4">
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-lg-8">
+              <label class="form-label fw-semibold" for="{{ form.titulo.id_for_label }}">Título</label>
+              {{ form.titulo }}
+              {{ form.titulo.errors }}
+            </div>
+            <div class="col-lg-4">
+              <label class="form-label fw-semibold" for="{{ form.categoria.id_for_label }}">Categoria</label>
+              {{ form.categoria }}
+              {{ form.categoria.errors }}
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold" for="{{ form.resumo.id_for_label }}">Resumo</label>
+              {{ form.resumo }}
+              {{ form.resumo.errors }}
+            </div>
+            <div class="col-lg-7">
+              <label class="form-label fw-semibold" for="{{ form.tags_texto.id_for_label }}">Tags</label>
+              {{ form.tags_texto }}
+              <div class="form-text">{{ form.tags_texto.help_text }}</div>
+              {{ form.tags_texto.errors }}
+            </div>
+            <div class="col-lg-5">
+              <label class="form-label fw-semibold" for="{{ form.tour_url.id_for_label }}">Link de tour relacionado</label>
+              {{ form.tour_url }}
+              {{ form.tour_url.errors }}
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="col-lg-8">
-        <label class="form-label fw-semibold" for="{{ form.tour_url.id_for_label }}">Link de tour relacionado</label>
-        {{ form.tour_url }}
-        {{ form.tour_url.errors }}
-      </div>
-      <div class="col-lg-4">
-        <label class="form-label fw-semibold">Público-alvo</label>
-        <div class="d-grid gap-1 small">
-          {{ form.publico_para }}
-        </div>
-        {{ form.publico_para.errors }}
-      </div>
-      <div class="col-12">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-          <label class="form-label fw-semibold mb-0" for="{{ form.conteudo.id_for_label }}">Conteúdo</label>
+      </section>
+
+      <section class="card shadow-sm help-content-card">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2 px-4 py-3">
+          <div>
+            <h5 class="fw-semibold mb-0">Conteúdo</h5>
+            <p class="text-muted small mb-0">Edite o artigo, insira imagens e use blocos de destaque quando necessário.</p>
+          </div>
           <div class="btn-group btn-group-sm" role="group" aria-label="Blocos rápidos">
             <button type="button" class="btn btn-outline-info js-help-insert" data-kind="info">Dica</button>
             <button type="button" class="btn btn-outline-warning js-help-insert" data-kind="warning">Aviso</button>
             <button type="button" class="btn btn-outline-success js-help-insert" data-kind="success">Exemplo</button>
           </div>
         </div>
-        {{ form.formato }}
-        {{ form.conteudo }}
-        {{ form.conteudo.errors }}
-      </div>
-    </div>
+        <div class="card-body p-3 p-lg-4">
+          {{ form.formato }}
+          {{ form.conteudo }}
+          {{ form.conteudo.errors }}
+        </div>
+      </section>
+    </main>
+
+    <aside class="col-lg-4 col-xl-3">
+      <section class="card shadow-sm help-settings-card">
+        <div class="card-header bg-transparent border-bottom px-4 py-3">
+          <h5 class="fw-semibold mb-0">Configurações do artigo</h5>
+        </div>
+        <div class="card-body p-4">
+          <div class="mb-4">
+            <div class="text-uppercase text-muted small fw-semibold mb-2">Opções</div>
+            <div class="help-toggle-list">
+              <label class="form-check form-switch help-switch-row" for="{{ form.ativo.id_for_label }}">
+                {{ form.ativo }}
+                <span class="form-check-label">Ativo</span>
+              </label>
+              <label class="form-check form-switch help-switch-row" for="{{ form.importante.id_for_label }}">
+                {{ form.importante }}
+                <span class="form-check-label">Importante</span>
+              </label>
+              <label class="form-check form-switch help-switch-row" for="{{ form.link_rapido.id_for_label }}">
+                {{ form.link_rapido }}
+                <span class="form-check-label">Link rápido</span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <div class="text-uppercase text-muted small fw-semibold mb-2">Público-alvo</div>
+            <div class="help-toggle-list">
+              {% for checkbox in form.publico_para %}
+              <label class="form-check form-switch help-switch-row" for="{{ checkbox.id_for_label }}">
+                {{ checkbox.tag }}
+                <span class="form-check-label">{{ checkbox.choice_label }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            {{ form.publico_para.errors }}
+          </div>
+        </div>
+      </section>
+    </aside>
   </div>
-  <div class="card-footer bg-transparent d-flex flex-wrap justify-content-end gap-2 p-3">
+
+  <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
     <a href="{% url 'relatorios:ajuda_artigo' article.slug %}" class="btn btn-outline-secondary">Cancelar</a>
     <button type="submit" class="btn btn-primary">
       <i class="bi bi-check2 me-1"></i>Salvar
@@ -121,7 +207,8 @@
 
   tinymce.init({
     selector: "#id_conteudo",
-    height: 620,
+    height: 440,
+    min_height: 400,
     menubar: false,
     branding: false,
     convert_urls: false,
@@ -131,7 +218,7 @@
     valid_classes: {
       "*": "text-primary text-secondary text-success text-danger text-warning text-info alert alert-primary alert-secondary alert-success alert-danger alert-warning alert-info table table-sm table-bordered img-fluid"
     },
-    content_style: "body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:14px} img{max-width:100%;height:auto;border-radius:.75rem} .alert{padding:.75rem 1rem;border-radius:.75rem}",
+    content_style: "body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:15px;line-height:1.65;padding:18px;color:#1f2937} img{max-width:100%;height:auto;border-radius:.75rem} .alert{padding:.85rem 1rem;border-radius:.75rem}",
     images_upload_url: "{% url 'relatorios:ajuda_imagem_upload' %}",
     images_upload_credentials: true,
     automatic_uploads: true,
