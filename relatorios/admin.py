@@ -91,6 +91,7 @@ class ArtigoAjudaAdmin(admin.ModelAdmin):
     search_fields = ["titulo", "slug", "resumo", "conteudo"]
     prepopulated_fields = {"slug": ("titulo",)}
     readonly_fields = ["criado_em", "atualizado_em", "criado_por", "atualizado_por"]
+    filter_horizontal = ["artigos_relacionados"]
 
 
 @admin.register(ImagemAjuda)

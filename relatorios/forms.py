@@ -170,16 +170,34 @@ class ArtigoAjudaForm(BootstrapMixin, forms.ModelForm):
             "importante",
             "link_rapido",
             "tour_url",
+            "artigos_relacionados",
         ]
         widgets = {
             "resumo": forms.Textarea(attrs={"rows": 3}),
             "conteudo": forms.Textarea(attrs={"rows": 18, "class": "form-control help-editor"}),
             "formato": forms.HiddenInput(),
+            "artigos_relacionados": forms.SelectMultiple(
+                attrs={
+                    "class": "form-select",
+                    "size": 8,
+                }
+            ),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["categoria"].queryset = CategoriaAjuda.objects.filter(ativo=True).order_by("ordem", "titulo")
+        relacionados_qs = ArtigoAjuda.objects.filter(ativo=True).select_related("categoria").order_by(
+            "categoria__ordem",
+            "categoria__titulo",
+            "titulo",
+        )
+        if self.instance.pk:
+            relacionados_qs = relacionados_qs.exclude(pk=self.instance.pk)
+        self.fields["artigos_relacionados"].queryset = relacionados_qs
+        self.fields["artigos_relacionados"].label_from_instance = (
+            lambda artigo: f"{artigo.categoria.titulo} - {artigo.titulo}"
+        )
         self.fields["formato"].initial = FormatoArtigoAjuda.HTML
         self.fields["tags_texto"].initial = ", ".join(self.instance.tags_lista) if self.instance.pk else ""
         self.fields["publico_para"].initial = self.instance.publico_lista if self.instance.pk else [PublicoArtigoAjuda.TODOS]

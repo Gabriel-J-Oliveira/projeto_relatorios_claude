@@ -414,6 +414,13 @@ class ArtigoAjuda(models.Model):
     importante = models.BooleanField("Importante", default=False)
     link_rapido = models.BooleanField("Link rápido", default=False)
     tour_url = models.CharField("URL do tour", max_length=255, blank=True)
+    artigos_relacionados = models.ManyToManyField(
+        "self",
+        symmetrical=False,
+        blank=True,
+        related_name="relacionado_em",
+        verbose_name="Artigos relacionados",
+    )
     ativo = models.BooleanField("Ativo", default=True)
     criado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,

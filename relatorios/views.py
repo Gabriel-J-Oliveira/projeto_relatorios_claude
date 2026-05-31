@@ -216,6 +216,34 @@ def ajuda_artigo_editar_view(request, slug):
     )
 
 
+@login_required
+@exigir_acesso_erp
+@require_POST
+def ajuda_artigo_excluir_view(request, slug):
+    if not usuario_pode_editar_ajuda(request.user):
+        help_logger.warning(
+            "Tentativa sem permissao de excluir artigo da ajuda. usuario=%s slug=%s",
+            request.user.pk,
+            slug,
+        )
+        raise PermissionDenied("Usuário sem permissão para excluir artigos da Central de Ajuda.")
+
+    artigo = get_object_or_404(ArtigoAjuda.objects.select_related("categoria"), slug=slug)
+    titulo = artigo.titulo
+    categoria_slug = artigo.categoria.slug if artigo.categoria_id else ""
+    artigo.delete()
+    help_logger.info(
+        "Artigo da ajuda excluido. usuario=%s artigo_slug=%s artigo_titulo=%s",
+        request.user.pk,
+        slug,
+        titulo,
+    )
+    messages.success(request, f"Artigo \"{titulo}\" excluído definitivamente.")
+    if categoria_slug:
+        return redirect("relatorios:ajuda_categoria", slug=categoria_slug)
+    return redirect("relatorios:ajuda_index")
+
+
 HELP_IMAGE_EXTENSOES = {".png", ".jpg", ".jpeg", ".webp"}
 HELP_IMAGE_MIMES = {"image/png", "image/jpeg", "image/webp"}
 HELP_IMAGE_ASSINATURAS = {

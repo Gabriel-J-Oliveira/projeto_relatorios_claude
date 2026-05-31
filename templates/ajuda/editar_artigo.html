@@ -125,6 +125,15 @@
               {{ form.tour_url }}
               {{ form.tour_url.errors }}
             </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold" for="{{ form.artigos_relacionados.id_for_label }}">Artigos relacionados</label>
+              {{ form.artigos_relacionados }}
+              <div class="form-text">
+                Selecione um ou mais artigos para aparecerem no atalho "Artigos relacionados" da visualizaÃ§Ã£o.
+                Use Ctrl para selecionar vÃ¡rios itens.
+              </div>
+              {{ form.artigos_relacionados.errors }}
+            </div>
           </div>
         </div>
       </section>

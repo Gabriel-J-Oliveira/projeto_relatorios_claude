@@ -23,6 +23,11 @@
 <a href="{% url 'relatorios:ajuda_artigo_editar' article.slug %}" class="btn btn-sm btn-outline-primary">
   <i class="bi bi-pencil-square me-1"></i>Editar
 </a>
+{% if article.db_id %}
+<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalExcluirArtigoAjuda">
+  <i class="bi bi-trash me-1"></i>Excluir
+</button>
+{% endif %}
 {% endif %}
 {% if category %}
 <a href="{% url 'relatorios:ajuda_categoria' category.slug %}" class="btn btn-sm btn-outline-secondary">
@@ -107,6 +112,35 @@
     }
   }
 </style>
+
+{% if can_edit_help and article.db_id %}
+<div class="modal fade" id="modalExcluirArtigoAjuda" tabindex="-1" aria-labelledby="modalExcluirArtigoAjudaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalExcluirArtigoAjudaLabel">Excluir artigo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">Tem certeza que deseja excluir definitivamente este artigo?</p>
+        <div class="alert alert-warning mb-0">
+          <strong>{{ article.title }}</strong><br>
+          Esta aÃ§Ã£o remove o artigo da Central de Ajuda e nÃ£o pode ser desfeita pela interface.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <form method="post" action="{% url 'relatorios:ajuda_artigo_excluir' article.slug %}" class="m-0">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger">
+            <i class="bi bi-trash me-1"></i>Excluir definitivamente
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 <div class="row g-4">
   <main class="col-lg-8 col-xl-9">

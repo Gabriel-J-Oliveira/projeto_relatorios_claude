@@ -64,6 +64,7 @@ class HelpArticle:
     db_id: int | None = None
     formato: str = "markdown"
     content: str = ""
+    related_slugs: tuple[str, ...] = ()
 
 
 def usuario_pode_editar_ajuda(user):
@@ -160,6 +161,7 @@ def _article_from_model(article):
         db_id=article.pk,
         formato=article.formato,
         content=article.conteudo,
+        related_slugs=tuple(article.artigos_relacionados.filter(ativo=True).values_list("slug", flat=True)),
     )
 
 
@@ -257,20 +259,29 @@ def buscar_artigos(user, termo, categoria_slug=""):
 
 def obter_artigo(user, slug):
     categories = {category.slug: category for category in listar_categorias()}
-    for article in listar_artigos(user):
+    articles = listar_artigos(user)
+    articles_by_slug = {item.slug: item for item in articles}
+    for article in articles:
         if article.slug != slug:
             continue
         content = article.content or _read_markdown(article.path)
+        related = [
+            articles_by_slug[related_slug]
+            for related_slug in article.related_slugs
+            if related_slug in articles_by_slug and related_slug != article.slug
+        ]
+        if not related:
+            related = [
+                item
+                for item in articles
+                if item.category == article.category and item.slug != article.slug
+            ][:8]
         return {
             "article": article,
             "category": categories.get(article.category),
             "content": content,
             "html": render_article_content(content, article.formato),
-            "related": [
-                item
-                for item in listar_artigos(user)
-                if item.category == article.category and item.slug != article.slug
-            ][:8],
+            "related": related,
             "categories": listar_categorias_com_contagem(user),
             "can_edit_help": usuario_pode_editar_ajuda(user),
         }
