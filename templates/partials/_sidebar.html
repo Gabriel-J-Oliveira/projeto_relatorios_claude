@@ -97,7 +97,7 @@
     <li class="nav-item">
       <a href="{% url 'relatorios:ajuda_index' %}"
          class="nav-link d-flex align-items-center gap-2
-                {% if request.resolver_match.url_name == 'ajuda_index' or request.resolver_match.url_name == 'ajuda_artigo' %}active{% endif %}">
+                {% if request.resolver_match.url_name == 'ajuda_index' or request.resolver_match.url_name == 'ajuda_artigo' or request.resolver_match.url_name == 'ajuda_categoria' or request.resolver_match.url_name == 'ajuda_artigo_editar' %}active{% endif %}">
         <i class="bi bi-question-circle fs-5"></i>
         <span>Ajuda</span>
       </a>

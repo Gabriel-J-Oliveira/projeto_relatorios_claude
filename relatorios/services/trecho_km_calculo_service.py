@@ -10,6 +10,7 @@ from relatorios.models import (
     TrechoRateioKM,
 )
 from relatorios.services.historico_service import registrar_evento
+from relatorios.services.km_financeiro_service import calcular_km_financeiro
 from relatorios.services.rateio_exceptions import RateioError
 
 
@@ -50,8 +51,10 @@ def _valor_km(valor):
 
 
 def _valor_km_cliente(cliente, trecho):
-    valor_cliente = getattr(cliente, "valor_km", None)
-    return _valor_km(valor_cliente if valor_cliente not in (None, "") else trecho.valor_km)
+    calculo = calcular_km_financeiro(trecho.km, cliente)
+    if calculo["valor_km_cliente"] is None:
+        return Decimal("0.0000")
+    return calculo["valor_km_cliente"]
 
 
 def _clientes_ids_item(trecho):
@@ -95,8 +98,9 @@ class TrechoKMCalculoService:
             calculo = existentes.get(cliente_id)
             if rejeitado:
                 cliente = calculo.cliente if calculo else clientes_por_id[cliente_id]
-                valor_km = _valor_km_cliente(cliente, trecho)
-                valor_calculado = _money(trecho.km * valor_km)
+                calculo_financeiro = calcular_km_financeiro(trecho.km, cliente)
+                valor_km = calculo_financeiro["valor_km_cliente"] or Decimal("0.0000")
+                valor_calculado = calculo_financeiro["valor_cobranca_calculado"] or Decimal("0.00")
                 TrechoRateioKM.objects.update_or_create(
                     trecho=trecho,
                     cliente_id=cliente_id,
@@ -131,9 +135,10 @@ class TrechoKMCalculoService:
                 continue
 
             cliente = clientes_por_id[cliente_id]
-            valor_km = _valor_km_cliente(cliente, trecho)
+            calculo_financeiro = calcular_km_financeiro(trecho.km, cliente)
+            valor_km = calculo_financeiro["valor_km_cliente"] or Decimal("0.0000")
             km_cliente = Decimal("0.0") if rejeitado else _km(trecho.km)
-            valor_calculado = Decimal("0.00") if rejeitado else _money(km_cliente * valor_km)
+            valor_calculado = Decimal("0.00") if rejeitado else (calculo_financeiro["valor_cobranca_calculado"] or Decimal("0.00"))
 
             TrechoRateioKM.objects.update_or_create(
                 trecho=trecho,
@@ -271,11 +276,16 @@ def serializar_calculo_trecho(calculo):
         "cliente": calculo.cliente.nome,
         "km_cliente": str(calculo.km_cliente),
         "valor_km": str(calculo.valor_km),
+        "valor_km_cliente_contratual": str(calculo.valor_km),
         "valor_calculado": str(calculo.valor_calculado),
+        "valor_cobranca_calculado": str(calculo.valor_calculado),
         "valor_final": str(calculo.valor_final),
+        "valor_cobranca_cliente": str(calculo.valor_final),
         "valor_km_control_sul": str(calculo.valor_km_control_sul),
+        "valor_km_reembolso_tecnico": str(calculo.valor_km_control_sul),
         "valor_reembolso_tecnico": str(calculo.valor_reembolso_tecnico),
         "excesso_reducao": str(calculo.excesso_reducao),
+        "diferenca": str(calculo.excesso_reducao),
         "status": calculo.status,
         "status_label": calculo.get_status_display(),
     }

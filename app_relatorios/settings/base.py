@@ -118,6 +118,16 @@ MEDIA_ROOT = BASE_DIR / "media"
 ANEXOS_URL = config("ANEXOS_URL", default="/anexos/")
 ANEXOS_ROOT = Path(config("ANEXOS_ROOT", default="/home/app_relatorios_files"))
 ANEXO_MAX_UPLOAD_MB = config("ANEXO_MAX_UPLOAD_MB", default=10, cast=int)
+HELP_IMAGES_ROOT = Path(
+    config("HELP_IMAGES_ROOT", default="/home/app_relatorios_files/help_images")
+)
+HELP_IMAGES_MAX_UPLOAD_MB = config(
+    "HELP_IMAGES_MAX_UPLOAD_MB",
+    default=config("HELP_IMAGE_MAX_UPLOAD_MB", default=5, cast=int),
+    cast=int,
+)
+# Compatibilidade com a variável anterior usada nas primeiras versões.
+HELP_IMAGE_MAX_UPLOAD_MB = HELP_IMAGES_MAX_UPLOAD_MB
 VALOR_KM_CONTROLSUL = config("VALOR_KM_CONTROLSUL", default="1.35")
 
 # Integracao de clientes ControlSul. O token deve vir apenas do ambiente.

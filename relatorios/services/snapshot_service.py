@@ -42,6 +42,15 @@ def _datetime(valor):
     return valor.isoformat() if valor else None
 
 
+def _tipo_diferenca(valor):
+    valor = _money(valor)
+    if valor > 0:
+        return "EXCESSO"
+    if valor < 0:
+        return "REDUCAO"
+    return "NEUTRO"
+
+
 def _user_payload(usuario):
     if not usuario:
         return None
@@ -116,6 +125,7 @@ def _rateio_despesa_payload(rateio):
 
 
 def _rateio_km_payload(rateio):
+    diferenca = rateio.excesso_reducao
     return {
         "id": rateio.pk,
         "cliente_id": rateio.cliente_id,
@@ -124,12 +134,18 @@ def _rateio_km_payload(rateio):
         "km_final": _decimal(rateio.km_final),
         "km_cliente": _decimal(rateio.km_cliente),
         "valor_km": _decimal(rateio.valor_km),
+        "valor_km_cliente_contratual": _decimal(rateio.valor_km),
         "valor_km_control_sul": _decimal(rateio.valor_km_control_sul),
+        "valor_km_reembolso_tecnico": _decimal(rateio.valor_km_control_sul),
         "valor_reembolso_tecnico": _decimal(rateio.valor_reembolso_tecnico),
-        "excesso_reducao": _decimal(rateio.excesso_reducao),
+        "excesso_reducao": _decimal(diferenca),
+        "diferenca": _decimal(diferenca),
+        "tipo_diferenca": _tipo_diferenca(diferenca),
         "valor_calculado": _decimal(rateio.valor_calculado),
+        "valor_cobranca_calculado": _decimal(rateio.valor_calculado),
         "valor_rateado": _decimal(rateio.valor_rateado),
         "valor_final": _decimal(rateio.valor_final),
+        "valor_cobranca_cliente": _decimal(rateio.valor_final),
         "status": rateio.status,
         "status_label": rateio.get_status_display(),
         "motivo_ajuste": rateio.motivo_ajuste,
@@ -192,6 +208,7 @@ def _despesa_payload(despesa):
 
 
 def _trecho_payload(trecho):
+    diferenca = trecho.excesso_reducao_km
     return {
         "id": trecho.pk,
         "ordem": trecho.ordem,
@@ -215,11 +232,16 @@ def _trecho_payload(trecho):
         "km_divergente_rota": trecho.km_divergente_rota,
         "valor_km": _decimal(trecho.valor_km),
         "valor_km_control_sul": _decimal(trecho.valor_km_control_sul),
+        "valor_km_reembolso_tecnico": _decimal(trecho.valor_km_control_sul),
         "valor_reembolso_tecnico": _decimal(trecho.valor_reembolso_tecnico),
-        "excesso_reducao": _decimal(trecho.excesso_reducao_km),
+        "excesso_reducao": _decimal(diferenca),
+        "diferenca": _decimal(diferenca),
+        "tipo_diferenca": _tipo_diferenca(diferenca),
         "valor_km_final": _decimal(trecho.valor_km_final),
         "valor_calculado": _decimal(trecho.valor_calculado_clientes),
+        "valor_cobranca_calculado": _decimal(trecho.valor_calculado_clientes),
         "valor_final": _decimal(trecho.valor_final_clientes),
+        "valor_cobranca_cliente": _decimal(trecho.valor_final_clientes),
         "status_financeiro": trecho.status_financeiro,
         "status_financeiro_label": trecho.get_status_financeiro_display(),
         "rejeitado": _status_rejeitado(trecho),
@@ -247,11 +269,17 @@ def _km_excedente_payload(relatorio):
                 "cliente_nome": cliente.nome,
                 "km": _decimal(linha["km"]),
                 "valor_km": _decimal(linha["valor_km"]),
+                "valor_km_cliente_contratual": _decimal(linha["valor_km"]),
                 "valor_km_control_sul": _decimal(linha["valor_km_control_sul"]),
+                "valor_km_reembolso_tecnico": _decimal(linha["valor_km_control_sul"]),
                 "valor_reembolso_tecnico": _decimal(linha["valor_reembolso_tecnico"]),
                 "excesso_reducao": _decimal(linha["excesso_reducao"]),
+                "diferenca": _decimal(linha["excesso_reducao"]),
+                "tipo_diferenca": linha.get("tipo_diferenca") or _tipo_diferenca(linha["excesso_reducao"]),
                 "valor_calculado": _decimal(linha["valor_calculado"]),
+                "valor_cobranca_calculado": _decimal(linha["valor_calculado"]),
                 "valor_final": _decimal(linha["valor_calculado"]),
+                "valor_cobranca_cliente": _decimal(linha["valor_calculado"]),
             }
         )
     return {

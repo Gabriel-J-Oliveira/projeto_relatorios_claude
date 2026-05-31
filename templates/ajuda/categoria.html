@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ category.title }}{% endblock %}
+{% block page_title %}{{ category.title }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'relatorios:ajuda_index' %}" class="text-decoration-none">Ajuda</a>
+</li>
+<li class="breadcrumb-item active">{{ category.title }}</li>
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'relatorios:ajuda_index' %}" class="btn btn-sm btn-outline-secondary">
+  <i class="bi bi-arrow-left me-1"></i>Voltar para Central
+</a>
+{% endblock %}
+
+{% block content %}
+<style>
+  .help-sidebar {
+    position: sticky;
+    top: 80px;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+  }
+
+  .help-article-card {
+    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+  }
+
+  .help-article-card:hover {
+    border-color: rgba(13, 110, 253, .35) !important;
+    box-shadow: 0 .75rem 1.75rem rgba(15, 23, 42, .08) !important;
+    transform: translateY(-2px);
+  }
+
+  @media (max-width: 991.98px) {
+    .help-sidebar {
+      max-height: none;
+      overflow: visible;
+      position: static;
+    }
+  }
+</style>
+
+<div class="row g-4">
+  <main class="col-lg-8 col-xl-9">
+    <section class="card border-0 shadow-sm mb-4">
+      <div class="card-body p-4">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+          <div>
+            <span class="badge bg-primary-subtle text-primary rounded-pill mb-2">
+              <i class="bi {{ category.icon }} me-1"></i>{{ articles|length }} artigo(s)
+            </span>
+            <h2 class="fw-bold mb-2">{{ category.title }}</h2>
+            <p class="text-muted mb-0">{{ category.description }}</p>
+          </div>
+        </div>
+        <form method="get" class="mt-4">
+          <label for="categoria-search" class="form-label small text-muted fw-semibold">Buscar nesta categoria</label>
+          <div class="input-group">
+            <span class="input-group-text bg-body"><i class="bi bi-search"></i></span>
+            <input id="categoria-search"
+                   type="search"
+                   name="q"
+                   value="{{ query }}"
+                   class="form-control"
+                   placeholder="Ex.: comprovante, aprovação, KM">
+            <button class="btn btn-primary" type="submit">Buscar</button>
+            {% if query %}
+            <a href="{% url 'relatorios:ajuda_categoria' category.slug %}" class="btn btn-outline-secondary">Limpar</a>
+            {% endif %}
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <div class="row g-3">
+      {% for article in articles %}
+      <div class="col-md-6">
+        <a href="{% url 'relatorios:ajuda_artigo' article.slug %}"
+           class="card border-0 shadow-sm help-article-card text-decoration-none text-reset h-100">
+          <div class="card-body">
+            <div class="d-flex flex-wrap gap-1 mb-2">
+              {% for tag in article.tags|slice:":3" %}
+              <span class="badge bg-body-tertiary text-body-secondary">#{{ tag }}</span>
+              {% endfor %}
+            </div>
+            <h6 class="fw-semibold mb-2">{{ article.title }}</h6>
+            <p class="text-muted small mb-0">{{ article.summary }}</p>
+          </div>
+        </a>
+      </div>
+      {% empty %}
+      <div class="col-12">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body text-center py-5 text-muted">
+            <i class="bi bi-search fs-1 d-block mb-2"></i>
+            Nenhum artigo encontrado nesta categoria.
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </main>
+
+  <aside class="col-lg-4 col-xl-3">
+    <div class="help-sidebar">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent border-bottom">
+          <h6 class="fw-semibold mb-0">Categorias</h6>
+        </div>
+        <div class="list-group list-group-flush">
+          {% for item in categories %}
+          <a href="{% url 'relatorios:ajuda_categoria' item.slug %}"
+             class="list-group-item list-group-item-action {% if item.slug == category.slug %}active{% endif %}">
+            <div class="d-flex justify-content-between gap-2">
+              <span class="small fw-semibold">{{ item.title }}</span>
+              <span class="badge bg-body-tertiary text-body-secondary">{{ item.count }}</span>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>
+{% endblock %}

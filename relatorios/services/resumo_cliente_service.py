@@ -142,10 +142,12 @@ def resumo_financeiro_por_cliente(relatorio):
                 resumo.valor_km_reembolso_tecnico += _money(calculo.valor_reembolso_tecnico)
                 resumo.total_aprovado += _money(calculo.valor_final)
             elif not trecho.rejeitado and trecho.status_financeiro != "rejeitado":
+                valor_km_cliente = getattr(resumo.cliente, "valor_km", None) or Decimal("0.00")
+                valor_cobranca_cliente = _money(trecho.km * valor_km_cliente)
                 resumo.km_total += trecho.km
-                resumo.valor_km_solicitado += _money(trecho.valor_calculado)
+                resumo.valor_km_solicitado += valor_cobranca_cliente
                 resumo.valor_km_reembolso_tecnico += _money(trecho.valor_reembolso_tecnico)
-                resumo.total_aprovado += _money(trecho.valor_final)
+                resumo.total_aprovado += valor_cobranca_cliente
             if trecho.rejeitado or trecho.status_financeiro == "rejeitado":
                 resumo.itens_rejeitados += 1
 

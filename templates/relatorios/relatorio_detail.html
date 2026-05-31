@@ -545,7 +545,7 @@
               <tr>
                 <th class="ps-3 small fw-semibold text-muted">Data</th>
                 <th class="small fw-semibold text-muted">KM</th>
-                <th class="small fw-semibold text-muted">Valor/KM ControlSul</th>
+                <th class="small fw-semibold text-muted">Valor/KM reembolso</th>
                 <th class="small fw-semibold text-muted">Aprovação KM</th>
                 <th class="small fw-semibold text-muted">Cobranca clientes</th>
                 <th class="small fw-semibold text-muted text-center">Rateio</th>
@@ -563,7 +563,7 @@
                 <td class="small">{{ t.km }} km</td>
                 <td class="small text-muted">R$ {{ t.valor_km_control_sul|floatformat:2 }}</td>
                 <td class="small text-muted">
-                  Gerenciado no rateio
+                  R$ {{ t.valor_reembolso_tecnico|floatformat:2 }}
                 </td>
                 <td class="small fw-semibold text-success">R$ {{ t.valor_calculado_clientes|floatformat:2 }}</td>
                 <td class="text-center">

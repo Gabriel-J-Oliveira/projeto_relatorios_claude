@@ -207,8 +207,8 @@ def _trechos_snapshot(payload):
         rejeitado = bool(trecho.get("rejeitado"))
         motivo = trecho.get("motivo_rejeicao") or trecho.get("motivo_recusa") or "-"
         rateios = trecho.get("rateios") or []
-        solicitado = _money(trecho.get("valor_calculado"))
-        aprovado = Decimal("0.00") if rejeitado else _money(trecho.get("valor_final"))
+        solicitado = _money(trecho.get("valor_cobranca_calculado") or trecho.get("valor_calculado"))
+        aprovado = Decimal("0.00") if rejeitado else _money(trecho.get("valor_cobranca_cliente") or trecho.get("valor_final"))
         status, badge = _item_status(rejeitado, solicitado, aprovado)
         linhas.append(
             _ns(
@@ -220,7 +220,7 @@ def _trechos_snapshot(payload):
                 km_calculado_api=_money(trecho.get("km_calculado_api")),
                 solicitado=solicitado,
                 valor_reembolso_tecnico=_money(trecho.get("valor_reembolso_tecnico")),
-                excesso_reducao=_money(trecho.get("excesso_reducao")),
+                excesso_reducao=_money(trecho.get("diferenca") or trecho.get("excesso_reducao")),
                 total_final=_money(aprovado),
                 status=status,
                 badge=badge,
@@ -230,9 +230,9 @@ def _trechos_snapshot(payload):
                     _ns(
                         cliente=rateio.get("cliente_nome") or "-",
                         km=_money(rateio.get("km_cliente") or rateio.get("km_final")),
-                        valor_km=Decimal(str(rateio.get("valor_km") or "0.00")),
-                        valor_original=_money(rateio.get("valor_calculado")),
-                        valor_final=_money(rateio.get("valor_final")),
+                        valor_km=Decimal(str(rateio.get("valor_km_cliente_contratual") or rateio.get("valor_km") or "0.00")),
+                        valor_original=_money(rateio.get("valor_cobranca_calculado") or rateio.get("valor_calculado")),
+                        valor_final=_money(rateio.get("valor_cobranca_cliente") or rateio.get("valor_final")),
                         status=rateio.get("status_label") or rateio.get("status") or "-",
                         motivo=rateio.get("motivo_ajuste") or "",
                     )

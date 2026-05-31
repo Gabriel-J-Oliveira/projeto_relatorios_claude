@@ -36,6 +36,8 @@ class ItemPdfCliente:
     valor_total: Decimal
     valor: Decimal
     percentual: Decimal | None = None
+    km: Decimal | None = None
+    valor_km_unitario: Decimal | None = None
     origem_item: str = ""
     origem_id: int | None = None
     comprovante_path: str = ""
@@ -186,11 +188,20 @@ def _itens_snapshot_cliente(payload, cliente_id):
                 and any(int(cliente.get("id") or 0) == cliente_id for cliente in clientes_trecho)
                 else []
             )
-        total_item = _money(trecho.get("valor_calculado") or trecho.get("valor_final"))
+        total_item = _money(
+            trecho.get("valor_cobranca_calculado")
+            or trecho.get("valor_calculado")
+            or trecho.get("valor_final")
+        )
         for rateio in rateios_cliente:
-            valor = _money(rateio.get("valor_final"))
+            valor = _money(rateio.get("valor_cobranca_cliente") or rateio.get("valor_final"))
             if valor <= 0:
                 continue
+            km_cliente = _money(rateio.get("km_cliente") or rateio.get("km_final") or trecho.get("km"))
+            valor_km = _money(
+                rateio.get("valor_km_cliente_contratual")
+                or rateio.get("valor_km")
+            )
             descricao = (
                 trecho.get("descricao")
                 or f"{trecho.get('origem', '')} -> {trecho.get('destino', '')}".strip(" ->")
@@ -205,6 +216,8 @@ def _itens_snapshot_cliente(payload, cliente_id):
                     valor_total=total_item,
                     valor=valor,
                     percentual=_percentual(valor, total_item),
+                    km=km_cliente,
+                    valor_km_unitario=valor_km,
                     origem_item="trecho",
                     origem_id=trecho.get("id"),
                 )
@@ -295,7 +308,12 @@ def _itens_vivos_cliente(relatorio, cliente_id):
         if rateios:
             total_trecho = sum((rateio.valor_final for rateio in rateios), Decimal("0.00"))
             valores = [
-                (rateio.valor_final, _percentual(rateio.valor_final, total_trecho))
+                (
+                    rateio.valor_final,
+                    _percentual(rateio.valor_final, total_trecho),
+                    rateio.km_cliente,
+                    rateio.valor_km,
+                )
                 for rateio in rateios
                 if rateio.cliente_id == cliente_id
             ]
@@ -307,10 +325,15 @@ def _itens_vivos_cliente(relatorio, cliente_id):
                 if clientes
                 else relatorio.cliente_id == cliente_id
             )
+            cliente = next((vinculo.cliente for vinculo in clientes if vinculo.cliente_id == cliente_id), None)
+            if cliente is None and relatorio.cliente_id == cliente_id:
+                cliente = relatorio.cliente
+            valor_km_cliente = getattr(cliente, "valor_km", None) if cliente else None
+            valor_cliente = _money(trecho.km * valor_km_cliente) if valor_km_cliente else trecho.valor_final_clientes
             valores = [
-                (trecho.valor_final, _percentual(trecho.valor_final, trecho.valor_final))
+                (valor_cliente, _percentual(valor_cliente, valor_cliente), trecho.km, valor_km_cliente)
             ] if cliente_participa else []
-        for valor_rateado, percentual in valores:
+        for valor_rateado, percentual, km_cliente, valor_km_unitario in valores:
             valor = _money(valor_rateado)
             if valor <= 0:
                 continue
@@ -323,6 +346,8 @@ def _itens_vivos_cliente(relatorio, cliente_id):
                     valor_total=_money(trecho.valor_calculado_clientes),
                     valor=valor,
                     percentual=percentual,
+                    km=_money(km_cliente),
+                    valor_km_unitario=_money(valor_km_unitario),
                     origem_item="trecho",
                     origem_id=trecho.pk,
                 )

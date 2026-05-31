@@ -15,6 +15,10 @@ from .models import (
     TipoDocumentoComprovante,
     Municipio,
     Setor,
+    ArtigoAjuda,
+    CategoriaAjuda,
+    PublicoArtigoAjuda,
+    FormatoArtigoAjuda,
 )
 from .validators import validar_anexo_upload
 
@@ -139,6 +143,66 @@ class CompletarCadastroUsuarioForm(BootstrapMixin, forms.Form):
         if qs.exists():
             raise forms.ValidationError("Este e-mail já está em uso por outro usuário.")
         return email
+
+
+class ArtigoAjudaForm(BootstrapMixin, forms.ModelForm):
+    tags_texto = forms.CharField(
+        label="Tags",
+        required=False,
+        help_text="Separe as tags por vírgula.",
+    )
+    publico_para = forms.MultipleChoiceField(
+        label="Público-alvo",
+        required=False,
+        choices=PublicoArtigoAjuda.choices,
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    class Meta:
+        model = ArtigoAjuda
+        fields = [
+            "titulo",
+            "categoria",
+            "resumo",
+            "conteudo",
+            "formato",
+            "ativo",
+            "importante",
+            "link_rapido",
+            "tour_url",
+        ]
+        widgets = {
+            "resumo": forms.Textarea(attrs={"rows": 3}),
+            "conteudo": forms.Textarea(attrs={"rows": 18, "class": "form-control help-editor"}),
+            "formato": forms.HiddenInput(),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["categoria"].queryset = CategoriaAjuda.objects.filter(ativo=True).order_by("ordem", "titulo")
+        self.fields["formato"].initial = FormatoArtigoAjuda.HTML
+        self.fields["tags_texto"].initial = ", ".join(self.instance.tags_lista) if self.instance.pk else ""
+        self.fields["publico_para"].initial = self.instance.publico_lista if self.instance.pk else [PublicoArtigoAjuda.TODOS]
+        for name in ["ativo", "importante", "link_rapido"]:
+            self.fields[name].widget.attrs.setdefault("class", "form-check-input")
+
+    def clean_tags_texto(self):
+        texto = self.cleaned_data.get("tags_texto") or ""
+        return [tag.strip() for tag in texto.split(",") if tag.strip()]
+
+    def clean_publico_para(self):
+        valores = self.cleaned_data.get("publico_para") or []
+        return valores or [PublicoArtigoAjuda.TODOS]
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.formato = FormatoArtigoAjuda.HTML
+        instance.tags = self.cleaned_data.get("tags_texto") or []
+        instance.publico_para = self.cleaned_data.get("publico_para") or [PublicoArtigoAjuda.TODOS]
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
 
 
 # ─────────────────────────────────────────────

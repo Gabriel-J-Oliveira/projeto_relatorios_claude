@@ -20,6 +20,9 @@ from .models import (
     PerfilUsuario,
     Setor,
     UsuarioSetorImportado,
+    CategoriaAjuda,
+    ArtigoAjuda,
+    ImagemAjuda,
 )
 
 
@@ -69,6 +72,33 @@ class UsuarioSetorImportadoAdmin(admin.ModelAdmin):
         "tecnico_vinculado__nome",
     ]
     readonly_fields = ["nome_normalizado", "aplicado_em", "criado_em", "atualizado_em"]
+
+
+@admin.register(CategoriaAjuda)
+class CategoriaAjudaAdmin(admin.ModelAdmin):
+    list_display = ["titulo", "slug", "ordem", "ativo", "atualizado_em"]
+    list_filter = ["ativo"]
+    search_fields = ["titulo", "slug", "descricao"]
+    prepopulated_fields = {"slug": ("titulo",)}
+    list_editable = ["ordem", "ativo"]
+    readonly_fields = ["criado_em", "atualizado_em"]
+
+
+@admin.register(ArtigoAjuda)
+class ArtigoAjudaAdmin(admin.ModelAdmin):
+    list_display = ["titulo", "categoria", "ativo", "importante", "link_rapido", "atualizado_em"]
+    list_filter = ["ativo", "categoria", "importante", "link_rapido", "formato"]
+    search_fields = ["titulo", "slug", "resumo", "conteudo"]
+    prepopulated_fields = {"slug": ("titulo",)}
+    readonly_fields = ["criado_em", "atualizado_em", "criado_por", "atualizado_por"]
+
+
+@admin.register(ImagemAjuda)
+class ImagemAjudaAdmin(admin.ModelAdmin):
+    list_display = ["nome_original", "artigo", "tipo_mime", "tamanho_bytes", "enviado_por", "criado_em"]
+    list_filter = ["tipo_mime", "criado_em"]
+    search_fields = ["nome_original", "arquivo", "artigo__titulo"]
+    readonly_fields = ["nome_original", "tipo_mime", "tamanho_bytes", "enviado_por", "criado_em"]
 
 
 @admin.register(Tecnico)

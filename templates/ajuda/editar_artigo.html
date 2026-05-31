@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block titulo %}Editar artigo{% endblock %}
+{% block page_title %}Editar artigo{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'relatorios:ajuda_index' %}" class="text-decoration-none">Ajuda</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'relatorios:ajuda_artigo' article.slug %}" class="text-decoration-none">{{ article.titulo }}</a>
+</li>
+<li class="breadcrumb-item active">Editar</li>
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'relatorios:ajuda_artigo' article.slug %}" class="btn btn-sm btn-outline-secondary">
+  <i class="bi bi-eye me-1"></i>Visualizar
+</a>
+{% endblock %}
+
+{% block content %}
+<style>
+  .help-editor-card {
+    max-width: 1180px;
+  }
+
+  .tox-tinymce {
+    border-color: var(--bs-border-color) !important;
+    border-radius: .75rem !important;
+  }
+</style>
+
+<form method="post" class="card border-0 shadow-sm help-editor-card">
+  {% csrf_token %}
+  <div class="card-body p-4">
+    {% if form.non_field_errors %}
+    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="row g-3">
+      <div class="col-lg-8">
+        <label class="form-label fw-semibold" for="{{ form.titulo.id_for_label }}">Título</label>
+        {{ form.titulo }}
+        {{ form.titulo.errors }}
+      </div>
+      <div class="col-lg-4">
+        <label class="form-label fw-semibold" for="{{ form.categoria.id_for_label }}">Categoria</label>
+        {{ form.categoria }}
+        {{ form.categoria.errors }}
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold" for="{{ form.resumo.id_for_label }}">Resumo</label>
+        {{ form.resumo }}
+        {{ form.resumo.errors }}
+      </div>
+      <div class="col-lg-8">
+        <label class="form-label fw-semibold" for="{{ form.tags_texto.id_for_label }}">Tags</label>
+        {{ form.tags_texto }}
+        <div class="form-text">{{ form.tags_texto.help_text }}</div>
+        {{ form.tags_texto.errors }}
+      </div>
+      <div class="col-lg-4">
+        <label class="form-label fw-semibold">Opções</label>
+        <div class="d-flex flex-wrap gap-3 small">
+          <label class="form-check">
+            {{ form.ativo }} <span class="form-check-label">Ativo</span>
+          </label>
+          <label class="form-check">
+            {{ form.importante }} <span class="form-check-label">Importante</span>
+          </label>
+          <label class="form-check">
+            {{ form.link_rapido }} <span class="form-check-label">Link rápido</span>
+          </label>
+        </div>
+      </div>
+      <div class="col-lg-8">
+        <label class="form-label fw-semibold" for="{{ form.tour_url.id_for_label }}">Link de tour relacionado</label>
+        {{ form.tour_url }}
+        {{ form.tour_url.errors }}
+      </div>
+      <div class="col-lg-4">
+        <label class="form-label fw-semibold">Público-alvo</label>
+        <div class="d-grid gap-1 small">
+          {{ form.publico_para }}
+        </div>
+        {{ form.publico_para.errors }}
+      </div>
+      <div class="col-12">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+          <label class="form-label fw-semibold mb-0" for="{{ form.conteudo.id_for_label }}">Conteúdo</label>
+          <div class="btn-group btn-group-sm" role="group" aria-label="Blocos rápidos">
+            <button type="button" class="btn btn-outline-info js-help-insert" data-kind="info">Dica</button>
+            <button type="button" class="btn btn-outline-warning js-help-insert" data-kind="warning">Aviso</button>
+            <button type="button" class="btn btn-outline-success js-help-insert" data-kind="success">Exemplo</button>
+          </div>
+        </div>
+        {{ form.formato }}
+        {{ form.conteudo }}
+        {{ form.conteudo.errors }}
+      </div>
+    </div>
+  </div>
+  <div class="card-footer bg-transparent d-flex flex-wrap justify-content-end gap-2 p-3">
+    <a href="{% url 'relatorios:ajuda_artigo' article.slug %}" class="btn btn-outline-secondary">Cancelar</a>
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-check2 me-1"></i>Salvar
+    </button>
+  </div>
+</form>
+
+<script src="https://cdn.jsdelivr.net/npm/tinymce@7/tinymce.min.js" referrerpolicy="origin"></script>
+<script>
+  function getCsrfToken() {
+    const match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : "";
+  }
+
+  tinymce.init({
+    selector: "#id_conteudo",
+    height: 620,
+    menubar: false,
+    branding: false,
+    convert_urls: false,
+    plugins: "lists link image table code autoresize",
+    toolbar: "undo redo | blocks | bold italic underline | bullist numlist blockquote | alignleft aligncenter alignright | link image table | code",
+    block_formats: "Parágrafo=p;Título 1=h1;Título 2=h2;Título 3=h3",
+    valid_classes: {
+      "*": "text-primary text-secondary text-success text-danger text-warning text-info alert alert-primary alert-secondary alert-success alert-danger alert-warning alert-info table table-sm table-bordered img-fluid"
+    },
+    content_style: "body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:14px} img{max-width:100%;height:auto;border-radius:.75rem} .alert{padding:.75rem 1rem;border-radius:.75rem}",
+    images_upload_url: "{% url 'relatorios:ajuda_imagem_upload' %}",
+    images_upload_credentials: true,
+    automatic_uploads: true,
+    images_upload_handler: async (blobInfo, progress) => {
+      const formData = new FormData();
+      formData.append("file", blobInfo.blob(), blobInfo.filename());
+      const response = await fetch("{% url 'relatorios:ajuda_imagem_upload' %}", {
+        method: "POST",
+        headers: {"X-CSRFToken": getCsrfToken()},
+        body: formData,
+        credentials: "same-origin"
+      });
+      const data = await response.json();
+      if (!response.ok || !data.location) {
+        throw new Error(data.error || "Não foi possível enviar a imagem.");
+      }
+      return data.location;
+    },
+    setup: (editor) => {
+      document.querySelectorAll(".js-help-insert").forEach((button) => {
+        button.addEventListener("click", () => {
+          const kind = button.dataset.kind || "info";
+          const titles = {info: "Dica", warning: "Atenção", success: "Exemplo"};
+          editor.insertContent(`<div class="alert alert-${kind}"><strong>${titles[kind]}:</strong> escreva o conteúdo aqui.</div><p></p>`);
+        });
+      });
+    }
+  });
+</script>
+{% endblock %}

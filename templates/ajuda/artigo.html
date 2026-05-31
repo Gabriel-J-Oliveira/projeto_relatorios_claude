@@ -10,10 +10,25 @@
 <li class="breadcrumb-item">
   <a href="{% url 'relatorios:ajuda_index' %}" class="text-decoration-none">Ajuda</a>
 </li>
+{% if category %}
+<li class="breadcrumb-item">
+  <a href="{% url 'relatorios:ajuda_categoria' category.slug %}" class="text-decoration-none">{{ category.title }}</a>
+</li>
+{% endif %}
 <li class="breadcrumb-item active">{{ article.title }}</li>
 {% endblock %}
 
 {% block page_actions %}
+{% if can_edit_help %}
+<a href="{% url 'relatorios:ajuda_artigo_editar' article.slug %}" class="btn btn-sm btn-outline-primary">
+  <i class="bi bi-pencil-square me-1"></i>Editar
+</a>
+{% endif %}
+{% if category %}
+<a href="{% url 'relatorios:ajuda_categoria' category.slug %}" class="btn btn-sm btn-outline-secondary">
+  <i class="bi bi-folder2-open me-1"></i>Voltar para categoria
+</a>
+{% endif %}
 <a href="{% url 'relatorios:ajuda_index' %}" class="btn btn-sm btn-outline-secondary">
   <i class="bi bi-arrow-left me-1"></i>Voltar para Central
 </a>
@@ -50,6 +65,7 @@
     padding-left: 1.2rem;
   }
 
+  .help-article img,
   .help-article-content img {
     border: 1px solid var(--bs-border-color);
     border-radius: .65rem;
@@ -70,6 +86,25 @@
     font-weight: 600;
     margin: 1rem 0;
     padding: .75rem .9rem;
+  }
+
+  .help-sidebar {
+    position: sticky;
+    top: 80px;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+  }
+
+  .help-article-content .alert {
+    color: var(--bs-alert-color);
+  }
+
+  @media (max-width: 991.98px) {
+    .help-sidebar {
+      max-height: none;
+      overflow: visible;
+      position: static;
+    }
   }
 </style>
 
@@ -96,7 +131,7 @@
           {% endfor %}
         </div>
 
-        <div class="help-article-content help-content">
+        <div class="help-article help-article-content help-content">
           {{ html }}
         </div>
       </div>
@@ -104,6 +139,24 @@
   </main>
 
   <aside class="col-lg-4 col-xl-3">
+    <div class="help-sidebar">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-transparent border-bottom">
+        <h6 class="fw-semibold mb-0">Categorias</h6>
+      </div>
+      <div class="list-group list-group-flush">
+        {% for item in categories %}
+        <a href="{% url 'relatorios:ajuda_categoria' item.slug %}"
+           class="list-group-item list-group-item-action {% if category and item.slug == category.slug %}active{% endif %}">
+          <div class="d-flex justify-content-between gap-2">
+            <span class="small fw-semibold">{{ item.title }}</span>
+            <span class="badge bg-body-tertiary text-body-secondary">{{ item.count }}</span>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+
     <div class="card border-0 shadow-sm mb-3">
       <div class="card-header bg-transparent border-bottom">
         <h6 class="fw-semibold mb-0">Artigos relacionados</h6>
@@ -128,6 +181,7 @@
           Ir para a Central
         </a>
       </div>
+    </div>
     </div>
   </aside>
 </div>

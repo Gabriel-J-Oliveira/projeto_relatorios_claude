@@ -429,12 +429,12 @@ def _rateios_trecho_snapshot(trecho, payload):
             _ns(
                 cliente=rateio.get("cliente_nome") or "Nao informado",
                 km=_money(rateio.get("km_cliente") or rateio.get("km_final")),
-                valor_km=Decimal(str(rateio.get("valor_km") or "0.00")),
+                valor_km=Decimal(str(rateio.get("valor_km_cliente_contratual") or rateio.get("valor_km") or "0.00")),
                 valor_km_control_sul=Decimal(str(rateio.get("valor_km_control_sul") or "1.35")),
                 valor_reembolso_tecnico=_money(rateio.get("valor_reembolso_tecnico")),
-                excesso_reducao=_money(rateio.get("excesso_reducao")),
-                valor_original=_money(rateio.get("valor_calculado")),
-                valor_final=_money(rateio.get("valor_final")),
+                excesso_reducao=_money(rateio.get("diferenca") or rateio.get("excesso_reducao")),
+                valor_original=_money(rateio.get("valor_cobranca_calculado") or rateio.get("valor_calculado")),
+                valor_final=_money(rateio.get("valor_cobranca_cliente") or rateio.get("valor_final")),
                 status=rateio.get("status_label") or rateio.get("status") or "-",
                 motivo=rateio.get("motivo_ajuste") or "",
             )
@@ -445,16 +445,14 @@ def _rateios_trecho_snapshot(trecho, payload):
         _ns(
             cliente=cliente.get("nome") or "Nao informado",
             km=_money(trecho.get("km")),
-            valor_km=Decimal(
-                str(trecho.get("valor_km_final") or trecho.get("valor_km") or "0.00")
-            ),
+            valor_km=Decimal(str(cliente.get("valor_km") or "0.00")),
             valor_km_control_sul=Decimal(
                 str(trecho.get("valor_km_control_sul") or "1.35")
             ),
             valor_reembolso_tecnico=_money(trecho.get("valor_reembolso_tecnico")),
-            excesso_reducao=_money(trecho.get("excesso_reducao")),
-            valor_original=_money(trecho.get("valor_calculado")),
-            valor_final=_money(trecho.get("valor_final")),
+            excesso_reducao=_money(trecho.get("diferenca") or trecho.get("excesso_reducao")),
+            valor_original=_money(trecho.get("valor_cobranca_calculado") or trecho.get("valor_calculado")),
+            valor_final=_money(trecho.get("valor_cobranca_cliente") or trecho.get("valor_final")),
             status="-",
             motivo="",
         )
@@ -674,9 +672,9 @@ def _trechos_internos_vivos(relatorio):
         if not rateios:
             vinculos = list(trecho.clientes_vinculados.select_related("cliente").all())
             rateios = [
-                _ns(cliente=vinculo.cliente.nome, km=_money(trecho.km), valor_km=trecho.valor_km_final, valor_km_control_sul=trecho.valor_km_control_sul, valor_reembolso_tecnico=_money(trecho.valor_reembolso_tecnico), excesso_reducao=_money(trecho.excesso_reducao_km), valor_original=solicitado, valor_final=aprovado, status="-", motivo="")
+                _ns(cliente=vinculo.cliente.nome, km=_money(trecho.km), valor_km=vinculo.cliente.valor_km or Decimal("0.00"), valor_km_control_sul=trecho.valor_km_control_sul, valor_reembolso_tecnico=_money(trecho.valor_reembolso_tecnico), excesso_reducao=_money(trecho.excesso_reducao_km), valor_original=solicitado, valor_final=aprovado, status="-", motivo="")
                 for vinculo in vinculos[:1]
-            ] or [_ns(cliente=_cliente_nome(relatorio.cliente), km=_money(trecho.km), valor_km=trecho.valor_km_final, valor_km_control_sul=trecho.valor_km_control_sul, valor_reembolso_tecnico=_money(trecho.valor_reembolso_tecnico), excesso_reducao=_money(trecho.excesso_reducao_km), valor_original=solicitado, valor_final=aprovado, status="-", motivo="")]
+            ] or [_ns(cliente=_cliente_nome(relatorio.cliente), km=_money(trecho.km), valor_km=getattr(relatorio.cliente, "valor_km", None) or Decimal("0.00"), valor_km_control_sul=trecho.valor_km_control_sul, valor_reembolso_tecnico=_money(trecho.valor_reembolso_tecnico), excesso_reducao=_money(trecho.excesso_reducao_km), valor_original=solicitado, valor_final=aprovado, status="-", motivo="")]
         linhas.append(
             _ns(
                 id=trecho.pk,
@@ -771,16 +769,16 @@ def _montar_consulta_viva(relatorio):
         else:
             status, badge = _badge_item(
                 trecho,
-                trecho.valor_calculado,
-                trecho.valor_final,
+                trecho.valor_calculado_clientes,
+                trecho.valor_final_clientes,
             )
             itens.append(
                 ItemConsultaRelatorioDTO(
                     tipo="KM",
                     cliente=_cliente_nome(relatorio.cliente),
                     descricao=descricao,
-                    valor_solicitado=_money(trecho.valor_calculado),
-                    valor_aprovado=_money(trecho.valor_final),
+                    valor_solicitado=_money(trecho.valor_calculado_clientes),
+                    valor_aprovado=_money(trecho.valor_final_clientes),
                     status=status,
                     badge=badge,
                     data=trecho.data,

@@ -18,6 +18,7 @@ from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
+from django.utils.text import get_valid_filename
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.utils.http import content_disposition_header, url_has_allowed_host_and_scheme
@@ -27,6 +28,8 @@ from django.views.generic import ListView, TemplateView
 from .models import (
     Adiantamento,
     AnexoRelatorio,
+    ArtigoAjuda,
+    ImagemAjuda,
     Cliente,
     ItemDespesa,
     Municipio,
@@ -103,10 +106,18 @@ from .services.pdf_cliente_service import (
 from .services.pdf_interno_service import montar_contexto_pdf_interno
 from .services.maps_service import MapsServiceError, buscar_endereco, calcular_rota
 from .services.dashboard_service import get_dashboard_context, get_dashboard_data
-from .services.help_center_service import contexto_central_ajuda, obter_artigo
+from .services.help_center_service import (
+    contexto_central_ajuda,
+    materializar_artigo_arquivo,
+    obter_artigo,
+    obter_categoria,
+    sanitizar_html,
+    usuario_pode_editar_ajuda,
+)
 from .services.setores_service import aplicar_setor_manual_perfil
 from .forms import (
     AdiantamentoForm,
+    ArtigoAjudaForm,
     ClienteForm,
     CompletarCadastroUsuarioForm,
     ItemDespesaForm,
@@ -120,6 +131,7 @@ from .forms import (
 
 logger = logging.getLogger(__name__)
 security_logger = logging.getLogger("security")
+help_logger = logging.getLogger("relatorios.help_center")
 
 BLOQUEIO_POS_APROVACAO = {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
 
@@ -157,11 +169,157 @@ def ajuda_index_view(request):
 
 @login_required
 @exigir_acesso_erp
+def ajuda_categoria_view(request, slug):
+    termo = (request.GET.get("q") or "").strip()
+    contexto = obter_categoria(request.user, slug, termo)
+    if not contexto:
+        raise Http404("Categoria de ajuda não encontrada.")
+    return render(request, "ajuda/categoria.html", contexto)
+
+
+@login_required
+@exigir_acesso_erp
 def ajuda_artigo_view(request, slug):
     artigo = obter_artigo(request.user, slug)
     if not artigo:
         raise Http404("Artigo de ajuda não encontrado.")
     return render(request, "ajuda/artigo.html", artigo)
+
+
+@login_required
+@exigir_acesso_erp
+def ajuda_artigo_editar_view(request, slug):
+    if not usuario_pode_editar_ajuda(request.user):
+        raise PermissionDenied("Usuário sem permissão para editar a Central de Ajuda.")
+
+    artigo = materializar_artigo_arquivo(slug, request.user)
+    if not artigo:
+        raise Http404("Artigo de ajuda não encontrado.")
+
+    if request.method == "POST":
+        form = ArtigoAjudaForm(request.POST, instance=artigo)
+        if form.is_valid():
+            artigo = form.save(commit=False)
+            artigo.conteudo = sanitizar_html(artigo.conteudo)
+            artigo.atualizado_por = request.user
+            artigo.save()
+            form.save_m2m()
+            messages.success(request, "Artigo atualizado com sucesso.")
+            return redirect("relatorios:ajuda_artigo", slug=artigo.slug)
+    else:
+        form = ArtigoAjudaForm(instance=artigo)
+
+    return render(
+        request,
+        "ajuda/editar_artigo.html",
+        {"form": form, "article": artigo, "can_edit_help": True},
+    )
+
+
+HELP_IMAGE_EXTENSOES = {".png", ".jpg", ".jpeg", ".webp"}
+HELP_IMAGE_MIMES = {"image/png", "image/jpeg", "image/webp"}
+HELP_IMAGE_ASSINATURAS = {
+    ".png": (b"\x89PNG\r\n\x1a\n",),
+    ".jpg": (b"\xff\xd8\xff",),
+    ".jpeg": (b"\xff\xd8\xff",),
+    ".webp": (b"RIFF",),
+}
+
+
+def _validar_help_image(arquivo):
+    nome = getattr(arquivo, "name", "") or ""
+    ext = "." + nome.rsplit(".", 1)[-1].lower() if "." in nome else ""
+    tipo_mime = getattr(arquivo, "content_type", "") or mimetypes.guess_type(nome)[0] or ""
+    tamanho = getattr(arquivo, "size", 0) or 0
+    if not arquivo or tamanho <= 0:
+        raise ValidationError("O arquivo enviado está vazio.")
+    if ext not in HELP_IMAGE_EXTENSOES or tipo_mime not in HELP_IMAGE_MIMES:
+        raise ValidationError("Formato não permitido. Envie apenas PNG, JPG, JPEG ou WEBP.")
+    limite_mb = int(getattr(settings, "HELP_IMAGE_MAX_UPLOAD_MB", 5))
+    if tamanho > limite_mb * 1024 * 1024:
+        raise ValidationError(f"A imagem excede o limite de {limite_mb} MB.")
+    pos = arquivo.tell() if hasattr(arquivo, "tell") else None
+    if hasattr(arquivo, "seek"):
+        arquivo.seek(0)
+    cabecalho = arquivo.read(16)
+    if pos is not None and hasattr(arquivo, "seek"):
+        arquivo.seek(pos)
+    assinaturas = HELP_IMAGE_ASSINATURAS.get(ext) or ()
+    if not any(cabecalho.startswith(assinatura) for assinatura in assinaturas):
+        raise ValidationError("Formato não permitido. Envie apenas PNG, JPG, JPEG ou WEBP.")
+    if ext == ".webp" and b"WEBP" not in cabecalho:
+        raise ValidationError("Formato não permitido. Envie apenas PNG, JPG, JPEG ou WEBP.")
+    return tipo_mime
+
+
+@login_required
+@require_POST
+@exigir_acesso_erp
+def ajuda_imagem_upload_view(request):
+    if not usuario_pode_editar_ajuda(request.user):
+        help_logger.warning(
+            "Tentativa sem permissao de upload de imagem da ajuda. usuario=%s path=%s",
+            getattr(request.user, "pk", None),
+            request.path,
+        )
+        return JsonResponse(
+            {"success": False, "error": "Você não tem permissão para enviar imagens."},
+            status=403,
+        )
+    arquivo = request.FILES.get("file") or request.FILES.get("imagem")
+    try:
+        tipo_mime = _validar_help_image(arquivo)
+    except ValidationError as exc:
+        help_logger.warning(
+            "Upload de imagem da ajuda bloqueado. usuario=%s nome=%s erro=%s",
+            getattr(request.user, "pk", None),
+            getattr(arquivo, "name", ""),
+            "; ".join(exc.messages),
+        )
+        return JsonResponse({"success": False, "error": "; ".join(exc.messages)}, status=400)
+
+    nome_original = get_valid_filename(getattr(arquivo, "name", "") or "imagem")
+    imagem = ImagemAjuda.objects.create(
+        arquivo=arquivo,
+        nome_original=nome_original,
+        tipo_mime=tipo_mime,
+        tamanho_bytes=getattr(arquivo, "size", 0) or 0,
+        enviado_por=request.user,
+    )
+    url = reverse("relatorios:ajuda_imagem_visualizar", args=[imagem.pk])
+    help_logger.info(
+        "Imagem da ajuda enviada. usuario=%s imagem=%s nome=%s tamanho=%s mime=%s",
+        getattr(request.user, "pk", None),
+        imagem.pk,
+        imagem.nome_original,
+        imagem.tamanho_bytes,
+        imagem.tipo_mime,
+    )
+    return JsonResponse(
+        {
+            "success": True,
+            "id": imagem.pk,
+            "location": url,
+            "url": url,
+            "message": "Imagem enviada com sucesso.",
+        }
+    )
+
+
+@login_required
+@exigir_acesso_erp
+def ajuda_imagem_visualizar_view(request, pk):
+    imagem = get_object_or_404(ImagemAjuda, pk=pk)
+    try:
+        arquivo = imagem.arquivo.open("rb")
+    except FileNotFoundError:
+        raise Http404("Imagem não encontrada.")
+    response = FileResponse(arquivo, content_type=imagem.tipo_mime or "application/octet-stream")
+    response["Content-Disposition"] = content_disposition_header(
+        False,
+        imagem.nome_original or imagem.arquivo.name.rsplit("/", 1)[-1],
+    )
+    return response
 
 
 @login_required

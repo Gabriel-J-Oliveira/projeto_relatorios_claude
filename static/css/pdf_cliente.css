@@ -223,7 +223,7 @@ h1 {
   color: #334155;
   font-size: 7.8pt;
   letter-spacing: .06em;
-  padding: 9px 10px;
+  padding: 8px 7px;
   text-align: left;
   text-transform: uppercase;
 }
@@ -239,7 +239,7 @@ h1 {
 .items-table td {
   border-bottom: 1px solid #e6ebf2;
   color: #263244;
-  padding: 9px 10px;
+  padding: 8px 7px;
   vertical-align: top;
 }
 

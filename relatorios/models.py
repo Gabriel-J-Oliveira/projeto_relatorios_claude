@@ -8,15 +8,18 @@ Mudanças:
 
 import mimetypes
 import unicodedata
+import uuid
+from pathlib import Path
 
 from django.db import models
 from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.utils.text import slugify
 from decimal import Decimal
 
-from .storage import anexos_storage
+from .storage import anexos_storage, help_images_storage
 from .validators import validar_anexo_upload
 
 
@@ -350,6 +353,149 @@ class UsuarioSetorImportado(models.Model):
     def save(self, *args, **kwargs):
         self.nome_normalizado = normalizar_nome_pessoa(self.nome)
         super().save(*args, **kwargs)
+
+
+class CategoriaAjuda(models.Model):
+    titulo = models.CharField("Título", max_length=120)
+    slug = models.SlugField("Slug", max_length=140, unique=True)
+    descricao = models.TextField("Descrição", blank=True)
+    icone = models.CharField("Ícone Bootstrap", max_length=80, default="bi-question-circle")
+    ordem = models.PositiveIntegerField("Ordem", default=0)
+    ativo = models.BooleanField("Ativo", default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Categoria de ajuda"
+        verbose_name_plural = "Categorias de ajuda"
+        ordering = ["ordem", "titulo"]
+
+    def __str__(self):
+        return self.titulo
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.titulo)
+        super().save(*args, **kwargs)
+
+
+class PublicoArtigoAjuda(models.TextChoices):
+    TODOS = "todos", "Todos"
+    GERAL = "geral", "Geral"
+    TECNICO = "tecnico", "Técnico"
+    FINANCEIRO = "financeiro", "Financeiro"
+    ADMIN = "admin", "Admin"
+
+
+class FormatoArtigoAjuda(models.TextChoices):
+    MARKDOWN = "markdown", "Markdown"
+    HTML = "html", "HTML"
+
+
+class ArtigoAjuda(models.Model):
+    categoria = models.ForeignKey(
+        CategoriaAjuda,
+        on_delete=models.PROTECT,
+        related_name="artigos",
+        verbose_name="Categoria",
+    )
+    titulo = models.CharField("Título", max_length=180)
+    slug = models.SlugField("Slug", max_length=200, unique=True)
+    resumo = models.TextField("Resumo", blank=True)
+    conteudo = models.TextField("Conteúdo")
+    formato = models.CharField(
+        "Formato",
+        max_length=20,
+        choices=FormatoArtigoAjuda.choices,
+        default=FormatoArtigoAjuda.HTML,
+    )
+    tags = models.JSONField("Tags", default=list, blank=True)
+    publico_para = models.JSONField("Público-alvo", default=list, blank=True)
+    importante = models.BooleanField("Importante", default=False)
+    link_rapido = models.BooleanField("Link rápido", default=False)
+    tour_url = models.CharField("URL do tour", max_length=255, blank=True)
+    ativo = models.BooleanField("Ativo", default=True)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="artigos_ajuda_criados",
+    )
+    atualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="artigos_ajuda_atualizados",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Artigo de ajuda"
+        verbose_name_plural = "Artigos de ajuda"
+        ordering = ["categoria__ordem", "titulo"]
+
+    def __str__(self):
+        return self.titulo
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.titulo)
+        super().save(*args, **kwargs)
+
+    @property
+    def tags_lista(self):
+        if isinstance(self.tags, list):
+            return self.tags
+        return []
+
+    @property
+    def publico_lista(self):
+        if isinstance(self.publico_para, list) and self.publico_para:
+            return self.publico_para
+        return [PublicoArtigoAjuda.TODOS]
+
+
+def _help_image_upload_to(instance, filename):
+    extensao = Path(filename or "").suffix.lower()
+    return f"{timezone.now():%Y/%m}/{uuid.uuid4().hex}{extensao}"
+
+
+class ImagemAjuda(models.Model):
+    artigo = models.ForeignKey(
+        ArtigoAjuda,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="imagens",
+        verbose_name="Artigo",
+    )
+    arquivo = models.FileField(
+        "Arquivo",
+        upload_to=_help_image_upload_to,
+        storage=help_images_storage,
+    )
+    nome_original = models.CharField("Nome original", max_length=255)
+    tipo_mime = models.CharField("Tipo MIME", max_length=120, blank=True)
+    tamanho_bytes = models.PositiveIntegerField("Tamanho", default=0)
+    enviado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="imagens_ajuda_enviadas",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Imagem de ajuda"
+        verbose_name_plural = "Imagens de ajuda"
+        ordering = ["-criado_em"]
+
+    def __str__(self):
+        return self.nome_original or self.arquivo.name
 
     def __str__(self):
         return f"{self.nome} - {self.setor}"
@@ -968,7 +1114,7 @@ class RelatorioTecnico(models.Model):
                     Decimal("0.00"),
                 )
             else:
-                total += trecho.valor_calculado or Decimal("0.00")
+                total += trecho.valor_calculado_clientes
         total += self.total_km_excedente
         return _valor_monetario(total)
 
@@ -1002,17 +1148,28 @@ class RelatorioTecnico(models.Model):
             acumulado += km_cliente
             valor_km = cliente.valor_km or Decimal("0.00")
             valor_reembolso = valor_km_control_sul()
+            valor_calculado = _valor_monetario(km_cliente * valor_km)
+            valor_reembolso_tecnico = _valor_monetario(km_cliente * valor_reembolso)
+            excesso_reducao = _valor_monetario(valor_calculado - valor_reembolso_tecnico)
+            tipo_diferenca = "NEUTRO"
+            if excesso_reducao > 0:
+                tipo_diferenca = "EXCESSO"
+            elif excesso_reducao < 0:
+                tipo_diferenca = "REDUCAO"
             linhas.append(
                 {
                     "cliente": cliente,
                     "km": km_cliente,
                     "valor_km": valor_km,
-                    "valor_calculado": _valor_monetario(km_cliente * valor_km),
+                    "valor_km_cliente_contratual": valor_km,
+                    "valor_calculado": valor_calculado,
+                    "valor_cobranca_cliente": valor_calculado,
                     "valor_km_control_sul": valor_reembolso,
-                    "valor_reembolso_tecnico": _valor_monetario(km_cliente * valor_reembolso),
-                    "excesso_reducao": _valor_monetario(
-                        (km_cliente * valor_km) - (km_cliente * valor_reembolso)
-                    ),
+                    "valor_km_reembolso_tecnico": valor_reembolso,
+                    "valor_reembolso_tecnico": valor_reembolso_tecnico,
+                    "excesso_reducao": excesso_reducao,
+                    "diferenca": excesso_reducao,
+                    "tipo_diferenca": tipo_diferenca,
                 }
             )
         return linhas
@@ -1064,7 +1221,7 @@ class RelatorioTecnico(models.Model):
                     Decimal("0.00"),
                 )
             else:
-                total += trecho.valor_final
+                total += trecho.valor_final_clientes
         total += self.total_km_excedente
         return _valor_monetario(total)
 
@@ -1777,7 +1934,22 @@ class TrechoKm(models.Model):
     def valor_calculado_clientes(self):
         calculos = list(self.rateios.all())
         if not calculos:
-            return self.valor_calculado
+            clientes = self._clientes_para_cobranca_km()
+            if not clientes:
+                return _valor_monetario(self.valor_calculado or Decimal("0.00"))
+            total = sum(
+                (
+                    self.km
+                    * (
+                        cliente.valor_km
+                        if cliente.valor_km not in (None, "")
+                        else Decimal("0.00")
+                    )
+                    for cliente in clientes
+                ),
+                Decimal("0.00"),
+            )
+            return _valor_monetario(total)
         total = sum(
             (calculo.valor_calculado for calculo in calculos),
             Decimal("0.00"),
@@ -1788,12 +1960,34 @@ class TrechoKm(models.Model):
     def valor_final_clientes(self):
         calculos = list(self.rateios.all())
         if not calculos:
-            return self.valor_final
+            if self.rejeitado or self.status_financeiro == StatusFinanceiroItem.REJEITADO:
+                return Decimal("0.00")
+            if self.valor_km_aprovado is not None:
+                return self.valor_final
+            return self.valor_calculado_clientes
         total = sum(
             (calculo.valor_final for calculo in calculos),
             Decimal("0.00"),
         )
         return _valor_monetario(total)
+
+    def _clientes_para_cobranca_km(self):
+        clientes = [
+            vinculo.cliente
+            for vinculo in self.clientes_vinculados.select_related("cliente")
+        ]
+        if clientes:
+            return clientes
+        if self.relatorio_id:
+            clientes = [
+                vinculo.cliente
+                for vinculo in self.relatorio.clientes_vinculados.select_related("cliente")
+            ]
+            if clientes:
+                return clientes
+            if self.relatorio.cliente_id:
+                return [self.relatorio.cliente]
+        return []
 
     @property
     def tem_multiplos_clientes(self):

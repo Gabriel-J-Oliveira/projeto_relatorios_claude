@@ -74,6 +74,8 @@
           <th>Documento</th>
           <th>Nº doc.</th>
           <th>Descrição</th>
+          <th class="amount">KM</th>
+          <th class="amount">Valor/KM</th>
           <th class="amount">Valor total</th>
           <th class="amount">Valor a pagar</th>
           <th class="amount">Participação</th>
@@ -86,13 +88,15 @@
           <td>{{ item.documento }}</td>
           <td>{{ item.numero_documento|default:"-" }}</td>
           <td>{{ item.descricao }}</td>
+          <td class="amount">{% if item.origem_item == "trecho" %}{{ item.km|floatformat:2 }}{% else %}-{% endif %}</td>
+          <td class="amount">{% if item.origem_item == "trecho" %}R$ {{ item.valor_km_unitario|floatformat:2 }}{% else %}-{% endif %}</td>
           <td class="amount">{{ item.valor_total|floatformat:2 }}</td>
           <td class="amount">{{ item.valor|floatformat:2 }}</td>
           <td class="amount">{% if item.percentual %}{{ item.percentual|floatformat:2 }}%{% else %}-{% endif %}</td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="7" class="empty">Nenhum item aprovado para este cliente.</td>
+          <td colspan="9" class="empty">Nenhum item aprovado para este cliente.</td>
         </tr>
         {% endfor %}
       </tbody>
