@@ -37,9 +37,18 @@
     <li class="nav-item">
       <a href="{% url 'relatorios:relatorio_list' %}"
          class="nav-link d-flex align-items-center gap-2
-                {% if 'relatorio' in request.resolver_match.url_name %}active{% endif %}">
+                {% if 'relatorio' in request.resolver_match.url_name and 'relatorio_legado' not in request.resolver_match.url_name %}active{% endif %}">
         <i class="bi bi-file-earmark-text fs-5"></i>
         <span>Relatorios</span>
+      </a>
+    </li>
+
+    <li class="nav-item">
+      <a href="{% url 'relatorios:relatorio_legado_list' %}"
+         class="nav-link d-flex align-items-center gap-2
+                {% if 'relatorio_legado' in request.resolver_match.url_name %}active{% endif %}">
+        <i class="bi bi-archive fs-5"></i>
+        <span>Histórico legado</span>
       </a>
     </li>
 

@@ -1431,6 +1431,159 @@ class RelatorioSnapshotFinanceiro(models.Model):
         raise ValidationError("Snapshot financeiro nao pode ser excluido.")
 
 
+class OrigemRelatorioLegado(models.TextChoices):
+    LEGADO_PLANILHA = "legado_planilha", "Planilha antiga"
+
+
+class RelatorioLegado(models.Model):
+    origem = models.CharField(
+        "Origem",
+        max_length=30,
+        choices=OrigemRelatorioLegado.choices,
+        default=OrigemRelatorioLegado.LEGADO_PLANILHA,
+        db_index=True,
+    )
+    is_legado = models.BooleanField("Legado", default=True, db_index=True)
+    is_historico_frio = models.BooleanField("Histórico frio", default=True, db_index=True)
+    numero_original_legado = models.CharField("Número original", max_length=40, db_index=True)
+    arquivo_origem_legado = models.CharField("Arquivo de origem", max_length=255, blank=True)
+    linha_origem_legado = models.PositiveIntegerField("Linha de origem", null=True, blank=True)
+    importado_em = models.DateTimeField("Importado em", auto_now_add=True)
+    importado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="relatorios_legados_importados",
+        verbose_name="Importado por",
+    )
+    observacao_legado = models.TextField("Observação legado", blank=True)
+    dados_legado_json = models.JSONField("Dados brutos do legado", default=dict, blank=True)
+    escritorio = models.CharField("Escritório", max_length=120, blank=True)
+    cliente_nome = models.CharField("Cliente legado", max_length=255, blank=True)
+    cliente_vinculado = models.ForeignKey(
+        Cliente,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="relatorios_legados",
+        verbose_name="Cliente vinculado",
+    )
+    tecnico_nome = models.CharField("Técnico legado", max_length=180, blank=True)
+    tecnico_nome_normalizado = models.CharField("Técnico normalizado", max_length=200, blank=True, db_index=True)
+    tecnico_vinculado = models.ForeignKey(
+        Tecnico,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="relatorios_legados",
+        verbose_name="Técnico vinculado",
+    )
+    cidade = models.CharField("Cidade", max_length=160, blank=True)
+    uf = models.CharField("UF", max_length=2, blank=True)
+    tipo_localidade = models.CharField("Localidade", max_length=20, blank=True)
+    colaboradores = models.JSONField("Colaboradores", default=list, blank=True)
+    diarias = models.JSONField("Diárias", default=list, blank=True)
+    periodos = models.JSONField("Períodos", default=list, blank=True)
+    data_texto = models.CharField("Data/período original", max_length=120, blank=True)
+    data_inicio = models.DateField("Data início", null=True, blank=True)
+    data_fim = models.DateField("Data fim", null=True, blank=True)
+    motivo = models.TextField("Motivo", blank=True)
+    gasto = models.CharField("Gasto", max_length=80, blank=True)
+    reembolso = models.CharField("Reembolso", max_length=40, blank=True)
+    valor_adiantamento = models.DecimalField("Adiantamento", max_digits=12, decimal_places=2, null=True, blank=True)
+    total_despesas = models.DecimalField("Total despesas", max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    total_km = models.DecimalField("Total KM", max_digits=12, decimal_places=2, null=True, blank=True)
+    valor_km = models.DecimalField("Valor/KM", max_digits=10, decimal_places=2, null=True, blank=True)
+    total_km_valor = models.DecimalField("Total KM valor", max_digits=12, decimal_places=2, null=True, blank=True)
+    total_geral = models.DecimalField("Total geral", max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Relatório legado"
+        verbose_name_plural = "Relatórios legados"
+        ordering = ["-data_inicio", "-numero_original_legado"]
+        constraints = [
+            models.UniqueConstraint(fields=["origem", "numero_original_legado"], name="uniq_relatorio_legado_origem_numero")
+        ]
+        indexes = [
+            models.Index(fields=["origem", "numero_original_legado"]),
+            models.Index(fields=["data_inicio"]),
+            models.Index(fields=["cliente_nome"]),
+            models.Index(fields=["tecnico_nome_normalizado"]),
+        ]
+
+    def __str__(self):
+        return f"Legado #{self.numero_original_legado} - {self.cliente_nome or 'sem cliente'}"
+
+    @property
+    def periodo_exibicao(self):
+        if self.data_inicio and self.data_fim and self.data_inicio != self.data_fim:
+            return f"{self.data_inicio:%d/%m/%Y} a {self.data_fim:%d/%m/%Y}"
+        if self.data_inicio:
+            return f"{self.data_inicio:%d/%m/%Y}"
+        return self.data_texto
+
+    @property
+    def cidade_exibicao(self):
+        if self.uf and self.cidade:
+            return f"{self.uf} - {self.cidade}"
+        return self.cidade or self.uf
+
+    @property
+    def tem_km(self):
+        return bool((self.total_km and self.total_km > 0) or (self.total_km_valor and self.total_km_valor > 0))
+
+
+class DespesaLegada(models.Model):
+    relatorio = models.ForeignKey(
+        RelatorioLegado,
+        on_delete=models.CASCADE,
+        related_name="despesas",
+        verbose_name="Relatório legado",
+    )
+    ordem = models.PositiveIntegerField("Ordem", default=0)
+    data = models.DateField("Data", null=True, blank=True)
+    data_original = models.CharField("Data original", max_length=80, blank=True)
+    documento = models.CharField("Documento", max_length=120, blank=True)
+    descricao = models.CharField("Descrição", max_length=255, blank=True)
+    tipo_codigo = models.CharField("Tipo código", max_length=20, blank=True)
+    tipo_descricao = models.CharField("Tipo", max_length=80, blank=True)
+    quantidade = models.DecimalField("Quantidade", max_digits=12, decimal_places=2, null=True, blank=True)
+    valor = models.DecimalField("Valor", max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    dados_legado_json = models.JSONField("Dados brutos", default=dict, blank=True)
+
+    class Meta:
+        verbose_name = "Despesa legada"
+        verbose_name_plural = "Despesas legadas"
+        ordering = ["relatorio", "ordem"]
+        indexes = [models.Index(fields=["relatorio", "ordem"])]
+
+    def __str__(self):
+        return f"{self.relatorio_id} #{self.ordem} - {self.descricao}"
+
+
+class KmLegado(models.Model):
+    relatorio = models.OneToOneField(
+        RelatorioLegado,
+        on_delete=models.CASCADE,
+        related_name="km_legado",
+        verbose_name="Relatório legado",
+    )
+    km = models.DecimalField("KM", max_digits=12, decimal_places=2, null=True, blank=True)
+    valor_km = models.DecimalField("Valor/KM", max_digits=10, decimal_places=2, null=True, blank=True)
+    valor_total = models.DecimalField("Valor total", max_digits=12, decimal_places=2, null=True, blank=True)
+    dados_legado_json = models.JSONField("Dados brutos", default=dict, blank=True)
+
+    class Meta:
+        verbose_name = "KM legado"
+        verbose_name_plural = "KMs legados"
+
+    def __str__(self):
+        return f"KM legado do relatório {self.relatorio_id}"
+
+
 # ─────────────────────────────────────────────────────────────────
 # EQUIPE DO RELATÓRIO
 # ─────────────────────────────────────────────────────────────────

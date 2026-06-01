@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block titulo %}Relatório legado #{{ relatorio.numero_original_legado }}{% endblock %}
+{% block page_title %}Relatório legado #{{ relatorio.numero_original_legado }}{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'relatorios:relatorio_legado_list' %}" class="text-decoration-none">Relatórios legados</a></li>
+  <li class="breadcrumb-item active">#{{ relatorio.numero_original_legado }}</li>
+{% endblock %}
+
+{% block page_actions %}
+  <a href="{% url 'relatorios:relatorio_legado_list' %}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Voltar
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="alert alert-secondary border-0 shadow-sm">
+  <i class="bi bi-archive me-2"></i>
+  Relatório importado da planilha antiga para consulta histórica. Este registro é somente leitura.
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body p-4">
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+      <div>
+        <span class="badge bg-secondary-subtle text-secondary mb-2">Histórico frio</span>
+        <h5 class="fw-semibold mb-1">Relatório legado / histórico frio</h5>
+        <div class="text-muted small">Origem: Planilha antiga{% if relatorio.arquivo_origem_legado %} · {{ relatorio.arquivo_origem_legado }}{% endif %}</div>
+      </div>
+      {% if relatorio.importado_em %}
+      <div class="text-muted small text-end">Importado em<br><strong>{{ relatorio.importado_em|date:"d/m/Y H:i" }}</strong></div>
+      {% endif %}
+    </div>
+
+    <div class="row g-3">
+      {% if relatorio.numero_original_legado %}
+      <div class="col-md-3"><div class="text-muted small">Número original</div><div class="fw-semibold">#{{ relatorio.numero_original_legado }}</div></div>
+      {% endif %}
+      {% if relatorio.cliente_nome %}
+      <div class="col-md-5"><div class="text-muted small">Cliente</div><div class="fw-semibold">{{ relatorio.cliente_nome }}</div></div>
+      {% endif %}
+      {% if relatorio.tecnico_nome %}
+      <div class="col-md-4"><div class="text-muted small">Técnico</div><div class="fw-semibold">{{ relatorio.tecnico_nome }}</div></div>
+      {% endif %}
+      {% if relatorio.periodo_exibicao %}
+      <div class="col-md-3"><div class="text-muted small">Período/data</div><div>{{ relatorio.periodo_exibicao }}</div></div>
+      {% endif %}
+      {% if relatorio.cidade_exibicao %}
+      <div class="col-md-3"><div class="text-muted small">Cidade/UF</div><div>{{ relatorio.cidade_exibicao }}</div></div>
+      {% endif %}
+      {% if relatorio.tipo_localidade %}
+      <div class="col-md-3"><div class="text-muted small">Localidade</div><div>{{ relatorio.tipo_localidade }}</div></div>
+      {% endif %}
+      {% if relatorio.gasto %}
+      <div class="col-md-3"><div class="text-muted small">Gasto</div><div>{{ relatorio.gasto }}</div></div>
+      {% endif %}
+      {% if relatorio.reembolso %}
+      <div class="col-md-3"><div class="text-muted small">Reembolso</div><div>{{ relatorio.reembolso }}</div></div>
+      {% endif %}
+      {% if relatorio.motivo %}
+      <div class="col-12"><div class="text-muted small">Motivo</div><div>{{ relatorio.motivo }}</div></div>
+      {% endif %}
+      {% if relatorio.colaboradores %}
+      <div class="col-12">
+        <div class="text-muted small">Colaboradores</div>
+        <div class="d-flex flex-wrap gap-1">
+          {% for nome in relatorio.colaboradores %}
+          <span class="badge bg-body-tertiary text-body-secondary">{{ nome }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if despesas %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-transparent border-bottom">
+    <h6 class="fw-semibold mb-0"><i class="bi bi-receipt me-1 text-primary"></i>Despesas</h6>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            {% if colunas_despesas.data %}<th class="ps-4">Data</th>{% endif %}
+            {% if colunas_despesas.documento %}<th>Documento</th>{% endif %}
+            {% if colunas_despesas.descricao %}<th>Descrição</th>{% endif %}
+            {% if colunas_despesas.tipo %}<th>Tipo</th>{% endif %}
+            {% if colunas_despesas.valor %}<th class="text-end pe-4">Valor</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for despesa in despesas %}
+          <tr>
+            {% if colunas_despesas.data %}<td class="ps-4">{{ despesa.data|date:"d/m/Y"|default:despesa.data_original }}</td>{% endif %}
+            {% if colunas_despesas.documento %}<td>{{ despesa.documento }}</td>{% endif %}
+            {% if colunas_despesas.descricao %}<td class="text-wrap">{{ despesa.descricao }}</td>{% endif %}
+            {% if colunas_despesas.tipo %}<td>{{ despesa.tipo_descricao|default:despesa.tipo_codigo }}</td>{% endif %}
+            {% if colunas_despesas.valor %}<td class="text-end pe-4">R$ {{ despesa.valor|floatformat:2 }}</td>{% endif %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if relatorio.tem_km and km_legado %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-transparent border-bottom">
+    <h6 class="fw-semibold mb-0"><i class="bi bi-speedometer2 me-1 text-primary"></i>KM</h6>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      {% if km_legado.km %}<div class="col-md-4"><div class="text-muted small">KM</div><div class="fw-semibold">{{ km_legado.km|floatformat:2 }} km</div></div>{% endif %}
+      {% if km_legado.valor_km %}<div class="col-md-4"><div class="text-muted small">Valor/KM</div><div>R$ {{ km_legado.valor_km|floatformat:2 }}</div></div>{% endif %}
+      {% if km_legado.valor_total %}<div class="col-md-4"><div class="text-muted small">Valor total</div><div>R$ {{ km_legado.valor_total|floatformat:2 }}</div></div>{% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-transparent border-bottom">
+    <h6 class="fw-semibold mb-0"><i class="bi bi-calculator me-1 text-primary"></i>Totais</h6>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      {% if relatorio.total_despesas %}<div class="col-md-4"><div class="text-muted small">Total despesas</div><div class="fw-semibold">R$ {{ relatorio.total_despesas|floatformat:2 }}</div></div>{% endif %}
+      {% if relatorio.total_km_valor %}<div class="col-md-4"><div class="text-muted small">Total KM</div><div class="fw-semibold">R$ {{ relatorio.total_km_valor|floatformat:2 }}</div></div>{% endif %}
+      {% if relatorio.total_geral %}<div class="col-md-4"><div class="text-muted small">Total geral</div><div class="fw-semibold">R$ {{ relatorio.total_geral|floatformat:2 }}</div></div>{% endif %}
+      {% if relatorio.valor_adiantamento %}<div class="col-md-4"><div class="text-muted small">Adiantamento</div><div>R$ {{ relatorio.valor_adiantamento|floatformat:2 }}</div></div>{% endif %}
+    </div>
+    {% if relatorio.observacao_legado %}
+    <div class="border-top mt-3 pt-3 text-muted small">{{ relatorio.observacao_legado }}</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

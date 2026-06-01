@@ -23,6 +23,9 @@ from .models import (
     CategoriaAjuda,
     ArtigoAjuda,
     ImagemAjuda,
+    RelatorioLegado,
+    DespesaLegada,
+    KmLegado,
 )
 
 
@@ -415,6 +418,63 @@ class RelatorioTecnicoAdmin(admin.ModelAdmin):
 # ─────────────────────────────────────────────
 # ADIANTAMENTO
 # ─────────────────────────────────────────────
+
+
+class DespesaLegadaInline(admin.TabularInline):
+    model = DespesaLegada
+    extra = 0
+    can_delete = False
+    readonly_fields = [
+        "ordem",
+        "data",
+        "data_original",
+        "documento",
+        "descricao",
+        "tipo_codigo",
+        "tipo_descricao",
+        "quantidade",
+        "valor",
+        "dados_legado_json",
+    ]
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+class KmLegadoInline(admin.StackedInline):
+    model = KmLegado
+    extra = 0
+    can_delete = False
+    readonly_fields = ["km", "valor_km", "valor_total", "dados_legado_json"]
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(RelatorioLegado)
+class RelatorioLegadoAdmin(admin.ModelAdmin):
+    list_display = [
+        "numero_original_legado",
+        "cliente_nome",
+        "tecnico_nome",
+        "data_inicio",
+        "total_geral",
+        "importado_em",
+    ]
+    list_filter = ["origem", "is_historico_frio", "tipo_localidade", "importado_em"]
+    search_fields = ["numero_original_legado", "cliente_nome", "tecnico_nome", "cidade", "motivo"]
+    date_hierarchy = "data_inicio"
+    readonly_fields = [field.name for field in RelatorioLegado._meta.fields]
+    inlines = [DespesaLegadaInline, KmLegadoInline]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Adiantamento)

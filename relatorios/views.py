@@ -35,6 +35,7 @@ from .models import (
     Municipio,
     PerfilUsuario,
     PoliticaValor,
+    RelatorioLegado,
     RelatorioTecnico,
     RelatorioTecnicoEquipe,
     StatusFinanceiroItem,
@@ -43,6 +44,7 @@ from .models import (
     TipoEventoHistorico,
     TrechoKm,
     valor_km_control_sul,
+    normalizar_nome_pessoa,
 )
 from .services.historico_service import registrar_evento
 from .services.email_service import EmailNotificacaoError, enviar_report_suporte
@@ -1555,6 +1557,75 @@ def dashboard_dados_json(request):
             duracao,
         )
     return JsonResponse(dados)
+
+
+def _relatorios_legados_visiveis(user):
+    qs = RelatorioLegado.objects.select_related("cliente_vinculado", "tecnico_vinculado", "importado_por")
+    if usuario_pode_atuar_como_financeiro(user) or usuario_eh_administrativo(user):
+        return qs
+    nome_usuario = normalizar_nome_pessoa(user.get_full_name() or user.username)
+    if not nome_usuario:
+        return qs.none()
+    return qs.filter(tecnico_nome_normalizado=nome_usuario)
+
+
+class RelatorioLegadoListView(AcessoErpMixin, ListView):
+    model = RelatorioLegado
+    template_name = "relatorios/legados_list.html"
+    context_object_name = "relatorios"
+    paginate_by = 20
+
+    def get_queryset(self):
+        qs = _relatorios_legados_visiveis(self.request.user).prefetch_related("despesas")
+        busca = (self.request.GET.get("q") or "").strip()
+        if busca:
+            qs = qs.filter(
+                Q(numero_original_legado__icontains=busca)
+                | Q(cliente_nome__icontains=busca)
+                | Q(tecnico_nome__icontains=busca)
+                | Q(cidade__icontains=busca)
+                | Q(motivo__icontains=busca)
+            )
+        return qs.order_by("-data_inicio", "-importado_em", "-numero_original_legado")
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        params = self.request.GET.copy()
+        params.pop("page", None)
+        ctx["query"] = self.request.GET.get("q", "")
+        ctx["total"] = self.get_queryset().count()
+        ctx["pagination_query"] = params.urlencode()
+        ctx["titulo_pagina"] = "Relatórios legados"
+        return ctx
+
+
+@login_required
+@exigir_acesso_erp
+def relatorio_legado_detail_view(request, pk):
+    relatorio = get_object_or_404(
+        _relatorios_legados_visiveis(request.user).prefetch_related("despesas"),
+        pk=pk,
+    )
+    despesas = list(relatorio.despesas.all())
+    colunas_despesas = {
+        "data": any(item.data or item.data_original for item in despesas),
+        "documento": any(item.documento for item in despesas),
+        "descricao": any(item.descricao for item in despesas),
+        "tipo": any(item.tipo_descricao or item.tipo_codigo for item in despesas),
+        "valor": any(item.valor for item in despesas),
+    }
+    km_legado = getattr(relatorio, "km_legado", None)
+    return render(
+        request,
+        "relatorios/legado_detail.html",
+        {
+            "relatorio": relatorio,
+            "despesas": despesas,
+            "colunas_despesas": colunas_despesas,
+            "km_legado": km_legado,
+            "titulo_pagina": f"Relatório legado #{relatorio.numero_original_legado}",
+        },
+    )
 
 
 class RelatorioListView(AcessoErpMixin, ListView):

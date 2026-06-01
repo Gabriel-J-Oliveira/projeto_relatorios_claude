@@ -22,6 +22,8 @@ urlpatterns = [
 
     # Relatórios
     path("relatorios/", views.RelatorioListView.as_view(), name="relatorio_list"),
+    path("relatorios/legados/", views.RelatorioLegadoListView.as_view(), name="relatorio_legado_list"),
+    path("relatorios/legados/<int:pk>/", views.relatorio_legado_detail_view, name="relatorio_legado_detail"),
     path("relatorios/novo/", views.relatorio_form_view, name="relatorio_create"),
     path("relatorios/<int:pk>/", views.relatorio_detail_view, name="relatorio_detail"),
     path("relatorios/<int:pk>/consulta/", views.relatorio_consulta_view, name="relatorio_consulta"),
