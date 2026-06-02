@@ -245,6 +245,12 @@ LOGOUT_REDIRECT_URL = "/login/"
 #     "ERP-Tecnicos": "Tecnico",
 # }
 AD_GROUP_MAPPING = config("AD_GROUP_MAPPING", default="{}", cast=json.loads)
+AD_SYNC_ENABLED = config("AD_SYNC_ENABLED", default=True, cast=bool)
+AD_USERS_BASE_DN = config("AD_USERS_BASE_DN", default="")
+AD_USERS_FILTER = config(
+    "AD_USERS_FILTER",
+    default="(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))",
+)
 
 # ─── Autenticação LDAP/Active Directory ───────────────────────────────────────
 # O backend LDAP fica antes do ModelBackend, mas só tenta autenticar quando

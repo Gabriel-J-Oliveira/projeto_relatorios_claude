@@ -23,7 +23,7 @@
         <input type="text"
                name="busca"
                value="{{ busca }}"
-               placeholder="Nome ou e-mail..."
+               placeholder="Nome, usuário AD ou e-mail..."
                class="form-control">
       </div>
       <div class="col-auto d-flex gap-1">
@@ -53,9 +53,11 @@
         <thead class="table-light">
           <tr>
             <th class="ps-4 py-3 fw-semibold text-muted small">Nome</th>
+            <th class="py-3 fw-semibold text-muted small">Usuário AD</th>
             <th class="py-3 fw-semibold text-muted small">E-mail</th>
             <th class="py-3 fw-semibold text-muted small">Setor</th>
             <th class="py-3 fw-semibold text-muted small">Perfil/Função</th>
+            <th class="py-3 fw-semibold text-muted small">Origem</th>
             <th class="py-3 fw-semibold text-muted small">Relatórios</th>
             <th class="py-3 fw-semibold text-muted small">Status</th>
             <th class="py-3 fw-semibold text-muted small text-end pe-4">Ações</th>
@@ -73,9 +75,17 @@
                 <span class="fw-semibold small">{{ t.nome }}</span>
               </div>
             </td>
+            <td class="small text-muted">{{ t.ad_username|default:"-" }}</td>
             <td class="small text-muted">{{ t.email }}</td>
             <td class="small text-muted">{{ t.setor.nome|default:"-" }}</td>
             <td class="small text-muted">{{ t.funcao_setor|default:"Usuário" }}</td>
+            <td>
+              {% if t.origem_ad %}
+                <span class="badge bg-info-subtle text-info rounded-pill px-2">AD</span>
+              {% else %}
+                <span class="badge bg-body-tertiary text-body-secondary rounded-pill px-2">Local</span>
+              {% endif %}
+            </td>
             <td>
               <span class="badge bg-primary-subtle text-primary rounded-pill px-2">
                 {{ t.relatorios.count }}

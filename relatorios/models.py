@@ -260,6 +260,26 @@ class PerfilUsuario(models.Model):
 class Tecnico(models.Model):
     nome = models.CharField("Nome completo", max_length=150)
     email = models.EmailField("E-mail", unique=True)
+    ad_username = models.CharField(
+        "Usuário AD",
+        max_length=150,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    ad_user_principal_name = models.CharField(
+        "User Principal Name",
+        max_length=255,
+        blank=True,
+    )
+    ad_distinguished_name = models.TextField("DN no AD", blank=True)
+    origem_ad = models.BooleanField("Origem AD", default=False, db_index=True)
+    ad_sincronizado_em = models.DateTimeField(
+        "Sincronizado com AD em",
+        null=True,
+        blank=True,
+    )
     telefone = models.CharField("Telefone", max_length=20, blank=True)
     setor = models.ForeignKey(
         Setor,

@@ -1591,7 +1591,7 @@
     if (municipioInput.value && municipiosEncontrados.some(m => String(m.id) === String(municipioInput.value))) {
       return;
     }
-    const lista = municipiosEncontrados.length ? municipiosEncontrados : await buscarMunicipiosAtendimento(texto);
+    const lista = await buscarMunicipiosAtendimento(texto);
     const alvo = normalizarMunicipioBusca(texto);
     const exatos = lista.filter(m => {
       const label = normalizarMunicipioBusca(m.label);

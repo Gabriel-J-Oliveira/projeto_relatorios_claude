@@ -236,6 +236,28 @@ class ArtigoAjudaForm(BootstrapMixin, forms.ModelForm):
         return instance
 
 
+class TecnicoChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        partes = [obj.nome]
+        identificador = obj.ad_username or obj.email
+        if identificador:
+            partes.append(identificador)
+        if obj.email and obj.email != identificador:
+            partes.append(obj.email)
+        return " — ".join(partes)
+
+
+class TecnicoMultipleChoiceField(forms.ModelMultipleChoiceField):
+    def label_from_instance(self, obj):
+        partes = [obj.nome]
+        identificador = obj.ad_username or obj.email
+        if identificador:
+            partes.append(identificador)
+        if obj.email and obj.email != identificador:
+            partes.append(obj.email)
+        return " — ".join(partes)
+
+
 # ─────────────────────────────────────────────
 # CABEÇALHO
 # ─────────────────────────────────────────────
@@ -245,7 +267,12 @@ class ArtigoAjudaForm(BootstrapMixin, forms.ModelForm):
 
 class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
 
-    tecnicos_equipe = forms.ModelMultipleChoiceField(
+    tecnico_responsavel = TecnicoChoiceField(
+        queryset=Tecnico.objects.filter(ativo=True).order_by("nome"),
+        required=True,
+        label="Técnico responsável",
+    )
+    tecnicos_equipe = TecnicoMultipleChoiceField(
         queryset=Tecnico.objects.filter(ativo=True).order_by("nome"),
         required=False,
         label="Equipe (técnicos adicionais)",
@@ -411,6 +438,11 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
 
             cidade_base = cidade.split("/")[0].strip()
             uf_base = cidade.split("/", 1)[1].strip().upper() if "/" in cidade else ""
+            if not uf_base:
+                partes = cidade_base.split()
+                if len(partes) > 1 and len(partes[-1]) == 2:
+                    uf_base = partes[-1].upper()
+                    cidade_base = " ".join(partes[:-1]).strip()
             qs = Municipio.objects.filter(
                 ativo=True,
                 nome_normalizado=normalizar_texto_busca(cidade_base),

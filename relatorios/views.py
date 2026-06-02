@@ -1328,12 +1328,26 @@ def municipios_buscar_json(request):
         termo_limpo = " ".join(partes[:-1]) or termo_limpo
     termo_norm = normalizar_texto_busca(termo_limpo)
     qs = Municipio.objects.filter(ativo=True)
-    filtros = Q(nome_normalizado__icontains=termo_norm) | Q(nome__icontains=termo)
+    filtros = (
+        Q(nome_normalizado__icontains=termo_norm)
+        | Q(nome__icontains=termo_limpo)
+        | Q(aliases__icontains=termo_limpo)
+        | Q(aliases__icontains=termo_norm)
+    )
     if len(termo.strip()) == 2:
         filtros |= Q(uf__iexact=termo)
     qs = qs.filter(filtros)
     if uf_informada:
         qs = qs.filter(uf__iexact=uf_informada)
+    municipios = list(qs.order_by("nome", "uf")[:40])
+    municipios.sort(
+        key=lambda municipio: (
+            municipio.nome_normalizado != termo_norm,
+            not municipio.nome_normalizado.startswith(termo_norm),
+            municipio.nome,
+            municipio.uf,
+        )
+    )
     dados = [
         {
             "id": municipio.pk,
@@ -1345,7 +1359,7 @@ def municipios_buscar_json(request):
             "tipo_localidade_label": municipio.get_tipo_localidade_padrao_display(),
             "label": municipio.label,
         }
-        for municipio in qs.order_by("nome", "uf")[:20]
+        for municipio in municipios[:20]
     ]
     return JsonResponse({"success": True, "data": dados})
 
@@ -3302,6 +3316,8 @@ class TecnicoListView(AdministrativoMixin, ListView):
             qs = qs.filter(
                 Q(nome__icontains=busca)
                 | Q(email__icontains=busca)
+                | Q(ad_username__icontains=busca)
+                | Q(ad_user_principal_name__icontains=busca)
                 | Q(setor__nome__icontains=busca)
                 | Q(funcao_setor__icontains=busca)
             )
@@ -3324,7 +3340,10 @@ def tecnico_detail_view(request, pk):
     if tecnico.email:
         from django.contrib.auth import get_user_model
 
-        usuario = get_user_model().objects.filter(email__iexact=tecnico.email).first()
+        usuario = (
+            get_user_model().objects.filter(username__iexact=tecnico.ad_username).first()
+            or get_user_model().objects.filter(email__iexact=tecnico.email).first()
+        )
     tipo_usuario = "Administrador" if usuario and usuario_eh_administrativo(usuario) else "Usuário"
     return render(
         request,

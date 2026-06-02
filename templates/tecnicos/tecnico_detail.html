@@ -47,7 +47,7 @@
           <div class="col-12 col-md-6">
             <div class="border rounded-2 p-3 h-100">
               <div class="text-muted small mb-1">Usuário/login</div>
-              <div class="fw-semibold">{{ usuario_vinculado.username|default:"-" }}</div>
+              <div class="fw-semibold">{{ tecnico.ad_username|default:usuario_vinculado.username|default:"-" }}</div>
             </div>
           </div>
           <div class="col-12 col-md-6">
@@ -70,12 +70,24 @@
           </div>
           <div class="col-12 col-md-6">
             <div class="border rounded-2 p-3 h-100">
+              <div class="text-muted small mb-1">Origem</div>
+              <div class="fw-semibold">{% if tecnico.origem_ad %}Active Directory{% else %}Local{% endif %}</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="border rounded-2 p-3 h-100">
+              <div class="text-muted small mb-1">Última sincronização AD</div>
+              <div class="fw-semibold">{{ tecnico.ad_sincronizado_em|date:"d/m/Y H:i"|default:"-" }}</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="border rounded-2 p-3 h-100">
               <div class="text-muted small mb-1">Último login</div>
               <div class="fw-semibold">
                 {% if usuario_vinculado and usuario_vinculado.last_login %}
                   {{ usuario_vinculado.last_login|date:"d/m/Y H:i" }}
                 {% else %}
-                  -
+                  Sem login registrado
                 {% endif %}
               </div>
             </div>
