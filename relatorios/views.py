@@ -42,6 +42,7 @@ from .models import (
     StatusFinanceiroItem,
     StatusRelatorio,
     Tecnico,
+    TipoDespesa,
     TipoEventoHistorico,
     TrechoKm,
     valor_km_control_sul,
@@ -1452,7 +1453,12 @@ def _avisos_financeiro(relatorio):
         if despesa.tipo == "alimentacao" and despesa.data:
             despesas_por_data.setdefault(despesa.data, []).append((idx, despesa))
 
-        if despesa.valor and despesa.valor > Decimal("300.00") and not observacoes:
+        if (
+            despesa.tipo not in {TipoDespesa.PASSAGEM, TipoDespesa.HOSPEDAGEM}
+            and despesa.valor
+            and despesa.valor > Decimal("300.00")
+            and not observacoes
+        ):
             despesas_altas_sem_observacao.append((idx, despesa))
 
         if despesa.acima_politica:

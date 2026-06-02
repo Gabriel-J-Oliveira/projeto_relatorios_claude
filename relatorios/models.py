@@ -113,6 +113,7 @@ class TipoDespesa(models.TextChoices):
     HOSPEDAGEM = "hospedagem", "Hospedagem"
     COMBUSTIVEL = "combustivel", "Combustível"
     PEDAGIO = "pedagio", "Pedágio"
+    PASSAGEM = "passagem", "Passagem"
     TRANSPORTE = "transporte", "Transporte"
     ESTACIONAMENTO = "estacionamento", "Estacionamento"
     MATERIAL = "material", "Material / Ferramentas"

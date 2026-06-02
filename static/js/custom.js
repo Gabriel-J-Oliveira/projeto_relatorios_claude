@@ -416,6 +416,12 @@ const Validators = {
   },
 
   valorAltoSemObs(campoValor, linhaDesp) {
+    const tipoDespesa = linhaDesp
+      ?.querySelector('select[name$="-tipo"], input[name$="-tipo"]')
+      ?.value;
+    if (["passagem", "hospedagem"].includes(tipoDespesa)) {
+      return { ok: true };
+    }
     const valor = parseFloat(campoValor.value) || 0;
     if (valor <= 300) return { ok: true };
 

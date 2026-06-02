@@ -1616,6 +1616,20 @@
     const tipo = linha.querySelector('[name$="-tipo"]')?.value || "";
     const data = linha.querySelector('[name$="-data"]')?.value || "";
     const descricao = linha.querySelector('[name$="-descricao"]')?.value || "";
+    const aviso = linha.querySelector(".aviso-inline");
+    if (["passagem", "hospedagem"].includes(tipo) && aviso?.textContent?.includes("despesas altas")) {
+      aviso.textContent = "";
+    }
+    const limparPolitica = () => {
+      info.textContent = "Sem politica definida";
+      info.className = "small mt-1 politica-despesa-info text-muted";
+      if (aviso?.textContent?.includes("politica vigente")) aviso.textContent = "";
+    };
+    if (tipo === "passagem") {
+      limparPolitica();
+      info.dataset.policyKey = `${tipo}|sem-politica`;
+      return;
+    }
     const cidade = document.getElementById("id_cidade_atendimento")?.value || "";
     const municipioId = document.getElementById("id_municipio_atendimento")?.value || "";
     const tipoLocalidade = document.getElementById("id_tipo_localidade")?.value || "";
@@ -1625,8 +1639,7 @@
     info.dataset.policyKey = chave;
 
     if (!tipo || !data) {
-      info.textContent = "Sem politica definida";
-      info.className = "small mt-1 politica-despesa-info text-muted";
+      limparPolitica();
       return;
     }
 
@@ -1643,8 +1656,7 @@
       const payload = await response.json();
       const limite = normalizarNumero(payload?.data?.limite);
       if (!payload.success || !limite) {
-        info.textContent = "Sem politica definida";
-        info.className = "small mt-1 politica-despesa-info text-muted";
+        limparPolitica();
         return;
       }
       const excedeu = valor > limite;
@@ -1655,12 +1667,12 @@
         ? "small mt-1 politica-despesa-info alert alert-warning py-1 px-2 mb-0"
         : "small mt-1 politica-despesa-info text-muted";
       if (excedeu) {
-        const aviso = linha.querySelector(".aviso-inline");
         if (aviso) aviso.textContent = "Este valor excede a politica vigente. O financeiro podera aplicar o valor da politica na conferencia.";
+      } else if (aviso?.textContent?.includes("politica vigente")) {
+        aviso.textContent = "";
       }
     } catch (error) {
-      info.textContent = "Sem politica definida";
-      info.className = "small mt-1 politica-despesa-info text-muted";
+      limparPolitica();
     }
   }
 

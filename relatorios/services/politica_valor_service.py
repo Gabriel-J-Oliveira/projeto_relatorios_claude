@@ -111,6 +111,9 @@ def resolver_politica_despesa(
     descricao="",
     valor_informado=None,
 ):
+    if tipo_despesa == TipoDespesa.PASSAGEM:
+        return None
+
     if municipio is not None:
         cidade = getattr(municipio, "nome", "") or cidade
         tipo_localidade = tipo_localidade or getattr(municipio, "tipo_localidade_padrao", "")
@@ -129,13 +132,9 @@ def resolver_politica_despesa(
         if cidade_chave:
             chave = f"HOSPEDAGEM_{cidade_chave}"
     elif tipo_despesa == TipoDespesa.TRANSPORTE:
-        rota = _rota_chave(texto)
-        if rota:
-            chave = rota
-        else:
-            cidade_chave = _cidade_chave(texto)
-            if cidade_chave:
-                chave = f"KM_DIARIO_{cidade_chave}"
+        cidade_chave = _cidade_chave(texto)
+        if cidade_chave:
+            chave = f"KM_DIARIO_{cidade_chave}"
 
     if not chave:
         return None
