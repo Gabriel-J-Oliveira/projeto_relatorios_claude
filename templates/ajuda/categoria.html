@@ -14,6 +14,11 @@
 {% endblock %}
 
 {% block page_actions %}
+{% if can_edit_help %}
+<a href="{% url 'relatorios:ajuda_artigo_criar' category.slug %}" class="btn btn-sm btn-primary">
+  <i class="bi bi-plus-lg me-1"></i>Criar artigo
+</a>
+{% endif %}
 <a href="{% url 'relatorios:ajuda_index' %}" class="btn btn-sm btn-outline-secondary">
   <i class="bi bi-arrow-left me-1"></i>Voltar para Central
 </a>

@@ -5,6 +5,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.forms import inlineformset_factory, BaseInlineFormSet
 from django.utils import timezone
+from django.utils.text import slugify
 from .models import (
     RelatorioTecnico,
     ItemDespesa,
@@ -212,6 +213,17 @@ class ArtigoAjudaForm(BootstrapMixin, forms.ModelForm):
     def clean_publico_para(self):
         valores = self.cleaned_data.get("publico_para") or []
         return valores or [PublicoArtigoAjuda.TODOS]
+
+    def clean_titulo(self):
+        titulo = (self.cleaned_data.get("titulo") or "").strip()
+        slug = slugify(titulo)
+        if slug:
+            qs = ArtigoAjuda.objects.filter(slug=slug)
+            if self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise forms.ValidationError("Já existe um artigo com este título. Ajuste o título para criar um slug único.")
+        return titulo
 
     def save(self, commit=True):
         instance = super().save(commit=False)

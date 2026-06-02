@@ -29,6 +29,7 @@ from .models import (
     Adiantamento,
     AnexoRelatorio,
     ArtigoAjuda,
+    CategoriaAjuda,
     ImagemAjuda,
     Cliente,
     ItemDespesa,
@@ -215,6 +216,42 @@ def ajuda_artigo_editar_view(request, slug):
         request,
         "ajuda/editar_artigo.html",
         {"form": form, "article": artigo, "can_edit_help": True},
+    )
+
+
+@login_required
+@exigir_acesso_erp
+def ajuda_artigo_criar_view(request, slug):
+    if not usuario_pode_editar_ajuda(request.user):
+        raise PermissionDenied("Usuário sem permissão para criar artigos na Central de Ajuda.")
+
+    categoria = get_object_or_404(CategoriaAjuda, slug=slug, ativo=True)
+    artigo = ArtigoAjuda(categoria=categoria, conteudo="")
+
+    if request.method == "POST":
+        form = ArtigoAjudaForm(request.POST, instance=artigo)
+        if form.is_valid():
+            artigo = form.save(commit=False)
+            artigo.conteudo = sanitizar_html(artigo.conteudo)
+            artigo.criado_por = request.user
+            artigo.atualizado_por = request.user
+            artigo.save()
+            form.save_m2m()
+            messages.success(request, "Artigo criado com sucesso.")
+            return redirect("relatorios:ajuda_artigo", slug=artigo.slug)
+    else:
+        form = ArtigoAjudaForm(instance=artigo, initial={"categoria": categoria})
+
+    return render(
+        request,
+        "ajuda/editar_artigo.html",
+        {
+            "form": form,
+            "article": artigo,
+            "category": categoria,
+            "can_edit_help": True,
+            "is_create": True,
+        },
     )
 
 
@@ -2428,7 +2465,7 @@ def relatorio_reembolso_pdf_view(request, pk):
             "itens": itens,
             "total": total,
             "emitido_em": emitido_em,
-            "empresa": "CONTROL SUL GESTÃO EMPRESARIAL",
+            "empresa": "CONTROLSUL GESTÃO EMPRESARIAL",
         },
         request=request,
     )
@@ -2605,7 +2642,7 @@ def relatorio_pdf_interno_view(request, pk):
         "relatorios/pdf/interno.html",
         {
             "pdf": pdf_contexto,
-            "empresa": "CONTROL SUL GESTÃO EMPRESARIAL",
+            "empresa": "CONTROLSUL GESTÃO EMPRESARIAL",
             "emitido_em": emitido_em,
             "usuario_gerador": usuario_gerador,
         },

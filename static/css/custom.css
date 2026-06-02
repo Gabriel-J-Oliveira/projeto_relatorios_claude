@@ -294,17 +294,114 @@ body::-webkit-scrollbar-thumb:hover {
     --app-sidebar-width: 236px;
   }
 
+  body {
+    font-size: .875rem;
+  }
+
   .sidebar-brand-logo {
     max-width: 162px;
   }
 
   .app-main {
-    padding: 1.25rem 1.5rem;
+    padding: 1rem 1.25rem;
+  }
+
+  .page-heading {
+    margin-bottom: 1rem !important;
+  }
+
+  .page-heading h4 {
+    font-size: 1.12rem;
+  }
+
+  .card {
+    border-radius: .6rem;
+  }
+
+  .card-body {
+    padding: 1rem;
   }
 
   .card-header {
+    padding-bottom: .65rem;
     padding-left: 1rem;
     padding-right: 1rem;
+    padding-top: .65rem;
+  }
+
+  .btn {
+    padding: .34rem .65rem;
+  }
+
+  .btn-sm {
+    padding: .22rem .48rem;
+  }
+
+  .form-control,
+  .form-select,
+  .btn {
+    min-height: 32px;
+  }
+
+  .form-label {
+    font-size: .78rem;
+    margin-bottom: .25rem;
+  }
+
+  .table th {
+    font-size: .72rem;
+  }
+
+  .table td,
+  .table th {
+    padding-bottom: .42rem;
+    padding-top: .42rem;
+  }
+
+  .badge {
+    font-size: .72em;
+  }
+
+  .modal-xl {
+    --bs-modal-width: min(1120px, calc(100vw - 2rem));
+  }
+
+  .dashboard-kpi-card .card-body,
+  [data-tour="dashboard-kpis"] .card-body {
+    padding: .85rem !important;
+  }
+
+  .dashboard-kpi-value,
+  .dashboard-kpi-card strong,
+  [data-tour="dashboard-kpis"] strong {
+    font-size: clamp(1.15rem, 1.7vw, 1.55rem) !important;
+    line-height: 1.12;
+  }
+
+  .relatorio-form-table,
+  .relatorio-detail-table,
+  .relatorios-list-table {
+    font-size: .82rem;
+  }
+
+  .mapa-relatorio,
+  .mapa-km,
+  #mapa-km-form,
+  #mapa-relatorio-detail,
+  #mapa-relatorio-consulta {
+    max-height: 300px;
+  }
+}
+
+@media (min-width: 1200px) and (max-width: 1399.98px) {
+  .row.g-4 {
+    --bs-gutter-x: 1rem;
+    --bs-gutter-y: 1rem;
+  }
+
+  .row.g-3 {
+    --bs-gutter-x: .75rem;
+    --bs-gutter-y: .75rem;
   }
 }
 

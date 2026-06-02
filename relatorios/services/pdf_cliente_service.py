@@ -20,7 +20,7 @@ from relatorios.services.snapshot_service import SnapshotError, validar_snapshot
 logger = logging.getLogger(__name__)
 
 
-EMPRESA_PADRAO = "CONTROL SUL GESTÃO EMPRESARIAL"
+EMPRESA_PADRAO = "CONTROLSUL GESTÃO EMPRESARIAL"
 
 
 class PdfClienteError(Exception):

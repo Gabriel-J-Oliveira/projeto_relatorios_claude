@@ -360,7 +360,7 @@ def _gerar_pdf_interno(relatorio):
         "relatorios/pdf/interno.html",
         {
             "pdf": contexto,
-            "empresa": "CONTROL SUL GESTÃO EMPRESARIAL",
+            "empresa": "CONTROLSUL GESTÃO EMPRESARIAL",
             "emitido_em": emitido_em,
             "usuario_gerador": None,
         },

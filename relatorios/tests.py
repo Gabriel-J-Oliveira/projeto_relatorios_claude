@@ -1257,7 +1257,7 @@ class RelatorioTecnicoFlowTests(TestCase):
         self.assertEqual(response["Content-Type"], "application/pdf")
         self.assertIn("inline", response["Content-Disposition"])
         self.assertEqual(response.content, b"%PDF-FAKE")
-        self.assertIn("CONTROL SUL GESTÃO EMPRESARIAL", FakeHTML.rendered_html)
+        self.assertIn("CONTROLSUL GESTÃO EMPRESARIAL", FakeHTML.rendered_html)
         self.assertIn("RELATÓRIO DE REEMBOLSO", FakeHTML.rendered_html)
         self.assertIn("Despesa aprovada parcial", FakeHTML.rendered_html)
         self.assertIn("10,00", FakeHTML.rendered_html)

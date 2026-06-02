@@ -8,6 +8,7 @@ urlpatterns = [
     path("perfil/", views.perfil_usuario_view, name="perfil_usuario"),
     path("ajuda/", views.ajuda_index_view, name="ajuda_index"),
     path("ajuda/categoria/<slug:slug>/", views.ajuda_categoria_view, name="ajuda_categoria"),
+    path("ajuda/categoria/<slug:slug>/novo-artigo/", views.ajuda_artigo_criar_view, name="ajuda_artigo_criar"),
     path("ajuda/artigo/<slug:slug>/editar/", views.ajuda_artigo_editar_view, name="ajuda_artigo_editar"),
     path("ajuda/artigo/<slug:slug>/excluir/", views.ajuda_artigo_excluir_view, name="ajuda_artigo_excluir"),
     path("ajuda/imagens/upload/", views.ajuda_imagem_upload_view, name="ajuda_imagem_upload"),

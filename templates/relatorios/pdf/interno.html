@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
   <meta charset="utf-8">
-  <title>Relatorio de Despesa de Viagem - Via da Contabilidade {{ pdf.relatorio.identificador }}</title>
+  <title>Relatório de Despesa de Viagem - Via da Contabilidade {{ pdf.relatorio.identificador }}</title>
 </head>
 <body>
   <header class="pdf-header">
@@ -10,7 +10,7 @@
       <div class="brand-mark">CS</div>
       <div>
         <div class="company">{{ empresa }}</div>
-        <h1>Relatorio de Despesa de Viagem</h1>
+        <h1>Relatório de Despesa de Viagem</h1>
         <div class="company">Via da Contabilidade</div>
       </div>
     </div>
@@ -22,7 +22,7 @@
   </header>
 
   <section class="section">
-    <h2>Dados do relatorio</h2>
+    <h2>Dados do relatório</h2>
     <div class="meta-grid">
       <div>
         <span class="label">Cliente(s)</span>
@@ -43,33 +43,33 @@
         <strong>{{ pdf.relatorio.cidade_atendimento }}/{{ pdf.relatorio.uf_atendimento }}</strong>
       </div>
       <div>
-        <span class="label">Periodo</span>
+        <span class="label">Período</span>
         <strong>{{ pdf.relatorio.data_inicio|date:"d/m/Y" }} a {{ pdf.relatorio.data_fim|date:"d/m/Y" }}</strong>
       </div>
       <div>
-        <span class="label">Emissao</span>
+        <span class="label">Emissão</span>
         <strong>{{ pdf.emitido_em|date:"d/m/Y H:i" }}</strong>
       </div>
       <div>
-        <span class="label">Aprovacao</span>
+        <span class="label">Aprovação</span>
         <strong>{{ pdf.relatorio.aprovado_em|date:"d/m/Y H:i"|default:"-" }}</strong>
       </div>
     </div>
   </section>
 
   <section class="section">
-    <h2>Resumo contabil</h2>
+    <h2>Resumo contábil</h2>
     <div class="summary-grid accounting-summary">
-      <div class="summary-card"><span>Pago pelo tecnico</span><strong>R$ {{ pdf.total_pago_tecnico|floatformat:2 }}</strong></div>
+      <div class="summary-card"><span>Pago pelo técnico</span><strong>R$ {{ pdf.total_pago_tecnico|floatformat:2 }}</strong></div>
       <div class="summary-card"><span>Pago pela empresa</span><strong>R$ {{ pdf.total_pago_empresa|floatformat:2 }}</strong></div>
       <div class="summary-card"><span>KM a cobrar cliente</span><strong>R$ {{ pdf.total_km_cobrar_cliente|floatformat:2 }}</strong></div>
       <div class="summary-card"><span>Adiantamento</span><strong>R$ {{ pdf.totais.valor_adiantamento|floatformat:2 }}</strong></div>
-      <div class="summary-card balance"><span>Ressarcir tecnico</span><strong>R$ {{ pdf.total_reembolso_tecnico|floatformat:2 }}</strong></div>
+      <div class="summary-card balance"><span>Ressarcir técnico</span><strong>R$ {{ pdf.total_reembolso_tecnico|floatformat:2 }}</strong></div>
     </div>
   </section>
 
   <section class="section">
-    <h2>Distribuicao por cliente</h2>
+    <h2>Distribuição por cliente</h2>
     <table class="data-table compact">
       <thead>
         <tr>
@@ -77,7 +77,7 @@
           <th class="amount">Despesas</th>
           <th class="amount">KM</th>
           <th class="amount">Aprovado</th>
-          <th class="amount">Diferenca</th>
+          <th class="amount">Diferença</th>
         </tr>
       </thead>
       <tbody>
@@ -119,7 +119,7 @@
           <th>Data</th>
           <th>Trecho</th>
           <th class="amount">KM</th>
-          <th class="amount">Pagar tecnico</th>
+          <th class="amount">Pagar técnico</th>
           <th class="amount">Cobrar cliente</th>
           <th class="amount">Excesso/reducao</th>
           <th>Status</th>
@@ -184,9 +184,9 @@
   </section>
 
   <section class="section page-break-avoid signature-section">
-    <p>Declaro que o valor a ressarcir ao tecnico constante neste relatorio corresponde aos gastos aprovados conforme conferencia financeira.</p>
+    <p>Declaro que o valor a ressarcir ao técnico constante neste relatório corresponde aos gastos aprovados conforme conferência financeira.</p>
     <div class="signature-grid">
-      <div><span></span><strong>Tecnico / colaborador</strong></div>
+      <div><span></span><strong>Técnico / colaborador</strong></div>
       <div><span></span><strong>Coordenador ou Departamento Financeiro</strong></div>
       <div><span></span><strong>Data</strong></div>
     </div>
