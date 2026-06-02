@@ -11,7 +11,7 @@
 
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-12 col-lg-7 col-xl-5">
+  <div class="col-12 col-lg-6 col-xl-5">
     <div class="card border-0 shadow-sm">
       <div class="card-header bg-transparent border-bottom py-3">
         <div class="d-flex align-items-center gap-2">
@@ -55,23 +55,6 @@
               <label class="form-label fw-medium" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
               {{ form.email }}
               {% for error in form.email.errors %}
-                <div class="invalid-feedback d-block">{{ error }}</div>
-              {% endfor %}
-            </div>
-            <div class="col-12 col-md-7">
-              <label class="form-label fw-medium" for="{{ form.setor.id_for_label }}">{{ form.setor.label }}</label>
-              {{ form.setor }}
-              {% for error in form.setor.errors %}
-                <div class="invalid-feedback d-block">{{ error }}</div>
-              {% endfor %}
-            </div>
-            <div class="col-12 col-md-5">
-              <label class="form-label fw-medium" for="{{ form.funcao_setor.id_for_label }}">{{ form.funcao_setor.label }}</label>
-              {{ form.funcao_setor }}
-              {% if form.funcao_setor.help_text %}
-                <div class="form-text small">{{ form.funcao_setor.help_text }}</div>
-              {% endif %}
-              {% for error in form.funcao_setor.errors %}
                 <div class="invalid-feedback d-block">{{ error }}</div>
               {% endfor %}
             </div>

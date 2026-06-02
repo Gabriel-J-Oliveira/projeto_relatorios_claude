@@ -11,6 +11,8 @@ from relatorios.models import PoliticaValor, TipoDespesa, TipoLocalidade
 
 logger = logging.getLogger(__name__)
 
+TIPOS_DESPESA_SEM_POLITICA = {TipoDespesa.PASSAGEM, TipoDespesa.TRANSPORTE}
+
 
 @dataclass(frozen=True)
 class PoliticaAplicavel:
@@ -111,7 +113,7 @@ def resolver_politica_despesa(
     descricao="",
     valor_informado=None,
 ):
-    if tipo_despesa == TipoDespesa.PASSAGEM:
+    if tipo_despesa in TIPOS_DESPESA_SEM_POLITICA:
         return None
 
     if municipio is not None:
@@ -131,10 +133,6 @@ def resolver_politica_despesa(
         cidade_chave = _cidade_chave(texto)
         if cidade_chave:
             chave = f"HOSPEDAGEM_{cidade_chave}"
-    elif tipo_despesa == TipoDespesa.TRANSPORTE:
-        cidade_chave = _cidade_chave(texto)
-        if cidade_chave:
-            chave = f"KM_DIARIO_{cidade_chave}"
 
     if not chave:
         return None

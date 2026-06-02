@@ -118,7 +118,6 @@ from .services.help_center_service import (
     sanitizar_html,
     usuario_pode_editar_ajuda,
 )
-from .services.setores_service import aplicar_setor_manual_perfil
 from .forms import (
     AdiantamentoForm,
     ArtigoAjudaForm,
@@ -579,12 +578,6 @@ def completar_cadastro_view(request):
             request.user.last_name = form.cleaned_data["last_name"].strip()
             request.user.email = form.cleaned_data["email"]
             request.user.save(update_fields=["first_name", "last_name", "email"])
-            aplicar_setor_manual_perfil(
-                request.user,
-                setor=form.cleaned_data["setor"],
-                funcao_setor=form.cleaned_data.get("funcao_setor", ""),
-                atualizado_por=request.user,
-            )
             perfil.refresh_from_db()
             perfil.cadastro_confirmado_em = timezone.now()
             perfil.save(update_fields=["cadastro_confirmado_em", "atualizado_em"])
@@ -1454,7 +1447,8 @@ def _avisos_financeiro(relatorio):
             despesas_por_data.setdefault(despesa.data, []).append((idx, despesa))
 
         if (
-            despesa.tipo not in {TipoDespesa.PASSAGEM, TipoDespesa.HOSPEDAGEM}
+            despesa.tipo
+            not in {TipoDespesa.PASSAGEM, TipoDespesa.HOSPEDAGEM, TipoDespesa.TRANSPORTE}
             and despesa.valor
             and despesa.valor > Decimal("300.00")
             and not observacoes

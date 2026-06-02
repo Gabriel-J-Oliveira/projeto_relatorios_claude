@@ -1617,7 +1617,7 @@
     const data = linha.querySelector('[name$="-data"]')?.value || "";
     const descricao = linha.querySelector('[name$="-descricao"]')?.value || "";
     const aviso = linha.querySelector(".aviso-inline");
-    if (["passagem", "hospedagem"].includes(tipo) && aviso?.textContent?.includes("despesas altas")) {
+    if (["passagem", "hospedagem", "transporte"].includes(tipo) && aviso?.textContent?.includes("despesas altas")) {
       aviso.textContent = "";
     }
     const limparPolitica = () => {
@@ -1625,7 +1625,7 @@
       info.className = "small mt-1 politica-despesa-info text-muted";
       if (aviso?.textContent?.includes("politica vigente")) aviso.textContent = "";
     };
-    if (tipo === "passagem") {
+    if (["passagem", "transporte"].includes(tipo)) {
       limparPolitica();
       info.dataset.policyKey = `${tipo}|sem-politica`;
       return;

@@ -419,7 +419,7 @@ const Validators = {
     const tipoDespesa = linhaDesp
       ?.querySelector('select[name$="-tipo"], input[name$="-tipo"]')
       ?.value;
-    if (["passagem", "hospedagem"].includes(tipoDespesa)) {
+    if (["passagem", "hospedagem", "transporte"].includes(tipoDespesa)) {
       return { ok: true };
     }
     const valor = parseFloat(campoValor.value) || 0;

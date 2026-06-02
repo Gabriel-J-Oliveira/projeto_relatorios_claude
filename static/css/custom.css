@@ -189,6 +189,58 @@ header.navbar {
   white-space: normal;
 }
 
+#tabela-despesas {
+  min-width: 1240px;
+  table-layout: fixed;
+}
+
+#tabela-despesas .linha-despesa td {
+  vertical-align: top;
+}
+
+#tabela-despesas .despesa-col-data {
+  width: 120px;
+}
+
+#tabela-despesas .despesa-col-tipo {
+  width: 170px;
+}
+
+#tabela-despesas .despesa-col-descricao {
+  width: 210px;
+}
+
+#tabela-despesas .despesa-col-valor {
+  width: 150px;
+}
+
+#tabela-despesas .despesa-col-pagador {
+  width: 118px;
+}
+
+#tabela-despesas .despesa-col-anexo {
+  width: 210px;
+}
+
+#tabela-despesas .despesa-col-observacao {
+  width: 180px;
+}
+
+#tabela-despesas .despesa-col-clientes {
+  width: 185px;
+}
+
+#tabela-despesas .despesa-col-anexo .btn {
+  min-height: 31px;
+}
+
+#tabela-despesas .despesa-col-anexo input[type="file"] {
+  max-width: 1px;
+  opacity: 0;
+  position: absolute;
+  pointer-events: none;
+}
+
 .card-body,
 .card-header,
 .modal-body {

@@ -10,7 +10,7 @@ from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 from django.utils import timezone
 
 from relatorios.models import PerfilUsuario
-from relatorios.services.setores_service import aplicar_setor_importado_para_usuario, garantir_tecnico_para_usuario
+from relatorios.services.setores_service import garantir_tecnico_para_usuario
 from relatorios.services.autorizacao_service import (
     usuario_eh_superadmin,
     usuario_pode_acessar_erp,
@@ -40,17 +40,12 @@ def perfil_usuario_completo(user):
     if not getattr(user, "is_authenticated", False):
         return True
     perfil, _criado = PerfilUsuario.objects.get_or_create(usuario=user)
-    if not perfil.setor_confirmado:
-        aplicar_setor_importado_para_usuario(user)
-        perfil.refresh_from_db()
     garantir_tecnico_para_usuario(user)
     return bool(
         perfil.cadastro_confirmado_em
         and (user.first_name or "").strip()
         and (user.last_name or "").strip()
         and (user.email or "").strip()
-        and perfil.setor_confirmado
-        and perfil.setor_id
     )
 
 

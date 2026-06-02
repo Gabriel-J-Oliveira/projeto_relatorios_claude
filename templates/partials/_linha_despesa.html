@@ -3,7 +3,7 @@
     id="linha-despesa-nova-{{ idx }}"
     data-form-index="{{ idx }}"
     {% if form.instance.pk %}data-pk="{{ form.instance.pk }}"{% endif %}>
-  <td class="p-1 px-3 pt-3 col-md-1" data-tour="despesas-data-tipo">
+  <td class="p-1 px-3 pt-3 despesa-col-data" data-tour="despesas-data-tipo">
     <input type="hidden"
            name="despesas-{{ idx }}-id"
            id="id_despesas-{{ idx }}-id"
@@ -29,7 +29,7 @@
       {% if form.data.errors %}{{ form.data.errors.0 }}{% endif %}
     </div>
   </td>
-  <td class="p-1 pt-3 col-md-1" data-tour="despesas-data-tipo">
+  <td class="p-1 pt-3 despesa-col-tipo" data-tour="despesas-data-tipo">
     <select name="despesas-{{ idx }}-tipo"
             id="id_despesas-{{ idx }}-tipo"
             class="form-select form-select-sm {% if form.tipo.errors %}is-invalid{% endif %}"
@@ -44,7 +44,7 @@
     </div>
     <div class="text-warning small aviso-refeicao"></div>
   </td>
-  <td class="p-1 pt-3 col-md-2" data-tour="despesas-descricao-valor">
+  <td class="p-1 pt-3 despesa-col-descricao" data-tour="despesas-descricao-valor">
     <input type="text"
            name="despesas-{{ idx }}-descricao"
            id="id_despesas-{{ idx }}-descricao"
@@ -57,7 +57,7 @@
     <div class="text-warning small aviso-inline"></div>
     <div class="text-warning small aviso-duplicata"></div>
 </td>
-  <td class="p-1 pt-3 col-md-1" data-tour="despesas-descricao-valor">
+  <td class="p-1 pt-3 despesa-col-valor" data-tour="despesas-descricao-valor">
     <input type="text"
            inputmode="decimal"
            name="despesas-{{ idx }}-valor"
@@ -74,7 +74,7 @@
     </div>
     <div class="text-warning small aviso-inline"></div>
   </td>
-  <td class="p-1 pt-3 col-md-1">
+  <td class="p-1 pt-3 despesa-col-pagador">
     <select name="despesas-{{ idx }}-quem_pagou"
             id="id_despesas-{{ idx }}-quem_pagou"
             class="form-select form-select-sm campo-quem-pagou"
@@ -85,7 +85,7 @@
               {% if form.quem_pagou.value == "empresa" %}selected{% endif %}>Empresa</option>
     </select>
   </td>
-  <td class="p-1 text-center text-nowrap col-md-3 pt-3" data-tour="despesas-comprovante">
+  <td class="p-1 text-center text-nowrap pt-3 despesa-col-anexo" data-tour="despesas-comprovante">
     {% if form.instance.comprovante %}
       <a href="{{ form.instance.comprovante.url }}"
          target="_blank"
@@ -125,7 +125,7 @@
       {% if form.comprovante.errors %}{{ form.comprovante.errors.0 }}{% elif form.tipo_documento_comprovante.errors %}{{ form.tipo_documento_comprovante.errors.0 }}{% elif form.numero_documento_comprovante.errors %}{{ form.numero_documento_comprovante.errors.0 }}{% endif %}
     </div>
   </td>
-  <td class="p-1 pt-3 col-md-3">
+  <td class="p-1 pt-3 despesa-col-observacao">
     <input type="text"
            name="despesas-{{ idx }}-observacoes"
            id="id_despesas-{{ idx }}-observacoes"
@@ -135,7 +135,7 @@
       <div class="text-warning small aviso-inline"></div>
 
   </td>
-  <td class="p-1 pt-3" data-tour="despesas-clientes">
+  <td class="p-1 pt-3 despesa-col-clientes" data-tour="despesas-clientes">
     <input type="hidden"
            class="clientes-item-input"
            name="despesas-{{ idx }}-clientes"
