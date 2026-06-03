@@ -43,6 +43,10 @@
         <strong>{{ pdf.relatorio.cidade_atendimento }}/{{ pdf.relatorio.uf_atendimento }}</strong>
       </div>
       <div>
+        <span class="label">Tipo de reembolso</span>
+        <strong>{{ pdf.relatorio.tipo_reembolso_label|default:"Reembolsável" }}</strong>
+      </div>
+      <div>
         <span class="label">Período</span>
         <strong>{{ pdf.relatorio.data_inicio|date:"d/m/Y" }} a {{ pdf.relatorio.data_fim|date:"d/m/Y" }}</strong>
       </div>

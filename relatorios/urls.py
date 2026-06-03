@@ -34,6 +34,7 @@ urlpatterns = [
     path("relatorios/<int:pk>/pdf-interno/", views.relatorio_pdf_interno_view, name="relatorio_pdf_interno"),
     path("relatorios/<int:pk>/editar/", views.relatorio_form_view, name="relatorio_update"),
     path("relatorios/<int:pk>/duplicar/", views.relatorio_duplicate_view, name="relatorio_duplicate"),
+    path("relatorios/<int:pk>/excluir-rascunho/", views.relatorio_excluir_rascunho_view, name="relatorio_excluir_rascunho"),
     path("relatorios/<int:pk>/status/<str:status>/", views.relatorio_status_view, name="relatorio_status"),
     path("relatorios/<int:pk>/financeiro/valores/", views.relatorio_valores_financeiros_json, name="relatorio_valores_financeiros"),
     path(

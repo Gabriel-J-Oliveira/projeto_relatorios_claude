@@ -135,6 +135,7 @@ from .forms import (
 logger = logging.getLogger(__name__)
 security_logger = logging.getLogger("security")
 help_logger = logging.getLogger("relatorios.help_center")
+rascunhos_logger = logging.getLogger("relatorios.rascunhos")
 
 BLOQUEIO_POS_APROVACAO = {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
 
@@ -2925,6 +2926,62 @@ def relatorio_duplicate_view(request, pk):
         f"Relatório {original.identificador} duplicado como {novo.identificador}.",
     )
     return redirect("relatorios:relatorio_update", pk=novo.pk)
+
+
+def _usuario_pode_excluir_rascunho(user, relatorio):
+    if relatorio.status != StatusRelatorio.RASCUNHO:
+        return False
+    if usuario_eh_administrativo(user) or usuario_eh_superadmin(user):
+        return True
+    return usuario_pode_editar_relatorio(user, relatorio)
+
+
+@require_POST
+@login_required
+@exigir_acesso_erp
+def relatorio_excluir_rascunho_view(request, pk):
+    relatorio = get_object_or_404(
+        _relatorios_visiveis(
+            request.user,
+            RelatorioTecnico.objects.select_related("cliente", "tecnico_responsavel", "criado_por"),
+        ),
+        pk=pk,
+    )
+    if relatorio.status != StatusRelatorio.RASCUNHO:
+        rascunhos_logger.warning(
+            "exclusao_rascunho_bloqueada_status usuario=%s relatorio=%s status=%s",
+            getattr(request.user, "pk", None),
+            relatorio.pk,
+            relatorio.status,
+        )
+        messages.error(
+            request,
+            "Este relatório não pode ser excluído porque já foi enviado para conferência.",
+        )
+        return redirect("relatorios:relatorio_detail", pk=relatorio.pk)
+
+    if not _usuario_pode_excluir_rascunho(request.user, relatorio):
+        rascunhos_logger.warning(
+            "exclusao_rascunho_bloqueada_permissao usuario=%s relatorio=%s",
+            getattr(request.user, "pk", None),
+            relatorio.pk,
+        )
+        raise PermissionDenied("Você não tem permissão para excluir este rascunho.")
+
+    identificador = relatorio.identificador
+    relatorio_id = relatorio.pk
+    with transaction.atomic():
+        rascunhos_logger.info(
+            "exclusao_rascunho usuario=%s relatorio=%s identificador=%s status=%s",
+            getattr(request.user, "pk", None),
+            relatorio_id,
+            identificador,
+            relatorio.status,
+        )
+        relatorio.delete()
+
+    messages.success(request, "Rascunho excluído com sucesso.")
+    return redirect("relatorios:relatorio_list")
 
 
 @require_POST

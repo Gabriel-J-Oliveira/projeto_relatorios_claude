@@ -13,6 +13,20 @@
   <li class="breadcrumb-item active">{{ titulo_pagina }}</li>
 {% endblock %}
 {% block page_actions %}
+{% if instance and instance.status == 'rascunho' %}
+  {% if instance.criado_por_id == request.user.id or request.user.is_superuser or permissoes_erp.administrativo %}
+  <form method="post"
+        action="{% url 'relatorios:relatorio_excluir_rascunho' instance.pk %}"
+        class="d-inline"
+        onsubmit="return confirm('Tem certeza que deseja excluir este rascunho? Esta ação não poderá ser desfeita.');">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1">
+      <i class="bi bi-trash3"></i>
+      Excluir rascunho
+    </button>
+  </form>
+  {% endif %}
+{% endif %}
 <button type="button"
         class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
         id="relatorio-form-tour-start">
@@ -181,6 +195,14 @@
                   </div>
 
                   {# Cliente / Responsável #}
+                  <div class="col-md-4">
+                    <label class="form-label fw-medium small text-muted">Tipo de reembolso</label>
+                    {{ form.tipo_reembolso }}
+                    {% if form.tipo_reembolso.errors %}
+                      <div class="text-danger small mt-1">{{ form.tipo_reembolso.errors.0 }}</div>
+                    {% endif %}
+                  </div>
+
                   <div class="col-md-6" data-tour="relatorio-clientes">
                     <label class="form-label fw-medium small text-muted">Clientes *</label>
                     <input type="hidden"

@@ -72,6 +72,9 @@
 <div class="alert alert-{{ relatorio.status_badge_cor }} d-flex align-items-center gap-2 mb-4 py-2" data-tour="detail-status">
   <i class="bi bi-info-circle-fill"></i>
   <strong>Status:</strong> {{ relatorio.get_status_display }}
+  <span class="badge rounded-pill bg-{{ relatorio.tipo_reembolso_badge_cor }}-subtle text-{{ relatorio.tipo_reembolso_badge_cor }} border border-{{ relatorio.tipo_reembolso_badge_cor }}-subtle">
+    {{ relatorio.get_tipo_reembolso_display }}
+  </span>
   <span class="ms-auto small text-muted">
     Atualizado em {{ relatorio.atualizado_em|date:"d/m/Y H:i" }}
   </span>

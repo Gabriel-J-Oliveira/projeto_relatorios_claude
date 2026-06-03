@@ -19,7 +19,7 @@
   <a href="{% url 'relatorios:relatorio_pdf_interno' relatorio.pk %}"
      target="_blank"
      rel="noopener"
-     class="btn btn-outline-dark btn-sm">
+     class="btn btn-outline-secondary btn-sm consulta-pdf-interno-btn">
     <i class="bi bi-file-earmark-text me-1"></i>Gerar PDF interno
   </a>
   {% endif %}
@@ -31,9 +31,6 @@
     <i class="bi bi-file-earmark-pdf me-1"></i>Gerar PDF
   </a>
   {% endif %}
-  <button class="btn btn-outline-dark btn-sm" disabled>
-    <i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel
-  </button>
 </div>
 {% endblock %}
 
@@ -48,6 +45,9 @@
         </span>
         <span class="badge rounded-pill bg-{{ consulta.relatorio.status_badge_cor }}-subtle text-{{ consulta.relatorio.status_badge_cor }} border border-{{ consulta.relatorio.status_badge_cor }}-subtle">
           {{ consulta.relatorio.status_label }}
+        </span>
+        <span class="badge rounded-pill bg-{{ consulta.relatorio.tipo_reembolso_badge_cor }}-subtle text-{{ consulta.relatorio.tipo_reembolso_badge_cor }} border border-{{ consulta.relatorio.tipo_reembolso_badge_cor }}-subtle">
+          {{ consulta.relatorio.tipo_reembolso_label }}
         </span>
       </div>
       <h2 class="consulta-title mb-3">Relatório final de prestação</h2>
@@ -84,6 +84,10 @@
         <div>
           <span>Finalização</span>
           <strong>{{ consulta.finalizado_em|default:"Não finalizado" }}</strong>
+        </div>
+        <div>
+          <span>Tipo de reembolso</span>
+          <strong>{{ consulta.relatorio.tipo_reembolso_label }}</strong>
         </div>
       </div>
     </div>
@@ -669,6 +673,19 @@
   .consulta-anexo small {
     display: block;
     color: var(--bs-secondary-color);
+  }
+
+  .consulta-pdf-interno-btn {
+    color: var(--bs-body-color);
+    border-color: var(--bs-border-color);
+    background-color: var(--bs-body-bg);
+  }
+
+  .consulta-pdf-interno-btn:hover,
+  .consulta-pdf-interno-btn:focus {
+    color: var(--bs-emphasis-color);
+    border-color: var(--bs-primary);
+    background-color: var(--bs-primary-bg-subtle);
   }
 
   .mapa-trechos-km {

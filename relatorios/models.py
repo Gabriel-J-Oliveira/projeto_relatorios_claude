@@ -77,6 +77,11 @@ class TipoRelatorio(models.TextChoices):
     OPERACIONAL = "operacional", "Operacional"
 
 
+class TipoReembolso(models.TextChoices):
+    REEMBOLSAVEL = "reembolsavel", "Reembolsável"
+    NAO_REEMBOLSAVEL = "nao_reembolsavel", "Não reembolsável"
+
+
 class StatusFinanceiroItem(models.TextChoices):
     APROVADO = "aprovado", "Aprovado"
     REJEITADO = "rejeitado", "Rejeitado"
@@ -926,6 +931,12 @@ class RelatorioTecnico(models.Model):
         choices=TipoRelatorio.choices,
         default=TipoRelatorio.OPERACIONAL,
     )
+    tipo_reembolso = models.CharField(
+        "Tipo de reembolso",
+        max_length=20,
+        choices=TipoReembolso.choices,
+        default=TipoReembolso.REEMBOLSAVEL,
+    )
 
     # Financeiro
     valor_adiantamento = models.DecimalField(
@@ -1303,6 +1314,13 @@ class RelatorioTecnico(models.Model):
             StatusRelatorio.APROVADO: "success",
             StatusRelatorio.REJEITADO: "danger",
         }.get(self.status, "secondary")
+
+    @property
+    def tipo_reembolso_badge_cor(self):
+        return {
+            TipoReembolso.REEMBOLSAVEL: "success",
+            TipoReembolso.NAO_REEMBOLSAVEL: "secondary",
+        }.get(self.tipo_reembolso, "secondary")
 
     def clean(self):
         erros = {}

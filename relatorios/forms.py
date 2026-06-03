@@ -278,6 +278,7 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
             "data_fim",
             "motivo",
             "tipo_relatorio",
+            "tipo_reembolso",
             "valor_adiantamento",
             "km_excedente_interno",
             "observacao_km_excedente",
@@ -305,7 +306,10 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
             "km_excedente_interno": forms.TextInput(),
             "observacao_km_excedente": forms.Textarea(attrs={"rows": 2}),
         }
-        labels = {"tipo_relatorio": "Tipo de relatorio"}
+        labels = {
+            "tipo_relatorio": "Tipo de relatorio",
+            "tipo_reembolso": "Tipo de reembolso",
+        }
 
 
     def __init__(self, *args, **kwargs):
@@ -353,6 +357,9 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         if self.instance and self.instance.pk and not self.instance.numero:
             self.fields["numero"].initial = "Rascunho"
         self.fields["tipo_relatorio"].widget.attrs.update(
+            {"class": "form-select form-select-sm"}
+        )
+        self.fields["tipo_reembolso"].widget.attrs.update(
             {"class": "form-select form-select-sm"}
         )
         self.fields["valor_adiantamento"].widget.attrs.update(

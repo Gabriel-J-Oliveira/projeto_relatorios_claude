@@ -503,6 +503,11 @@ def _montar_consulta_snapshot(snapshot):
             status=relatorio.get("status") or "",
             status_label=relatorio.get("status_label") or "",
             status_badge_cor=_status_badge_cor(relatorio.get("status") or ""),
+            tipo_reembolso=relatorio.get("tipo_reembolso") or "reembolsavel",
+            tipo_reembolso_label=relatorio.get("tipo_reembolso_label") or "Reembolsável",
+            tipo_reembolso_badge_cor=(
+                "secondary" if relatorio.get("tipo_reembolso") == "nao_reembolsavel" else "success"
+            ),
         ),
         "clientes": [_ns(**cliente) for cliente in payload.get("clientes") or []],
         "tecnicos": [_ns(**tecnico) for tecnico in payload.get("tecnicos") or []],
@@ -823,6 +828,9 @@ def _montar_consulta_viva(relatorio):
             status=relatorio.status,
             status_label=relatorio.get_status_display(),
             status_badge_cor=relatorio.status_badge_cor,
+            tipo_reembolso=relatorio.tipo_reembolso,
+            tipo_reembolso_label=relatorio.get_tipo_reembolso_display(),
+            tipo_reembolso_badge_cor=relatorio.tipo_reembolso_badge_cor,
         ),
         "clientes": [_ns(nome=cliente.nome) for cliente in relatorio.clientes_exibicao()],
         "tecnicos": [_ns(nome=tecnico.nome) for tecnico in relatorio.tecnicos_exibicao()],

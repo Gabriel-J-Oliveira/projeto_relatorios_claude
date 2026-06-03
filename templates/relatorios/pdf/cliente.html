@@ -53,6 +53,10 @@
       <span>Data de emissão</span>
       <strong>{{ emitido_em|date:"d/m/Y" }}</strong>
     </div>
+    <div>
+      <span>Tipo de reembolso</span>
+      <strong>{{ relatorio.tipo_reembolso_label|default:"Reembolsável" }}</strong>
+    </div>
   </section>
 
   {% if motivo_viagem %}

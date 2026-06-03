@@ -400,6 +400,8 @@ def construir_snapshot_financeiro(relatorio, usuario=None):
             "status_label": relatorio.get_status_display(),
             "tipo_relatorio": relatorio.tipo_relatorio,
             "tipo_relatorio_label": relatorio.get_tipo_relatorio_display(),
+            "tipo_reembolso": relatorio.tipo_reembolso,
+            "tipo_reembolso_label": relatorio.get_tipo_reembolso_display(),
             "municipio_atendimento": (
                 {
                     "id": relatorio.municipio_atendimento_id,
