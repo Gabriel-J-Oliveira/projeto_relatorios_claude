@@ -1,6 +1,7 @@
 import logging
 from functools import wraps
 
+from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect
@@ -9,6 +10,7 @@ from relatorios.models import StatusRelatorio
 
 
 logger = logging.getLogger(__name__)
+_EXTRA_ADMIN_LOGADOS = set()
 
 
 GRUPO_FINANCEIRO = "Financeiro"
@@ -24,6 +26,49 @@ GRUPOS_ERP = [
     GRUPO_ADMIN_ERP,
     GRUPO_DOMAIN_ADMINS,
 ]
+
+
+def _normalizar_login_usuario(valor):
+    login = str(valor or "").strip().lower()
+    if "\\" in login:
+        login = login.rsplit("\\", 1)[-1]
+    if "@" in login:
+        login = login.split("@", 1)[0]
+    return login
+
+
+def _extra_admin_users():
+    valor = getattr(settings, "EXTRA_ADMIN_USERS", "")
+    if isinstance(valor, (list, tuple, set)):
+        bruto = valor
+    else:
+        bruto = str(valor or "").split(",")
+    return {
+        _normalizar_login_usuario(item)
+        for item in bruto
+        if _normalizar_login_usuario(item)
+    }
+
+
+def usuario_eh_admin_extra(user):
+    if not getattr(user, "is_authenticated", False):
+        return False
+    candidatos = {
+        _normalizar_login_usuario(getattr(user, "username", "")),
+        _normalizar_login_usuario(user.get_username() if hasattr(user, "get_username") else ""),
+    }
+    extras = _extra_admin_users()
+    concedido = bool(extras.intersection(candidatos))
+    if concedido:
+        login = next(iter(extras.intersection(candidatos)))
+        if login not in _EXTRA_ADMIN_LOGADOS:
+            logger.info(
+                "Permissao administrativa concedida por EXTRA_ADMIN_USERS para usuario=%s id=%s.",
+                login,
+                getattr(user, "pk", None),
+            )
+            _EXTRA_ADMIN_LOGADOS.add(login)
+    return concedido
 
 
 def usuario_tem_grupo(user, nome_grupo):
@@ -46,12 +91,15 @@ def usuario_eh_superadmin(user):
 def usuario_eh_domain_admin(user):
     return bool(
         getattr(user, "is_authenticated", False)
-        and user.groups.filter(name=GRUPO_DOMAIN_ADMINS).exists()
+        and (
+            usuario_eh_admin_extra(user)
+            or user.groups.filter(name=GRUPO_DOMAIN_ADMINS).exists()
+        )
     )
 
 
 def usuario_tem_acesso_total(user):
-    return usuario_eh_superadmin(user) or usuario_eh_domain_admin(user)
+    return usuario_eh_superadmin(user) or usuario_eh_domain_admin(user) or usuario_eh_admin_extra(user)
 
 
 def _usuario_tem_algum_grupo(user, grupos):

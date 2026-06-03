@@ -40,10 +40,70 @@ from .services.identidade.ldap_utils import (
     normalizar_username_ad,
     usuario_ad_ativo,
 )
+from .services.autorizacao_service import (
+    usuario_eh_administrativo,
+    usuario_eh_admin_extra,
+    usuario_tem_acesso_total,
+)
 from .services.identidade.sincronizacao_service import (
     UsuarioExternoSnapshot,
     sincronizar_usuario_externo,
 )
+
+
+class _GrupoFake:
+    def __init__(self, nomes=()):
+        self.nomes = set(nomes)
+        self._filtro = set()
+
+    def filter(self, **kwargs):
+        valores = kwargs.get("name__in")
+        if valores is None and "name" in kwargs:
+            valores = [kwargs["name"]]
+        self._filtro = set(valores or [])
+        return self
+
+    def exists(self):
+        return bool(self.nomes.intersection(self._filtro))
+
+
+class _UsuarioFake:
+    is_authenticated = True
+    is_superuser = False
+    pk = 1
+
+    def __init__(self, username, grupos=()):
+        self.username = username
+        self.groups = _GrupoFake(grupos)
+
+    def get_username(self):
+        return self.username
+
+
+class ExtraAdminUsersTests(SimpleTestCase):
+    @override_settings(EXTRA_ADMIN_USERS=["joao.martins"])
+    def test_usuario_extra_admin_tem_acesso_administrativo(self):
+        usuario = _UsuarioFake("JOAO.MARTINS")
+
+        self.assertTrue(usuario_eh_admin_extra(usuario))
+        self.assertTrue(usuario_tem_acesso_total(usuario))
+        self.assertTrue(usuario_eh_administrativo(usuario))
+
+    @override_settings(EXTRA_ADMIN_USERS=["joao.martins"])
+    def test_usuario_fora_da_lista_nao_recebe_excecao(self):
+        usuario = _UsuarioFake("usuario.comum")
+
+        self.assertFalse(usuario_eh_admin_extra(usuario))
+        self.assertFalse(usuario_tem_acesso_total(usuario))
+        self.assertFalse(usuario_eh_administrativo(usuario))
+
+    @override_settings(EXTRA_ADMIN_USERS=[])
+    def test_admin_via_ad_continua_funcionando(self):
+        usuario = _UsuarioFake("admin.ad", grupos=["Domain Admins"])
+
+        self.assertFalse(usuario_eh_admin_extra(usuario))
+        self.assertTrue(usuario_tem_acesso_total(usuario))
+        self.assertTrue(usuario_eh_administrativo(usuario))
 
 
 class RelatorioTecnicoFlowTests(TestCase):

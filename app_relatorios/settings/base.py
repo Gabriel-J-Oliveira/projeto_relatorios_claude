@@ -247,6 +247,11 @@ LOGOUT_REDIRECT_URL = "/login/"
 #     "ERP-Tecnicos": "Tecnico",
 # }
 AD_GROUP_MAPPING = config("AD_GROUP_MAPPING", default="{}", cast=json.loads)
+EXTRA_ADMIN_USERS = config(
+    "EXTRA_ADMIN_USERS",
+    default="",
+    cast=lambda v: [item.strip().lower() for item in str(v).split(",") if item.strip()],
+)
 AD_SYNC_ENABLED = config("AD_SYNC_ENABLED", default=True, cast=bool)
 AD_USERS_BASE_DN = config("AD_USERS_BASE_DN", default="")
 AD_USERS_FILTER = config(
