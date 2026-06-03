@@ -2,7 +2,6 @@ import logging
 from urllib.parse import urljoin
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
 from django.core.validators import validate_email
@@ -10,13 +9,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
-from relatorios.models import TipoEventoHistorico
-from relatorios.services.autorizacao_service import (
-    GRUPO_ADMIN_ERP,
-    GRUPO_DOMAIN_ADMINS,
-    GRUPO_FINANCEIRO,
-    GRUPO_GESTOR,
-)
+from relatorios.models import EmailLog, StatusEmailLog, TipoEventoHistorico
 from relatorios.services.historico_service import registrar_evento
 from relatorios.services.pdf_cliente_service import gerar_zip_pdfs_clientes
 from relatorios.services.pdf_interno_service import montar_contexto_pdf_interno
@@ -27,14 +20,6 @@ logger = logging.getLogger(__name__)
 
 class EmailNotificacaoError(Exception):
     pass
-
-
-GRUPOS_DESTINATARIOS_FINANCEIRO = [
-    GRUPO_FINANCEIRO,
-    GRUPO_GESTOR,
-    GRUPO_ADMIN_ERP,
-    GRUPO_DOMAIN_ADMINS,
-]
 
 
 def _email_valido(email):
@@ -91,17 +76,11 @@ def _link_relatorio(relatorio):
 
 
 def get_destinatarios_financeiro():
-    User = get_user_model()
-    usuarios = (
-        User.objects.filter(
-            is_active=True,
-            groups__name__in=GRUPOS_DESTINATARIOS_FINANCEIRO,
-        )
-        .exclude(email="")
-        .values_list("email", flat=True)
-        .distinct()
-    )
-    return _unicos(usuarios)
+    return get_financeiro_recipients()
+
+
+def get_financeiro_recipients():
+    return _unicos([getattr(settings, "FINANCEIRO_EMAIL", "financeiro@controlsul.com.br")])
 
 
 def get_destinatarios_tecnicos(relatorio):
@@ -150,6 +129,64 @@ def _registrar_email(relatorio, tipo_email, destinatarios, anexos=None, erro=Non
     )
 
 
+def _meta_anexos(anexos):
+    metadados = []
+    for nome, conteudo, mimetype in anexos:
+        try:
+            tamanho = len(conteudo)
+        except TypeError:
+            tamanho = None
+        metadados.append(
+            {
+                "nome": str(nome or "anexo"),
+                "tamanho_bytes": tamanho,
+                "mime_type": str(mimetype or ""),
+            }
+        )
+    return metadados
+
+
+def registrar_email_log_pendente(assunto, corpo, destinatarios, *, relatorio=None, tipo_email="notificacao"):
+    try:
+        return EmailLog.objects.create(
+            tipo=tipo_email,
+            relatorio=relatorio,
+            destinatarios=list(destinatarios or []),
+            assunto=str(assunto or "")[:255],
+            corpo=corpo or "",
+            status=StatusEmailLog.PENDENTE,
+        )
+    except Exception:
+        logger.exception(
+            "Falha ao registrar EmailLog pendente tipo=%s relatorio=%s.",
+            tipo_email,
+            getattr(relatorio, "pk", None),
+        )
+        return None
+
+
+def atualizar_email_log(email_log, *, status, erro=""):
+    if not email_log:
+        return
+    try:
+        email_log.status = status
+        email_log.tentativas = (email_log.tentativas or 0) + 1
+        email_log.ultimo_erro = str(erro or "")[:4000]
+        if status == StatusEmailLog.ENVIADO:
+            email_log.enviado_em = timezone.now()
+        email_log.save(
+            update_fields=[
+                "status",
+                "tentativas",
+                "ultimo_erro",
+                "enviado_em",
+                "atualizado_em",
+            ]
+        )
+    except Exception:
+        logger.exception("Falha ao atualizar EmailLog id=%s.", getattr(email_log, "pk", None))
+
+
 def enviar_email_base(
     assunto,
     corpo,
@@ -162,6 +199,14 @@ def enviar_email_base(
     destinatarios = _unicos(destinatarios)
     anexos = list(anexos or [])
     nomes_anexos = [anexo[0] for anexo in anexos]
+    anexos_meta = _meta_anexos(anexos)
+    email_log = registrar_email_log_pendente(
+        assunto,
+        corpo,
+        destinatarios,
+        relatorio=relatorio,
+        tipo_email=tipo_email,
+    )
 
     if not destinatarios:
         erro = "Nenhum destinatário interno válido encontrado."
@@ -170,15 +215,18 @@ def enviar_email_base(
             tipo_email,
             getattr(relatorio, "pk", None),
         )
+        atualizar_email_log(email_log, status=StatusEmailLog.FALHA, erro=erro)
         _registrar_email(relatorio, tipo_email, destinatarios, nomes_anexos, erro=erro)
         raise EmailNotificacaoError(erro)
 
     try:
         logger.info(
-            "Iniciando envio de email interno %s do relatorio %s para %s destinatario(s).",
+            "email_envio_inicio tipo=%s relatorio=%s destinatarios=%s assunto=%s anexos=%s",
             tipo_email,
             getattr(relatorio, "pk", None),
-            len(destinatarios),
+            destinatarios,
+            assunto,
+            anexos_meta,
         )
         email = EmailMultiAlternatives(
             subject=assunto,
@@ -191,19 +239,28 @@ def enviar_email_base(
         enviados = email.send(fail_silently=False)
     except Exception as exc:
         logger.exception(
-            "Falha ao enviar email interno %s do relatorio %s.",
+            "email_envio_falha tipo=%s relatorio=%s destinatarios=%s assunto=%s anexos=%s erro=%s",
             tipo_email,
             getattr(relatorio, "pk", None),
+            destinatarios,
+            assunto,
+            anexos_meta,
+            exc,
         )
+        atualizar_email_log(email_log, status=StatusEmailLog.FALHA, erro=exc)
         _registrar_email(relatorio, tipo_email, destinatarios, nomes_anexos, erro=exc)
         raise EmailNotificacaoError(str(exc)) from exc
 
     logger.info(
-        "Email interno %s enviado para %s destinatario(s) no relatorio %s.",
+        "email_envio_sucesso tipo=%s relatorio=%s destinatarios=%s assunto=%s anexos=%s enviados=%s",
         tipo_email,
-        len(destinatarios),
         getattr(relatorio, "pk", None),
+        destinatarios,
+        assunto,
+        anexos_meta,
+        enviados,
     )
+    atualizar_email_log(email_log, status=StatusEmailLog.ENVIADO)
     _registrar_email(relatorio, tipo_email, destinatarios, nomes_anexos)
     return enviados
 
@@ -306,6 +363,19 @@ def notificar_relatorio_reenviado(relatorio):
         get_destinatarios_financeiro(),
         relatorio=relatorio,
         tipo_email="relatorio_reenviado",
+    )
+
+
+def reenviar_relatorio_financeiro_manual(relatorio):
+    return enviar_email_base(
+        f"Reenvio financeiro manual - relatorio #{relatorio.identificador}",
+        _corpo_base(
+            relatorio,
+            "Reenvio manual para a caixa central do financeiro. Verifique este relatorio conforme o fluxo operacional.",
+        ),
+        get_financeiro_recipients(),
+        relatorio=relatorio,
+        tipo_email="reenvio_financeiro_manual",
     )
 
 

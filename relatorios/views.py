@@ -812,7 +812,7 @@ def _anexos_visualizacao_relatorio(relatorio):
                 descricao=despesa.descricao,
                 nome=nome,
                 tipo_mime=tipo_mime,
-                preview_url=reverse("relatorios:despesa_comprovante_visualizar", kwargs={"pk": despesa.pk}),
+                preview_url=reverse("relatorios:despesa_comprovante_preview", kwargs={"pk": despesa.pk}),
                 download_url=reverse("relatorios:despesa_comprovante_baixar", kwargs={"pk": despesa.pk}),
             )
         )
@@ -825,7 +825,7 @@ def _anexos_visualizacao_relatorio(relatorio):
                 descricao=anexo.observacao or anexo.nome_original,
                 nome=nome,
                 tipo_mime=tipo_mime,
-                preview_url=reverse("relatorios:anexo_visualizar", kwargs={"pk": anexo.pk}),
+                preview_url=reverse("relatorios:anexo_preview", kwargs={"pk": anexo.pk}),
                 download_url=reverse("relatorios:anexo_baixar", kwargs={"pk": anexo.pk}),
             )
         )

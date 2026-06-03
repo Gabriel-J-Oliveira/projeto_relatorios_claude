@@ -13,6 +13,7 @@ from django.utils import timezone
 from .models import (
     Adiantamento,
     Cliente,
+    EmailLog,
     HistoricoRelatorio,
     ItemDespesa,
     PerfilUsuario,
@@ -1363,6 +1364,42 @@ class RelatorioTecnicoFlowTests(TestCase):
         self.assertIn("Histórico resumido", FakeHTML.rendered_html)
         self.assertIn("Relatório enviado para conferência", FakeHTML.rendered_html)
         self.assertIn("Gerado por financeiro", FakeHTML.rendered_html)
+
+
+class EmailServiceTests(TestCase):
+    @override_settings(FINANCEIRO_EMAIL="financeiro-central@controlsul.com.br")
+    def test_destinatarios_financeiro_usam_email_central(self):
+        usuario = get_user_model().objects.create_user(
+            username="financeiro.pessoal",
+            email="financeiro.pessoal@controlsul.com.br",
+            password="x",
+        )
+        grupo = Group.objects.get(name="Financeiro")
+        usuario.groups.add(grupo)
+
+        from relatorios.services.email_service import get_financeiro_recipients
+
+        self.assertEqual(get_financeiro_recipients(), ["financeiro-central@controlsul.com.br"])
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="sistema@controlsul.com.br",
+    )
+    def test_envio_base_registra_email_log_enviado(self):
+        from relatorios.services.email_service import enviar_email_base
+
+        enviados = enviar_email_base(
+            "Assunto teste",
+            "Corpo teste",
+            ["destino@controlsul.com.br"],
+            tipo_email="teste_unitario",
+        )
+
+        self.assertEqual(enviados, 1)
+        log = EmailLog.objects.get(tipo="teste_unitario")
+        self.assertEqual(log.status, "enviado")
+        self.assertEqual(log.tentativas, 1)
+        self.assertEqual(log.destinatarios, ["destino@controlsul.com.br"])
 
 
 class IdentidadeAdPreparacaoTests(TestCase):

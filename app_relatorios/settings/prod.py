@@ -42,7 +42,7 @@ SESSION_COOKIE_SECURE = config("SESSION_COOKIE_SECURE", default=False, cast=bool
 CSRF_COOKIE_SECURE = config("CSRF_COOKIE_SECURE", default=False, cast=bool)
 
 SECURE_CONTENT_TYPE_NOSNIFF = config("SECURE_CONTENT_TYPE_NOSNIFF", default=True, cast=bool)
-X_FRAME_OPTIONS = config("X_FRAME_OPTIONS", default="DENY")
+X_FRAME_OPTIONS = config("X_FRAME_OPTIONS", default="SAMEORIGIN")
 
 
 def _database_from_url(url):

@@ -17,6 +17,7 @@ from .models import (
     TrechoKm,
     Adiantamento,
     AnexoRelatorio,
+    EmailLog,
     PerfilUsuario,
     Setor,
     UsuarioSetorImportado,
@@ -234,6 +235,34 @@ class TrechoKmInline(admin.TabularInline):
 # ─────────────────────────────────────────────
 # RELATORIO TECNICO
 # ─────────────────────────────────────────────
+
+
+@admin.register(EmailLog)
+class EmailLogAdmin(admin.ModelAdmin):
+    list_display = [
+        "tipo",
+        "relatorio",
+        "status",
+        "tentativas",
+        "assunto",
+        "criado_em",
+        "enviado_em",
+    ]
+    list_filter = ["status", "tipo", "criado_em"]
+    search_fields = ["assunto", "relatorio__numero"]
+    readonly_fields = [
+        "tipo",
+        "relatorio",
+        "destinatarios",
+        "assunto",
+        "corpo",
+        "status",
+        "tentativas",
+        "ultimo_erro",
+        "criado_em",
+        "enviado_em",
+        "atualizado_em",
+    ]
 
 
 @admin.register(AnexoRelatorio)

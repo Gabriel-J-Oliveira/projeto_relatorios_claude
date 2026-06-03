@@ -370,7 +370,7 @@
                      class="btn btn-sm btn-outline-success rounded-circle px-2 py-1 anexo-preview-btn"
                      title="Visualizar comprovante"
                      aria-label="Visualizar comprovante"
-                     data-preview-url="{% url 'relatorios:despesa_comprovante_visualizar' d.pk %}"
+                     data-preview-url="{% url 'relatorios:despesa_comprovante_preview' d.pk %}"
                      data-download-url="{% url 'relatorios:despesa_comprovante_baixar' d.pk %}"
                      data-file-name="{{ d.comprovante.name|cut:'comprovantes/' }}"
                      data-file-type=""

@@ -107,6 +107,12 @@ class TipoEventoHistorico(models.TextChoices):
     EMAIL_FALHA = "email_falha", "Falha no envio de email"
 
 
+class StatusEmailLog(models.TextChoices):
+    PENDENTE = "pendente", "Pendente"
+    ENVIADO = "enviado", "Enviado"
+    FALHA = "falha", "Falha"
+
+
 class TipoLocalidade(models.TextChoices):
     CAPITAL = "capital", "Capital"
     INTERIOR = "interior", "Interior"
@@ -1399,6 +1405,44 @@ class HistoricoRelatorio(models.Model):
             TipoEventoHistorico.EMAIL_ENVIADO: "success",
             TipoEventoHistorico.EMAIL_FALHA: "danger",
         }.get(self.tipo_evento, "secondary")
+
+
+class EmailLog(models.Model):
+    tipo = models.CharField("Tipo", max_length=80, db_index=True)
+    relatorio = models.ForeignKey(
+        RelatorioTecnico,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="emails_log",
+    )
+    destinatarios = models.JSONField("Destinatários", default=list, blank=True)
+    assunto = models.CharField("Assunto", max_length=255)
+    corpo = models.TextField("Corpo", blank=True)
+    status = models.CharField(
+        "Status",
+        max_length=20,
+        choices=StatusEmailLog.choices,
+        default=StatusEmailLog.PENDENTE,
+        db_index=True,
+    )
+    tentativas = models.PositiveIntegerField("Tentativas", default=0)
+    ultimo_erro = models.TextField("Último erro", blank=True)
+    criado_em = models.DateTimeField("Criado em", auto_now_add=True)
+    enviado_em = models.DateTimeField("Enviado em", null=True, blank=True)
+    atualizado_em = models.DateTimeField("Atualizado em", auto_now=True)
+
+    class Meta:
+        verbose_name = "Log de e-mail"
+        verbose_name_plural = "Logs de e-mail"
+        ordering = ["-criado_em"]
+        indexes = [
+            models.Index(fields=["status", "tipo"]),
+            models.Index(fields=["relatorio", "tipo"]),
+        ]
+
+    def __str__(self):
+        return f"{self.tipo} - {self.get_status_display()}"
 
 
 def registrar_historico(relatorio, usuario, acao, descricao, dados_json=None):

@@ -47,20 +47,43 @@
     const type = String(fileType || "").toLowerCase();
     const ext = extFromName(fileName);
 
+    if (!url) {
+      const empty = document.createElement("div");
+      empty.className = "alert alert-warning mb-0";
+      empty.textContent = "Nao foi possivel localizar a URL de pre-visualizacao.";
+      body.appendChild(empty);
+      return;
+    }
+
     if (type === "application/pdf" || ext === ".pdf") {
+      const loading = document.createElement("div");
+      loading.className = "text-muted small mb-2";
+      loading.textContent = "Carregando PDF...";
       const iframe = document.createElement("iframe");
       iframe.src = url;
       iframe.className = "anexo-preview-frame";
       iframe.title = fileName || "Pré-visualização do PDF";
+      iframe.addEventListener("load", () => loading.remove(), { once: true });
+      body.appendChild(loading);
       body.appendChild(iframe);
       return;
     }
 
     if (type.startsWith("image/") || [".jpg", ".jpeg", ".png"].includes(ext)) {
+      const loading = document.createElement("div");
+      loading.className = "text-muted small mb-2";
+      loading.textContent = "Carregando imagem...";
       const img = document.createElement("img");
       img.src = url;
       img.alt = fileName || "Pré-visualização do anexo";
       img.className = "anexo-preview-image";
+      img.addEventListener("load", () => loading.remove(), { once: true });
+      img.addEventListener("error", () => {
+        loading.className = "alert alert-warning mb-0";
+        loading.textContent = "Nao foi possivel carregar a imagem. Use Abrir em nova aba ou Baixar.";
+        img.remove();
+      }, { once: true });
+      body.appendChild(loading);
       body.appendChild(img);
       return;
     }
@@ -91,6 +114,8 @@
     meta.textContent = fileType ? `${fileName} · ${fileType}` : fileName;
     download.href = downloadUrl;
     open.href = previewUrl;
+    open.classList.toggle("disabled", !previewUrl);
+    download.classList.toggle("disabled", !downloadUrl);
     renderPreview(body, previewUrl, fileType, fileName);
 
     bootstrap.Modal.getOrCreateInstance(modalEl).show();

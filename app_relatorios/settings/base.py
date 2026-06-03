@@ -154,6 +154,7 @@ DEFAULT_FROM_EMAIL = config(
     default=EMAIL_HOST_USER or "naoresponda@controlsul.com.br",
 )
 APP_BASE_URL = config("APP_BASE_URL", default="")
+FINANCEIRO_EMAIL = config("FINANCEIRO_EMAIL", default="financeiro@controlsul.com.br")
 EMAIL_DESTINATARIOS_FINALIZACAO_EXTRA = config(
     "EMAIL_DESTINATARIOS_FINALIZACAO_EXTRA",
     default="",
@@ -194,7 +195,7 @@ SESSION_COOKIE_HTTPONLY = config("SESSION_COOKIE_HTTPONLY", default=True, cast=b
 SESSION_COOKIE_SAMESITE = config("SESSION_COOKIE_SAMESITE", default="Lax")
 CSRF_COOKIE_SAMESITE = config("CSRF_COOKIE_SAMESITE", default="Lax")
 SECURE_CONTENT_TYPE_NOSNIFF = config("SECURE_CONTENT_TYPE_NOSNIFF", default=True, cast=bool)
-X_FRAME_OPTIONS = config("X_FRAME_OPTIONS", default="DENY")
+X_FRAME_OPTIONS = config("X_FRAME_OPTIONS", default="SAMEORIGIN")
 SECURE_REFERRER_POLICY = config("SECURE_REFERRER_POLICY", default="same-origin")
 SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", default=False, cast=bool)
 SECURE_HSTS_SECONDS = config("SECURE_HSTS_SECONDS", default=0, cast=int)
