@@ -1,0 +1,8 @@
+{% extends "emails/base_email.html" %}
+{% block content %}
+<div style="display:inline-block; background:{{ status_bg }}; color:{{ status_cor }}; font-size:12px; font-weight:700; padding:6px 10px; border-radius:999px; margin-bottom:14px;">{{ status_label }}</div>
+<h1 style="margin:0 0 10px; color:#111827; font-size:24px; line-height:1.25;">{{ titulo }}</h1>
+<p style="margin:0; color:#4b5563; font-size:15px; line-height:1.6;">{{ mensagem }}</p>
+{% include "emails/partials/resumo_relatorio.html" %}
+{% include "emails/partials/botao_acao.html" %}
+{% endblock %}

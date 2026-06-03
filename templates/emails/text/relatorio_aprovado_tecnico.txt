@@ -1,0 +1,15 @@
+{{ titulo }}
+
+{{ mensagem }}
+
+{% for linha in resumo_linhas %}{{ linha.label }}: {{ linha.value }}
+{% endfor %}
+{% if anexos_linhas %}Arquivos gerados:
+{% for item in anexos_linhas %}- {{ item }}
+{% endfor %}
+{% endif %}
+{% if action_url %}
+{{ action_label }}: {{ action_url }}
+{% endif %}
+
+Este é um e-mail automático enviado pelo Sistema de Relatórios de Viagem. Não responda esta mensagem.

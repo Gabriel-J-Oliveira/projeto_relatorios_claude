@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ email_title|default:"Sistema de Relatórios de Viagem" }}</title>
+  </head>
+  <body style="margin:0; padding:0; background:#f2f4f7; font-family:Arial, Helvetica, sans-serif; color:#1f2937;">
+    <div style="display:none; max-height:0; overflow:hidden; opacity:0;">{{ preheader|default:"Mensagem automática do sistema." }}</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f4f7; margin:0; padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:680px; background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 8px 24px rgba(15,23,42,.08);">
+            <tr>
+              <td style="background:#0f2f57; padding:24px 28px; color:#ffffff;">
+                <div style="font-size:22px; font-weight:700; line-height:1.2;">ControlSul</div>
+                <div style="font-size:13px; opacity:.9; margin-top:4px;">Sistema de Relatórios de Viagem</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 28px;">
+                <div style="height:6px; background:{{ status_cor|default:'#1f5fbf' }}; border-radius:0 0 8px 8px;"></div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px;">
+                {% block content %}{% endblock %}
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#f8fafc; padding:18px 28px; border-top:1px solid #e5e7eb; color:#6b7280; font-size:12px; line-height:1.5;">
+                Este é um e-mail automático enviado pelo Sistema de Relatórios de Viagem. Não responda esta mensagem.
+                <br>
+                © {{ ano_atual|default:"2026" }} ControlSul.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

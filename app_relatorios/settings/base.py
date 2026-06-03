@@ -154,6 +154,7 @@ DEFAULT_FROM_EMAIL = config(
     default=EMAIL_HOST_USER or "naoresponda@controlsul.com.br",
 )
 APP_BASE_URL = config("APP_BASE_URL", default="")
+SITE_URL = config("SITE_URL", default=APP_BASE_URL)
 FINANCEIRO_EMAIL = config("FINANCEIRO_EMAIL", default="financeiro@controlsul.com.br")
 EMAIL_DESTINATARIOS_FINALIZACAO_EXTRA = config(
     "EMAIL_DESTINATARIOS_FINALIZACAO_EXTRA",

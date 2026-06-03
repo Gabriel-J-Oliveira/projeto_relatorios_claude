@@ -5,8 +5,10 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
 from django.core.validators import validate_email
+from django.template.exceptions import TemplateDoesNotExist
 from django.template.loader import render_to_string
 from django.urls import reverse
+from django.utils.html import strip_tags
 from django.utils import timezone
 
 from relatorios.models import EmailLog, StatusEmailLog, TipoEventoHistorico
@@ -69,7 +71,11 @@ def _tecnicos_texto(relatorio):
 
 def _link_relatorio(relatorio):
     caminho = reverse("relatorios:relatorio_consulta", kwargs={"pk": relatorio.pk})
-    base_url = (getattr(settings, "APP_BASE_URL", "") or "").strip()
+    base_url = (
+        getattr(settings, "SITE_URL", "")
+        or getattr(settings, "APP_BASE_URL", "")
+        or ""
+    ).strip()
     if not base_url:
         return caminho
     return urljoin(base_url.rstrip("/") + "/", caminho.lstrip("/"))
@@ -195,6 +201,7 @@ def enviar_email_base(
     relatorio=None,
     tipo_email="notificacao",
     anexos=None,
+    html_corpo=None,
 ):
     destinatarios = _unicos(destinatarios)
     anexos = list(anexos or [])
@@ -234,6 +241,8 @@ def enviar_email_base(
             from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
             to=destinatarios,
         )
+        if html_corpo:
+            email.attach_alternative(html_corpo, "text/html")
         for nome, conteudo, mimetype in anexos:
             email.attach(nome, conteudo, mimetype)
         enviados = email.send(fail_silently=False)
@@ -343,6 +352,101 @@ def _corpo_base(relatorio, mensagem):
             "",
             "Mensagem automática do sistema de relatórios.",
         ]
+    )
+
+
+def _resumo_relatorio_linhas(relatorio, *, incluir_aprovado=False):
+    linhas = [
+        {"label": "Nº do relatório", "value": f"#{relatorio.identificador}"},
+        {"label": "Técnico responsável", "value": _tecnicos_texto(relatorio)},
+        {"label": "Período", "value": f"{_formatar_data(relatorio.data_inicio)} a {_formatar_data(relatorio.data_fim)}"},
+        {"label": "Cliente(s)", "value": _clientes_texto(relatorio)},
+        {"label": "Tipo de reembolso", "value": getattr(relatorio, "get_tipo_reembolso_display", lambda: "Não informado")()},
+        {"label": "Status", "value": relatorio.get_status_display()},
+        {"label": "Valor solicitado", "value": _formatar_moeda(getattr(relatorio, "total_solicitado", 0))},
+    ]
+    if incluir_aprovado:
+        linhas.append({"label": "Valor aprovado", "value": _formatar_moeda(getattr(relatorio, "total_aprovado", 0))})
+    linhas.append({"label": "Data/hora", "value": timezone.localtime(timezone.now()).strftime("%d/%m/%Y %H:%M")})
+    return linhas
+
+
+def _contexto_email_relatorio(
+    relatorio,
+    *,
+    titulo,
+    mensagem,
+    status_label,
+    status_cor,
+    status_bg,
+    action_label,
+    motivo="",
+    incluir_aprovado=False,
+    anexos_linhas=None,
+):
+    return {
+        "email_title": titulo,
+        "preheader": mensagem,
+        "titulo": titulo,
+        "mensagem": mensagem,
+        "status_label": status_label,
+        "status_cor": status_cor,
+        "status_bg": status_bg,
+        "resumo_linhas": _resumo_relatorio_linhas(relatorio, incluir_aprovado=incluir_aprovado),
+        "action_url": _link_relatorio(relatorio),
+        "action_label": action_label,
+        "motivo": motivo,
+        "anexos_linhas": list(anexos_linhas or []),
+        "ano_atual": timezone.localtime(timezone.now()).year,
+    }
+
+
+def render_email_template(template_name, context, text_template_name=None):
+    html_template = template_name if template_name.endswith(".html") else f"{template_name}.html"
+    html = render_to_string(html_template, context)
+    text = ""
+    if text_template_name:
+        try:
+            text = render_to_string(text_template_name, context)
+        except TemplateDoesNotExist:
+            text = ""
+    if not text:
+        candidato = html_template.replace("emails/", "emails/text/").replace(".html", ".txt")
+        try:
+            text = render_to_string(candidato, context)
+        except TemplateDoesNotExist:
+            text = strip_tags(html)
+    return text.strip(), html
+
+
+def send_templated_email(
+    subject,
+    to,
+    template_html,
+    template_text,
+    context,
+    *,
+    attachments=None,
+    relatorio=None,
+    tipo_email="notificacao",
+):
+    corpo_texto, corpo_html = render_email_template(template_html, context, template_text)
+    logger.info(
+        "email_template_renderizado tipo=%s relatorio=%s template=%s destinatarios=%s assunto=%s",
+        tipo_email,
+        getattr(relatorio, "pk", None),
+        template_html,
+        _unicos(to),
+        subject,
+    )
+    return enviar_email_base(
+        subject,
+        corpo_texto,
+        to,
+        relatorio=relatorio,
+        tipo_email=tipo_email,
+        anexos=attachments,
+        html_corpo=corpo_html,
     )
 
 
@@ -500,6 +604,220 @@ def enviar_documentos_relatorio_finalizado(relatorio):
         relatorio.pk,
         len(gerados),
     )
+    return enviados
+
+
+def notificar_relatorio_aprovado(relatorio):
+    return enviar_documentos_relatorio_finalizado(relatorio)
+
+
+def enviar_report_suporte(usuario, tipo, assunto, descricao, pagina_atual="", request=None):
+    tipo_label = {"problema": "Problema", "sugestao": "Sugestão"}.get(tipo, tipo)
+    assunto_limpo = _limpar_assunto_email(assunto)[:150]
+    user_agent = request.META.get("HTTP_USER_AGENT", "")[:500] if request else ""
+    ip = ""
+    if request:
+        forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
+        ip = (forwarded.split(",")[0] if forwarded else request.META.get("REMOTE_ADDR", ""))[:80]
+    usuario_nome = (usuario.get_full_name() or usuario.username) if usuario else "Não informado"
+    agora = timezone.localtime(timezone.now()).strftime("%d/%m/%Y %H:%M:%S")
+    contexto = {
+        "email_title": f"Reporte de suporte - {tipo_label}",
+        "preheader": "Um usuário enviou um reporte pelo sistema.",
+        "titulo": f"Reporte de suporte - {tipo_label}",
+        "mensagem": "Um usuário enviou um problema ou sugestão pelo sistema de relatórios.",
+        "status_label": tipo_label,
+        "status_cor": "#1f5fbf",
+        "status_bg": "#e8f0ff",
+        "action_url": pagina_atual or "",
+        "action_label": "Abrir página informada",
+        "motivo": str(descricao or "").strip(),
+        "ano_atual": timezone.localtime(timezone.now()).year,
+        "resumo_linhas": [
+            {"label": "Tipo", "value": tipo_label},
+            {"label": "Assunto", "value": assunto_limpo},
+            {"label": "Usuário", "value": usuario_nome},
+            {"label": "Username", "value": getattr(usuario, "username", "") or "Não informado"},
+            {"label": "E-mail", "value": getattr(usuario, "email", "") or "Não informado"},
+            {"label": "User ID", "value": getattr(usuario, "pk", "") or "Não informado"},
+            {"label": "Página", "value": pagina_atual or "Não informada"},
+            {"label": "Data/hora", "value": agora},
+            {"label": "Path", "value": request.path if request else "Não informado"},
+            {"label": "IP", "value": ip or "Não informado"},
+            {"label": "User agent", "value": user_agent or "Não informado"},
+        ],
+    }
+    logger.info(
+        "Enviando report de suporte tipo=%s usuario=%s assunto=%s pagina=%s",
+        tipo,
+        getattr(usuario, "pk", None),
+        assunto_limpo,
+        pagina_atual,
+    )
+    enviados = send_templated_email(
+        f"[Sistema de Reembolso] [{tipo_label}] {assunto_limpo}",
+        ["infrati@controlsul.com.br"],
+        "emails/teste_email.html",
+        None,
+        contexto,
+        tipo_email="suporte_report",
+    )
+    logger.info(
+        "Report de suporte enviado tipo=%s usuario=%s assunto=%s",
+        tipo,
+        getattr(usuario, "pk", None),
+        assunto_limpo,
+    )
+    return enviados
+
+
+# Versoes HTML finais. Mantidas ao fim do modulo para substituir os envios
+# legados sem alterar regras de destinatario ou workflow.
+def notificar_relatorio_enviado(relatorio):
+    contexto = _contexto_email_relatorio(
+        relatorio,
+        titulo="Novo relatório enviado para conferência",
+        mensagem="Há um relatório aguardando análise financeira.",
+        status_label="Conferência pendente",
+        status_cor="#1f5fbf",
+        status_bg="#e8f0ff",
+        action_label="Abrir conferência",
+    )
+    return send_templated_email(
+        f"Relatório enviado para conferência — #{relatorio.identificador}",
+        get_destinatarios_financeiro(),
+        "emails/relatorio_enviado_financeiro.html",
+        "emails/text/relatorio_enviado_financeiro.txt",
+        contexto,
+        relatorio=relatorio,
+        tipo_email="relatorio_enviado",
+    )
+
+
+def notificar_relatorio_reenviado(relatorio):
+    contexto = _contexto_email_relatorio(
+        relatorio,
+        titulo="Relatório reenviado para conferência",
+        mensagem="Um relatório em ajuste foi reenviado para análise financeira.",
+        status_label="Conferência pendente",
+        status_cor="#1f5fbf",
+        status_bg="#e8f0ff",
+        action_label="Abrir conferência",
+    )
+    return send_templated_email(
+        f"Relatório reenviado para conferência — #{relatorio.identificador}",
+        get_destinatarios_financeiro(),
+        "emails/relatorio_enviado_financeiro.html",
+        "emails/text/relatorio_enviado_financeiro.txt",
+        contexto,
+        relatorio=relatorio,
+        tipo_email="relatorio_reenviado",
+    )
+
+
+def reenviar_relatorio_financeiro_manual(relatorio):
+    contexto = _contexto_email_relatorio(
+        relatorio,
+        titulo="Reenvio financeiro manual",
+        mensagem="Reenvio manual para a caixa central do financeiro. Verifique este relatório conforme o fluxo operacional.",
+        status_label="Reenvio manual",
+        status_cor="#1f5fbf",
+        status_bg="#e8f0ff",
+        action_label="Abrir conferência",
+    )
+    return send_templated_email(
+        f"Reenvio financeiro manual - relatorio #{relatorio.identificador}",
+        get_financeiro_recipients(),
+        "emails/relatorio_enviado_financeiro.html",
+        "emails/text/relatorio_enviado_financeiro.txt",
+        contexto,
+        relatorio=relatorio,
+        tipo_email="reenvio_financeiro_manual",
+    )
+
+
+def notificar_ajuste_solicitado(relatorio):
+    motivo = (relatorio.motivo_rejeicao or "").strip()
+    contexto = _contexto_email_relatorio(
+        relatorio,
+        titulo="Relatório devolvido para ajuste",
+        mensagem="O financeiro solicitou correções antes de concluir a análise.",
+        status_label="Ajuste pendente",
+        status_cor="#9a5b00",
+        status_bg="#fff4db",
+        action_label="Corrigir relatório",
+        motivo=motivo,
+    )
+    return send_templated_email(
+        f"Ajuste solicitado no relatório — #{relatorio.identificador}",
+        get_destinatarios_tecnicos(relatorio),
+        "emails/relatorio_ajuste_tecnico.html",
+        "emails/text/relatorio_ajuste_tecnico.txt",
+        contexto,
+        relatorio=relatorio,
+        tipo_email="ajuste_solicitado",
+    )
+
+
+def notificar_relatorio_rejeitado(relatorio):
+    motivo = (relatorio.motivo_rejeicao or "").strip()
+    contexto = _contexto_email_relatorio(
+        relatorio,
+        titulo="Relatório rejeitado",
+        mensagem="O relatório foi rejeitado definitivamente após a conferência.",
+        status_label="Rejeitado",
+        status_cor="#a61b1b",
+        status_bg="#ffe8e8",
+        action_label="Consultar relatório",
+        motivo=motivo,
+        incluir_aprovado=True,
+    )
+    return send_templated_email(
+        f"Relatório rejeitado — #{relatorio.identificador}",
+        get_destinatarios_tecnicos(relatorio),
+        "emails/relatorio_rejeitado_tecnico.html",
+        "emails/text/relatorio_rejeitado_tecnico.txt",
+        contexto,
+        relatorio=relatorio,
+        tipo_email="relatorio_rejeitado",
+    )
+
+
+def enviar_documentos_relatorio_finalizado(relatorio):
+    logger.info("Gerando anexos de finalizacao do relatorio %s.", relatorio.pk)
+    pdf_interno = _gerar_pdf_interno(relatorio)
+    zip_clientes, gerados, ignorados = gerar_zip_pdfs_clientes(relatorio)
+    anexos = [
+        (f"relatorio-interno-{relatorio.numero}.pdf", pdf_interno, "application/pdf"),
+        (f"relatorio-{relatorio.numero}-clientes.zip", zip_clientes, "application/zip"),
+    ]
+    contexto = _contexto_email_relatorio(
+        relatorio,
+        titulo="Relatório aprovado",
+        mensagem="O relatório foi aprovado e os documentos oficiais foram gerados.",
+        status_label="Aprovado",
+        status_cor="#17663a",
+        status_bg="#e7f7ee",
+        action_label="Consultar relatório",
+        incluir_aprovado=True,
+        anexos_linhas=[
+            "Relatório financeiro interno",
+            "Pacote ZIP com PDFs individuais dos clientes",
+        ],
+    )
+    enviados = send_templated_email(
+        f"Relatório finalizado — documentos gerados #{relatorio.identificador}",
+        get_destinatarios_internos_finalizacao(relatorio),
+        "emails/relatorio_finalizado_financeiro.html",
+        "emails/text/relatorio_aprovado_tecnico.txt",
+        contexto,
+        relatorio=relatorio,
+        tipo_email="relatorio_finalizado_documentos",
+        attachments=anexos,
+    )
+    if ignorados:
+        logger.info("PDFs de clientes ignorados no email do relatorio %s: %s", relatorio.pk, ignorados)
+    logger.info("Email de finalizacao do relatorio %s anexou %s PDF(s) de cliente no ZIP.", relatorio.pk, len(gerados))
     return enviados
 
 

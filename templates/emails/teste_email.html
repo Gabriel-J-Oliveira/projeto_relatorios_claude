@@ -1,0 +1,13 @@
+{% extends "emails/base_email.html" %}
+{% block content %}
+<div style="display:inline-block; background:{{ status_bg|default:'#e8f0ff' }}; color:{{ status_cor|default:'#1f5fbf' }}; font-size:12px; font-weight:700; padding:6px 10px; border-radius:999px; margin-bottom:14px;">Teste visual</div>
+<h1 style="margin:0 0 10px; color:#111827; font-size:24px; line-height:1.25;">{{ titulo|default:"Teste de template de e-mail" }}</h1>
+<p style="margin:0; color:#4b5563; font-size:15px; line-height:1.6;">{{ mensagem|default:"Este e-mail valida o padrão visual dos comunicados do sistema." }}</p>
+{% if motivo %}
+<div style="margin-top:18px; border-left:4px solid #1f5fbf; background:#f0f6ff; padding:14px 16px; color:#1e3a5f; font-size:14px; line-height:1.55;">
+  <strong>Descrição:</strong><br>{{ motivo|linebreaksbr }}
+</div>
+{% endif %}
+{% include "emails/partials/resumo_relatorio.html" %}
+{% include "emails/partials/botao_acao.html" %}
+{% endblock %}

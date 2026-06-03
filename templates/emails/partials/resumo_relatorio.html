@@ -1,0 +1,12 @@
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin:18px 0 0; border:1px solid #e5e7eb; border-radius:10px; overflow:hidden;">
+  <tr>
+    <th align="left" style="background:#0f2f57; color:#ffffff; padding:11px 14px; font-size:13px;">Informação</th>
+    <th align="left" style="background:#0f2f57; color:#ffffff; padding:11px 14px; font-size:13px;">Valor</th>
+  </tr>
+  {% for linha in resumo_linhas %}
+  <tr>
+    <td style="padding:11px 14px; border-top:1px solid #e5e7eb; color:#4b5563; font-size:13px; width:38%;">{{ linha.label }}</td>
+    <td style="padding:11px 14px; border-top:1px solid #e5e7eb; color:#111827; font-size:13px; font-weight:600;">{{ linha.value }}</td>
+  </tr>
+  {% endfor %}
+</table>
