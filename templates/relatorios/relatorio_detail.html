@@ -1695,6 +1695,7 @@
       const formFinanceiro = document.getElementById("form-valores-aprovados-financeiro");
       let totalDespesas = 0;
       let totalKm = 0;
+      let encontrouCampoKm = false;
 
       document.querySelectorAll(".campo-aprovado-despesa").forEach(function (input) {
         const original = parseMoney(input.dataset.valorOriginal);
@@ -1712,6 +1713,7 @@
       });
 
       document.querySelectorAll(".campo-aprovado-km").forEach(function (input) {
+        encontrouCampoKm = true;
         if (input.dataset.multiCliente === "1") {
           const valorFinalMulti = parseMoney(input.dataset.valorFinalOriginal);
           totalKm += valorFinalMulti;
@@ -1731,6 +1733,9 @@
         const destino = detalheId ? document.querySelector(`#${detalheId} .total-aprovado-km-linha`) : null;
         if (destino) destino.textContent = formatMoney(valorFinal);
       });
+      if (!encontrouCampoKm) {
+        totalKm = parseMoney(document.getElementById("total-aprovado-km")?.textContent);
+      }
 
       const totalAprovado = Math.round((totalDespesas + totalKm) * 100) / 100;
       const totalSolicitado = parseMoney(formFinanceiro?.dataset.totalSolicitado);
