@@ -67,6 +67,7 @@
       <div class="summary-card"><span>Pago pelo técnico</span><strong>R$ {{ pdf.total_pago_tecnico|floatformat:2 }}</strong></div>
       <div class="summary-card"><span>Pago pela empresa</span><strong>R$ {{ pdf.total_pago_empresa|floatformat:2 }}</strong></div>
       <div class="summary-card"><span>KM a cobrar cliente</span><strong>R$ {{ pdf.total_km_cobrar_cliente|floatformat:2 }}</strong></div>
+      <div class="summary-card"><span>Removido do reembolso</span><strong>R$ {{ pdf.totais.valor_removido_reembolso|floatformat:2 }}</strong></div>
       <div class="summary-card"><span>Adiantamento</span><strong>R$ {{ pdf.totais.valor_adiantamento|floatformat:2 }}</strong></div>
       <div class="summary-card balance"><span>Ressarcir técnico</span><strong>R$ {{ pdf.total_reembolso_tecnico|floatformat:2 }}</strong></div>
     </div>

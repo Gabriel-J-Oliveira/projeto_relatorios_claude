@@ -122,8 +122,11 @@ def _totais_snapshot(payload):
         total_solicitado=_money(totais.get("total_solicitado")),
         total_aprovado=_money(totais.get("total_aprovado")),
         diferenca_removida=_money(totais.get("diferenca_removida")),
+        valor_removido_reembolso=_money(
+            totais.get("valor_removido_reembolso") or totais.get("diferenca_removida")
+        ),
         valor_adiantamento=_money(totais.get("valor_adiantamento")),
-        saldo_aprovado=_money(totais.get("saldo_aprovado")),
+        saldo_aprovado=_money(totais.get("total_a_reembolsar") or totais.get("saldo_aprovado")),
     )
 
 
@@ -371,8 +374,9 @@ def _totais_vivos(relatorio):
         total_solicitado=relatorio.total_solicitado,
         total_aprovado=relatorio.total_aprovado,
         diferenca_removida=relatorio.diferenca_removida,
+        valor_removido_reembolso=relatorio.valor_removido_reembolso,
         valor_adiantamento=relatorio.valor_adiantamento,
-        saldo_aprovado=relatorio.saldo_aprovado,
+        saldo_aprovado=relatorio.total_a_reembolsar,
     )
 
 

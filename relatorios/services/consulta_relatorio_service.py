@@ -521,6 +521,26 @@ def _montar_consulta_snapshot(snapshot):
             total_solicitado=_decimal(totais.get("total_solicitado")),
             total_aprovado=_decimal(totais.get("total_aprovado")),
             diferenca_removida=_decimal(totais.get("diferenca_removida")),
+            total_despesas_reembolsaveis=_decimal(
+                totais.get("total_despesas_reembolsaveis")
+                or totais.get("total_despesas_tecnico")
+            ),
+            valor_km_ressarcir=_decimal(
+                totais.get("valor_km_ressarcir")
+                or totais.get("total_km_reembolso_tecnico")
+            ),
+            valor_km_cobrar_cliente=_decimal(
+                totais.get("valor_km_cobrar_cliente")
+                or totais.get("total_km")
+            ),
+            valor_removido_reembolso=_decimal(
+                totais.get("valor_removido_reembolso")
+                or totais.get("diferenca_removida")
+            ),
+            total_a_reembolsar=_decimal(
+                totais.get("total_a_reembolsar")
+                or totais.get("saldo_aprovado")
+            ),
             total_km_percorrido=Decimal(str(totais.get("total_km_percorrido") or "0.00")),
             valor_adiantamento=_decimal(totais.get("valor_adiantamento")),
             saldo_aprovado=_decimal(totais.get("saldo_aprovado")),
@@ -844,6 +864,11 @@ def _montar_consulta_viva(relatorio):
             total_solicitado=relatorio.total_solicitado,
             total_aprovado=relatorio.total_aprovado,
             diferenca_removida=relatorio.diferenca_removida,
+            total_despesas_reembolsaveis=relatorio.total_despesas_reembolsaveis,
+            valor_km_ressarcir=relatorio.valor_km_ressarcir,
+            valor_km_cobrar_cliente=relatorio.valor_km_cobrar_cliente,
+            valor_removido_reembolso=relatorio.valor_removido_reembolso,
+            total_a_reembolsar=relatorio.total_a_reembolsar,
             total_km_percorrido=relatorio.total_km_percorrido,
             valor_adiantamento=relatorio.valor_adiantamento,
             saldo_aprovado=relatorio.saldo_aprovado,

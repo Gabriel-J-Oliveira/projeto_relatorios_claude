@@ -102,38 +102,38 @@
 <section class="row g-3 mb-4">
   <div class="col-12 col-sm-6 col-xl-2">
     <div class="consulta-kpi">
-      <span>Total solicitado</span>
-      <strong>R$ {{ consulta.totais.total_solicitado|floatformat:2 }}</strong>
+      <span>Despesas reembolsaveis</span>
+      <strong>R$ {{ consulta.totais.total_despesas_reembolsaveis|floatformat:2 }}</strong>
     </div>
   </div>
   <div class="col-12 col-sm-6 col-xl-2">
     <div class="consulta-kpi success">
-      <span>Total aprovado</span>
-      <strong>R$ {{ consulta.totais.total_aprovado|floatformat:2 }}</strong>
+      <span>KM a ressarcir</span>
+      <strong>R$ {{ consulta.totais.valor_km_ressarcir|floatformat:2 }}</strong>
     </div>
   </div>
   <div class="col-12 col-sm-6 col-xl-2">
     <div class="consulta-kpi warning">
-      <span>Diferença removida</span>
-      <strong>R$ {{ consulta.totais.diferenca_removida|floatformat:2 }}</strong>
+      <span>KM a cobrar cliente</span>
+      <strong>R$ {{ consulta.totais.valor_km_cobrar_cliente|floatformat:2 }}</strong>
+    </div>
+  </div>
+  <div class="col-12 col-sm-6 col-xl-2">
+    <div class="consulta-kpi">
+      <span>Valor removido</span>
+      <strong>R$ {{ consulta.totais.valor_removido_reembolso|floatformat:2 }}</strong>
+    </div>
+  </div>
+  <div class="col-12 col-sm-6 col-xl-2">
+    <div class="consulta-kpi success">
+      <span>Total a reembolsar</span>
+      <strong>R$ {{ consulta.totais.total_a_reembolsar|floatformat:2 }}</strong>
     </div>
   </div>
   <div class="col-12 col-sm-6 col-xl-2">
     <div class="consulta-kpi">
       <span>KM total</span>
       <strong>{{ consulta.totais.total_km_percorrido|floatformat:2 }} km</strong>
-    </div>
-  </div>
-  <div class="col-12 col-sm-6 col-xl-2">
-    <div class="consulta-kpi">
-      <span>Despesas</span>
-      <strong>{{ consulta.contagens.despesas }}</strong>
-    </div>
-  </div>
-  <div class="col-12 col-sm-6 col-xl-2">
-    <div class="consulta-kpi">
-      <span>Trechos KM</span>
-      <strong>{{ consulta.contagens.trechos_km }}</strong>
     </div>
   </div>
 </section>

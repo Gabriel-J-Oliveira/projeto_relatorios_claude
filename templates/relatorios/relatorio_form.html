@@ -594,6 +594,10 @@
                           <span class="fw-semibold small">R$ <span id="res-total-geral">0,00</span></span>
                         </div>
                         <div class="d-flex justify-content-between py-2 border-bottom border-secondary-subtle">
+                          <span class="text-muted small">KM a cobrar cliente</span>
+                          <span class="fw-semibold small">R$ <span id="res-km-cobranca">0,00</span></span>
+                        </div>
+                        <div class="d-flex justify-content-between py-2 border-bottom border-secondary-subtle">
                           <span class="text-muted small">(-) Adiantamento Recebido</span>
                           <span class="fw-semibold small text-danger">R$ <span id="res-adiantamento">0,00</span></span>
                         </div>
@@ -2703,6 +2707,7 @@ async function adicionarLinhaKm() {
     setText("res-subtotal-tec", (totalTec + totalKmReembolso).toFixed(2).replace(".", ","));
     setText("res-subtotal-emp", totalEmp.toFixed(2).replace(".", ","));
     setText("res-total-geral", totalGeral.toFixed(2).replace(".", ","));
+    setText("res-km-cobranca", totalKmCobranca.toFixed(2).replace(".", ","));
     setText("res-adiantamento", adiant.toFixed(2).replace(".", ","));
 
     const saldoFmt = (saldo < 0 ? "-R$ " : "R$ ") + Math.abs(saldo).toFixed(2).replace(".", ",");

@@ -192,7 +192,8 @@
       id="form-valores-aprovados-financeiro"
       data-save-url="{% url 'relatorios:relatorio_valores_financeiros' relatorio.pk %}"
       data-total-solicitado="{{ relatorio.total_solicitado|unlocalize }}"
-      data-adiantamento="{{ relatorio.valor_adiantamento|unlocalize }}">
+      data-adiantamento="{{ relatorio.valor_adiantamento|unlocalize }}"
+      data-tipo-reembolso="{{ relatorio.tipo_reembolso }}">
   {% csrf_token %}
   <div id="feedback-valores-financeiros"
        class="alert alert-danger border-0 shadow-sm small d-none"
@@ -351,6 +352,7 @@
                          class="form-control form-control-sm campo-aprovado-despesa campo-moeda"
                          data-tour="detail-despesa-valor-aprovado"
                          data-valor-original="{{ d.valor }}"
+                         data-quem-pagou="{{ d.quem_pagou }}"
                          data-status-financeiro="{% if d.rejeitado %}rejeitado{% else %}{{ d.status_financeiro }}{% endif %}"
                          {% if not superadmin_django %}{% if not pode_atuar_financeiro or relatorio.status == 'aprovado' or relatorio.status == 'rejeitado' or d.rejeitado or d.status_financeiro == 'rejeitado' %}disabled{% endif %}{% endif %}>
                   <div class="small text-muted mt-1">Final: <span class="total-aprovado-despesa-linha">R$ {{ d.valor_final|floatformat:2 }}</span></div>
@@ -802,71 +804,78 @@
       </div>
       <div class="card-body">
 
-        <div class="d-flex flex-column gap-2 small">
-          <div class="d-flex justify-content-between py-1 border-bottom">
-            <span class="text-muted">Despesas (técnico)</span>
-            <span class="fw-semibold">R$ {{ relatorio.total_despesas_tecnico|floatformat:2 }}</span>
+        <div class="d-flex flex-column gap-3 small">
+          <div>
+            <div class="fw-bold text-uppercase text-muted mb-2" style="font-size: .7rem;">Reembolso ao tecnico</div>
+            <div class="d-flex justify-content-between py-1 border-bottom">
+              <span class="text-muted">Despesas reembolsaveis</span>
+              <span class="fw-semibold" id="despesas-reembolsaveis-financeiro">R$ {{ relatorio.total_despesas_reembolsaveis|floatformat:2 }}</span>
+            </div>
+            <div class="d-flex justify-content-between py-1 border-bottom">
+              <span class="text-muted">Valor do KM a ser ressarcido</span>
+              <span class="fw-semibold" id="km-ressarcir-financeiro">R$ {{ relatorio.valor_km_ressarcir|floatformat:2 }}</span>
+            </div>
+            <div class="d-flex justify-content-between py-1 border-bottom">
+              <span class="text-muted">(-) Adiantamento</span>
+              <span class="fw-semibold text-danger" id="adiantamento-financeiro">R$ {{ relatorio.valor_adiantamento|floatformat:2 }}</span>
+            </div>
+            <div class="d-flex justify-content-between pt-2">
+              <span class="fw-bold">Total a reembolsar</span>
+              <span class="fw-bold text-success" id="saldo-aprovado-financeiro">R$ {{ relatorio.total_a_reembolsar|floatformat:2 }}</span>
+            </div>
           </div>
-          <div class="d-flex justify-content-between py-1 border-bottom">
-            <span class="text-muted">Despesas (empresa)</span>
-            <span class="fw-semibold">R$ {{ relatorio.total_despesas_empresa|floatformat:2 }}</span>
+
+          <div>
+            <div class="fw-bold text-uppercase text-muted mb-2" style="font-size: .7rem;">Cobranca ao cliente</div>
+            <div class="d-flex justify-content-between py-1 border-bottom">
+              <span class="text-muted">Valor do KM a ser cobrado do cliente</span>
+              <span class="fw-semibold" id="km-cobranca-clientes-financeiro">R$ {{ relatorio.valor_km_cobrar_cliente|floatformat:2 }}</span>
+            </div>
           </div>
-          <div class="d-flex justify-content-between py-1 border-bottom">
-            <span class="text-muted">Deslocamento (KM reembolso)</span>
-            <span class="fw-semibold" id="km-reembolso-solicitado-financeiro">R$ {{ relatorio.total_km_reembolso_tecnico_solicitado|floatformat:2 }}</span>
-          </div>
-          <div class="d-flex justify-content-between py-1 border-bottom">
-            <span class="text-muted">Cobranca clientes KM</span>
-            <span class="fw-semibold" id="km-cobranca-clientes-financeiro">R$ {{ relatorio.total_km|floatformat:2 }}</span>
-          </div>
-          <div class="d-flex justify-content-between py-1 border-bottom {% if relatorio.total_km_excesso_reducao_clientes > 0 %}text-success{% elif relatorio.total_km_excesso_reducao_clientes < 0 %}text-danger{% endif %}">
-            <span class="text-muted">Diferenca cobranca x reembolso</span>
-            <span class="fw-semibold" id="km-diferenca-cobranca-financeiro">R$ {{ relatorio.total_km_excesso_reducao_clientes|floatformat:2 }}</span>
-          </div>
-          <div class="d-flex justify-content-between py-1 border-bottom">
-            <span class="fw-medium">Total Solicitado</span>
-            <span class="fw-bold">R$ {{ relatorio.total_solicitado|floatformat:2 }}</span>
-          </div>
-          <div class="d-flex justify-content-between py-1 border-bottom">
-            <span class="fw-medium">Total Aprovado</span>
-            <span class="fw-bold text-success" id="total-aprovado-financeiro">R$ {{ relatorio.total_aprovado|floatformat:2 }}</span>
-          </div>
-          <div class="d-flex justify-content-between py-1 border-bottom {% if relatorio.diferenca_removida > 0 %}text-danger{% endif %}">
-            <span class="fw-medium">Diferença removida</span>
-            <span class="fw-bold" id="diferenca-removida-financeiro">R$ {{ relatorio.diferenca_removida|floatformat:2 }}</span>
-          </div>
-          <div class="d-flex justify-content-between py-1 border-bottom">
-            <span class="text-muted">(-) Adiantamento</span>
-            <span class="fw-semibold text-danger">
-              R$ {{ relatorio.valor_adiantamento|floatformat:2 }}
-            </span>
+
+          <div>
+            <div class="fw-bold text-uppercase text-muted mb-2" style="font-size: .7rem;">Ajustes da conferencia</div>
+            <div class="d-flex justify-content-between py-1 border-bottom {% if relatorio.valor_removido_reembolso > 0 %}text-danger{% endif %}">
+              <span class="text-muted">Valor removido do reembolso</span>
+              <span class="fw-bold" id="valor-removido-reembolso-financeiro">R$ {{ relatorio.valor_removido_reembolso|floatformat:2 }}</span>
+            </div>
           </div>
         </div>
 
-        {% if relatorio.diferenca_removida > 0 %}
+        {% if relatorio.tipo_reembolso == 'nao_reembolsavel' %}
+        <div class="alert alert-secondary border-0 shadow-sm mt-3 mb-0 py-2 small">
+          <i class="bi bi-info-circle me-1"></i>
+          Este relatorio foi marcado como nao reembolsavel.
+        </div>
+        {% endif %}
+
+        {% if relatorio.valor_removido_reembolso > 0 %}
         <div class="alert alert-warning border-0 shadow-sm mt-3 mb-0 py-2 small">
           <i class="bi bi-exclamation-triangle-fill me-1"></i>
-          Há valores removidos ou ajustados no total aprovado.
+          Ha itens removidos do reembolso na conferencia.
         </div>
         {% endif %}
 
         <div class="mt-3 p-3 rounded-3
-             {% if relatorio.saldo_aprovado >= 0 %}bg-success-subtle{% else %}bg-danger-subtle{% endif %}">
+             {% if relatorio.total_a_reembolsar >= 0 %}bg-success-subtle{% else %}bg-danger-subtle{% endif %}">
           <div class="d-flex justify-content-between align-items-center">
-            <span class="fw-bold">Saldo aprovado a reembolsar</span>
-            <span id="saldo-aprovado-financeiro"
+            <span class="fw-bold">Total a reembolsar</span>
+            <span id="total-a-reembolsar-destaque"
                   class="fw-bold fs-5
-                  {% if relatorio.saldo_aprovado >= 0 %}text-success{% else %}text-danger{% endif %}">
-              R$ {{ relatorio.saldo_aprovado|floatformat:2 }}
+                  {% if relatorio.total_a_reembolsar >= 0 %}text-success{% else %}text-danger{% endif %}">
+              R$ {{ relatorio.total_a_reembolsar|floatformat:2 }}
             </span>
           </div>
           <div class="small mt-1
-               {% if relatorio.saldo_aprovado >= 0 %}text-success{% else %}text-danger{% endif %}">
-            {% if relatorio.saldo_aprovado > 0 %}
+               {% if relatorio.total_a_reembolsar >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {% if relatorio.tipo_reembolso == 'nao_reembolsavel' %}
+            <i class="bi bi-info-circle me-1"></i>
+            Relatorio nao reembolsavel.
+            {% elif relatorio.total_a_reembolsar > 0 %}
             <i class="bi bi-arrow-left-circle me-1"></i>
-            Empresa deve reembolsar o técnico.
-            {% elif relatorio.saldo_aprovado < 0 %} <i class="bi bi-arrow-right-circle me-1"></i>
-              Técnico deve devolver à empresa.
+            Empresa deve reembolsar o tecnico.
+            {% elif relatorio.total_a_reembolsar < 0 %} <i class="bi bi-arrow-right-circle me-1"></i>
+              Tecnico deve devolver a empresa.
               {% else %}
               <i class="bi bi-check-circle me-1"></i>
               Contas zeradas.
@@ -1694,13 +1703,20 @@
     function atualizarTotaisFinanceiros() {
       const formFinanceiro = document.getElementById("form-valores-aprovados-financeiro");
       let totalDespesas = 0;
+      let totalDespesasReembolsaveis = 0;
       let totalKm = 0;
+      let valorRemovidoReembolso = 0;
       let encontrouCampoKm = false;
 
       document.querySelectorAll(".campo-aprovado-despesa").forEach(function (input) {
         const original = parseMoney(input.dataset.valorOriginal);
-        const valor = inputFinanceiroAtivo(input) ? valorAprovadoInput(input, original) : 0;
+        const ativo = inputFinanceiroAtivo(input);
+        const valor = ativo ? valorAprovadoInput(input, original) : 0;
         totalDespesas += valor;
+        if (input.dataset.quemPagou === "tecnico") {
+          totalDespesasReembolsaveis += valor;
+          if (!ativo) valorRemovidoReembolso += original;
+        }
         const linha = input.closest("tr");
         const itemId = linha?.dataset.itemId;
         const modalRateio = itemId ? document.getElementById(`modal-rateio-despesa-${itemId}`) : null;
@@ -1738,44 +1754,50 @@
       }
 
       const totalAprovado = Math.round((totalDespesas + totalKm) * 100) / 100;
-      const totalSolicitado = parseMoney(formFinanceiro?.dataset.totalSolicitado);
       const adiantamento = parseMoney(formFinanceiro?.dataset.adiantamento);
-      const diferenca = Math.max(0, Math.round((totalSolicitado - totalAprovado) * 100) / 100);
-      const saldo = Math.round((totalAprovado - adiantamento) * 100) / 100;
+      const naoReembolsavel = formFinanceiro?.dataset.tipoReembolso === "nao_reembolsavel";
+      const saldo = naoReembolsavel
+        ? 0
+        : Math.round((totalDespesasReembolsaveis + totalKm - adiantamento) * 100) / 100;
 
       const totalDespesasEl = document.getElementById("total-aprovado-despesas");
       const totalKmEl = document.getElementById("total-aprovado-km");
-      const totalFinanceiroEl = document.getElementById("total-aprovado-financeiro");
-      const diferencaEl = document.getElementById("diferenca-removida-financeiro");
+      const despesasReembolsaveisEl = document.getElementById("despesas-reembolsaveis-financeiro");
+      const kmRessarcirEl = document.getElementById("km-ressarcir-financeiro");
+      const removidoEl = document.getElementById("valor-removido-reembolso-financeiro");
       const saldoEl = document.getElementById("saldo-aprovado-financeiro");
+      const saldoDestaqueEl = document.getElementById("total-a-reembolsar-destaque");
 
       if (totalDespesasEl) totalDespesasEl.textContent = formatMoney(totalDespesas);
       if (totalKmEl) totalKmEl.textContent = formatMoney(totalKm);
-      if (totalFinanceiroEl) totalFinanceiroEl.textContent = formatMoney(totalAprovado);
-      if (diferencaEl) diferencaEl.textContent = formatMoney(diferenca);
-      if (saldoEl) {
-        saldoEl.textContent = formatMoney(saldo);
-        saldoEl.classList.toggle("text-success", saldo >= 0);
-        saldoEl.classList.toggle("text-danger", saldo < 0);
-      }
+      if (despesasReembolsaveisEl) despesasReembolsaveisEl.textContent = formatMoney(totalDespesasReembolsaveis);
+      if (kmRessarcirEl) kmRessarcirEl.textContent = formatMoney(totalKm);
+      if (removidoEl) removidoEl.textContent = formatMoney(valorRemovidoReembolso);
+      [saldoEl, saldoDestaqueEl].forEach(el => {
+        if (!el) return;
+        el.textContent = formatMoney(saldo);
+        el.classList.toggle("text-success", saldo >= 0);
+        el.classList.toggle("text-danger", saldo < 0);
+      });
     }
 
     function aplicarResumoGlobal(resumo) {
       if (!resumo) return;
       setText("total-aprovado-despesas", formatMoney(parseMoney(resumo.total_aprovado_despesas)));
       setText("total-aprovado-km", formatMoney(parseMoney(resumo.total_aprovado_km)));
-      setText("km-reembolso-solicitado-financeiro", formatMoney(parseMoney(resumo.km_reembolso_tecnico_solicitado)));
-      setText("km-cobranca-clientes-financeiro", formatMoney(parseMoney(resumo.km)));
-      setText("km-diferenca-cobranca-financeiro", formatMoney(parseMoney(resumo.km_excesso_reducao)));
-      setText("total-aprovado-financeiro", formatMoney(parseMoney(resumo.total_aprovado)));
-      setText("diferenca-removida-financeiro", formatMoney(parseMoney(resumo.diferenca_removida)));
+      setText("despesas-reembolsaveis-financeiro", formatMoney(parseMoney(resumo.despesas_reembolsaveis)));
+      setText("km-ressarcir-financeiro", formatMoney(parseMoney(resumo.km_ressarcir || resumo.km_reembolso_tecnico)));
+      setText("km-cobranca-clientes-financeiro", formatMoney(parseMoney(resumo.km_cobranca_cliente || resumo.km)));
+      setText("valor-removido-reembolso-financeiro", formatMoney(parseMoney(resumo.valor_removido_reembolso)));
       const saldoEl = document.getElementById("saldo-aprovado-financeiro");
-      if (saldoEl) {
-        const saldo = parseMoney(resumo.saldo_aprovado);
-        saldoEl.textContent = formatMoney(saldo);
-        saldoEl.classList.toggle("text-success", saldo >= 0);
-        saldoEl.classList.toggle("text-danger", saldo < 0);
-      }
+      const saldoDestaqueEl = document.getElementById("total-a-reembolsar-destaque");
+      const saldo = parseMoney(resumo.total_a_reembolsar || resumo.saldo_aprovado);
+      [saldoEl, saldoDestaqueEl].forEach(el => {
+        if (!el) return;
+        el.textContent = formatMoney(saldo);
+        el.classList.toggle("text-success", saldo >= 0);
+        el.classList.toggle("text-danger", saldo < 0);
+      });
       const formFinanceiro = document.getElementById("form-valores-aprovados-financeiro");
       if (formFinanceiro) {
         formFinanceiro.dataset.totalSolicitado = resumo.total_solicitado || formFinanceiro.dataset.totalSolicitado || "0";

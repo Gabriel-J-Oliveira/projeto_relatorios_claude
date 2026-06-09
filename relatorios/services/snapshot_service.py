@@ -445,8 +445,11 @@ def construir_snapshot_financeiro(relatorio, usuario=None):
         "totais": {
             "total_despesas_tecnico": _decimal(relatorio.total_despesas_tecnico),
             "total_despesas_empresa": _decimal(relatorio.total_despesas_empresa),
+            "total_despesas_reembolsaveis": _decimal(relatorio.total_despesas_reembolsaveis),
             "total_despesas": _decimal(relatorio.total_despesas),
             "total_km": _decimal(relatorio.total_km),
+            "valor_km_cobrar_cliente": _decimal(relatorio.valor_km_cobrar_cliente),
+            "valor_km_ressarcir": _decimal(relatorio.valor_km_ressarcir),
             "total_km_reembolso_tecnico_solicitado": _decimal(relatorio.total_km_reembolso_tecnico_solicitado),
             "total_km_reembolso_tecnico": _decimal(relatorio.total_km_reembolso_tecnico),
             "total_km_excesso_reducao_clientes": _decimal(relatorio.total_km_excesso_reducao_clientes),
@@ -456,9 +459,11 @@ def construir_snapshot_financeiro(relatorio, usuario=None):
             "total_aprovado_km": _decimal(relatorio.total_aprovado_km),
             "total_aprovado": _decimal(relatorio.total_aprovado),
             "diferenca_removida": _decimal(relatorio.diferenca_removida),
+            "valor_removido_reembolso": _decimal(relatorio.valor_removido_reembolso),
             "valor_adiantamento": _decimal(relatorio.valor_adiantamento),
             "saldo": _decimal(relatorio.saldo),
             "saldo_aprovado": _decimal(relatorio.saldo_aprovado),
+            "total_a_reembolsar": _decimal(relatorio.total_a_reembolsar),
         },
         "contagens": {
             "despesas": len(despesas),

@@ -1267,8 +1267,28 @@ class RelatorioTecnico(models.Model):
         return _valor_monetario(total)
 
     @property
+    def total_despesas_reembolsaveis(self):
+        total = sum(
+            (
+                despesa.valor_final
+                for despesa in self.despesas.all()
+                if despesa.quem_pagou == QuemPagou.TECNICO
+            ),
+            Decimal("0.00"),
+        )
+        return _valor_monetario(total)
+
+    @property
     def total_aprovado_km(self):
         return self.total_km_reembolso_tecnico
+
+    @property
+    def valor_km_ressarcir(self):
+        return self.total_km_reembolso_tecnico
+
+    @property
+    def valor_km_cobrar_cliente(self):
+        return self.total_km
 
     @property
     def total_aprovado(self):
@@ -1278,16 +1298,26 @@ class RelatorioTecnico(models.Model):
     def diferenca_removida(self):
         total = Decimal("0.00")
         for despesa in self.despesas.all():
-            diferenca = _valor_monetario(despesa.valor - despesa.valor_final)
-            if diferenca > 0:
-                total += diferenca
+            if despesa.rejeitado or despesa.status_financeiro == StatusFinanceiroItem.REJEITADO:
+                total += despesa.valor
         for trecho in self.trechos.all():
-            diferenca = _valor_monetario(
-                trecho.valor_reembolso_tecnico_solicitado - trecho.valor_reembolso_tecnico
-            )
-            if diferenca > 0:
-                total += diferenca
+            if trecho.rejeitado or trecho.status_financeiro == StatusFinanceiroItem.REJEITADO:
+                total += trecho.valor_reembolso_tecnico_solicitado
         return _valor_monetario(total)
+
+    @property
+    def valor_removido_reembolso(self):
+        return self.diferenca_removida
+
+    @property
+    def total_a_reembolsar(self):
+        if self.tipo_reembolso == TipoReembolso.NAO_REEMBOLSAVEL:
+            return Decimal("0.00")
+        return _valor_monetario(
+            self.total_despesas_reembolsaveis
+            + self.valor_km_ressarcir
+            - self.valor_adiantamento
+        )
 
     @property
     def saldo(self):
@@ -1297,18 +1327,7 @@ class RelatorioTecnico(models.Model):
 
     @property
     def saldo_aprovado(self):
-        total_empresa_aprovado = sum(
-            (
-                despesa.valor_final
-                for despesa in self.despesas.filter(quem_pagou=QuemPagou.EMPRESA)
-            ),
-            Decimal("0.00"),
-        )
-        return _valor_monetario(
-            self.total_aprovado
-            - _valor_monetario(total_empresa_aprovado)
-            - self.valor_adiantamento
-        )
+        return self.total_a_reembolsar
 
     @property
     def total_km_percorrido(self):
