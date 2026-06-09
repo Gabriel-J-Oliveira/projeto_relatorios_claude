@@ -1276,8 +1276,18 @@ class RelatorioTecnico(models.Model):
 
     @property
     def diferenca_removida(self):
-        diferenca = self.total_solicitado - self.total_aprovado
-        return _valor_monetario(diferenca if diferenca > 0 else Decimal("0.00"))
+        total = Decimal("0.00")
+        for despesa in self.despesas.all():
+            diferenca = _valor_monetario(despesa.valor - despesa.valor_final)
+            if diferenca > 0:
+                total += diferenca
+        for trecho in self.trechos.all():
+            diferenca = _valor_monetario(
+                trecho.valor_reembolso_tecnico_solicitado - trecho.valor_reembolso_tecnico
+            )
+            if diferenca > 0:
+                total += diferenca
+        return _valor_monetario(total)
 
     @property
     def saldo(self):
