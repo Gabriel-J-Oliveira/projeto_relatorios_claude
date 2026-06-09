@@ -45,6 +45,7 @@ from .services.autorizacao_service import (
     usuario_eh_admin_extra,
     usuario_tem_acesso_total,
 )
+from .services.resumo_cliente_service import resumo_financeiro_por_cliente
 from .services.identidade.sincronizacao_service import (
     UsuarioExternoSnapshot,
     sincronizar_usuario_externo,
@@ -1134,11 +1135,51 @@ class RelatorioTecnicoFlowTests(TestCase):
             motivo_rejeicao="Duplicado",
         )
 
-        self.assertEqual(relatorio.total_solicitado, Decimal("525.00"))
+        self.assertEqual(relatorio.total_solicitado, Decimal("352.50"))
         self.assertEqual(relatorio.total_aprovado_despesas, Decimal("80.00"))
-        self.assertEqual(relatorio.total_aprovado_km, Decimal("200.00"))
-        self.assertEqual(relatorio.total_aprovado, Decimal("280.00"))
-        self.assertEqual(relatorio.diferenca_removida, Decimal("245.00"))
+        self.assertEqual(relatorio.total_aprovado_km, Decimal("135.00"))
+        self.assertEqual(relatorio.total_aprovado, Decimal("215.00"))
+        self.assertEqual(relatorio.diferenca_removida, Decimal("137.50"))
+
+    def test_resumo_financeiro_km_usa_reembolso_tecnico_e_separa_cobranca_cliente(self):
+        self.cliente.valor_km = Decimal("1.85")
+        self.cliente.save(update_fields=["valor_km"])
+        relatorio = self.criar_relatorio("RT-2026-024")
+        relatorio.km_excedente_interno = Decimal("4.00")
+        relatorio.save(update_fields=["km_excedente_interno"])
+        ItemDespesa.objects.create(
+            relatorio=relatorio,
+            ordem=0,
+            data="2026-05-02",
+            tipo="alimentacao",
+            descricao="Despesa tecnico",
+            valor=Decimal("660.65"),
+            quem_pagou="tecnico",
+        )
+        TrechoKm.objects.create(
+            relatorio=relatorio,
+            ordem=0,
+            data="2026-05-02",
+            origem="Curitiba",
+            destino="Ponta Grossa",
+            km=Decimal("100.00"),
+            valor_km=Decimal("1.85"),
+        )
+
+        self.assertEqual(relatorio.total_km, Decimal("192.40"))
+        self.assertEqual(relatorio.total_km_reembolso_tecnico_solicitado, Decimal("140.40"))
+        self.assertEqual(relatorio.total_km_reembolso_tecnico, Decimal("140.40"))
+        self.assertEqual(relatorio.total_solicitado, Decimal("801.05"))
+        self.assertEqual(relatorio.total_aprovado_km, Decimal("140.40"))
+        self.assertEqual(relatorio.total_aprovado, Decimal("801.05"))
+        self.assertEqual(relatorio.diferenca_removida, Decimal("0.00"))
+        self.assertEqual(relatorio.total_km_excesso_reducao_clientes, Decimal("52.00"))
+        resumo_clientes = resumo_financeiro_por_cliente(relatorio)
+        self.assertEqual(resumo_clientes["erros"], [])
+        self.assertEqual(resumo_clientes["clientes"][0].valor_km_solicitado, Decimal("192.40"))
+        self.assertEqual(resumo_clientes["clientes"][0].valor_km_reembolso_tecnico, Decimal("140.40"))
+        self.assertEqual(resumo_clientes["clientes"][0].total_solicitado, Decimal("801.05"))
+        self.assertEqual(resumo_clientes["clientes"][0].total_aprovado, Decimal("801.05"))
 
     def test_financeiro_rejeita_trecho_km_individual(self):
         self.client.force_login(self.usuario_financeiro)

@@ -1174,6 +1174,15 @@ class RelatorioTecnico(models.Model):
         return _valor_monetario(total)
 
     @property
+    def total_km_reembolso_tecnico_solicitado(self):
+        total = sum(
+            (trecho.valor_reembolso_tecnico_solicitado for trecho in self.trechos.all()),
+            Decimal("0.00"),
+        )
+        total += self.total_km_excedente_reembolso_tecnico
+        return _valor_monetario(total)
+
+    @property
     def total_km_excesso_reducao_clientes(self):
         return _valor_monetario(self.total_km - self.total_km_reembolso_tecnico)
 
@@ -1240,7 +1249,9 @@ class RelatorioTecnico(models.Model):
     @property
     def total_despesas(self):
         return _valor_monetario(
-            self.total_despesas_tecnico + self.total_despesas_empresa + self.total_km
+            self.total_despesas_tecnico
+            + self.total_despesas_empresa
+            + self.total_km_reembolso_tecnico_solicitado
         )
 
     @property
@@ -1257,18 +1268,7 @@ class RelatorioTecnico(models.Model):
 
     @property
     def total_aprovado_km(self):
-        total = Decimal("0.00")
-        for trecho in self.trechos.all():
-            calculos = list(trecho.rateios.all())
-            if calculos:
-                total += sum(
-                    (calculo.valor_final for calculo in calculos),
-                    Decimal("0.00"),
-                )
-            else:
-                total += trecho.valor_final_clientes
-        total += self.total_km_excedente
-        return _valor_monetario(total)
+        return self.total_km_reembolso_tecnico
 
     @property
     def total_aprovado(self):
@@ -1297,8 +1297,6 @@ class RelatorioTecnico(models.Model):
         return _valor_monetario(
             self.total_aprovado
             - _valor_monetario(total_empresa_aprovado)
-            - self.total_km
-            + self.total_km_reembolso_tecnico
             - self.valor_adiantamento
         )
 
@@ -2167,6 +2165,10 @@ class TrechoKm(models.Model):
     def valor_reembolso_tecnico(self):
         if self.rejeitado or self.status_financeiro == StatusFinanceiroItem.REJEITADO:
             return Decimal("0.00")
+        return _valor_monetario(self.km * self.valor_km_control_sul)
+
+    @property
+    def valor_reembolso_tecnico_solicitado(self):
         return _valor_monetario(self.km * self.valor_km_control_sul)
 
     @property

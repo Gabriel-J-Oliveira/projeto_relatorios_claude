@@ -233,6 +233,7 @@ def _trecho_payload(trecho):
         "valor_km": _decimal(trecho.valor_km),
         "valor_km_control_sul": _decimal(trecho.valor_km_control_sul),
         "valor_km_reembolso_tecnico": _decimal(trecho.valor_km_control_sul),
+        "valor_reembolso_tecnico_solicitado": _decimal(trecho.valor_reembolso_tecnico_solicitado),
         "valor_reembolso_tecnico": _decimal(trecho.valor_reembolso_tecnico),
         "excesso_reducao": _decimal(diferenca),
         "diferenca": _decimal(diferenca),
@@ -446,6 +447,7 @@ def construir_snapshot_financeiro(relatorio, usuario=None):
             "total_despesas_empresa": _decimal(relatorio.total_despesas_empresa),
             "total_despesas": _decimal(relatorio.total_despesas),
             "total_km": _decimal(relatorio.total_km),
+            "total_km_reembolso_tecnico_solicitado": _decimal(relatorio.total_km_reembolso_tecnico_solicitado),
             "total_km_reembolso_tecnico": _decimal(relatorio.total_km_reembolso_tecnico),
             "total_km_excesso_reducao_clientes": _decimal(relatorio.total_km_excesso_reducao_clientes),
             "total_km_percorrido": _decimal(relatorio.total_km_percorrido),
@@ -499,28 +501,22 @@ def validar_snapshot_payload(payload):
             soma_aprovada += _money(Decimal(str(despesa.get("valor_final") or "0.00")))
 
     for trecho in payload.get("trechos_km") or []:
-        soma_solicitada += _money(Decimal(str(trecho.get("valor_calculado") or "0.00")))
-        rateios = trecho.get("rateios") or []
-        if rateios:
-            soma_aprovada += sum(
-                (_money(Decimal(str(rateio.get("valor_final") or "0.00"))) for rateio in rateios),
-                Decimal("0.00"),
-            )
-        else:
-            soma_aprovada += _money(Decimal(str(trecho.get("valor_final") or "0.00")))
+        soma_solicitada += _money(
+            Decimal(str(trecho.get("valor_reembolso_tecnico_solicitado") or "0.00"))
+        )
+        soma_aprovada += _money(
+            Decimal(str(trecho.get("valor_reembolso_tecnico") or "0.00"))
+        )
 
     km_excedente = payload.get("km_excedente") or {}
     rateios_excedente = km_excedente.get("rateios") or []
     if rateios_excedente:
-        total_excedente = sum(
-            (_money(Decimal(str(rateio.get("valor_calculado") or "0.00"))) for rateio in rateios_excedente),
+        total_excedente_reembolso = sum(
+            (_money(Decimal(str(rateio.get("valor_reembolso_tecnico") or "0.00"))) for rateio in rateios_excedente),
             Decimal("0.00"),
         )
-        soma_solicitada += total_excedente
-        soma_aprovada += sum(
-            (_money(Decimal(str(rateio.get("valor_final") or "0.00"))) for rateio in rateios_excedente),
-            Decimal("0.00"),
-        )
+        soma_solicitada += total_excedente_reembolso
+        soma_aprovada += total_excedente_reembolso
 
     if _money(soma_solicitada) != _money(total_solicitado):
         erros.append("Snapshot financeiro nao fecha com o total solicitado.")

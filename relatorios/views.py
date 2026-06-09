@@ -2062,6 +2062,7 @@ def relatorio_form_view(request, pk=None):
                                 else "Novo Relatório"
                             ),
                             "valor_km_padrao": valor_km_padrao,
+                            "valor_km_control_sul": str(valor_km_control_sul()),
                             "resumo_erros": resumo_erros,
                             "clientes_selecionados_ids": clientes_post_ids,
                             "clientes_selecionados_nomes": clientes_post_nomes,
@@ -2096,6 +2097,7 @@ def relatorio_form_view(request, pk=None):
                                 "Salvar alterações" if instance else "Criar Relatório"
                             ),
                             "valor_km_padrao": str(valor_km_padrao),
+                            "valor_km_control_sul": str(valor_km_control_sul()),
                             "resumo_erros": [diagnostico_backend["mensagem"]],
                             "diagnostico_backend": diagnostico_backend,
                             "clientes_selecionados_ids": clientes_post_ids,
@@ -2155,6 +2157,7 @@ def relatorio_form_view(request, pk=None):
             # valor_km_padrao aqui é APENAS para uso no template (JS, exibição).
             # Sempre string para evitar erros de template com None.
             "valor_km_padrao": str(valor_km_padrao),
+            "valor_km_control_sul": str(valor_km_control_sul()),
             "resumo_erros": resumo_erros,
             "clientes_selecionados_ids": clientes_post_ids,
             "clientes_selecionados_nomes": clientes_post_nomes,

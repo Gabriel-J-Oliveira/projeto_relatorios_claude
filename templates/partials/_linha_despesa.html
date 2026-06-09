@@ -1,164 +1,202 @@
-﻿{% load l10n %}
+{% load l10n %}
 <tr class="linha-despesa"
     id="linha-despesa-nova-{{ idx }}"
     data-form-index="{{ idx }}"
     {% if form.instance.pk %}data-pk="{{ form.instance.pk }}"{% endif %}>
-  <td class="p-1 px-3 pt-3 despesa-col-data" data-tour="despesas-data-tipo">
-    <input type="hidden"
-           name="despesas-{{ idx }}-id"
-           id="id_despesas-{{ idx }}-id"
-           value="{{ form.id.value|default:'' }}">
-    <input type="hidden"
-           name="despesas-{{ idx }}-ordem"
-           id="id_despesas-{{ idx }}-ordem"
-           value="{{ idx }}">
-    <div class="d-none">
-      <input type="checkbox"
-             name="despesas-{{ idx }}-DELETE"
-             id="id_despesas-{{ idx }}-DELETE"
-             {% if form.DELETE.value %}checked{% endif %}>
-    </div>
-    <input type="date"
-           name="despesas-{{ idx }}-data"
-           id="id_despesas-{{ idx }}-data"
-           value="{% if form.data.value %}{{ form.data.value|date:'Y-m-d'|default:form.data.value }}{% endif %}"
-           max="{% now 'Y-m-d' %}"
-           class="form-control form-control-sm {% if form.data.errors %}is-invalid{% endif %}"
-           onchange="recalcular()">
-    <div class="invalid-feedback d-block small erro-inline">
-      {% if form.data.errors %}{{ form.data.errors.0 }}{% endif %}
-    </div>
-  </td>
-  <td class="p-1 pt-3 despesa-col-tipo" data-tour="despesas-data-tipo">
-    <select name="despesas-{{ idx }}-tipo"
-            id="id_despesas-{{ idx }}-tipo"
-            class="form-select form-select-sm {% if form.tipo.errors %}is-invalid{% endif %}"
-            onchange="recalcular()">
-      {% for value, label in form.fields.tipo.choices %}
-        <option value="{{ value }}"
-                {% if form.tipo.value == value %}selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
-    <div class="invalid-feedback d-block small erro-inline">
-      {% if form.tipo.errors %}{{ form.tipo.errors.0 }}{% endif %}
-    </div>
-    <div class="text-warning small aviso-refeicao"></div>
-  </td>
-  <td class="p-1 pt-3 despesa-col-descricao" data-tour="despesas-descricao-valor">
-    <input type="text"
-           name="despesas-{{ idx }}-descricao"
-           id="id_despesas-{{ idx }}-descricao"
-           value="{{ form.descricao.value|default:'' }}"
-           placeholder="Fornecedor / Detalhe"
-           class="form-control form-control-sm {% if form.descricao.errors %}is-invalid{% endif %}">
-    <div class="invalid-feedback d-block small erro-inline">
-      {% if form.descricao.errors %}{{ form.descricao.errors.0 }}{% endif %}
-    </div>
-    <div class="text-warning small aviso-inline"></div>
-    <div class="text-warning small aviso-duplicata"></div>
-</td>
-  <td class="p-1 pt-3 despesa-col-valor" data-tour="despesas-descricao-valor">
-    <input type="text"
-           inputmode="decimal"
-           name="despesas-{{ idx }}-valor"
-           id="id_despesas-{{ idx }}-valor"
-           value="{{ form.valor.value|default:''|unlocalize }}"
-           class="form-control form-control-sm campo-valor-desp campo-moeda"
-           oninput="recalcular()">
-    <div class="invalid-feedback d-block small erro-inline">
-      {% if form.valor.errors %}{{ form.valor.errors.0 }}{% endif %}
-    </div>
-    <div class="small mt-1 politica-despesa-info text-muted"
-         data-policy-empty="Sem politica definida">
-      Sem politica definida
-    </div>
-    <div class="text-warning small aviso-inline"></div>
-  </td>
-  <td class="p-1 pt-3 despesa-col-pagador">
-    <select name="despesas-{{ idx }}-quem_pagou"
-            id="id_despesas-{{ idx }}-quem_pagou"
-            class="form-select form-select-sm campo-quem-pagou"
-            onchange="recalcular()">
-      <option value="tecnico"
-              {% if form.quem_pagou.value == "tecnico" %}selected{% endif %}>Técnico</option>
-      <option value="empresa"
-              {% if form.quem_pagou.value == "empresa" %}selected{% endif %}>Empresa</option>
-    </select>
-  </td>
-  <td class="p-1 text-center text-nowrap pt-3 despesa-col-anexo" data-tour="despesas-comprovante">
-    {% if form.instance.comprovante %}
-      <a href="{{ form.instance.comprovante.url }}"
-         target="_blank"
-         class="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1 px-2 py-1 mb-1">
-        <i class="bi bi-file-earmark-check small"></i>
-        Atual
-      </a>
-    {% endif %}
-    <label class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 px-2 py-1 mb-0 cursor-pointer">
-      <i class="bi bi-paperclip small"></i>
-      <input type="file"
-             name="despesas-{{ idx }}-comprovante"
-             id="id_despesas-{{ idx }}-comprovante"
-              class="form-sm {% if form.comprovante.errors %}is-invalid{% endif %}"
-              accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-              onchange=" this.parentElement.classList.replace( 'btn-outline-secondary', 'btn-success' )">
-    </label>
-    <div class="d-flex gap-1 mt-1">
-      <select name="despesas-{{ idx }}-tipo_documento_comprovante"
-              id="id_despesas-{{ idx }}-tipo_documento_comprovante"
-              class="form-select form-select-sm tipo-documento-comprovante {% if form.tipo_documento_comprovante.errors %}is-invalid{% endif %}">
-        <option value="">Tipo</option>
-        {% for value, label in form.fields.tipo_documento_comprovante.choices %}
-          {% if value %}
-            <option value="{{ value }}" {% if form.tipo_documento_comprovante.value == value %}selected{% endif %}>{{ label }}</option>
-          {% endif %}
-        {% endfor %}
-      </select>
-      <input type="text"
-             name="despesas-{{ idx }}-numero_documento_comprovante"
-             id="id_despesas-{{ idx }}-numero_documento_comprovante"
-             value="{{ form.numero_documento_comprovante.value|default:'' }}"
-             placeholder="Nº doc."
-             class="form-control form-control-sm numero-documento-comprovante {% if form.numero_documento_comprovante.errors %}is-invalid{% endif %}">
-    </div>
-    <div class="invalid-feedback d-block small erro-inline">
-      {% if form.comprovante.errors %}{{ form.comprovante.errors.0 }}{% elif form.tipo_documento_comprovante.errors %}{{ form.tipo_documento_comprovante.errors.0 }}{% elif form.numero_documento_comprovante.errors %}{{ form.numero_documento_comprovante.errors.0 }}{% endif %}
-    </div>
-  </td>
-  <td class="p-1 pt-3 despesa-col-observacao">
-    <input type="text"
-           name="despesas-{{ idx }}-observacoes"
-           id="id_despesas-{{ idx }}-observacoes"
-           value="{{ form.observacoes.value|default:'' }}"
-           placeholder="Observação"
-           class="form-control form-control-sm w-100">
-      <div class="text-warning small aviso-inline"></div>
+  <td colspan="8" class="p-0">
+    <div class="despesa-row">
+      <input type="hidden"
+             name="despesas-{{ idx }}-id"
+             id="id_despesas-{{ idx }}-id"
+             value="{{ form.id.value|default:'' }}">
+      <input type="hidden"
+             name="despesas-{{ idx }}-ordem"
+             id="id_despesas-{{ idx }}-ordem"
+             value="{{ idx }}">
+      <div class="d-none">
+        <input type="checkbox"
+               name="despesas-{{ idx }}-DELETE"
+               id="id_despesas-{{ idx }}-DELETE"
+               {% if form.DELETE.value %}checked{% endif %}>
+      </div>
 
-  </td>
-  <td class="p-1 pt-3 despesa-col-clientes" data-tour="despesas-clientes">
-    <input type="hidden"
-           class="clientes-item-input"
-           name="despesas-{{ idx }}-clientes"
-           id="id_despesas-{{ idx }}-clientes"
-           value="{% if form.clientes_value_set %}{{ form.clientes_value }}{% elif form.instance.pk %}{% for vinculo in form.instance.clientes_vinculados.all %}{{ vinculo.cliente_id }}{% if not forloop.last %},{% endif %}{% endfor %}{% endif %}">
-    <button type="button"
-            class="btn btn-sm btn-outline-secondary w-100 clientes-item-btn"
-            data-bs-toggle="modal"
-            data-bs-target="#modalSelecionarClientes"
-            data-client-selector="item"
-            data-client-target="id_despesas-{{ idx }}-clientes">
-      <i class="bi bi-people me-1"></i>
-      <span class="clientes-item-label">Clientes envolvidos</span>
-      <span class="badge rounded-pill text-bg-secondary ms-1 clientes-item-count">0</span>
-    </button>
-    <div class="invalid-feedback d-block small erro-clientes-item"></div>
-  </td>
-  <td class="p-1 text-center text-nowrap pe-3 pt-3">
-    <button type="button"
-            class="btn btn-sm btn-outline-danger"
-            onclick="removerLinha(this)">
-      <i class="bi bi-trash3"></i> Remover
-    </button>
+      <div class="despesa-main-row">
+        <div class="despesa-field despesa-field-data" data-tour="despesas-data-tipo">
+          <label class="despesa-field-label" for="id_despesas-{{ idx }}-data">Data</label>
+          <input type="date"
+                 name="despesas-{{ idx }}-data"
+                 id="id_despesas-{{ idx }}-data"
+                 value="{% if form.data.value %}{{ form.data.value|date:'Y-m-d'|default:form.data.value }}{% endif %}"
+                 max="{% now 'Y-m-d' %}"
+                 class="form-control form-control-sm {% if form.data.errors %}is-invalid{% endif %}"
+                 onchange="recalcular()">
+          <div class="invalid-feedback d-block small erro-inline">
+            {% if form.data.errors %}{{ form.data.errors.0 }}{% endif %}
+          </div>
+        </div>
+
+        <div class="despesa-field despesa-field-tipo" data-tour="despesas-data-tipo">
+          <label class="despesa-field-label" for="id_despesas-{{ idx }}-tipo">Tipo</label>
+          <select name="despesas-{{ idx }}-tipo"
+                  id="id_despesas-{{ idx }}-tipo"
+                  class="form-select form-select-sm {% if form.tipo.errors %}is-invalid{% endif %}"
+                  onchange="recalcular()">
+            {% for value, label in form.fields.tipo.choices %}
+              <option value="{{ value }}"
+                      {% if form.tipo.value == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <div class="invalid-feedback d-block small erro-inline">
+            {% if form.tipo.errors %}{{ form.tipo.errors.0 }}{% endif %}
+          </div>
+          <div class="text-warning small aviso-refeicao"></div>
+        </div>
+
+        <div class="despesa-field despesa-field-descricao" data-tour="despesas-descricao-valor">
+          <label class="despesa-field-label" for="id_despesas-{{ idx }}-descricao">Descricao / Fornecedor</label>
+          <input type="text"
+                 name="despesas-{{ idx }}-descricao"
+                 id="id_despesas-{{ idx }}-descricao"
+                 value="{{ form.descricao.value|default:'' }}"
+                 placeholder="Fornecedor / Detalhe"
+                 class="form-control form-control-sm {% if form.descricao.errors %}is-invalid{% endif %}">
+          <div class="invalid-feedback d-block small erro-inline">
+            {% if form.descricao.errors %}{{ form.descricao.errors.0 }}{% endif %}
+          </div>
+          <div class="text-warning small aviso-inline"></div>
+          <div class="text-warning small aviso-duplicata"></div>
+        </div>
+
+        <div class="despesa-field despesa-field-valor" data-tour="despesas-descricao-valor">
+          <label class="despesa-field-label" for="id_despesas-{{ idx }}-valor">Valor R$</label>
+          <input type="text"
+                 inputmode="decimal"
+                 name="despesas-{{ idx }}-valor"
+                 id="id_despesas-{{ idx }}-valor"
+                 value="{{ form.valor.value|default:''|unlocalize }}"
+                 class="form-control form-control-sm campo-valor-desp campo-moeda"
+                 oninput="recalcular()">
+          <div class="invalid-feedback d-block small erro-inline">
+            {% if form.valor.errors %}{{ form.valor.errors.0 }}{% endif %}
+          </div>
+          <div class="small mt-1 politica-despesa-info text-muted"
+               data-policy-empty="Sem politica definida"></div>
+          <div class="text-warning small aviso-inline"></div>
+        </div>
+
+        <div class="despesa-field despesa-field-pagador">
+          <label class="despesa-field-label" for="id_despesas-{{ idx }}-quem_pagou">Quem pagou</label>
+          <select name="despesas-{{ idx }}-quem_pagou"
+                  id="id_despesas-{{ idx }}-quem_pagou"
+                  class="form-select form-select-sm campo-quem-pagou"
+                  onchange="recalcular()">
+            <option value="tecnico"
+                    {% if form.quem_pagou.value == "tecnico" %}selected{% endif %}>Tecnico</option>
+            <option value="empresa"
+                    {% if form.quem_pagou.value == "empresa" %}selected{% endif %}>Empresa</option>
+          </select>
+        </div>
+
+        <div class="despesa-field despesa-field-anexo" data-tour="despesas-comprovante">
+          <label class="despesa-field-label" for="id_despesas-{{ idx }}-comprovante">Comprovante</label>
+          <div class="d-flex align-items-center gap-1">
+            {% if form.instance.comprovante %}
+              <a href="{{ form.instance.comprovante.url }}"
+                 target="_blank"
+                 class="btn btn-sm btn-outline-success despesa-file-btn">
+                <i class="bi bi-file-earmark-check"></i>
+                <span>Atual</span>
+              </a>
+            {% endif %}
+            <label class="btn btn-sm btn-outline-secondary despesa-file-btn mb-0 cursor-pointer">
+              <i class="bi bi-paperclip"></i>
+              <span class="despesa-file-label">Anexar</span>
+              <input type="file"
+                     name="despesas-{{ idx }}-comprovante"
+                     id="id_despesas-{{ idx }}-comprovante"
+                     class="form-sm {% if form.comprovante.errors %}is-invalid{% endif %}"
+                     accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                     onchange="this.closest('.despesa-file-btn').classList.replace('btn-outline-secondary', 'btn-success'); this.closest('.despesa-file-btn').querySelector('.despesa-file-label').textContent = this.files?.[0]?.name || 'Anexar';">
+            </label>
+          </div>
+          <div class="invalid-feedback d-block small erro-inline">
+            {% if form.comprovante.errors %}{{ form.comprovante.errors.0 }}{% endif %}
+          </div>
+        </div>
+
+        <div class="despesa-field despesa-field-clientes" data-tour="despesas-clientes">
+          <label class="despesa-field-label" for="id_despesas-{{ idx }}-clientes">Clientes</label>
+          <input type="hidden"
+                 class="clientes-item-input"
+                 name="despesas-{{ idx }}-clientes"
+                 id="id_despesas-{{ idx }}-clientes"
+                 value="{% if form.clientes_value_set %}{{ form.clientes_value }}{% elif form.instance.pk %}{% for vinculo in form.instance.clientes_vinculados.all %}{{ vinculo.cliente_id }}{% if not forloop.last %},{% endif %}{% endfor %}{% endif %}">
+          <button type="button"
+                  class="btn btn-sm btn-outline-secondary w-100 clientes-item-btn"
+                  data-bs-toggle="modal"
+                  data-bs-target="#modalSelecionarClientes"
+                  data-client-selector="item"
+                  data-client-target="id_despesas-{{ idx }}-clientes"
+                  title="Selecionar clientes envolvidos nesta despesa">
+            <i class="bi bi-people me-1"></i>
+            <span class="clientes-item-label">Clientes</span>
+            <span class="badge rounded-pill text-bg-secondary ms-1 clientes-item-count">0</span>
+          </button>
+          <div class="invalid-feedback d-block small erro-clientes-item"></div>
+        </div>
+
+        <div class="despesa-field despesa-actions">
+          <label class="despesa-field-label">&nbsp;</label>
+          <button type="button"
+                  class="btn btn-sm btn-outline-danger w-100"
+                  onclick="removerLinha(this)">
+            <i class="bi bi-trash3 me-1"></i>Remover
+          </button>
+        </div>
+      </div>
+
+      <div class="despesa-extra-row">
+        <div class="despesa-field despesa-field-documento-tipo">
+          <label class="despesa-field-label" for="id_despesas-{{ idx }}-tipo_documento_comprovante">Tipo documento</label>
+          <select name="despesas-{{ idx }}-tipo_documento_comprovante"
+                  id="id_despesas-{{ idx }}-tipo_documento_comprovante"
+                  class="form-select form-select-sm tipo-documento-comprovante {% if form.tipo_documento_comprovante.errors %}is-invalid{% endif %}">
+            <option value="">Tipo</option>
+            {% for value, label in form.fields.tipo_documento_comprovante.choices %}
+              {% if value %}
+                <option value="{{ value }}" {% if form.tipo_documento_comprovante.value == value %}selected{% endif %}>{{ label }}</option>
+              {% endif %}
+            {% endfor %}
+          </select>
+          <div class="invalid-feedback d-block small erro-inline">
+            {% if form.tipo_documento_comprovante.errors %}{{ form.tipo_documento_comprovante.errors.0 }}{% endif %}
+          </div>
+        </div>
+
+        <div class="despesa-field despesa-field-documento-numero">
+          <label class="despesa-field-label" for="id_despesas-{{ idx }}-numero_documento_comprovante">No documento</label>
+          <input type="text"
+                 name="despesas-{{ idx }}-numero_documento_comprovante"
+                 id="id_despesas-{{ idx }}-numero_documento_comprovante"
+                 value="{{ form.numero_documento_comprovante.value|default:'' }}"
+                 placeholder="No doc."
+                 class="form-control form-control-sm numero-documento-comprovante {% if form.numero_documento_comprovante.errors %}is-invalid{% endif %}">
+          <div class="invalid-feedback d-block small erro-inline">
+            {% if form.numero_documento_comprovante.errors %}{{ form.numero_documento_comprovante.errors.0 }}{% endif %}
+          </div>
+        </div>
+
+        <div class="despesa-field despesa-field-observacao">
+          <label class="despesa-field-label" for="id_despesas-{{ idx }}-observacoes">Observacao</label>
+          <input type="text"
+                 name="despesas-{{ idx }}-observacoes"
+                 id="id_despesas-{{ idx }}-observacoes"
+                 value="{{ form.observacoes.value|default:'' }}"
+                 placeholder="Observacao"
+                 class="form-control form-control-sm w-100">
+          <div class="text-warning small aviso-inline"></div>
+        </div>
+      </div>
+    </div>
   </td>
 </tr>
-

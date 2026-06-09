@@ -56,7 +56,7 @@ def _clientes_trecho(trecho, clientes_relatorio_ids):
 
 def _marcar_status(resumo):
     resumo.total_solicitado = _money(
-        resumo.despesas_solicitadas + resumo.valor_km_solicitado
+        resumo.despesas_solicitadas + resumo.valor_km_reembolso_tecnico
     )
     resumo.total_aprovado = _money(resumo.total_aprovado)
     resumo.diferenca_removida = _money(
@@ -131,6 +131,12 @@ def resumo_financeiro_por_cliente(relatorio):
     for trecho in relatorio.trechos.all():
         cliente_ids = _clientes_trecho(trecho, clientes_relatorio_ids)
         calculos = {calculo.cliente_id: calculo for calculo in trecho.rateios.all()}
+        rejeitado = trecho.rejeitado or trecho.status_financeiro == "rejeitado"
+        reembolso_por_cliente = _dividir_decimal(
+            trecho.valor_reembolso_tecnico_solicitado,
+            cliente_ids,
+        )
+        km_por_cliente = _dividir_decimal(trecho.km, cliente_ids)
         for cliente_id in cliente_ids:
             resumo = resumos.get(cliente_id)
             if not resumo:
@@ -140,15 +146,19 @@ def resumo_financeiro_por_cliente(relatorio):
                 resumo.km_total += calculo.km_cliente
                 resumo.valor_km_solicitado += _money(calculo.valor_calculado)
                 resumo.valor_km_reembolso_tecnico += _money(calculo.valor_reembolso_tecnico)
-                resumo.total_aprovado += _money(calculo.valor_final)
-            elif not trecho.rejeitado and trecho.status_financeiro != "rejeitado":
+                if not rejeitado:
+                    resumo.total_aprovado += _money(calculo.valor_reembolso_tecnico)
+            else:
                 valor_km_cliente = getattr(resumo.cliente, "valor_km", None) or Decimal("0.00")
-                valor_cobranca_cliente = _money(trecho.km * valor_km_cliente)
-                resumo.km_total += trecho.km
+                km_cliente = km_por_cliente.get(cliente_id, Decimal("0.00"))
+                valor_cobranca_cliente = _money(km_cliente * valor_km_cliente)
+                valor_reembolso_cliente = reembolso_por_cliente.get(cliente_id, Decimal("0.00"))
+                resumo.km_total += km_cliente
                 resumo.valor_km_solicitado += valor_cobranca_cliente
-                resumo.valor_km_reembolso_tecnico += _money(trecho.valor_reembolso_tecnico)
-                resumo.total_aprovado += valor_cobranca_cliente
-            if trecho.rejeitado or trecho.status_financeiro == "rejeitado":
+                resumo.valor_km_reembolso_tecnico += valor_reembolso_cliente
+                if not rejeitado:
+                    resumo.total_aprovado += valor_reembolso_cliente
+            if rejeitado:
                 resumo.itens_rejeitados += 1
 
     for linha in relatorio.rateio_km_excedente_clientes():
@@ -163,7 +173,7 @@ def resumo_financeiro_por_cliente(relatorio):
         resumo.km_total += linha["km"]
         resumo.valor_km_solicitado += _money(linha["valor_calculado"])
         resumo.valor_km_reembolso_tecnico += _money(linha["valor_reembolso_tecnico"])
-        resumo.total_aprovado += _money(linha["valor_calculado"])
+        resumo.total_aprovado += _money(linha["valor_reembolso_tecnico"])
 
     for resumo in resumos.values():
         resumo.km_total = Decimal(resumo.km_total or "0").quantize(Decimal("0.01"))

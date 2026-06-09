@@ -629,7 +629,7 @@
                       </div>
                     </div>
                     <div class="col-md-2">
-                      <span class="text-muted">Total aprovado</span>
+                      <span class="text-muted">Cobranca cliente final</span>
                       <div class="fw-semibold text-success total-aprovado-km-linha">R$ {{ t.valor_final_clientes|floatformat:2 }}</div>
                     </div>
                     <div class="col-md-2">
@@ -727,9 +727,10 @@
             </tbody>
             <tfoot class="table-light fw-semibold">
               <tr>
-                <td colspan="4" class="ps-3 small text-end text-muted">Total KM: {{ relatorio.total_km_percorrido }} km</td>
-                <td class="small fw-bold text-success">R$ {{ relatorio.total_km|floatformat:2 }}</td>
+                <td colspan="3" class="ps-3 small text-end text-muted">Total KM: {{ relatorio.total_km_percorrido }} km</td>
                 <td class="small fw-bold text-success" id="total-aprovado-km">R$ {{ relatorio.total_aprovado_km|floatformat:2 }}</td>
+                <td class="small fw-bold text-success">R$ {{ relatorio.total_km|floatformat:2 }}</td>
+                <td></td>
                 <td></td>
               </tr>
             </tfoot>
@@ -811,8 +812,16 @@
             <span class="fw-semibold">R$ {{ relatorio.total_despesas_empresa|floatformat:2 }}</span>
           </div>
           <div class="d-flex justify-content-between py-1 border-bottom">
-            <span class="text-muted">Deslocamento (KM)</span>
-            <span class="fw-semibold">R$ {{ relatorio.total_km|floatformat:2 }}</span>
+            <span class="text-muted">Deslocamento (KM reembolso)</span>
+            <span class="fw-semibold" id="km-reembolso-solicitado-financeiro">R$ {{ relatorio.total_km_reembolso_tecnico_solicitado|floatformat:2 }}</span>
+          </div>
+          <div class="d-flex justify-content-between py-1 border-bottom">
+            <span class="text-muted">Cobranca clientes KM</span>
+            <span class="fw-semibold" id="km-cobranca-clientes-financeiro">R$ {{ relatorio.total_km|floatformat:2 }}</span>
+          </div>
+          <div class="d-flex justify-content-between py-1 border-bottom {% if relatorio.total_km_excesso_reducao_clientes > 0 %}text-success{% elif relatorio.total_km_excesso_reducao_clientes < 0 %}text-danger{% endif %}">
+            <span class="text-muted">Diferenca cobranca x reembolso</span>
+            <span class="fw-semibold" id="km-diferenca-cobranca-financeiro">R$ {{ relatorio.total_km_excesso_reducao_clientes|floatformat:2 }}</span>
           </div>
           <div class="d-flex justify-content-between py-1 border-bottom">
             <span class="fw-medium">Total Solicitado</span>
@@ -1750,6 +1759,9 @@
       if (!resumo) return;
       setText("total-aprovado-despesas", formatMoney(parseMoney(resumo.total_aprovado_despesas)));
       setText("total-aprovado-km", formatMoney(parseMoney(resumo.total_aprovado_km)));
+      setText("km-reembolso-solicitado-financeiro", formatMoney(parseMoney(resumo.km_reembolso_tecnico_solicitado)));
+      setText("km-cobranca-clientes-financeiro", formatMoney(parseMoney(resumo.km)));
+      setText("km-diferenca-cobranca-financeiro", formatMoney(parseMoney(resumo.km_excesso_reducao)));
       setText("total-aprovado-financeiro", formatMoney(parseMoney(resumo.total_aprovado)));
       setText("diferenca-removida-financeiro", formatMoney(parseMoney(resumo.diferenca_removida)));
       const saldoEl = document.getElementById("saldo-aprovado-financeiro");

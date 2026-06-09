@@ -148,6 +148,7 @@ def montar_payload_financeiro(relatorio):
             "despesas_tecnico": _str_money(relatorio.total_despesas_tecnico),
             "despesas_empresa": _str_money(relatorio.total_despesas_empresa),
             "km": _str_money(relatorio.total_km),
+            "km_reembolso_tecnico_solicitado": _str_money(relatorio.total_km_reembolso_tecnico_solicitado),
             "km_reembolso_tecnico": _str_money(relatorio.total_km_reembolso_tecnico),
             "km_excesso_reducao": _str_money(relatorio.total_km_excesso_reducao_clientes),
             "total_solicitado": _str_money(relatorio.total_solicitado),

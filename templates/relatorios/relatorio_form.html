@@ -546,7 +546,7 @@
                           <span class="fw-semibold small">R$ <span id="res-tec-desp">0,00</span></span>
                         </div>
                         <div class="d-flex justify-content-between py-2 border-bottom border-secondary-subtle">
-                          <span class="text-muted small">Deslocamento (KM)</span>
+                          <span class="text-muted small">Deslocamento (KM reembolso)</span>
                           <span class="fw-semibold small">R$ <span id="res-km">0,00</span></span>
                         </div>
                         <div class="d-flex justify-content-between pt-3 fw-bold">
@@ -1153,6 +1153,7 @@
   const URL_MAPAS_BUSCAR_ENDERECO = "{% url 'relatorios:mapa_buscar_endereco' %}";
   const URL_MAPAS_CALCULAR_ROTA = "{% url 'relatorios:mapa_calcular_rota' %}";
   const RELATORIO_ATUAL_ID = "{{ instance.pk|default:'' }}";
+  const VALOR_KM_CONTROLSUL = Number("{{ valor_km_control_sul|default:'1.35' }}".replace(",", ".")) || 1.35;
 
   // ── Contadores de índice (nunca reutilizados) ──────────────────
   let _idxDesp = {{ fs_desp.total_form_count }};
@@ -1356,7 +1357,7 @@
       const label = td?.querySelector(".clientes-item-label");
       const erro = td?.querySelector(".erro-clientes-item");
       if (count) count.textContent = ids.length;
-      if (label) label.textContent = ids.length ? "Clientes" : "Clientes envolvidos";
+      if (label) label.textContent = "Clientes";
       if (erro) erro.textContent = "";
       atualizarEstadoKmMultiCliente(input.closest("tr"));
     });
@@ -1643,7 +1644,7 @@
       aviso.textContent = "";
     }
     const limparPolitica = () => {
-      info.textContent = "Sem politica definida";
+      info.textContent = "";
       info.className = "small mt-1 politica-despesa-info text-muted";
       if (aviso?.textContent?.includes("politica vigente")) aviso.textContent = "";
     };
@@ -2518,7 +2519,7 @@ async function adicionarLinhaKm() {
   function marcarCampoInvalido(input, mensagem) {
     if (!input) return;
     input.classList.add("is-invalid");
-    let feedback = input.closest("td, .mb-3, .col-md-4, .col-md-6, .col-12")?.querySelector(".erro-inline, .invalid-feedback");
+    let feedback = input.closest(".despesa-field, td, .mb-3, .col-md-4, .col-md-6, .col-12")?.querySelector(".erro-inline, .invalid-feedback");
     if (!feedback) {
       feedback = document.createElement("div");
       feedback.className = "invalid-feedback d-block small erro-inline";
@@ -2530,7 +2531,7 @@ async function adicionarLinhaKm() {
   function limparValidacaoCampo(input) {
     if (!input) return;
     input.classList.remove("is-invalid");
-    const feedback = input.closest("td, .mb-3, .col-md-4, .col-md-6, .col-12")?.querySelector(".erro-inline, .invalid-feedback");
+    const feedback = input.closest(".despesa-field, td, .mb-3, .col-md-4, .col-md-6, .col-12")?.querySelector(".erro-inline, .invalid-feedback");
     if (feedback && feedback.dataset.backend !== "true") feedback.textContent = "";
   }
 
@@ -2668,36 +2669,38 @@ async function adicionarLinhaKm() {
       atualizarPoliticaDespesa(tr);
     });
 
-    let totalKmPx = 0, totalKmKm = 0;
+    let totalKmCobranca = 0, totalKmReembolso = 0, totalKmKm = 0;
     document.querySelectorAll(".linha-trecho").forEach(tr => {
       if (linhaEstaRemovida(tr)) return;
       const km = normalizarNumero(tr.querySelector(".campo-km")?.value);
       const vkm = normalizarNumero(tr.querySelector(".campo-vkm")?.value);
       totalKmKm += km;
+      totalKmReembolso += km * VALOR_KM_CONTROLSUL;
       if (!trechoTemMultiplosClientes(tr)) {
-        totalKmPx += km * vkm;
+        totalKmCobranca += km * vkm;
       }
     });
     const kmExcedente = calcularKmExcedenteFrontend();
     totalKmKm += kmExcedente.km;
-    totalKmPx += kmExcedente.valor;
+    totalKmCobranca += kmExcedente.valor;
+    totalKmReembolso += kmExcedente.km * VALOR_KM_CONTROLSUL;
 
-    const totalGeral = totalTec + totalEmp + totalKmPx;
+    const totalGeral = totalTec + totalEmp + totalKmReembolso;
     const adiant = normalizarNumero(
       document.querySelector("[name='valor_adiantamento']")?.value
     );
-    const saldo = totalTec + totalKmPx - adiant;
+    const saldo = totalTec + totalKmReembolso - adiant;
 
     // Rodapés das tabelas
     setText("total-despesas", (totalTec + totalEmp).toFixed(2).replace(".", ","));
     setText("total-km-percorrido", totalKmKm.toFixed(2).replace(".", ","));
-    setText("total-km-valor", totalKmPx.toFixed(2).replace(".", ","));
+    setText("total-km-valor", totalKmCobranca.toFixed(2).replace(".", ","));
 
     // Resumo
     setText("res-tec-desp", totalTec.toFixed(2).replace(".", ","));
     setText("res-emp-desp", totalEmp.toFixed(2).replace(".", ","));
-    setText("res-km", totalKmPx.toFixed(2).replace(".", ","));
-    setText("res-subtotal-tec", (totalTec + totalKmPx).toFixed(2).replace(".", ","));
+    setText("res-km", totalKmReembolso.toFixed(2).replace(".", ","));
+    setText("res-subtotal-tec", (totalTec + totalKmReembolso).toFixed(2).replace(".", ","));
     setText("res-subtotal-emp", totalEmp.toFixed(2).replace(".", ","));
     setText("res-total-geral", totalGeral.toFixed(2).replace(".", ","));
     setText("res-adiantamento", adiant.toFixed(2).replace(".", ","));
