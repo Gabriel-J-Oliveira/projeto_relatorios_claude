@@ -47,6 +47,10 @@
         <strong>{{ pdf.relatorio.tipo_reembolso_label|default:"Reembolsável" }}</strong>
       </div>
       <div>
+        <span class="label">Area de gasto</span>
+        <strong>{{ pdf.relatorio.tipo_relatorio_label|default:"Nao informado" }}</strong>
+      </div>
+      <div>
         <span class="label">Período</span>
         <strong>{{ pdf.relatorio.data_inicio|date:"d/m/Y" }} a {{ pdf.relatorio.data_fim|date:"d/m/Y" }}</strong>
       </div>

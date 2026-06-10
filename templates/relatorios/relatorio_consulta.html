@@ -49,6 +49,9 @@
         <span class="badge rounded-pill bg-{{ consulta.relatorio.tipo_reembolso_badge_cor }}-subtle text-{{ consulta.relatorio.tipo_reembolso_badge_cor }} border border-{{ consulta.relatorio.tipo_reembolso_badge_cor }}-subtle">
           {{ consulta.relatorio.tipo_reembolso_label }}
         </span>
+        <span class="badge rounded-pill text-bg-light border">
+          Area de gasto: {{ consulta.relatorio.tipo_relatorio_label|default:"Nao informado" }}
+        </span>
       </div>
       <h2 class="consulta-title mb-3">Relatório final de prestação</h2>
       <div class="consulta-meta-grid">
@@ -88,6 +91,10 @@
         <div>
           <span>Tipo de reembolso</span>
           <strong>{{ consulta.relatorio.tipo_reembolso_label }}</strong>
+        </div>
+        <div>
+          <span>Area de gasto</span>
+          <strong>{{ consulta.relatorio.tipo_relatorio_label|default:"Nao informado" }}</strong>
         </div>
       </div>
     </div>

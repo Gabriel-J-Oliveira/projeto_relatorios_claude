@@ -118,6 +118,8 @@ def _relatorio_snapshot_contexto(payload):
         "identificador": relatorio.get("identificador") or relatorio.get("numero") or "",
         "periodo_inicio": _data(relatorio.get("data_inicio")),
         "periodo_fim": _data(relatorio.get("data_fim")),
+        "tipo_relatorio": relatorio.get("tipo_relatorio") or "",
+        "tipo_relatorio_label": relatorio.get("tipo_relatorio_label") or "Nao informado",
         "tipo_reembolso": relatorio.get("tipo_reembolso") or "reembolsavel",
         "tipo_reembolso_label": relatorio.get("tipo_reembolso_label") or "Reembolsável",
         "finalizado_em": _datetime(
@@ -250,6 +252,8 @@ def _relatorio_vivo_contexto(relatorio):
         "identificador": relatorio.identificador,
         "periodo_inicio": relatorio.data_inicio,
         "periodo_fim": relatorio.data_fim,
+        "tipo_relatorio": relatorio.tipo_relatorio,
+        "tipo_relatorio_label": relatorio.get_tipo_relatorio_display(),
         "tipo_reembolso": relatorio.tipo_reembolso,
         "tipo_reembolso_label": relatorio.get_tipo_reembolso_display(),
         "finalizado_em": relatorio.aprovado_em,

@@ -73,8 +73,10 @@ class StatusRelatorio(models.TextChoices):
 
 
 class TipoRelatorio(models.TextChoices):
+    ADMINISTRATIVO = "administrativo", "Administrativo"
     INSTITUCIONAL = "institucional", "Institucional"
     OPERACIONAL = "operacional", "Operacional"
+    TREINAMENTO = "treinamento", "Treinamento"
 
 
 class TipoReembolso(models.TextChoices):

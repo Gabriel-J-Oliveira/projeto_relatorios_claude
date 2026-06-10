@@ -87,7 +87,7 @@
         '[data-tour="relatorio-tipo"]',
         "#tab-dados-btn",
         "Tipo de relatório",
-        "Selecione o tipo do relatório conforme o objetivo do atendimento, como operacional ou institucional."
+        "Selecione a área de gasto do relatório, como Administrativo, Institucional, Operacional ou Treinamento."
       ),
       step(
         '[data-tour="relatorio-cidade-uf"]',

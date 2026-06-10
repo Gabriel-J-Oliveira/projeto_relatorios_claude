@@ -307,7 +307,7 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
             "observacao_km_excedente": forms.Textarea(attrs={"rows": 2}),
         }
         labels = {
-            "tipo_relatorio": "Tipo de relatorio",
+            "tipo_relatorio": "Area de gasto",
             "tipo_reembolso": "Tipo de reembolso",
         }
 

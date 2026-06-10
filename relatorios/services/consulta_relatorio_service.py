@@ -503,6 +503,8 @@ def _montar_consulta_snapshot(snapshot):
             status=relatorio.get("status") or "",
             status_label=relatorio.get("status_label") or "",
             status_badge_cor=_status_badge_cor(relatorio.get("status") or ""),
+            tipo_relatorio=relatorio.get("tipo_relatorio") or "",
+            tipo_relatorio_label=relatorio.get("tipo_relatorio_label") or "Nao informado",
             tipo_reembolso=relatorio.get("tipo_reembolso") or "reembolsavel",
             tipo_reembolso_label=relatorio.get("tipo_reembolso_label") or "Reembolsável",
             tipo_reembolso_badge_cor=(
@@ -848,6 +850,8 @@ def _montar_consulta_viva(relatorio):
             status=relatorio.status,
             status_label=relatorio.get_status_display(),
             status_badge_cor=relatorio.status_badge_cor,
+            tipo_relatorio=relatorio.tipo_relatorio,
+            tipo_relatorio_label=relatorio.get_tipo_relatorio_display(),
             tipo_reembolso=relatorio.tipo_reembolso,
             tipo_reembolso_label=relatorio.get_tipo_reembolso_display(),
             tipo_reembolso_badge_cor=relatorio.tipo_reembolso_badge_cor,

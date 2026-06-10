@@ -241,7 +241,12 @@ class Command(BaseCommand):
             data_inicio=data_inicio,
             data_fim=data_fim,
             motivo=f"Atendimento demo {idx + 1}",
-            tipo_relatorio=TipoRelatorio.OPERACIONAL if idx % 4 else TipoRelatorio.INSTITUCIONAL,
+            tipo_relatorio=[
+                TipoRelatorio.ADMINISTRATIVO,
+                TipoRelatorio.INSTITUCIONAL,
+                TipoRelatorio.OPERACIONAL,
+                TipoRelatorio.TREINAMENTO,
+            ][idx % 4],
             valor_adiantamento=Decimal("250.00") if idx % 5 == 0 else Decimal("0.00"),
             km_excedente_interno=Decimal("12.00") if idx % 4 == 0 else Decimal("0.00"),
             observacao_km_excedente="Deslocamentos internos entre hotel, cliente e restaurante." if idx % 4 == 0 else "",
