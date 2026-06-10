@@ -89,13 +89,17 @@ def _serializar_despesa(despesa):
 
 
 def _serializar_trecho(trecho):
+    valor_reembolso_tecnico = trecho.valor_reembolso_tecnico
+    valor_cobranca_cliente = trecho.valor_final_clientes
     return {
         "tipo": "trecho",
         "id": trecho.pk,
         "rejeitado": not _ativo(trecho),
         "status_financeiro": trecho.status_financeiro,
         "valor_solicitado": _str_money(trecho.valor_calculado_clientes),
-        "valor_final": _str_money(trecho.valor_final_clientes),
+        "valor_final": _str_money(valor_cobranca_cliente),
+        "valor_reembolso_tecnico": _str_money(valor_reembolso_tecnico),
+        "valor_cobranca_cliente": _str_money(valor_cobranca_cliente),
         "rateios": [
             {
                 "cliente_id": rateio.cliente_id,

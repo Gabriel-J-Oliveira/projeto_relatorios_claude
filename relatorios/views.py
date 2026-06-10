@@ -3131,6 +3131,12 @@ def relatorio_item_financeiro_view(request, pk, tipo, item_pk, acao):
                     "valor_final": str(
                         item.valor_final if tipo == "despesa" else item.valor_final_clientes
                     ),
+                    "valor_reembolso_tecnico": (
+                        str(item.valor_reembolso_tecnico) if tipo == "trecho" else ""
+                    ),
+                    "valor_cobranca_cliente": (
+                        str(item.valor_final_clientes) if tipo == "trecho" else ""
+                    ),
                     "message": mensagem_sucesso,
                     "financeiro": payload_financeiro,
                 }

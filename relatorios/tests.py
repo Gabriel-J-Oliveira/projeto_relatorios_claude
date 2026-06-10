@@ -1200,6 +1200,37 @@ class RelatorioTecnicoFlowTests(TestCase):
         self.assertEqual(relatorio.valor_km_cobrar_cliente, Decimal("100.00"))
         self.assertEqual(relatorio.valor_removido_reembolso, Decimal("0.00"))
 
+    def test_resumo_financeiro_somente_km_reembolsa_tecnico_a_um_e_trinta_e_cinco(self):
+        self.cliente.valor_km = Decimal("1.85")
+        self.cliente.save(update_fields=["valor_km"])
+        relatorio = self.criar_relatorio("RT-2026-026")
+        relatorio.valor_adiantamento = Decimal("0.00")
+        relatorio.save(update_fields=["valor_adiantamento"])
+        TrechoKm.objects.create(
+            relatorio=relatorio,
+            ordem=0,
+            data="2026-05-02",
+            origem="Origem 1",
+            destino="Destino 1",
+            km=Decimal("26.81"),
+            valor_km=Decimal("1.85"),
+        )
+        TrechoKm.objects.create(
+            relatorio=relatorio,
+            ordem=1,
+            data="2026-05-02",
+            origem="Origem 2",
+            destino="Destino 2",
+            km=Decimal("26.04"),
+            valor_km=Decimal("1.85"),
+        )
+
+        self.assertEqual(relatorio.total_km_percorrido, Decimal("52.85"))
+        self.assertEqual(relatorio.valor_km_ressarcir, Decimal("71.35"))
+        self.assertEqual(relatorio.valor_km_cobrar_cliente, Decimal("97.77"))
+        self.assertEqual(relatorio.valor_removido_reembolso, Decimal("0.00"))
+        self.assertEqual(relatorio.total_a_reembolsar, Decimal("71.35"))
+
     def test_financeiro_rejeita_trecho_km_individual(self):
         self.client.force_login(self.usuario_financeiro)
         relatorio = self.criar_relatorio("RT-2026-021")

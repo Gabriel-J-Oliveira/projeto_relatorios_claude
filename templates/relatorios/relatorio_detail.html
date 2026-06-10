@@ -1734,7 +1734,10 @@
       document.querySelectorAll(".campo-aprovado-km").forEach(function (input) {
         encontrouCampoKm = true;
         if (input.dataset.multiCliente === "1") {
-          const valorFinalMulti = parseMoney(input.dataset.valorFinalOriginal);
+          const valorReembolsoMulti = parseMoney(
+            input.dataset.valorReembolsoTecnico || input.dataset.valorFinalOriginal
+          );
+          const valorFinalMulti = inputFinanceiroAtivo(input) ? valorReembolsoMulti : 0;
           totalKm += valorFinalMulti;
           const detalheId = input.closest("tr")?.nextElementSibling?.id;
           const destino = detalheId ? document.querySelector(`#${detalheId} .total-aprovado-km-linha`) : null;
@@ -1851,8 +1854,14 @@
           validarRateioModal(modal);
         }
       } else {
-        const valorFinal = parseMoney(item.valor_final);
+        const valorFinal = parseMoney(item.valor_reembolso_tecnico || item.valor_final);
         linha.nextElementSibling?.querySelectorAll(".total-aprovado-km-linha").forEach(el => el.textContent = formatMoney(valorFinal));
+        const input = linha.querySelector(".campo-aprovado-km");
+        if (input) {
+          input.dataset.valorFinalOriginal = item.valor_final || "0";
+          input.dataset.valorReembolsoTecnico = item.valor_reembolso_tecnico || item.valor_final || "0";
+          input.dataset.valorCobrancaCliente = item.valor_cobranca_cliente || "0";
+        }
         const modal = document.getElementById(`modal-rateio-trecho-${item.id}`);
         if (modal) {
           modal.dataset.rateioTotal = item.valor_final || "0";

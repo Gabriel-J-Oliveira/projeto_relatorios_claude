@@ -550,6 +550,10 @@ def _aplicar_visao_contabil(pdf):
         linha[destino] += _money(getattr(despesa, "aprovado", Decimal("0.00")))
 
     trechos_aprovados = [t for t in pdf.trechos if not getattr(t, "rejeitado", False)]
+    km_total_reembolso = sum(
+        (_money(getattr(t, "km", 0)) for t in trechos_aprovados),
+        Decimal("0.00"),
+    )
     km_tecnico = sum(
         (_money(getattr(t, "valor_reembolso_tecnico", 0)) for t in trechos_aprovados),
         Decimal("0.00"),
@@ -568,7 +572,12 @@ def _aplicar_visao_contabil(pdf):
 
     pdf.total_pago_tecnico = sum((_money(d.aprovado) for d in pdf.despesas_tecnico), Decimal("0.00"))
     pdf.total_pago_empresa = sum((_money(d.aprovado) for d in pdf.despesas_empresa), Decimal("0.00"))
-    pdf.total_reembolso_tecnico = _money(pdf.total_pago_tecnico + km_tecnico - pdf.totais.valor_adiantamento)
+    pdf.km_total_reembolso = _money(km_total_reembolso)
+    pdf.total_km_reembolso_tecnico = _money(km_tecnico)
+    pdf.valor_km_reembolso_tecnico_unitario = _money(
+        km_tecnico / km_total_reembolso if km_total_reembolso > 0 else Decimal("1.35")
+    )
+    pdf.total_reembolso_tecnico = _money(pdf.totais.saldo_aprovado)
     pdf.lancamentos_contabeis = [
         _ns(
             categoria=item["categoria"],
