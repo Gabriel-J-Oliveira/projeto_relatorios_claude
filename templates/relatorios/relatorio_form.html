@@ -441,10 +441,11 @@
 
                     <tfoot class="bg-body-tertiary border-top">
                       <tr>
-                        <td colspan="3" class="text-end py-2 pe-3 small fw-medium text-muted">Totais</td>
+                        <td colspan="3" class="text-end py-2 pe-3 small fw-medium text-muted">Totais (trechos + interno)</td>
                         <td class="py-2 small fw-bold">
                           <span id="total-km-percorrido">0</span>
                           <small class="text-muted fw-normal">km</small>
+                          <div class="text-muted fw-normal small" id="total-km-breakdown"></div>
                         </td>
                         <td></td>
                         <td class="py-2 fw-bold small">
@@ -547,7 +548,10 @@
                         </div>
                         <div class="d-flex justify-content-between py-2 border-bottom border-secondary-subtle">
                           <span class="text-muted small">Deslocamento (KM reembolso)</span>
-                          <span class="fw-semibold small">R$ <span id="res-km">0,00</span></span>
+                          <span class="fw-semibold small text-end">
+                            R$ <span id="res-km">0,00</span>
+                            <small class="d-block text-muted fw-normal" id="res-km-breakdown"></small>
+                          </span>
                         </div>
                         <div class="d-flex justify-content-between pt-3 fw-bold">
                           <span class="small">Subtotal Técnico</span>
@@ -2691,21 +2695,23 @@ async function adicionarLinhaKm() {
       atualizarPoliticaDespesa(tr);
     });
 
-    let totalKmCobranca = 0, totalKmReembolso = 0, totalKmKm = 0;
+    let totalKmCobranca = 0, totalKmReembolso = 0, totalKmKm = 0, totalKmTrechosKm = 0, totalKmReembolsoTrechos = 0;
     document.querySelectorAll(".linha-trecho").forEach(tr => {
       if (linhaEstaRemovida(tr)) return;
       const km = normalizarNumero(tr.querySelector(".campo-km")?.value);
       const vkm = normalizarNumero(tr.querySelector(".campo-vkm")?.value);
       totalKmKm += km;
-      totalKmReembolso += km * VALOR_KM_CONTROLSUL;
+      totalKmTrechosKm += km;
+      totalKmReembolsoTrechos += km * VALOR_KM_CONTROLSUL;
       if (!trechoTemMultiplosClientes(tr)) {
         totalKmCobranca += km * vkm;
       }
     });
     const kmExcedente = calcularKmExcedenteFrontend();
+    const totalKmInternoReembolso = kmExcedente.km * VALOR_KM_CONTROLSUL;
+    totalKmReembolso = totalKmReembolsoTrechos + totalKmInternoReembolso;
     totalKmKm += kmExcedente.km;
     totalKmCobranca += kmExcedente.valor;
-    totalKmReembolso += kmExcedente.km * VALOR_KM_CONTROLSUL;
 
     const totalGeral = totalTec + totalEmp + totalKmReembolso;
     const adiant = normalizarNumero(
@@ -2716,12 +2722,24 @@ async function adicionarLinhaKm() {
     // Rodapés das tabelas
     setText("total-despesas", (totalTec + totalEmp).toFixed(2).replace(".", ","));
     setText("total-km-percorrido", totalKmKm.toFixed(2).replace(".", ","));
+    setText(
+      "total-km-breakdown",
+      kmExcedente.km > 0
+        ? `Trechos ${totalKmTrechosKm.toFixed(2).replace(".", ",")} km + interno ${kmExcedente.km.toFixed(2).replace(".", ",")} km`
+        : ""
+    );
     setText("total-km-valor", totalKmCobranca.toFixed(2).replace(".", ","));
 
     // Resumo
     setText("res-tec-desp", totalTec.toFixed(2).replace(".", ","));
     setText("res-emp-desp", totalEmp.toFixed(2).replace(".", ","));
     setText("res-km", totalKmReembolso.toFixed(2).replace(".", ","));
+    setText(
+      "res-km-breakdown",
+      kmExcedente.km > 0
+        ? `Trechos R$ ${totalKmReembolsoTrechos.toFixed(2).replace(".", ",")} + interno R$ ${totalKmInternoReembolso.toFixed(2).replace(".", ",")}`
+        : ""
+    );
     setText("res-subtotal-tec", (totalTec + totalKmReembolso).toFixed(2).replace(".", ","));
     setText("res-subtotal-emp", totalEmp.toFixed(2).replace(".", ","));
     setText("res-total-geral", totalGeral.toFixed(2).replace(".", ","));

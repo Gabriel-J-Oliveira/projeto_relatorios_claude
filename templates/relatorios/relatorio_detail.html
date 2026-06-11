@@ -732,7 +732,7 @@
             </tbody>
             <tfoot class="table-light fw-semibold">
               <tr>
-                <td colspan="3" class="ps-3 small text-end text-muted">Total KM: {{ relatorio.total_km_percorrido }} km</td>
+                <td colspan="3" class="ps-3 small text-end text-muted">Total KM (trechos + interno): {{ relatorio.total_km_percorrido }} km</td>
                 <td class="small fw-bold text-success" id="total-aprovado-km">R$ {{ relatorio.total_aprovado_km|floatformat:2 }}</td>
                 <td class="small fw-bold text-success">R$ {{ relatorio.total_km|floatformat:2 }}</td>
                 <td></td>
@@ -757,10 +757,17 @@
             <strong>{{ relatorio.km_excedente_interno|floatformat:2 }} km</strong>
           </div>
           <div class="col-md-3">
-            <span class="text-muted small d-block">Total financeiro</span>
+            <span class="text-muted small d-block">Reembolso tecnico</span>
+            <strong class="text-primary valor-reembolso-km-excedente"
+                    data-valor-reembolso="{{ relatorio.total_km_excedente_reembolso_tecnico|unlocalize }}">
+              R$ {{ relatorio.total_km_excedente_reembolso_tecnico|floatformat:2 }}
+            </strong>
+          </div>
+          <div class="col-md-3">
+            <span class="text-muted small d-block">Cobranca cliente</span>
             <strong class="text-success">R$ {{ relatorio.total_km_excedente|floatformat:2 }}</strong>
           </div>
-          <div class="col-md-6">
+          <div class="col-md-3">
             <span class="text-muted small d-block">Observação</span>
             <span>{{ relatorio.observacao_km_excedente|default:"Sem observação" }}</span>
           </div>
@@ -1703,12 +1710,18 @@
       return texto ? parseMoney(texto) : fallback;
     }
 
-    function totalReembolsoKmRenderizado() {
-      const linhas = Array.from(document.querySelectorAll(".valor-reembolso-km-linha"));
-      if (!linhas.length) return 0;
-      const total = linhas.reduce(function (acc, el) {
+    function totalReembolsoKmExcedenteRenderizado() {
+      return Array.from(document.querySelectorAll(".valor-reembolso-km-excedente")).reduce(function (acc, el) {
         return acc + parseMoney(el.dataset.valorReembolso || el.textContent);
       }, 0);
+    }
+
+    function totalReembolsoKmRenderizado() {
+      const linhas = Array.from(document.querySelectorAll(".valor-reembolso-km-linha"));
+      const totalTrechos = linhas.reduce(function (acc, el) {
+        return acc + parseMoney(el.dataset.valorReembolso || el.textContent);
+      }, 0);
+      const total = totalTrechos + totalReembolsoKmExcedenteRenderizado();
       return Math.round(total * 100) / 100;
     }
 
@@ -1769,6 +1782,8 @@
         if (!totalKm) {
           totalKm = parseMoney(document.getElementById("total-aprovado-km")?.textContent);
         }
+      } else {
+        totalKm += totalReembolsoKmExcedenteRenderizado();
       }
 
       const totalAprovado = Math.round((totalDespesas + totalKm) * 100) / 100;
