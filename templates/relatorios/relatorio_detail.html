@@ -570,7 +570,7 @@
                 <td class="ps-3 small text-muted">{{ t.data|date:"d/m/Y"|default:"A preencher" }}</td>
                 <td class="small">{{ t.km }} km</td>
                 <td class="small text-muted">R$ {{ t.valor_km_control_sul|floatformat:2 }}</td>
-                <td class="small text-muted">
+                <td class="small text-muted valor-reembolso-km-linha" data-valor-reembolso="{{ t.valor_reembolso_tecnico|unlocalize }}">
                   R$ {{ t.valor_reembolso_tecnico|floatformat:2 }}
                 </td>
                 <td class="small fw-semibold text-success">R$ {{ t.valor_calculado_clientes|floatformat:2 }}</td>
@@ -635,11 +635,11 @@
                     </div>
                     <div class="col-md-2">
                       <span class="text-muted">Cobranca cliente final</span>
-                      <div class="fw-semibold text-success total-aprovado-km-linha">R$ {{ t.valor_final_clientes|floatformat:2 }}</div>
+                      <div class="fw-semibold text-success total-cobranca-km-linha">R$ {{ t.valor_final_clientes|floatformat:2 }}</div>
                     </div>
                     <div class="col-md-2">
                       <span class="text-muted">Reembolso tecnico</span>
-                      <div class="fw-semibold">R$ {{ t.valor_reembolso_tecnico|floatformat:2 }}</div>
+                      <div class="fw-semibold total-aprovado-km-linha valor-reembolso-km-detalhe" data-valor-reembolso="{{ t.valor_reembolso_tecnico|unlocalize }}">R$ {{ t.valor_reembolso_tecnico|floatformat:2 }}</div>
                     </div>
                     <div class="col-md-2">
                       <span class="text-muted">Excesso/reducao</span>
@@ -1703,6 +1703,15 @@
       return texto ? parseMoney(texto) : fallback;
     }
 
+    function totalReembolsoKmRenderizado() {
+      const linhas = Array.from(document.querySelectorAll(".valor-reembolso-km-linha"));
+      if (!linhas.length) return 0;
+      const total = linhas.reduce(function (acc, el) {
+        return acc + parseMoney(el.dataset.valorReembolso || el.textContent);
+      }, 0);
+      return Math.round(total * 100) / 100;
+    }
+
     function atualizarTotaisFinanceiros() {
       const formFinanceiro = document.getElementById("form-valores-aprovados-financeiro");
       let totalDespesas = 0;
@@ -1756,7 +1765,10 @@
         if (destino) destino.textContent = formatMoney(valorFinal);
       });
       if (!encontrouCampoKm) {
-        totalKm = parseMoney(document.getElementById("total-aprovado-km")?.textContent);
+        totalKm = totalReembolsoKmRenderizado();
+        if (!totalKm) {
+          totalKm = parseMoney(document.getElementById("total-aprovado-km")?.textContent);
+        }
       }
 
       const totalAprovado = Math.round((totalDespesas + totalKm) * 100) / 100;
@@ -1855,7 +1867,17 @@
         }
       } else {
         const valorFinal = parseMoney(item.valor_reembolso_tecnico || item.valor_final);
-        linha.nextElementSibling?.querySelectorAll(".total-aprovado-km-linha").forEach(el => el.textContent = formatMoney(valorFinal));
+        linha.querySelectorAll(".valor-reembolso-km-linha").forEach(function (el) {
+          el.textContent = formatMoney(valorFinal);
+          el.dataset.valorReembolso = String(valorFinal.toFixed(2));
+        });
+        linha.nextElementSibling?.querySelectorAll(".total-aprovado-km-linha").forEach(function (el) {
+          el.textContent = formatMoney(valorFinal);
+          el.dataset.valorReembolso = String(valorFinal.toFixed(2));
+        });
+        linha.nextElementSibling?.querySelectorAll(".total-cobranca-km-linha").forEach(el => {
+          el.textContent = formatMoney(parseMoney(item.valor_cobranca_cliente || item.valor_final));
+        });
         const input = linha.querySelector(".campo-aprovado-km");
         if (input) {
           input.dataset.valorFinalOriginal = item.valor_final || "0";

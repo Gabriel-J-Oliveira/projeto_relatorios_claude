@@ -1343,7 +1343,15 @@
     if (contador) contador.textContent = ids.length;
     if (badges) {
       badges.innerHTML = ids.length
-        ? ids.map(id => `<span class="badge rounded-pill text-bg-secondary">${getNomeTecnico(id)}</span>`).join("")
+        ? ids.map(id => `
+            <span class="badge rounded-pill text-bg-secondary d-inline-flex align-items-center gap-1">
+              <span>${escapeHtmlMapa(getNomeTecnico(id))}</span>
+              <button type="button"
+                      class="btn-close btn-close-white badge-remove-tecnico"
+                      data-tecnico-id="${escapeHtmlMapa(id)}"
+                      aria-label="Remover ${escapeHtmlMapa(getNomeTecnico(id))}"></button>
+            </span>
+          `).join("")
         : '<span class="text-muted small">Nenhum técnico selecionado</span>';
     }
   }
@@ -1478,7 +1486,6 @@
 
   function aplicarSelecaoTecnicos() {
     const ids = Array.from(document.querySelectorAll(".tecnico-opcao.btn-success"))
-      .filter(btn => !btn.closest("tr")?.classList.contains("d-none"))
       .map(btn => btn.dataset.tecnicoId);
     setTecnicosEquipe(ids);
     atualizarBadgesTecnicosEquipe();
@@ -2356,6 +2363,18 @@
       opcaoTecnico.classList.toggle("btn-outline-secondary");
       opcaoTecnico.textContent = opcaoTecnico.classList.contains("btn-success") ? "Selecionado" : "Selecionar";
     }
+
+    const removerTecnico = event.target.closest(".badge-remove-tecnico");
+    if (removerTecnico) {
+      const ids = getTecnicosEquipeIds().filter(id => id !== String(removerTecnico.dataset.tecnicoId));
+      setTecnicosEquipe(ids);
+      atualizarBadgesTecnicosEquipe();
+      document.querySelectorAll(`.tecnico-opcao[data-tecnico-id="${removerTecnico.dataset.tecnicoId}"]`).forEach(btn => {
+        btn.classList.remove("btn-success");
+        btn.classList.add("btn-outline-secondary");
+        btn.textContent = "Selecionar";
+      });
+    }
   });
 
   document.getElementById("btn-confirmar-clientes")
@@ -2377,7 +2396,6 @@
   document.getElementById("btn-limpar-tecnicos-selecao")
     ?.addEventListener("click", () => {
       document.querySelectorAll(".tecnico-opcao").forEach(btn => {
-        if (btn.closest("tr")?.classList.contains("d-none")) return;
         btn.classList.remove("btn-success");
         btn.classList.add("btn-outline-secondary");
         btn.textContent = "Selecionar";
