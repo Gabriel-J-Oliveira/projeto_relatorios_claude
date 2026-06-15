@@ -58,6 +58,16 @@
       <strong>{{ relatorio.tipo_reembolso_label|default:"Reembolsável" }}</strong>
     </div>
     <div>
+      <span>Técnico reembolsado</span>
+      <strong>{{ relatorio.tecnico_reembolso_nome|default:"Não informado" }}</strong>
+    </div>
+    {% if relatorio.tipo_reembolso == "nao_reembolsavel" %}
+    <div>
+      <span>Empresa do grupo</span>
+      <strong>{{ relatorio.empresa_grupo_label|default:"Não informado" }}</strong>
+    </div>
+    {% endif %}
+    <div>
       <span>Area de gasto</span>
       <strong>{{ relatorio.tipo_relatorio_label|default:"Nao informado" }}</strong>
     </div>

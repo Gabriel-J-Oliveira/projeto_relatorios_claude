@@ -524,6 +524,11 @@ LOGGING = {
             "level": APP_LOG_LEVEL,
             "propagate": False,
         },
+        "relatorios.manutencao": {
+            "handlers": ["console"],
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
     },
 }
 
@@ -566,3 +571,4 @@ if LOG_FILES_ENABLED:
     LOGGING["loggers"]["relatorios.services.pdf_interno_service"]["handlers"] = ["console", "pdfs_file", "errors_file"]
     LOGGING["loggers"]["relatorios.services.workflow_service"]["handlers"] = ["console", "app_file", "security_file", "errors_file"]
     LOGGING["loggers"]["relatorios.services.snapshot_service"]["handlers"] = ["console", "app_file", "pdfs_file", "errors_file"]
+    LOGGING["loggers"]["relatorios.manutencao"]["handlers"] = ["console", "app_file", "security_file", "errors_file"]

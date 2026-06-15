@@ -102,6 +102,9 @@ def _relatorio_snapshot(payload):
         tipo_relatorio_label=relatorio.get("tipo_relatorio_label") or "Nao informado",
         tipo_reembolso=relatorio.get("tipo_reembolso") or "reembolsavel",
         tipo_reembolso_label=relatorio.get("tipo_reembolso_label") or "Reembolsável",
+        empresa_grupo=relatorio.get("empresa_grupo") or "",
+        empresa_grupo_label=relatorio.get("empresa_grupo_label") or "",
+        tecnico_reembolso_nome=(relatorio.get("tecnico_reembolso") or {}).get("nome") or "Não informado",
         data_inicio=_date(relatorio.get("data_inicio")),
         data_fim=_date(relatorio.get("data_fim")),
         emitido_em=None,
@@ -358,6 +361,13 @@ def _relatorio_vivo(relatorio):
         tipo_relatorio_label=relatorio.get_tipo_relatorio_display(),
         tipo_reembolso=relatorio.tipo_reembolso,
         tipo_reembolso_label=relatorio.get_tipo_reembolso_display(),
+        empresa_grupo=relatorio.empresa_grupo,
+        empresa_grupo_label=relatorio.get_empresa_grupo_display() if relatorio.empresa_grupo else "",
+        tecnico_reembolso_nome=(
+            relatorio.tecnico_reembolso_exibicao().nome
+            if relatorio.tecnico_reembolso_exibicao()
+            else "Não informado"
+        ),
         data_inicio=relatorio.data_inicio,
         data_fim=relatorio.data_fim,
         aprovado_em=relatorio.aprovado_em,

@@ -13,7 +13,9 @@ from .models import (
     Tecnico,
     Cliente,
     Adiantamento,
+    EmpresaGrupo,
     TipoDocumentoComprovante,
+    TipoReembolso,
     Municipio,
     Setor,
     ArtigoAjuda,
@@ -259,10 +261,21 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         ),
         help_text="Segure Ctrl (ou Cmd) para selecionar múltiplos.",
     )
+    tecnico_reembolso = TecnicoChoiceField(
+        queryset=Tecnico.objects.filter(ativo=True).order_by("nome"),
+        required=False,
+        label="Técnico reembolsado",
+        widget=forms.HiddenInput(),
+    )
     municipio_atendimento = forms.ModelChoiceField(
         queryset=Municipio.objects.filter(ativo=True).order_by("nome", "uf"),
         required=False,
         widget=forms.HiddenInput(),
+    )
+    empresa_grupo = forms.ChoiceField(
+        choices=[("", "Selecione")] + list(EmpresaGrupo.choices),
+        required=False,
+        label="Empresa responsável pelo custo",
     )
 
     class Meta:
@@ -270,6 +283,7 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         fields = [
             "numero",
             "tecnico_responsavel",
+            "tecnico_reembolso",
             "municipio_atendimento",
             "cidade_atendimento",
             "uf_atendimento",
@@ -279,6 +293,7 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
             "motivo",
             "tipo_relatorio",
             "tipo_reembolso",
+            "empresa_grupo",
             "valor_adiantamento",
             "km_excedente_interno",
             "observacao_km_excedente",
@@ -317,6 +332,9 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         self.fields["tecnico_responsavel"].queryset = Tecnico.objects.filter(
+            ativo=True
+        ).order_by("nome")
+        self.fields["tecnico_reembolso"].queryset = Tecnico.objects.filter(
             ativo=True
         ).order_by("nome")
         for name in ["data_inicio", "data_fim"]:
@@ -362,6 +380,9 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
         self.fields["tipo_reembolso"].widget.attrs.update(
             {"class": "form-select form-select-sm"}
         )
+        self.fields["empresa_grupo"].widget.attrs.update(
+            {"class": "form-select form-select-sm"}
+        )
         self.fields["valor_adiantamento"].widget.attrs.update(
             {
                 "inputmode": "decimal",
@@ -387,6 +408,8 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
             self.fields["tecnicos_equipe"].initial = (
                 self.instance.tecnicos_adicionais.values_list("pk", flat=True)
             )
+            if self.instance.tecnico_reembolso_id:
+                self.fields["tecnico_reembolso"].initial = self.instance.tecnico_reembolso_id
 
     def clean_numero(self):
         if self.instance.pk:
@@ -442,11 +465,23 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
                 cd["tipo_localidade"] = municipio.tipo_localidade_padrao
         resp = cd.get("tecnico_responsavel")
         equipe = cd.get("tecnicos_equipe", [])
+        tecnico_reembolso = cd.get("tecnico_reembolso")
+        tecnicos_envolvidos = [tecnico for tecnico in [resp] + list(equipe or []) if tecnico]
+        if not tecnico_reembolso and len(tecnicos_envolvidos) == 1:
+            tecnico_reembolso = tecnicos_envolvidos[0]
+            cd["tecnico_reembolso"] = tecnico_reembolso
         if resp and resp in equipe:
             self.add_error(
                 "tecnicos_equipe",
                 "O técnico responsável não deve ser adicionado à equipe adicional.",
             )
+        if tecnico_reembolso and tecnico_reembolso not in tecnicos_envolvidos:
+            self.add_error(
+                "tecnico_reembolso",
+                "O técnico definido para reembolso deve estar entre os técnicos envolvidos no relatório.",
+            )
+        if cd.get("tipo_reembolso") != TipoReembolso.NAO_REEMBOLSAVEL:
+            cd["empresa_grupo"] = ""
         if cd.get("valor_adiantamento") is None:
             cd["valor_adiantamento"] = 0
         if cd.get("km_excedente_interno") is None:

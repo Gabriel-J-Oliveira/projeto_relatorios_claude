@@ -1,7 +1,7 @@
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import logging
 
-from relatorios.models import ItemDespesa, StatusFinanceiroItem
+from relatorios.models import ItemDespesa, StatusFinanceiroItem, TipoReembolso
 
 
 logger = logging.getLogger(__name__)
@@ -316,6 +316,21 @@ def validar_integridade_financeira_relatorio(relatorio):
     clientes_relatorio_ids = _clientes_relatorio_ids(relatorio)
     if not clientes_relatorio_ids:
         erros.append("Selecione ao menos um cliente para o relatório.")
+
+    tecnico_reembolso_id = getattr(relatorio, "tecnico_reembolso_id", None)
+    envolvidos = relatorio.tecnicos_envolvidos_ids()
+    tem_pagamento_tecnico = (
+        relatorio.tipo_reembolso == TipoReembolso.REEMBOLSAVEL
+        or relatorio.despesas.filter(quem_pagou="tecnico").exists()
+        or relatorio.trechos.exists()
+        or (relatorio.km_excedente_interno or Decimal("0.00")) > 0
+    )
+    if tem_pagamento_tecnico and not tecnico_reembolso_id:
+        erros.append("Selecione o técnico que receberá o reembolso.")
+    if tecnico_reembolso_id and tecnico_reembolso_id not in envolvidos:
+        erros.append("O técnico definido para reembolso deve estar entre os técnicos envolvidos no relatório.")
+    if relatorio.tipo_reembolso == TipoReembolso.NAO_REEMBOLSAVEL and not relatorio.empresa_grupo:
+        erros.append("Selecione a empresa responsável pelo custo.")
 
     for despesa in relatorio.despesas.all():
         erros.extend(validar_integridade_despesa(despesa, clientes_relatorio_ids))

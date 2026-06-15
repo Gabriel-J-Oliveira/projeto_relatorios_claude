@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+
+{% block page_title %}Manutenção do Sistema{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Início</a>
+  </li>
+  <li class="breadcrumb-item active">Manutenção</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .maintenance-log-row {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: .78rem;
+  }
+  .maintenance-log-message {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .maintenance-table {
+    min-width: 980px;
+  }
+  .maintenance-error-detail {
+    max-width: 360px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="alert alert-warning border-0 shadow-sm d-flex align-items-start gap-2">
+  <i class="bi bi-shield-lock-fill mt-1"></i>
+  <div>
+    <strong>Área restrita.</strong>
+    Esta área deve ser utilizada apenas para diagnóstico e manutenção operacional controlada.
+  </div>
+</div>
+
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item" role="presentation">
+    <a class="nav-link {% if aba_ativa != 'emails' %}active{% endif %}"
+       href="{% url 'relatorios:manutencao' %}?aba=logs">
+      <i class="bi bi-journal-text me-1"></i> Logs do sistema
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a class="nav-link {% if aba_ativa == 'emails' %}active{% endif %}"
+       href="{% url 'relatorios:manutencao' %}?aba=emails">
+      <i class="bi bi-envelope-exclamation me-1"></i> E-mails pendentes/falhos
+    </a>
+  </li>
+</ul>
+
+{% if aba_ativa == 'emails' %}
+<section class="d-grid gap-3">
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small">Pendentes</div>
+          <div class="fs-4 fw-bold">{{ email_resumo.pendentes }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small">Falhas</div>
+          <div class="fs-4 fw-bold text-danger">{{ email_resumo.falhas }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small">Enviados hoje</div>
+          <div class="fs-4 fw-bold text-success">{{ email_resumo.enviados_hoje }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+      <form method="get" class="row g-2 align-items-end">
+        <input type="hidden" name="aba" value="emails">
+        <div class="col-md-2">
+          <label class="form-label small text-muted">Status</label>
+          <select name="email_status" class="form-select form-select-sm">
+            <option value="">Pendentes e falhas</option>
+            {% for valor, label in email_status_choices %}
+              <option value="{{ valor }}" {% if request.GET.email_status == valor %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small text-muted">Tipo</label>
+          <input type="text" name="email_tipo" class="form-control form-control-sm" value="{{ request.GET.email_tipo }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small text-muted">Destinatário</label>
+          <input type="text" name="email_destinatario" class="form-control form-control-sm" value="{{ request.GET.email_destinatario }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small text-muted">Relatório</label>
+          <input type="text" name="email_relatorio" class="form-control form-control-sm" value="{{ request.GET.email_relatorio }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small text-muted">Data inicial</label>
+          <input type="date" name="email_data_inicio" class="form-control form-control-sm" value="{{ request.GET.email_data_inicio }}">
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+          <button class="btn btn-sm btn-primary w-100" type="submit">
+            <i class="bi bi-search me-1"></i>Filtrar
+          </button>
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'relatorios:manutencao' %}?aba=emails">Limpar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-body d-flex flex-wrap align-items-center justify-content-between gap-2">
+      <div>
+        <h6 class="mb-0">E-mails encontrados</h6>
+        <small class="text-muted">Exibindo até 100 registros.</small>
+      </div>
+      <form method="post" action="{% url 'relatorios:manutencao_email_teste' %}" class="d-flex gap-2">
+        {% csrf_token %}
+        <input type="email" name="destinatario_teste" class="form-control form-control-sm" placeholder="destinatário de teste" required>
+        <button class="btn btn-sm btn-outline-primary text-nowrap" type="submit">
+          <i class="bi bi-send me-1"></i>Teste SMTP
+        </button>
+      </form>
+    </div>
+    <div class="card-body">
+      <form method="post" action="{% url 'relatorios:manutencao_emails_reenviar_lote' %}"
+            onsubmit="return confirm('Reenviar os e-mails selecionados? Limite de 20 por execução.');">
+        {% csrf_token %}
+        <div class="d-flex justify-content-end mb-2">
+          <button class="btn btn-sm btn-warning" type="submit">
+            <i class="bi bi-arrow-repeat me-1"></i>Reenviar selecionados
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle maintenance-table">
+            <thead>
+              <tr>
+                <th style="width:36px;"></th>
+                <th>Data</th>
+                <th>Tipo</th>
+                <th>Relatório</th>
+                <th>Destinatários</th>
+                <th>Assunto</th>
+                <th>Status</th>
+                <th>Tentativas</th>
+                <th>Último erro</th>
+                <th class="text-end">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for email in email_logs %}
+              <tr>
+                <td>
+                  {% if email.status == 'pendente' or email.status == 'falha' %}
+                    <input class="form-check-input" type="checkbox" name="email_ids" value="{{ email.pk }}">
+                  {% endif %}
+                </td>
+                <td class="small">{{ email.criado_em|date:"d/m/Y H:i" }}</td>
+                <td><span class="badge text-bg-secondary">{{ email.tipo }}</span></td>
+                <td>
+                  {% if email.relatorio_id %}
+                    <a href="{% url 'relatorios:relatorio_detail' email.relatorio_id %}">#{{ email.relatorio.identificador }}</a>
+                  {% else %}
+                    <span class="text-muted">-</span>
+                  {% endif %}
+                </td>
+                <td class="small">{{ email.destinatarios|join:", " }}</td>
+                <td class="small">{{ email.assunto }}</td>
+                <td>
+                  <span class="badge {% if email.status == 'falha' %}text-bg-danger{% elif email.status == 'pendente' %}text-bg-warning{% else %}text-bg-success{% endif %}">
+                    {{ email.get_status_display }}
+                  </span>
+                </td>
+                <td>{{ email.tentativas }}</td>
+                <td>
+                  {% if email.ultimo_erro %}
+                    <span class="d-inline-block maintenance-error-detail" title="{{ email.ultimo_erro }}">{{ email.ultimo_erro }}</span>
+                  {% else %}
+                    <span class="text-muted">-</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  {% if email.status == 'pendente' or email.status == 'falha' %}
+                  <form method="post" action="{% url 'relatorios:manutencao_email_reenviar' email.pk %}" class="d-inline">
+                    {% csrf_token %}
+                    <button class="btn btn-sm btn-outline-primary" type="submit">
+                      <i class="bi bi-arrow-repeat me-1"></i>Reenviar
+                    </button>
+                  </form>
+                  {% else %}
+                    <span class="text-muted small">Sem ação</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="10" class="text-center text-muted py-4">Nenhum e-mail encontrado para os filtros atuais.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+{% else %}
+<section class="d-grid gap-3">
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+      <form method="get" class="row g-2 align-items-end">
+        <input type="hidden" name="aba" value="logs">
+        <div class="col-md-2">
+          <label class="form-label small text-muted">Data inicial</label>
+          <input type="date" name="log_data_inicio" class="form-control form-control-sm" value="{{ request.GET.log_data_inicio }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small text-muted">Data final</label>
+          <input type="date" name="log_data_fim" class="form-control form-control-sm" value="{{ request.GET.log_data_fim }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small text-muted">Nível</label>
+          <select name="log_nivel" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            {% for nivel in log_niveis %}
+              <option value="{{ nivel }}" {% if request.GET.log_nivel == nivel %}selected{% endif %}>{{ nivel }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small text-muted">Logger</label>
+          <input type="text" name="log_logger" class="form-control form-control-sm" value="{{ request.GET.log_logger }}" placeholder="relatorios...">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small text-muted">Buscar no log</label>
+          <input type="text" name="log_q" class="form-control form-control-sm" value="{{ request.GET.log_q }}" placeholder="SMTP, traceback...">
+        </div>
+        <div class="col-md-1">
+          <label class="form-label small text-muted">Limite</label>
+          <select name="log_limite" class="form-select form-select-sm">
+            <option value="100" {% if request.GET.log_limite == "100" %}selected{% endif %}>100</option>
+            <option value="200" {% if not request.GET.log_limite or request.GET.log_limite == "200" %}selected{% endif %}>200</option>
+            <option value="500" {% if request.GET.log_limite == "500" %}selected{% endif %}>500</option>
+            <option value="1000" {% if request.GET.log_limite == "1000" %}selected{% endif %}>1000</option>
+          </select>
+        </div>
+        <div class="col-md-1 d-flex gap-2">
+          <button class="btn btn-sm btn-primary" type="submit" title="Buscar">
+            <i class="bi bi-search"></i>
+          </button>
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'relatorios:manutencao' %}?aba=logs" title="Limpar">
+            <i class="bi bi-x-lg"></i>
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-body d-flex flex-wrap align-items-center justify-content-between gap-2">
+      <div>
+        <h6 class="mb-0">Logs recentes</h6>
+        <small class="text-muted">Diretório: {{ logs.log_dir }} | Arquivos: {{ logs.arquivos|join:", " }}</small>
+      </div>
+      <span class="badge text-bg-secondary">{{ logs.linhas|length }} linha(s)</span>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle maintenance-table">
+          <thead>
+            <tr>
+              <th>Data/hora</th>
+              <th>Nível</th>
+              <th>Logger</th>
+              <th>Origem</th>
+              <th>Mensagem</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for linha in logs.linhas %}
+            <tr class="maintenance-log-row {% if linha.nivel == 'ERROR' or linha.nivel == 'CRITICAL' %}table-danger{% elif linha.nivel == 'WARNING' %}table-warning{% endif %}">
+              <td class="text-nowrap">{{ linha.data_hora|default:"-" }}</td>
+              <td>
+                <span class="badge {% if linha.nivel == 'ERROR' or linha.nivel == 'CRITICAL' %}text-bg-danger{% elif linha.nivel == 'WARNING' %}text-bg-warning{% elif linha.nivel == 'INFO' %}text-bg-info{% else %}text-bg-secondary{% endif %}">
+                  {{ linha.nivel|default:"LOG" }}
+                </span>
+              </td>
+              <td>{{ linha.logger|default:"-" }}</td>
+              <td class="text-nowrap">{{ linha.origem|default:linha.arquivo }}</td>
+              <td class="maintenance-log-message">{{ linha.mensagem }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" class="text-center text-muted py-4">Nenhuma linha de log encontrada para os filtros atuais.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

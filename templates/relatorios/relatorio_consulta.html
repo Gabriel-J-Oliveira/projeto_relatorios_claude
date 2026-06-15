@@ -93,6 +93,16 @@
           <strong>{{ consulta.relatorio.tipo_reembolso_label }}</strong>
         </div>
         <div>
+          <span>Técnico reembolsado</span>
+          <strong>{{ consulta.relatorio.tecnico_reembolso_nome|default:"Não informado" }}</strong>
+        </div>
+        {% if consulta.relatorio.tipo_reembolso == 'nao_reembolsavel' %}
+        <div>
+          <span>Empresa do grupo</span>
+          <strong>{{ consulta.relatorio.empresa_grupo_label|default:"Não informado" }}</strong>
+        </div>
+        {% endif %}
+        <div>
           <span>Area de gasto</span>
           <strong>{{ consulta.relatorio.tipo_relatorio_label|default:"Nao informado" }}</strong>
         </div>

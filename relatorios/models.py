@@ -84,6 +84,12 @@ class TipoReembolso(models.TextChoices):
     NAO_REEMBOLSAVEL = "nao_reembolsavel", "Não reembolsável"
 
 
+class EmpresaGrupo(models.TextChoices):
+    BLAZIUS_E_LORENZETTI = "blazius_e_lorenzetti", "BLAZIUS E LORENZETTI"
+    CONTROLSUL = "controlsul", "CONTROLSUL"
+    FISCALMAX = "fiscalmax", "FISCALMAX"
+
+
 class StatusFinanceiroItem(models.TextChoices):
     APROVADO = "aprovado", "Aprovado"
     REJEITADO = "rejeitado", "Rejeitado"
@@ -880,6 +886,14 @@ class RelatorioTecnico(models.Model):
         blank=True,
         verbose_name="Equipe adicional",
     )
+    tecnico_reembolso = models.ForeignKey(
+        Tecnico,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="relatorios_reembolso",
+        verbose_name="Técnico reembolsado",
+    )
 
     # Atendimento
     municipio_atendimento = models.ForeignKey(
@@ -944,6 +958,12 @@ class RelatorioTecnico(models.Model):
         max_length=20,
         choices=TipoReembolso.choices,
         default=TipoReembolso.REEMBOLSAVEL,
+    )
+    empresa_grupo = models.CharField(
+        "Empresa responsável pelo custo",
+        max_length=30,
+        choices=EmpresaGrupo.choices,
+        blank=True,
     )
 
     # Financeiro
@@ -1109,6 +1129,20 @@ class RelatorioTecnico(models.Model):
             vistos.add(membro.tecnico_id)
             tecnicos.append(membro.tecnico)
         return tecnicos
+
+    def tecnicos_envolvidos_ids(self):
+        ids = []
+        if self.tecnico_responsavel_id:
+            ids.append(self.tecnico_responsavel_id)
+        if self.pk:
+            ids.extend(self.equipe.values_list("tecnico_id", flat=True))
+        return set(ids)
+
+    def tecnico_reembolso_exibicao(self):
+        if self.tecnico_reembolso_id:
+            return self.tecnico_reembolso
+        tecnicos = self.tecnicos_exibicao()
+        return tecnicos[0] if len(tecnicos) == 1 else None
 
     def tecnico_principal_exibicao(self):
         tecnicos = self.tecnicos_exibicao()
@@ -1313,8 +1347,6 @@ class RelatorioTecnico(models.Model):
 
     @property
     def total_a_reembolsar(self):
-        if self.tipo_reembolso == TipoReembolso.NAO_REEMBOLSAVEL:
-            return Decimal("0.00")
         return _valor_monetario(
             self.total_despesas_reembolsaveis
             + self.valor_km_ressarcir
@@ -1459,6 +1491,15 @@ class EmailLog(models.Model):
     ultimo_erro = models.TextField("Último erro", blank=True)
     criado_em = models.DateTimeField("Criado em", auto_now_add=True)
     enviado_em = models.DateTimeField("Enviado em", null=True, blank=True)
+    reenviado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="emails_reenviados",
+        verbose_name="Reenviado por",
+    )
+    ultimo_reenvio_em = models.DateTimeField("Último reenvio em", null=True, blank=True)
     atualizado_em = models.DateTimeField("Atualizado em", auto_now=True)
 
     class Meta:

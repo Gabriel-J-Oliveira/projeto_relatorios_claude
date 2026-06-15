@@ -261,6 +261,18 @@
             {% endwith %}
           </dd>
 
+          <dt class="col-sm-4 text-muted fw-medium">Técnico reembolsado</dt>
+          <dd class="col-sm-8 fw-semibold">
+            {% with tecnico_reembolso=relatorio.tecnico_reembolso_exibicao %}
+              {{ tecnico_reembolso.nome|default:"Não informado" }}
+            {% endwith %}
+          </dd>
+
+          {% if relatorio.tipo_reembolso == 'nao_reembolsavel' %}
+          <dt class="col-sm-4 text-muted fw-medium">Empresa do grupo</dt>
+          <dd class="col-sm-8 fw-semibold">{{ relatorio.get_empresa_grupo_display|default:"Não informado" }}</dd>
+          {% endif %}
+
           <dt class="col-sm-4 text-muted fw-medium">Local</dt>
           <dd class="col-sm-8">
             {{ relatorio.cidade_atendimento }}/{{ relatorio.uf_atendimento }}
@@ -855,7 +867,7 @@
         {% if relatorio.tipo_reembolso == 'nao_reembolsavel' %}
         <div class="alert alert-secondary border-0 shadow-sm mt-3 mb-0 py-2 small">
           <i class="bi bi-info-circle me-1"></i>
-          Este relatorio foi marcado como nao reembolsavel.
+          Relatorio nao reembolsavel: custo assumido pela empresa do grupo.
         </div>
         {% endif %}
 
@@ -880,7 +892,7 @@
                {% if relatorio.total_a_reembolsar >= 0 %}text-success{% else %}text-danger{% endif %}">
             {% if relatorio.tipo_reembolso == 'nao_reembolsavel' %}
             <i class="bi bi-info-circle me-1"></i>
-            Relatorio nao reembolsavel.
+            Custo assumido pela empresa do grupo; reembolso ao tecnico mantido quando houver valores aprovados.
             {% elif relatorio.total_a_reembolsar > 0 %}
             <i class="bi bi-arrow-left-circle me-1"></i>
             Empresa deve reembolsar o tecnico.
@@ -1788,10 +1800,7 @@
 
       const totalAprovado = Math.round((totalDespesas + totalKm) * 100) / 100;
       const adiantamento = parseMoney(formFinanceiro?.dataset.adiantamento);
-      const naoReembolsavel = formFinanceiro?.dataset.tipoReembolso === "nao_reembolsavel";
-      const saldo = naoReembolsavel
-        ? 0
-        : Math.round((totalDespesasReembolsaveis + totalKm - adiantamento) * 100) / 100;
+      const saldo = Math.round((totalDespesasReembolsaveis + totalKm - adiantamento) * 100) / 100;
 
       const totalDespesasEl = document.getElementById("total-aprovado-despesas");
       const totalKmEl = document.getElementById("total-aprovado-km");

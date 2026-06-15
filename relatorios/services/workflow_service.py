@@ -13,6 +13,7 @@ from relatorios.models import (
     StatusRelatorio,
     TipoAdiantamento,
     TipoEventoHistorico,
+    TipoReembolso,
 )
 from relatorios.services.autorizacao_service import (
     usuario_pode_atuar_como_financeiro,
@@ -196,6 +197,7 @@ def _registrar_adiantamento_do_relatorio(relatorio):
     if valor <= 0:
         return
 
+    tecnico_adiantamento = relatorio.tecnico_reembolso_exibicao() or relatorio.tecnico_responsavel
     descricao = f"Adiantamento vinculado ao relatório {relatorio.numero}"
     adiantamento = (
         Adiantamento.objects.select_for_update()
@@ -205,7 +207,7 @@ def _registrar_adiantamento_do_relatorio(relatorio):
     )
 
     if adiantamento:
-        adiantamento.tecnico = relatorio.tecnico_responsavel
+        adiantamento.tecnico = tecnico_adiantamento
         adiantamento.valor = valor
         adiantamento.data = relatorio.data_inicio
         adiantamento.descricao = descricao
@@ -213,7 +215,7 @@ def _registrar_adiantamento_do_relatorio(relatorio):
         return
 
     Adiantamento.objects.create(
-        tecnico=relatorio.tecnico_responsavel,
+        tecnico=tecnico_adiantamento,
         relatorio=relatorio,
         tipo=TipoAdiantamento.ADIANTAMENTO,
         valor=valor,
@@ -304,6 +306,26 @@ def _validar_aprovacao_financeira(relatorio):
         raise WorkflowError(erros_rateio)
 
 
+def _validar_dados_reembolso_relatorio(relatorio):
+    erros = []
+    tecnico_reembolso_id = getattr(relatorio, "tecnico_reembolso_id", None)
+    envolvidos = relatorio.tecnicos_envolvidos_ids()
+    tem_pagamento_tecnico = (
+        relatorio.tipo_reembolso == TipoReembolso.REEMBOLSAVEL
+        or relatorio.despesas.filter(quem_pagou="tecnico").exists()
+        or relatorio.trechos.exists()
+        or (relatorio.km_excedente_interno or Decimal("0.00")) > 0
+    )
+    if tem_pagamento_tecnico and not tecnico_reembolso_id:
+        erros.append("Selecione o técnico que receberá o reembolso.")
+    if tecnico_reembolso_id and tecnico_reembolso_id not in envolvidos:
+        erros.append("O técnico definido para reembolso deve estar entre os técnicos envolvidos no relatório.")
+    if relatorio.tipo_reembolso == TipoReembolso.NAO_REEMBOLSAVEL and not relatorio.empresa_grupo:
+        erros.append("Selecione a empresa responsável pelo custo.")
+    if erros:
+        raise WorkflowError(erros)
+
+
 def enviar_para_conferencia(relatorio_id, usuario=None):
     with transaction.atomic():
         relatorio = _obter_relatorio_bloqueado(relatorio_id)
@@ -316,6 +338,7 @@ def enviar_para_conferencia(relatorio_id, usuario=None):
         resultado_envio = validar_relatorio_para_envio(relatorio)
         if not resultado_envio.ok:
             raise WorkflowError(resultado_envio.errors)
+        _validar_dados_reembolso_relatorio(relatorio)
         status_anterior = relatorio.status
         gerar_numero_oficial(relatorio)
         _aplicar_status(relatorio, StatusRelatorio.CONFERENCIA)
@@ -397,6 +420,7 @@ def aprovar_relatorio(relatorio_id, usuario=None, post_data=None):
         validar_transicao(relatorio, StatusRelatorio.APROVADO)
         status_anterior = relatorio.status
         _salvar_valores_aprovados(post_data or {}, relatorio, _usuario(usuario), consolidar=True)
+        _validar_dados_reembolso_relatorio(relatorio)
         _validar_aprovacao_financeira(relatorio)
         relatorio.aprovado_em = timezone.now()
         relatorio.aprovado_por = _usuario(usuario)

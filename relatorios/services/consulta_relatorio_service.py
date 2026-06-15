@@ -507,6 +507,9 @@ def _montar_consulta_snapshot(snapshot):
             tipo_relatorio_label=relatorio.get("tipo_relatorio_label") or "Nao informado",
             tipo_reembolso=relatorio.get("tipo_reembolso") or "reembolsavel",
             tipo_reembolso_label=relatorio.get("tipo_reembolso_label") or "Reembolsável",
+            empresa_grupo=relatorio.get("empresa_grupo") or "",
+            empresa_grupo_label=relatorio.get("empresa_grupo_label") or "",
+            tecnico_reembolso_nome=(relatorio.get("tecnico_reembolso") or {}).get("nome") or "Não informado",
             tipo_reembolso_badge_cor=(
                 "secondary" if relatorio.get("tipo_reembolso") == "nao_reembolsavel" else "success"
             ),
@@ -854,6 +857,13 @@ def _montar_consulta_viva(relatorio):
             tipo_relatorio_label=relatorio.get_tipo_relatorio_display(),
             tipo_reembolso=relatorio.tipo_reembolso,
             tipo_reembolso_label=relatorio.get_tipo_reembolso_display(),
+            empresa_grupo=relatorio.empresa_grupo,
+            empresa_grupo_label=relatorio.get_empresa_grupo_display() if relatorio.empresa_grupo else "",
+            tecnico_reembolso_nome=(
+                relatorio.tecnico_reembolso_exibicao().nome
+                if relatorio.tecnico_reembolso_exibicao()
+                else "Não informado"
+            ),
             tipo_reembolso_badge_cor=relatorio.tipo_reembolso_badge_cor,
         ),
         "clientes": [_ns(nome=cliente.nome) for cliente in relatorio.clientes_exibicao()],

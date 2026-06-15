@@ -112,6 +112,17 @@
       </a>
     </li>
 
+    {% if permissoes_erp.manutencao %}
+    <li class="nav-item">
+      <a href="{% url 'relatorios:manutencao' %}"
+         class="nav-link d-flex align-items-center gap-2
+                {% if request.resolver_match.url_name == 'manutencao' %}active{% endif %}">
+        <i class="bi bi-tools fs-5"></i>
+        <span>Manutenção</span>
+      </a>
+    </li>
+    {% endif %}
+
   </ul>
 
 </nav>

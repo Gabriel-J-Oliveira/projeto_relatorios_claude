@@ -403,6 +403,16 @@ def construir_snapshot_financeiro(relatorio, usuario=None):
             "tipo_relatorio_label": relatorio.get_tipo_relatorio_display(),
             "tipo_reembolso": relatorio.tipo_reembolso,
             "tipo_reembolso_label": relatorio.get_tipo_reembolso_display(),
+            "empresa_grupo": relatorio.empresa_grupo,
+            "empresa_grupo_label": relatorio.get_empresa_grupo_display() if relatorio.empresa_grupo else "",
+            "tecnico_reembolso": (
+                {
+                    "id": relatorio.tecnico_reembolso_id,
+                    "nome": relatorio.tecnico_reembolso.nome,
+                }
+                if relatorio.tecnico_reembolso_id
+                else None
+            ),
             "municipio_atendimento": (
                 {
                     "id": relatorio.municipio_atendimento_id,

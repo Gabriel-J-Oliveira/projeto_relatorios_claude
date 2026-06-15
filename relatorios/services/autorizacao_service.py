@@ -134,6 +134,10 @@ def usuario_eh_administrativo(user):
     )
 
 
+def usuario_pode_acessar_manutencao(user):
+    return usuario_tem_acesso_total(user) or usuario_eh_admin_erp(user)
+
+
 def usuario_pode_acessar_erp(user):
     return _usuario_tem_algum_grupo(user, GRUPOS_ERP)
 
@@ -215,6 +219,7 @@ def permissoes_usuario(user):
         "visualiza_cadastros": administrativo or acesso_total,
         "visualiza_adiantamentos": administrativo or acesso_total,
         "aprova_relatorios": administrativo or acesso_total,
+        "manutencao": usuario_pode_acessar_manutencao(user),
     }
 
 

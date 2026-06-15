@@ -30,6 +30,7 @@ from .models import (
     AnexoRelatorio,
     ArtigoAjuda,
     CategoriaAjuda,
+    EmailLog,
     ImagemAjuda,
     Cliente,
     ItemDespesa,
@@ -40,6 +41,7 @@ from .models import (
     RelatorioTecnico,
     RelatorioTecnicoEquipe,
     StatusFinanceiroItem,
+    StatusEmailLog,
     StatusRelatorio,
     Tecnico,
     TipoDespesa,
@@ -77,6 +79,7 @@ from .services.autorizacao_service import (
     usuario_pode_enviar_relatorio,
     usuario_pode_visualizar_relatorio,
     usuario_eh_superadmin,
+    usuario_pode_acessar_manutencao,
 )
 from .services.workflow_service import (
     WorkflowError,
@@ -87,6 +90,14 @@ from .services.workflow_service import (
     relatorio_bloqueado as workflow_relatorio_bloqueado,
     solicitar_ajuste,
     _salvar_valores_aprovados,
+)
+from .services.manutencao_service import (
+    buscar_logs,
+    enviar_email_teste,
+    filtrar_emails,
+    reenviar_emails,
+    reenviar_email_log,
+    resumo_emails,
 )
 from .services.rateio_service import (
     RateioError,
@@ -483,6 +494,115 @@ def perfil_usuario_view(request):
             "titulo_pagina": "Meu perfil",
         },
     )
+
+
+def _exigir_manutencao(request):
+    if not usuario_pode_acessar_manutencao(request.user):
+        logger.warning(
+            "manutencao_acesso_negado usuario=%s path=%s",
+            getattr(request.user, "pk", None),
+            request.path,
+        )
+        raise PermissionDenied("Você não tem permissão para acessar a manutenção do sistema.")
+
+
+@login_required
+def manutencao_view(request):
+    _exigir_manutencao(request)
+    logs = buscar_logs(
+        data_inicio=request.GET.get("log_data_inicio"),
+        data_fim=request.GET.get("log_data_fim"),
+        nivel=request.GET.get("log_nivel"),
+        termo=request.GET.get("log_q"),
+        logger_nome=request.GET.get("log_logger"),
+        limite=request.GET.get("log_limite") or 200,
+    )
+    emails = list(filtrar_emails(request.GET)[:100])
+    logger.info(
+        "manutencao_acesso usuario=%s linhas_log=%s emails=%s",
+        request.user.pk,
+        len(logs.get("linhas", [])),
+        len(emails),
+    )
+    return render(
+        request,
+        "manutencao/index.html",
+        {
+            "titulo_pagina": "Manutenção do Sistema",
+            "logs": logs,
+            "email_logs": emails,
+            "email_status_choices": StatusEmailLog.choices,
+            "email_resumo": resumo_emails(),
+            "aba_ativa": request.GET.get("aba") or "logs",
+            "log_niveis": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        },
+    )
+
+
+@require_POST
+@login_required
+def manutencao_email_reenviar_view(request, pk):
+    _exigir_manutencao(request)
+    email_log = get_object_or_404(EmailLog, pk=pk)
+    if email_log.status not in {StatusEmailLog.PENDENTE, StatusEmailLog.FALHA}:
+        messages.warning(request, "Somente e-mails pendentes ou com falha podem ser reenviados por esta ação.")
+        return redirect(f"{reverse('relatorios:manutencao')}?aba=emails")
+    try:
+        reenviar_email_log(email_log, usuario=request.user)
+    except Exception as exc:
+        messages.error(request, "Falha ao reenviar e-mail. Verifique o detalhe do erro.")
+        logger.error(
+            "manutencao_email_reenvio_falha usuario=%s email_log=%s erro=%s",
+            request.user.pk,
+            pk,
+            exc,
+        )
+    else:
+        messages.success(request, "E-mail reenviado com sucesso.")
+    return redirect(f"{reverse('relatorios:manutencao')}?aba=emails")
+
+
+@require_POST
+@login_required
+def manutencao_emails_reenviar_lote_view(request):
+    _exigir_manutencao(request)
+    resultado = reenviar_emails(request.POST.getlist("email_ids"), usuario=request.user, limite=20)
+    if resultado.enviados:
+        messages.success(request, f"{resultado.enviados} e-mail(s) reenviado(s) com sucesso.")
+    if resultado.falhas:
+        messages.error(request, f"{resultado.falhas} e-mail(s) falharam no reenvio.")
+    if resultado.ignorados:
+        messages.warning(request, f"{resultado.ignorados} e-mail(s) foram ignorados.")
+    for mensagem in (resultado.mensagens or [])[:5]:
+        messages.warning(request, mensagem)
+    logger.info(
+        "manutencao_email_reenvio_lote usuario=%s enviados=%s falhas=%s ignorados=%s",
+        request.user.pk,
+        resultado.enviados,
+        resultado.falhas,
+        resultado.ignorados,
+    )
+    return redirect(f"{reverse('relatorios:manutencao')}?aba=emails")
+
+
+@require_POST
+@login_required
+def manutencao_email_teste_view(request):
+    _exigir_manutencao(request)
+    destinatario = request.POST.get("destinatario_teste")
+    try:
+        enviar_email_teste(destinatario, usuario=request.user)
+    except Exception as exc:
+        messages.error(request, f"Falha ao enviar e-mail de teste: {exc}")
+        logger.error(
+            "manutencao_email_teste_falha usuario=%s destinatario=%s erro=%s",
+            request.user.pk,
+            destinatario,
+            exc,
+        )
+    else:
+        messages.success(request, "E-mail de teste enviado com sucesso.")
+    return redirect(f"{reverse('relatorios:manutencao')}?aba=emails")
 
 
 @login_required
