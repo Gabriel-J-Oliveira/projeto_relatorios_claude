@@ -175,13 +175,15 @@
                    class="btn btn-sm btn-outline-secondary" title="Ver">
                   <i class="bi bi-eye"></i>
                 </a>
-                <form method="post" action="{% url 'relatorios:relatorio_duplicate' r.pk %}" class="d-inline">
-                  {% csrf_token %}
-                  <button type="submit" class="btn btn-outline-secondary btn-sm" title="Duplicar">
-                    <i class="bi bi-files"></i>
-                    <span class="ms-1"></span>
-                  </button>
-                </form>
+                {% if r.status != 'ajuste_pendente' %}
+                  <form method="post" action="{% url 'relatorios:relatorio_duplicate' r.pk %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-secondary btn-sm" title="Duplicar">
+                      <i class="bi bi-files"></i>
+                      <span class="ms-1"></span>
+                    </button>
+                  </form>
+                {% endif %}
                 {% if r.status == 'rascunho' or r.status == 'ajuste_pendente' %}
                   <a href="{% url 'relatorios:relatorio_update' r.pk %}"
                      class="btn btn-sm btn-outline-primary" title="Editar">

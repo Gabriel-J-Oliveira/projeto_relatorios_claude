@@ -82,6 +82,7 @@
                 data-municipios-url="{% url 'relatorios:municipios_buscar' %}"
                 novalidate>
             {% csrf_token %}
+            <input type="hidden" name="acao" value="enviar" id="acao-relatorio-default">
 
             {# Management forms — obrigatórios para Django formsets (Operação Real) #}
             {{ fs_desp.management_form }}
@@ -3146,7 +3147,10 @@ function validarKmGlobal() {
       });
     document.getElementById("form-relatorio")?.addEventListener("submit", event => {
       const form = event.currentTarget;
-      const acaoSubmit = event.submitter?.value || "rascunho";
+      const acaoSubmit =
+        event.submitter?.value ||
+        form.querySelector('input[type="hidden"][name="acao"]')?.value ||
+        "enviar";
       form?.querySelectorAll("button[type='submit']").forEach(button => {
         button.disabled = false;
         button.removeAttribute("aria-busy");

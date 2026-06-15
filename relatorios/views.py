@@ -1023,6 +1023,27 @@ def _sync_equipe(relatorio, tecnicos_apoio):
             )
 
 
+def _acao_relatorio_post(post_data):
+    """
+    Normaliza a acao do formulario.
+
+    Rascunho deve ser uma escolha explicita do botao "Salvar rascunho".
+    Qualquer POST sem acao, vindo por Enter, JS antigo ou browser sem
+    `event.submitter`, segue o fluxo principal de envio para conferencia.
+    """
+    return "rascunho" if post_data.get("acao") == "rascunho" else "enviar"
+
+
+def _label_botao_envio_relatorio(instance=None):
+    if not instance:
+        return "Criar Relatório"
+    if instance.status == StatusRelatorio.AJUSTE:
+        return "Reenviar para conferência"
+    if instance.status == StatusRelatorio.RASCUNHO:
+        return "Enviar para conferência"
+    return "Salvar alterações"
+
+
 def _duplicar_relatorio(original, usuario=None):
     novo = RelatorioTecnico(
         cliente=original.cliente,
@@ -2008,7 +2029,7 @@ def relatorio_form_view(request, pk=None):
             # "acao" vem do name/value do botão clicado:
             #   "rascunho" → botão Salvar rascunho
             #   "enviar"   → botão Salvar relatório (ou confirmação do modal)
-            acao = request.POST.get("acao", "rascunho")
+            acao = _acao_relatorio_post(request.POST)
             relatorio = form.save(commit=False)
             if acao != "rascunho" and not relatorio.municipio_atendimento_id:
                 form.add_error(
@@ -2181,6 +2202,8 @@ def relatorio_form_view(request, pk=None):
                                 if instance
                                 else "Novo Relatório"
                             ),
+                            "salvar_rascunho": "Salvar rascunho",
+                            "enviar": _label_botao_envio_relatorio(instance),
                             "valor_km_padrao": valor_km_padrao,
                             "valor_km_control_sul": str(valor_km_control_sul()),
                             "resumo_erros": resumo_erros,
@@ -2212,10 +2235,7 @@ def relatorio_form_view(request, pk=None):
                                 if instance
                                 else "Novo Relatório"
                             ),
-                            "salvar_rascunho": "Salvar rascunho",
-                            "enviar": (
-                                "Salvar alterações" if instance else "Criar Relatório"
-                            ),
+                            "enviar": _label_botao_envio_relatorio(instance),
                             "valor_km_padrao": str(valor_km_padrao),
                             "valor_km_control_sul": str(valor_km_control_sul()),
                             "resumo_erros": [diagnostico_backend["mensagem"]],
@@ -2273,9 +2293,9 @@ def relatorio_form_view(request, pk=None):
                 f"Editar Relatório {instance.identificador}" if instance else "Novo Relatório"
             ),
             "salvar_rascunho": "Salvar rascunho",
-            "enviar": "Salvar alterações" if instance else "Criar Relatório",
             # valor_km_padrao aqui é APENAS para uso no template (JS, exibição).
             # Sempre string para evitar erros de template com None.
+            "enviar": _label_botao_envio_relatorio(instance),
             "valor_km_padrao": str(valor_km_padrao),
             "valor_km_control_sul": str(valor_km_control_sul()),
             "resumo_erros": resumo_erros,
@@ -3034,6 +3054,13 @@ def relatorio_duplicate_view(request, pk):
         ),
         pk=pk,
     )
+
+    if original.status == StatusRelatorio.AJUSTE:
+        messages.warning(
+            request,
+            "Relatorio devolvido para ajuste deve ser corrigido no proprio registro.",
+        )
+        return redirect("relatorios:relatorio_update", pk=original.pk)
 
     try:
         with transaction.atomic():
