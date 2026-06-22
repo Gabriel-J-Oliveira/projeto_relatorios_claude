@@ -150,14 +150,99 @@ def usuario_pode_gerenciar_cadastros(user):
     return _usuario_tem_algum_grupo(user, [GRUPO_GESTOR, GRUPO_ADMIN_ERP])
 
 
-def usuario_pode_editar_relatorio(user, relatorio):
-    if usuario_tem_acesso_total(user):
-        return True
-    if relatorio.status in {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}:
-        return False
-    return usuario_eh_dono_relatorio(user, relatorio) or usuario_eh_responsavel_relatorio(
-        user, relatorio
+def _usuario_log_context(user):
+    return {
+        "id": getattr(user, "pk", None),
+        "username": getattr(user, "username", ""),
+        "email": getattr(user, "email", ""),
+        "autenticado": bool(getattr(user, "is_authenticated", False)),
+        "superuser": bool(getattr(user, "is_superuser", False)),
+    }
+
+
+def _tecnico_log_context(tecnico):
+    if not tecnico:
+        return None
+    return {
+        "id": getattr(tecnico, "pk", None),
+        "nome": getattr(tecnico, "nome", ""),
+        "email": getattr(tecnico, "email", ""),
+    }
+
+
+def _relatorio_autorizacao_log_context(relatorio):
+    criado_por = getattr(relatorio, "criado_por", None)
+    return {
+        "id": getattr(relatorio, "pk", None),
+        "numero": getattr(relatorio, "numero", None),
+        "status": getattr(relatorio, "status", None),
+        "criado_por": _usuario_log_context(criado_por) if criado_por else {
+            "id": getattr(relatorio, "criado_por_id", None),
+            "username": None,
+            "email": None,
+            "autenticado": None,
+            "superuser": None,
+        },
+        "tecnico_responsavel": _tecnico_log_context(
+            getattr(relatorio, "tecnico_responsavel", None)
+        ),
+        "tecnico_reembolso": _tecnico_log_context(
+            getattr(relatorio, "tecnico_reembolso", None)
+        ),
+    }
+
+
+def _log_autorizacao_relatorio(acao, user, relatorio, validacoes, resultado):
+    contexto = {
+        "acao": acao,
+        "usuario_logado": _usuario_log_context(user),
+        "relatorio": _relatorio_autorizacao_log_context(relatorio),
+        "validacoes": validacoes,
+        "resultado": resultado,
+        "condicoes_false": [
+            nome for nome, valor in validacoes.items() if valor is False
+        ],
+    }
+    mensagem = "autorizacao_%s resultado=%s contexto=%s" % (
+        acao,
+        resultado,
+        contexto,
     )
+    if resultado:
+        logger.info(mensagem)
+    else:
+        logger.warning(mensagem)
+
+
+def usuario_pode_editar_relatorio(user, relatorio):
+    acesso_total = usuario_tem_acesso_total(user)
+    status_finalizado = relatorio.status in {
+        StatusRelatorio.APROVADO,
+        StatusRelatorio.REJEITADO,
+    }
+    eh_dono = usuario_eh_dono_relatorio(user, relatorio)
+    eh_responsavel = usuario_eh_responsavel_relatorio(user, relatorio)
+    validacoes = {
+        "usuario_tem_acesso_total": acesso_total,
+        "status_nao_finalizado": not status_finalizado,
+        "usuario_eh_dono_relatorio": eh_dono,
+        "usuario_eh_responsavel_relatorio": eh_responsavel,
+    }
+    if acesso_total:
+        _log_autorizacao_relatorio("editar_relatorio", user, relatorio, validacoes, True)
+        return True
+    if status_finalizado:
+        _log_autorizacao_relatorio("editar_relatorio", user, relatorio, validacoes, False)
+        return False
+    resultado = eh_dono or eh_responsavel
+    _log_autorizacao_relatorio(
+        "editar_relatorio",
+        user,
+        relatorio,
+        validacoes,
+        resultado,
+    )
+    return resultado
 
 
 def usuario_eh_dono_relatorio(user, relatorio):
@@ -182,11 +267,31 @@ def usuario_pode_visualizar_relatorio(user, relatorio):
 
 
 def usuario_pode_enviar_relatorio(user, relatorio):
-    if usuario_tem_acesso_total(user):
+    acesso_total = usuario_tem_acesso_total(user)
+    status_permitido = relatorio.status in {
+        StatusRelatorio.RASCUNHO,
+        StatusRelatorio.AJUSTE,
+    }
+    pode_editar = usuario_pode_editar_relatorio(user, relatorio)
+    validacoes = {
+        "usuario_tem_acesso_total": acesso_total,
+        "status_permitido_para_envio": status_permitido,
+        "usuario_pode_editar_relatorio": pode_editar,
+    }
+    if acesso_total:
+        _log_autorizacao_relatorio("enviar_relatorio", user, relatorio, validacoes, True)
         return True
-    if relatorio.status not in {StatusRelatorio.RASCUNHO, StatusRelatorio.AJUSTE}:
+    if not status_permitido:
+        _log_autorizacao_relatorio("enviar_relatorio", user, relatorio, validacoes, False)
         return False
-    return usuario_pode_editar_relatorio(user, relatorio)
+    _log_autorizacao_relatorio(
+        "enviar_relatorio",
+        user,
+        relatorio,
+        validacoes,
+        pode_editar,
+    )
+    return pode_editar
 
 
 def queryset_relatorios_visiveis(user, queryset):
