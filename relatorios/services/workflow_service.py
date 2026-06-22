@@ -74,6 +74,17 @@ def _executar_notificacao(relatorio, funcao, aviso):
 
 
 def _validar_permissao_envio(relatorio, usuario):
+    logger.info(
+        "ENVIO_RELATORIO_WORKFLOW_PRE_AUTH user_id=%s username=%s relatorio_id=%s "
+        "status=%s criado_por_id=%s tecnico_responsavel_id=%s tecnico_reembolso_id=%s",
+        getattr(usuario, "pk", None),
+        getattr(usuario, "username", ""),
+        getattr(relatorio, "pk", None),
+        getattr(relatorio, "status", None),
+        getattr(relatorio, "criado_por_id", None),
+        getattr(relatorio, "tecnico_responsavel_id", None),
+        getattr(relatorio, "tecnico_reembolso_id", None),
+    )
     if not usuario_pode_enviar_relatorio(usuario, relatorio):
         raise WorkflowError("Você não tem permissão para enviar este relatório.")
 

@@ -171,6 +171,21 @@ def _registrar_bloqueio_seguranca(request, mensagem, **extra):
     )
 
 
+def _log_envio_relatorio_pre_autorizacao(request, relatorio, origem):
+    logger.info(
+        "ENVIO_RELATORIO_PRE_AUTH origem=%s user_id=%s username=%s relatorio_id=%s "
+        "status=%s criado_por_id=%s tecnico_responsavel_id=%s tecnico_reembolso_id=%s",
+        origem,
+        getattr(request.user, "pk", None),
+        getattr(request.user, "username", ""),
+        getattr(relatorio, "pk", None),
+        getattr(relatorio, "status", None),
+        getattr(relatorio, "criado_por_id", None),
+        getattr(relatorio, "tecnico_responsavel_id", None),
+        getattr(relatorio, "tecnico_reembolso_id", None),
+    )
+
+
 @login_required
 @exigir_acesso_erp
 def ajuda_index_view(request):
@@ -2031,6 +2046,20 @@ def relatorio_form_view(request, pk=None):
             #   "enviar"   → botão Salvar relatório (ou confirmação do modal)
             acao = _acao_relatorio_post(request.POST)
             relatorio = form.save(commit=False)
+            logger.info(
+                "RELATORIO_SAVE_DEBUG etapa=commit_false acao=%s user_id=%s username=%s "
+                "relatorio_id=%s status=%s criado_por_id=%s tecnico_responsavel_id=%s "
+                "tecnico_reembolso_id=%s instance_id=%s",
+                acao,
+                getattr(request.user, "pk", None),
+                getattr(request.user, "username", ""),
+                getattr(relatorio, "pk", None),
+                getattr(relatorio, "status", None),
+                getattr(relatorio, "criado_por_id", None),
+                getattr(relatorio, "tecnico_responsavel_id", None),
+                getattr(relatorio, "tecnico_reembolso_id", None),
+                getattr(instance, "pk", None),
+            )
             if acao != "rascunho" and not relatorio.municipio_atendimento_id:
                 form.add_error(
                     "cidade_atendimento",
@@ -2069,7 +2098,35 @@ def relatorio_form_view(request, pk=None):
                         if relatorio_novo:
                             relatorio.criado_por = request.user
                         relatorio.cliente_id = cliente_ids_relatorio[0]
+                        logger.info(
+                            "RELATORIO_SAVE_DEBUG etapa=antes_save acao=%s novo=%s user_id=%s "
+                            "username=%s relatorio_id=%s status=%s criado_por_id=%s "
+                            "tecnico_responsavel_id=%s tecnico_reembolso_id=%s",
+                            acao,
+                            relatorio_novo,
+                            getattr(request.user, "pk", None),
+                            getattr(request.user, "username", ""),
+                            getattr(relatorio, "pk", None),
+                            getattr(relatorio, "status", None),
+                            getattr(relatorio, "criado_por_id", None),
+                            getattr(relatorio, "tecnico_responsavel_id", None),
+                            getattr(relatorio, "tecnico_reembolso_id", None),
+                        )
                         relatorio.save()
+                        logger.info(
+                            "RELATORIO_SAVE_DEBUG etapa=apos_save acao=%s novo=%s user_id=%s "
+                            "username=%s relatorio_id=%s status=%s criado_por_id=%s "
+                            "tecnico_responsavel_id=%s tecnico_reembolso_id=%s",
+                            acao,
+                            relatorio_novo,
+                            getattr(request.user, "pk", None),
+                            getattr(request.user, "username", ""),
+                            getattr(relatorio, "pk", None),
+                            getattr(relatorio, "status", None),
+                            getattr(relatorio, "criado_por_id", None),
+                            getattr(relatorio, "tecnico_responsavel_id", None),
+                            getattr(relatorio, "tecnico_reembolso_id", None),
+                        )
                         form.save_m2m()
                         sync_clientes_relatorio(
                             relatorio,
@@ -2162,6 +2219,11 @@ def relatorio_form_view(request, pk=None):
                                 f"Rascunho {relatorio.identificador} criado.",
                             )
                         if acao != "rascunho":
+                            _log_envio_relatorio_pre_autorizacao(
+                                request,
+                                relatorio,
+                                "relatorio_form_view",
+                            )
                             relatorio = enviar_para_conferencia(
                                 relatorio.pk,
                                 usuario_historico,
@@ -3397,6 +3459,11 @@ def relatorio_status_view(request, pk, status):
             pk=pk,
         )
         if status == StatusRelatorio.CONFERENCIA:
+            _log_envio_relatorio_pre_autorizacao(
+                request,
+                relatorio_atual,
+                "relatorio_status_view",
+            )
             if not usuario_pode_enviar_relatorio(request.user, relatorio_atual):
                 _registrar_bloqueio_seguranca(
                     request,
