@@ -101,7 +101,7 @@
                 {% endif %}
               </a>
             </th>
-            <th class="py-2 fw-semibold text-muted small" data-tour="relatorios-list-clientes">Cliente</th>
+            <th class="py-2 fw-semibold text-muted small" data-tour="relatorios-list-clientes">Cliente / empresa</th>
             <th class="py-2 fw-semibold text-muted small">Técnico</th>
             <th class="py-2 fw-semibold text-muted small">Período</th>
             <th class="py-2 fw-semibold text-muted small">KM</th>
@@ -120,6 +120,12 @@
               </a>
             </td>
             <td data-label="Cliente" data-tour="relatorios-list-clientes-linha">
+              {% if r.tipo_reembolso == 'nao_reembolsavel' %}
+              <div class="small fw-medium text-nowrap">
+                {{ r.get_empresa_grupo_display|default:"Não informado" }}
+                <span class="badge bg-secondary-subtle text-secondary ms-1">Custo interno</span>
+              </div>
+              {% else %}
               {% with cliente_principal=r.cliente_principal_exibicao clientes_secundarios=r.clientes_secundarios_exibicao %}
               <div class="small fw-medium text-nowrap">
                 {{ cliente_principal.nome_exibicao|default:cliente_principal.nome|default:"Não informado" }}
@@ -137,6 +143,7 @@
                 {% endif %}
               </div>
               {% endwith %}
+              {% endif %}
               <div class="text-muted" style="font-size:.78rem;">{{ r.cidade_atendimento }}</div>
             </td>
             <td class="small" data-label="Técnico">

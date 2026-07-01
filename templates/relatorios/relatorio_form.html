@@ -178,7 +178,7 @@
 
                 <div class="row g-3">
                   {# Número / Status #}
-                  <div class="col-md-4" data-tour="relatorio-numero">
+                  <div class="col-md-3" data-tour="relatorio-numero">
                     <label class="form-label fw-medium small text-muted">Número</label>
                     {{ form.numero }}
                     <div class="form-text small">Gerado automaticamente ao enviar para conferência.</div>
@@ -187,7 +187,7 @@
                     {% endif %}
                   </div>
 
-                  <div class="col-md-4" data-tour="relatorio-tipo">
+                  <div class="col-md-3" data-tour="relatorio-tipo">
                     <label class="form-label fw-medium small text-muted">Tipo de relatório</label>
                     {{ form.tipo_relatorio }}
                     {% if form.tipo_relatorio.errors %}
@@ -196,14 +196,14 @@
                   </div>
 
                   {# Cliente / Responsável #}
-                  <div class="col-md-4">
+                  <div class="col-md-3">
                     <label class="form-label fw-medium small text-muted">Tipo de reembolso</label>
                     {{ form.tipo_reembolso }}
                     {% if form.tipo_reembolso.errors %}
                       <div class="text-danger small mt-1">{{ form.tipo_reembolso.errors.0 }}</div>
                     {% endif %}
                   </div>
-                  <div class="col-md-4 d-none" id="empresa-grupo-wrapper">
+                  <div class="col-md-3 d-none" id="empresa-grupo-wrapper">
                     <label class="form-label fw-medium small text-muted">Empresa responsável pelo custo</label>
                     {{ form.empresa_grupo }}
                     {% if form.empresa_grupo.errors %}
@@ -212,14 +212,16 @@
                     <div class="form-text small" id="empresa-grupo-feedback"></div>
                   </div>
 
-                  <div class="col-md-6" data-tour="relatorio-clientes">
-                    <label class="form-label fw-medium small text-muted">Clientes *</label>
+                  <div class="col-md-6" data-tour="relatorio-clientes" id="clientes-relatorio-wrapper">
+                    <label class="form-label fw-medium small text-muted"
+                           id="clientes-relatorio-label">Clientes *</label>
                     <input type="hidden"
                            name="clientes_relatorio"
                            id="id_clientes_relatorio"
                            value="{{ clientes_selecionados_ids|join:',' }}">
-                    <div class="border rounded-2 bg-body-tertiary px-3 py-2 d-flex align-items-center justify-content-between gap-2">
-                      <div class="min-w-0">
+                    <div class="border rounded-2 bg-body-tertiary px-3 py-2 d-flex align-items-center justify-content-between gap-2"
+                         id="clientes-relatorio-control">
+                      <div class="min-w-0" id="clientes-relatorio-resumo">
                         <div class="small text-muted mb-1">
                           <span id="clientes-relatorio-contador">{{ clientes_selecionados_ids|length }}</span>
                           cliente(s) selecionado(s)
@@ -232,8 +234,14 @@
                           {% endfor %}
                         </div>
                       </div>
+                      <div class="d-none align-items-center gap-2 small text-body-secondary"
+                           id="clientes-nao-reembolsavel-aviso">
+                        <i class="bi bi-lock-fill"></i>
+                        <span>Não aplicável. A empresa responsável pelo custo é definida no campo acima.</span>
+                      </div>
                       <button type="button"
                               class="btn btn-outline-secondary btn-sm text-nowrap"
+                              id="btn-selecionar-clientes-relatorio"
                               data-bs-toggle="modal"
                               data-bs-target="#modalSelecionarClientes"
                               data-client-selector="relatorio">
@@ -760,6 +768,9 @@
                           <tbody id="clientes-opcoes">
                             {% for cliente in clientes_importacao %}
                               <tr class="cliente-opcao-linha"
+                                  data-cliente-nome="{{ cliente.nome|default:'' }}"
+                                  data-cliente-razao-social="{{ cliente.razao_social|default:'' }}"
+                                  data-cliente-nome-fantasia="{{ cliente.nome_fantasia|default:'' }}"
                                   data-cliente-search="{{ cliente.nome_exibicao }} {{ cliente.razao_social|default:'' }} {{ cliente.nome|default:'' }} {{ cliente.cidade|default:'' }} {{ cliente.uf|default:'' }} {{ cliente.cnpj_cpf|default:'' }}">
                                 <td class="small">
                                   <div class="fw-semibold">{{ cliente.nome_exibicao }}</div>
@@ -1086,6 +1097,15 @@
       min-height: 46px;
       resize: vertical;
     }
+    .cliente-selecao-bloqueada {
+      background-color: color-mix(in srgb, var(--bs-secondary-bg) 82%, var(--bs-body-color) 18%) !important;
+      border-color: var(--bs-secondary-border-subtle) !important;
+      cursor: not-allowed;
+      min-height: 58px;
+    }
+    .cliente-selecao-bloqueada .btn:disabled {
+      opacity: .55;
+    }
     .badge-definir-reembolso {
       border: 0;
       border-radius: 999px;
@@ -1274,7 +1294,12 @@
     const empresa = document.querySelector('[name="empresa_grupo"]')?.value || "";
     const feedback = document.getElementById("empresa-grupo-feedback");
     if (feedback) feedback.textContent = "";
-    if (!empresa) return;
+    if (!empresa) {
+      setClientesInput(document.getElementById("id_clientes_relatorio"), []);
+      atualizarBadgesClientesRelatorio();
+      atualizarBadgesClientesItens();
+      return;
+    }
     const termo = normalizarBuscaTexto(EMPRESAS_GRUPO_TERMO[empresa] || empresa);
     const candidatos = Array.from(document.querySelectorAll(".cliente-opcao")).filter(btn => {
       const row = btn.closest(".cliente-opcao-linha");
@@ -1283,15 +1308,30 @@
       );
       return texto.includes(termo);
     });
-    if (candidatos.length === 1) {
-      setClientesInput(document.getElementById("id_clientes_relatorio"), [candidatos[0].dataset.clienteId]);
+    const candidatosExatos = candidatos.filter(btn => {
+      const row = btn.closest(".cliente-opcao-linha");
+      return [
+        btn.dataset.clienteNome,
+        row?.dataset.clienteNome,
+        row?.dataset.clienteRazaoSocial,
+        row?.dataset.clienteNomeFantasia,
+      ].some(valor => normalizarBuscaTexto(valor || "") === termo);
+    });
+    const candidato = candidatosExatos.length === 1
+      ? candidatosExatos[0]
+      : (candidatos.length === 1 ? candidatos[0] : null);
+    if (candidato) {
+      setClientesInput(document.getElementById("id_clientes_relatorio"), [candidato.dataset.clienteId]);
       atualizarBadgesClientesRelatorio();
       atualizarBadgesClientesItens();
-      if (feedback) feedback.textContent = "Cliente da empresa do grupo selecionado automaticamente.";
+      if (feedback) feedback.textContent = "Empresa vinculada automaticamente para os controles internos.";
     } else if (feedback) {
+      setClientesInput(document.getElementById("id_clientes_relatorio"), []);
+      atualizarBadgesClientesRelatorio();
+      atualizarBadgesClientesItens();
       feedback.textContent = candidatos.length > 1
-        ? "Mais de um cliente encontrado para esta empresa. Selecione manualmente."
-        : "Não foi possível localizar automaticamente o cliente da empresa do grupo. Selecione manualmente.";
+        ? "Há mais de um cadastro correspondente. Solicite a revisão do cadastro da empresa."
+        : "Não foi possível localizar o cadastro interno desta empresa do grupo.";
     }
   }
 
@@ -1301,8 +1341,32 @@
     const empresa = document.querySelector('[name="empresa_grupo"]');
     const naoReembolsavel = tipo === "nao_reembolsavel";
     wrapper?.classList.toggle("d-none", !naoReembolsavel);
-    if (!naoReembolsavel && empresa) empresa.value = "";
+    const controleClientes = document.getElementById("clientes-relatorio-control");
+    const resumoClientes = document.getElementById("clientes-relatorio-resumo");
+    const avisoClientes = document.getElementById("clientes-nao-reembolsavel-aviso");
+    const botaoClientes = document.getElementById("btn-selecionar-clientes-relatorio");
+    const labelClientes = document.getElementById("clientes-relatorio-label");
+    const tipoAnterior = wrapper?.dataset.tipoReembolsoAnterior || "";
+
+    controleClientes?.classList.toggle("cliente-selecao-bloqueada", naoReembolsavel);
+    resumoClientes?.classList.toggle("d-none", naoReembolsavel);
+    avisoClientes?.classList.toggle("d-none", !naoReembolsavel);
+    avisoClientes?.classList.toggle("d-flex", naoReembolsavel);
+    if (labelClientes) labelClientes.textContent = naoReembolsavel ? "Cliente externo" : "Clientes *";
+    if (botaoClientes) {
+      botaoClientes.disabled = naoReembolsavel;
+      botaoClientes.setAttribute("aria-disabled", naoReembolsavel ? "true" : "false");
+    }
+    if (!naoReembolsavel && empresa) {
+      empresa.value = "";
+      if (tipoAnterior === "nao_reembolsavel") {
+        setClientesInput(document.getElementById("id_clientes_relatorio"), []);
+        atualizarBadgesClientesRelatorio();
+        atualizarBadgesClientesItens();
+      }
+    }
     if (naoReembolsavel) selecionarClienteEmpresaGrupo();
+    if (wrapper) wrapper.dataset.tipoReembolsoAnterior = tipo;
   }
 
   const motivosClientesRelatorio = (() => {
@@ -1469,6 +1533,8 @@
 
   function atualizarBadgesClientesItens() {
     const relatorioIds = getClientesRelatorioIds();
+    const naoReembolsavel =
+      document.querySelector('[name="tipo_reembolso"]')?.value === "nao_reembolsavel";
     document.querySelectorAll(".clientes-item-input").forEach(input => {
       if (!input.value && relatorioIds.length === 1) {
         input.value = relatorioIds[0];
@@ -1478,9 +1544,17 @@
       const td = input.closest("td");
       const count = td?.querySelector(".clientes-item-count");
       const label = td?.querySelector(".clientes-item-label");
+      const botao = td?.querySelector(".clientes-item-btn");
       const erro = td?.querySelector(".erro-clientes-item");
       if (count) count.textContent = ids.length;
-      if (label) label.textContent = "Clientes";
+      if (label) label.textContent = naoReembolsavel ? "Empresa interna" : "Clientes";
+      if (botao) {
+        botao.disabled = naoReembolsavel;
+        botao.setAttribute("aria-disabled", naoReembolsavel ? "true" : "false");
+        botao.title = naoReembolsavel
+          ? "A empresa responsável pelo custo é definida nos dados gerais."
+          : "Selecionar clientes envolvidos";
+      }
       if (erro) erro.textContent = "";
       atualizarEstadoKmMultiCliente(input.closest("tr"));
     });
@@ -3156,6 +3230,7 @@ function validarKmGlobal() {
         button.removeAttribute("aria-busy");
       });
       let invalido = false;
+      const tipoReembolso = document.querySelector('[name="tipo_reembolso"]')?.value || "reembolsavel";
       const clientesRelatorio = getClientesRelatorioIds();
       const erroRelatorio = document.querySelector(".erro-clientes-relatorio");
       const erroMotivos = document.querySelector(".erro-motivos-clientes");
@@ -3175,7 +3250,7 @@ function validarKmGlobal() {
         invalido = true;
         document.getElementById("id_cidade_atendimento")?.classList.add("is-invalid");
       }
-      if (!clientesRelatorio.length) {
+      if (tipoReembolso === "reembolsavel" && !clientesRelatorio.length) {
         invalido = true;
         if (erroRelatorio) erroRelatorio.textContent = "Selecione ao menos um cliente.";
       }
@@ -3196,7 +3271,6 @@ function validarKmGlobal() {
         if (erroTecnicos) erroTecnicos.textContent = "Selecione ao menos um técnico.";
       }
       if (acaoSubmit !== "rascunho") {
-        const tipoReembolso = document.querySelector('[name="tipo_reembolso"]')?.value || "reembolsavel";
         const tecnicoReembolso = getTecnicoReembolsoId();
         const empresaGrupo = document.querySelector('[name="empresa_grupo"]')?.value || "";
         if (tipoReembolso === "reembolsavel" && !tecnicoReembolso) {
@@ -3214,7 +3288,7 @@ function validarKmGlobal() {
         const input = linha.querySelector(".clientes-item-input");
         const erro = linha.querySelector(".erro-clientes-item");
         if (erro) erro.textContent = "";
-        if (!idsFromValue(input?.value).length) {
+        if (tipoReembolso === "reembolsavel" && !idsFromValue(input?.value).length) {
           invalido = true;
           if (erro) erro.textContent = "Selecione o cliente.";
         }

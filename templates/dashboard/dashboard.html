@@ -253,7 +253,7 @@
               <thead class="table-light">
                 <tr>
                   <th class="ps-4 small text-muted">Relatório</th>
-                  <th class="small text-muted">Cliente</th>
+                  <th class="small text-muted">Cliente / empresa</th>
                   <th class="small text-muted">Técnico</th>
                   <th class="small text-muted">Status</th>
                   <th class="text-end pe-4 small text-muted">Ação</th>
@@ -263,7 +263,13 @@
                 {% for relatorio in relatorios_recentes %}
                 <tr>
                   <td class="ps-4 small fw-semibold">{{ relatorio.identificador }}</td>
-                  <td class="small">{{ relatorio.cliente_principal_exibicao|default:relatorio.cliente }}</td>
+                  <td class="small">
+                    {% if relatorio.tipo_reembolso == 'nao_reembolsavel' %}
+                      {{ relatorio.get_empresa_grupo_display|default:"Não informado" }}
+                    {% else %}
+                      {{ relatorio.cliente_principal_exibicao|default:relatorio.cliente }}
+                    {% endif %}
+                  </td>
                   <td class="small">{{ relatorio.tecnico_principal_exibicao|default:relatorio.tecnico_responsavel }}</td>
                   <td><span class="badge bg-{{ relatorio.status_badge_cor }}-subtle text-{{ relatorio.status_badge_cor }}">{{ relatorio.get_status_display }}</span></td>
                   <td class="text-end pe-4">

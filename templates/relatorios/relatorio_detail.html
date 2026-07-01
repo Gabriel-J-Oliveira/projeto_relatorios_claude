@@ -215,8 +215,14 @@
           <dt class="col-sm-4 text-muted fw-medium">Número</dt>
           <dd class="col-sm-8 fw-semibold">{{ relatorio.identificador }}</dd>
 
-          <dt class="col-sm-4 text-muted fw-medium">Cliente</dt>
+          <dt class="col-sm-4 text-muted fw-medium">
+            {% if relatorio.tipo_reembolso == 'nao_reembolsavel' %}Empresa responsável pelo custo{% else %}Cliente{% endif %}
+          </dt>
           <dd class="col-sm-8">
+            {% if relatorio.tipo_reembolso == 'nao_reembolsavel' %}
+              <span class="fw-medium">{{ relatorio.get_empresa_grupo_display|default:"Não informado" }}</span>
+              <span class="badge bg-secondary-subtle text-secondary ms-1">Custo interno</span>
+            {% else %}
             {% with cliente_principal=relatorio.cliente_principal_exibicao clientes_secundarios=relatorio.clientes_secundarios_exibicao %}
               {% if cliente_principal %}
               <span class="fw-medium">{{ cliente_principal.nome }}</span>
@@ -236,6 +242,7 @@
               <span class="text-muted">Não informado</span>
               {% endif %}
             {% endwith %}
+            {% endif %}
           </dd>
 
           <dt class="col-sm-4 text-muted fw-medium">Técnicos</dt>
@@ -267,11 +274,6 @@
               {{ tecnico_reembolso.nome|default:"Não informado" }}
             {% endwith %}
           </dd>
-
-          {% if relatorio.tipo_reembolso == 'nao_reembolsavel' %}
-          <dt class="col-sm-4 text-muted fw-medium">Empresa do grupo</dt>
-          <dd class="col-sm-8 fw-semibold">{{ relatorio.get_empresa_grupo_display|default:"Não informado" }}</dd>
-          {% endif %}
 
           <dt class="col-sm-4 text-muted fw-medium">Local</dt>
           <dd class="col-sm-8">
@@ -914,7 +916,9 @@
       <div class="card-header bg-transparent border-bottom py-3">
         <div class="d-flex align-items-center gap-2">
           <i class="bi bi-diagram-3 text-primary"></i>
-          <h6 class="mb-0 fw-semibold">Distribuição por Cliente</h6>
+          <h6 class="mb-0 fw-semibold">
+            {% if relatorio.tipo_reembolso == 'nao_reembolsavel' %}Alocação na empresa do grupo{% else %}Distribuição por Cliente{% endif %}
+          </h6>
         </div>
       </div>
       <div class="card-body">

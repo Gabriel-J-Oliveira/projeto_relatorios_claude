@@ -56,6 +56,7 @@ from .services.clientes_relatorio_service import (
     normalizar_ids_clientes,
     obter_clientes_relatorio,
     obter_motivos_clientes_relatorio,
+    resolver_cliente_empresa_grupo,
     sync_clientes_despesa,
     sync_clientes_relatorio,
     sync_clientes_trecho,
@@ -1954,6 +1955,12 @@ def relatorio_form_view(request, pk=None):
             request,
             instance,
         )
+        if request.POST.get("tipo_reembolso") == "nao_reembolsavel":
+            cliente_empresa = resolver_cliente_empresa_grupo(
+                request.POST.get("empresa_grupo")
+            )
+            clientes_post_ids = [cliente_empresa.pk] if cliente_empresa else []
+            clientes_post_nomes = [_nome_cliente(cliente_empresa)] if cliente_empresa else []
         tecnicos_post_ids, tecnicos_post_nomes = _tecnicos_selecionados_do_request(
             request,
             instance,
@@ -2026,9 +2033,30 @@ def relatorio_form_view(request, pk=None):
             logger.debug("Erros fs_km: %s", fs_km.errors)
 
         if form_ok and desp_ok and km_ok:
-            cliente_ids_relatorio = normalizar_ids_clientes(
-                request.POST.get("clientes_relatorio")
-            )
+            if form.cleaned_data.get("tipo_reembolso") == "nao_reembolsavel":
+                cliente_empresa = resolver_cliente_empresa_grupo(
+                    form.cleaned_data.get("empresa_grupo")
+                )
+                if cliente_empresa:
+                    cliente_ids_relatorio = [cliente_empresa.pk]
+                    clientes_post_ids = [cliente_empresa.pk]
+                    clientes_post_nomes = [_nome_cliente(cliente_empresa)]
+                else:
+                    cliente_ids_relatorio = []
+                    form.add_error(
+                        "empresa_grupo",
+                        "Não foi possível localizar de forma única o cadastro desta empresa do grupo.",
+                    )
+                    resumo_erros.append(
+                        "Revise o cadastro da empresa do grupo antes de salvar o relatório."
+                    )
+                    form_ok = False
+            else:
+                cliente_ids_relatorio = normalizar_ids_clientes(
+                    request.POST.get("clientes_relatorio")
+                )
+
+        if form_ok and desp_ok and km_ok:
             erros_clientes = _validar_clientes_formsets(
                 request,
                 fs_desp,

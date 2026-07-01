@@ -14,6 +14,7 @@ from .models import (
     Adiantamento,
     Cliente,
     EmailLog,
+    EmpresaGrupo,
     HistoricoRelatorio,
     ItemDespesa,
     PerfilUsuario,
@@ -49,6 +50,7 @@ from .services.autorizacao_service import (
 )
 from .services.resumo_cliente_service import resumo_financeiro_por_cliente
 from .services.clientes_valor_km_service import clientes_relatorio_sem_valor_km
+from .services.clientes_relatorio_service import resolver_cliente_empresa_grupo
 from .services.identidade.sincronizacao_service import (
     UsuarioExternoSnapshot,
     sincronizar_usuario_externo,
@@ -159,6 +161,32 @@ class ClienteListViewTests(TestCase):
         self.assertContains(response, reverse("relatorios:cliente_list"))
 
 
+class ClienteEmpresaGrupoTests(TestCase):
+    def test_resolve_empresa_por_correspondencia_exata_sem_confundir_com_outro_cliente(self):
+        empresa = Cliente.objects.create(
+            nome="CONTROLSUL",
+            razao_social="CONTROLSUL GESTAO EMPRESARIAL LTDA",
+            ativo=True,
+        )
+        Cliente.objects.create(
+            nome="CONTROLSUL TRANSPORTES",
+            razao_social="CONTROLSUL TRANSPORTES LTDA",
+            ativo=True,
+        )
+
+        encontrado = resolver_cliente_empresa_grupo(EmpresaGrupo.CONTROLSUL)
+
+        self.assertEqual(encontrado, empresa)
+
+    def test_nao_resolve_empresa_quando_correspondencia_e_ambigua(self):
+        Cliente.objects.create(nome="CONTROLSUL GESTAO", ativo=True)
+        Cliente.objects.create(nome="CONTROLSUL TRANSPORTES", ativo=True)
+
+        encontrado = resolver_cliente_empresa_grupo(EmpresaGrupo.CONTROLSUL)
+
+        self.assertIsNone(encontrado)
+
+
 class RelatorioTecnicoFlowTests(TestCase):
     def setUp(self):
         self.cliente = Cliente.objects.create(
@@ -236,6 +264,67 @@ class RelatorioTecnicoFlowTests(TestCase):
         self.assertNotIn("faturado", choices)
         self.assertNotIn("fechado", choices)
         self.assertNotIn("enviado", choices)
+
+    def test_nao_reembolsavel_ignora_cliente_postado_e_vincula_empresa_grupo(self):
+        self.usuario_financeiro.first_name = "Usuario"
+        self.usuario_financeiro.last_name = "Financeiro"
+        self.usuario_financeiro.email = "financeiro@example.com"
+        self.usuario_financeiro.save(update_fields=["first_name", "last_name", "email"])
+        PerfilUsuario.objects.update_or_create(
+            usuario=self.usuario_financeiro,
+            defaults={"cadastro_confirmado_em": timezone.now()},
+        )
+        controlsul = Cliente.objects.create(
+            nome="CONTROLSUL",
+            razao_social="CONTROLSUL GESTAO EMPRESARIAL LTDA",
+            cidade="Curitiba",
+            uf="PR",
+            valor_km=Decimal("1.35"),
+        )
+        dados = self.dados_relatorio(
+            acao="rascunho",
+            tipo_relatorio="operacional",
+            tipo_reembolso="nao_reembolsavel",
+            empresa_grupo=EmpresaGrupo.CONTROLSUL,
+            clientes_relatorio=str(self.cliente.pk),
+            tecnico_reembolso=str(self.tecnico.pk),
+            tecnicos_equipe=[],
+        )
+        dados.update(self.dados_formsets_vazios())
+        dados.update(
+            {
+                "despesas-TOTAL_FORMS": "1",
+                "despesas-0-id": "",
+                "despesas-0-ordem": "0",
+                "despesas-0-data": "2026-05-02",
+                "despesas-0-tipo": "alimentacao",
+                "despesas-0-descricao": "Almoco",
+                "despesas-0-valor": "50.00",
+                "despesas-0-quem_pagou": "tecnico",
+                "despesas-0-clientes": "",
+            }
+        )
+
+        response = self.client.post(reverse("relatorios:relatorio_create"), dados)
+
+        relatorio = RelatorioTecnico.objects.order_by("-pk").first()
+        self.assertIsNotNone(
+            relatorio,
+            msg=(
+                f"status={response.status_code}; location={response.get('Location')}; "
+                f"form={response.context['form'].errors if response.context else None}; "
+                f"resumo={response.context.get('resumo_erros') if response.context else None}"
+            ),
+        )
+        self.assertRedirects(
+            response,
+            reverse("relatorios:relatorio_detail", kwargs={"pk": relatorio.pk}),
+        )
+        self.assertEqual(relatorio.cliente_id, controlsul.pk)
+        self.assertEqual(
+            list(relatorio.clientes_vinculados.values_list("cliente_id", flat=True)),
+            [controlsul.pk],
+        )
 
     def test_trecho_calcula_valor_total_no_save(self):
         relatorio = self.criar_relatorio("RT-2026-002")

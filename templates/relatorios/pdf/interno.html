@@ -25,10 +25,15 @@
     <h2>Dados do relatório</h2>
     <div class="meta-grid">
       <div>
-        <span class="label">Cliente(s)</span>
-        <strong>{{ pdf.relatorio.cliente_principal }}{% if pdf.relatorio.cliente_extra_count %} +{{ pdf.relatorio.cliente_extra_count }}{% endif %}</strong>
-        {% if pdf.relatorio.clientes|length > 1 %}
-        <small>{% for cliente in pdf.relatorio.clientes %}{{ cliente.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}</small>
+        {% if pdf.relatorio.tipo_reembolso == "nao_reembolsavel" %}
+          <span class="label">Empresa responsável pelo custo</span>
+          <strong>{{ pdf.relatorio.empresa_grupo_label|default:"Não informado" }}</strong>
+        {% else %}
+          <span class="label">Cliente(s)</span>
+          <strong>{{ pdf.relatorio.cliente_principal }}{% if pdf.relatorio.cliente_extra_count %} +{{ pdf.relatorio.cliente_extra_count }}{% endif %}</strong>
+          {% if pdf.relatorio.clientes|length > 1 %}
+          <small>{% for cliente in pdf.relatorio.clientes %}{{ cliente.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}</small>
+          {% endif %}
         {% endif %}
       </div>
       <div>
@@ -50,12 +55,6 @@
         <span class="label">Técnico reembolsado</span>
         <strong>{{ pdf.relatorio.tecnico_reembolso_nome|default:"Não informado" }}</strong>
       </div>
-      {% if pdf.relatorio.tipo_reembolso == "nao_reembolsavel" %}
-      <div>
-        <span class="label">Empresa do grupo</span>
-        <strong>{{ pdf.relatorio.empresa_grupo_label|default:"Não informado" }}</strong>
-      </div>
-      {% endif %}
       <div>
         <span class="label">Area de gasto</span>
         <strong>{{ pdf.relatorio.tipo_relatorio_label|default:"Nao informado" }}</strong>

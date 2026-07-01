@@ -66,14 +66,19 @@
           </strong>
         </div>
         <div>
-          <span>Clientes</span>
-          <strong>
-            {% for cliente in consulta.clientes %}
-              {{ cliente.nome }}{% if not forloop.last %}, {% endif %}
-            {% empty %}
-              Não informado
-            {% endfor %}
-          </strong>
+          {% if consulta.relatorio.tipo_reembolso == 'nao_reembolsavel' %}
+            <span>Empresa responsável pelo custo</span>
+            <strong>{{ consulta.relatorio.empresa_grupo_label|default:"Não informado" }}</strong>
+          {% else %}
+            <span>Clientes</span>
+            <strong>
+              {% for cliente in consulta.clientes %}
+                {{ cliente.nome }}{% if not forloop.last %}, {% endif %}
+              {% empty %}
+                Não informado
+              {% endfor %}
+            </strong>
+          {% endif %}
         </div>
         <div>
           <span>Período</span>
@@ -96,12 +101,6 @@
           <span>Técnico reembolsado</span>
           <strong>{{ consulta.relatorio.tecnico_reembolso_nome|default:"Não informado" }}</strong>
         </div>
-        {% if consulta.relatorio.tipo_reembolso == 'nao_reembolsavel' %}
-        <div>
-          <span>Empresa do grupo</span>
-          <strong>{{ consulta.relatorio.empresa_grupo_label|default:"Não informado" }}</strong>
-        </div>
-        {% endif %}
         <div>
           <span>Area de gasto</span>
           <strong>{{ consulta.relatorio.tipo_relatorio_label|default:"Nao informado" }}</strong>

@@ -1,15 +1,23 @@
 from django.db import transaction
+from django.db.models import Q
 
 from relatorios.models import (
     Cliente,
     DespesaCliente,
+    EmpresaGrupo,
     RelatorioCliente,
     StatusRelatorio,
     TrechoKMCliente,
+    normalizar_texto_busca,
 )
 
 
 ESTADOS_FINAIS = {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
+EMPRESAS_GRUPO_TERMOS = {
+    EmpresaGrupo.BLAZIUS_E_LORENZETTI: "BLAZIUS E LORENZETTI",
+    EmpresaGrupo.CONTROLSUL: "CONTROLSUL",
+    EmpresaGrupo.FISCALMAX: "FISCALMAX",
+}
 
 
 def _bloquear_finalizado(relatorio):
@@ -37,6 +45,39 @@ def normalizar_ids_clientes(valor):
         vistos.add(cliente_id)
         ids.append(cliente_id)
     return ids
+
+
+def resolver_cliente_empresa_grupo(empresa_grupo):
+    termo = EMPRESAS_GRUPO_TERMOS.get(empresa_grupo)
+    if not termo:
+        return None
+
+    candidatos = list(
+        Cliente.objects.filter(ativo=True)
+        .filter(
+            Q(nome__icontains=termo)
+            | Q(razao_social__icontains=termo)
+            | Q(nome_fantasia__icontains=termo)
+        )
+        .distinct()
+        .order_by("pk")
+    )
+    termo_normalizado = normalizar_texto_busca(termo)
+    exatos = [
+        cliente
+        for cliente in candidatos
+        if termo_normalizado
+        in {
+            normalizar_texto_busca(cliente.nome),
+            normalizar_texto_busca(cliente.razao_social),
+            normalizar_texto_busca(cliente.nome_fantasia),
+        }
+    ]
+    if len(exatos) == 1:
+        return exatos[0]
+    if len(candidatos) == 1:
+        return candidatos[0]
+    return None
 
 
 def obter_clientes_relatorio(relatorio):
