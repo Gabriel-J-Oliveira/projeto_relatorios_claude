@@ -17,6 +17,7 @@ from .models import (
     HistoricoRelatorio,
     ItemDespesa,
     PerfilUsuario,
+    RelatorioCliente,
     RelatorioTecnico,
     RelatorioTecnicoEquipe,
     StatusFinanceiroItem,
@@ -25,6 +26,7 @@ from .models import (
     TipoAdiantamento,
     TipoEventoHistorico,
     TrechoKm,
+    TrechoKMCliente,
 )
 from .services.identidade.grupo_mapping_service import (
     mapear_grupos_ad_para_django,
@@ -46,6 +48,7 @@ from .services.autorizacao_service import (
     usuario_tem_acesso_total,
 )
 from .services.resumo_cliente_service import resumo_financeiro_por_cliente
+from .services.clientes_valor_km_service import clientes_relatorio_sem_valor_km
 from .services.identidade.sincronizacao_service import (
     UsuarioExternoSnapshot,
     sincronizar_usuario_externo,
@@ -105,6 +108,55 @@ class ExtraAdminUsersTests(SimpleTestCase):
         self.assertFalse(usuario_eh_admin_extra(usuario))
         self.assertTrue(usuario_tem_acesso_total(usuario))
         self.assertTrue(usuario_eh_administrativo(usuario))
+
+
+class ClienteListViewTests(TestCase):
+    def setUp(self):
+        self.usuario = get_user_model().objects.create_superuser(
+            username="admin-clientes",
+            password="senha-teste",
+            email="admin@example.com",
+        )
+        self.client.force_login(self.usuario)
+
+    def test_busca_parcial_retorna_todos_os_clientes_sem_duplicar(self):
+        cliente_gestao = Cliente.objects.create(
+            nome="ControlSul Gestao Empresarial",
+            razao_social="ControlSul Gestao Empresarial Ltda",
+            nome_fantasia="ControlSul Gestao",
+            cnpj_cpf="11111111000111",
+        )
+        cliente_transportes = Cliente.objects.create(
+            nome="ControlSul Transportes",
+            razao_social="ControlSul Transportes Ltda",
+            nome_fantasia="ControlSul Transportes",
+            cnpj_cpf="22222222000122",
+        )
+        Cliente.objects.create(
+            nome="Outro Cliente",
+            cnpj_cpf="33333333000133",
+        )
+
+        response = self.client.get(
+            reverse("relatorios:cliente_list"),
+            {"busca": "con"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ids = [cliente.pk for cliente in response.context["clientes"]]
+        self.assertCountEqual(ids, [cliente_gestao.pk, cliente_transportes.pk])
+        self.assertEqual(len(ids), len(set(ids)))
+
+    def test_listagem_filtrada_exibe_atalho_para_visualizar_todos(self):
+        Cliente.objects.create(nome="Cliente Pendente", valor_km=None)
+
+        response = self.client.get(
+            reverse("relatorios:cliente_list"),
+            {"valor_km": "pendente"},
+        )
+
+        self.assertContains(response, "Visualizar todos")
+        self.assertContains(response, reverse("relatorios:cliente_list"))
 
 
 class RelatorioTecnicoFlowTests(TestCase):
@@ -1199,6 +1251,61 @@ class RelatorioTecnicoFlowTests(TestCase):
         self.assertEqual(relatorio.valor_km_ressarcir, Decimal("135.00"))
         self.assertEqual(relatorio.valor_km_cobrar_cliente, Decimal("100.00"))
         self.assertEqual(relatorio.valor_removido_reembolso, Decimal("0.00"))
+
+    def test_valor_km_nao_e_validado_quando_relatorio_nao_tem_trechos(self):
+        self.cliente.valor_km = None
+        self.cliente.save(update_fields=["valor_km"])
+        relatorio = self.criar_relatorio("RT-2026-SEM-KM")
+        RelatorioCliente.objects.create(
+            relatorio=relatorio,
+            cliente=self.cliente,
+            motivo_viagem="Atendimento sem deslocamento",
+        )
+
+        self.assertEqual(clientes_relatorio_sem_valor_km(relatorio), [])
+
+    def test_valor_km_valida_so_cliente_usado_e_reflete_atualizacao_imediata(self):
+        cliente_sem_deslocamento = self.cliente
+        cliente_sem_deslocamento.valor_km = None
+        cliente_sem_deslocamento.save(update_fields=["valor_km"])
+        cliente_do_trecho = Cliente.objects.create(
+            nome="Cliente do Trecho",
+            valor_km=None,
+        )
+        relatorio = self.criar_relatorio("RT-2026-CLIENTE-KM")
+        RelatorioCliente.objects.create(
+            relatorio=relatorio,
+            cliente=cliente_sem_deslocamento,
+            ordem=0,
+            motivo_viagem="Apenas despesas",
+        )
+        RelatorioCliente.objects.create(
+            relatorio=relatorio,
+            cliente=cliente_do_trecho,
+            ordem=1,
+            motivo_viagem="Deslocamento",
+        )
+        trecho = TrechoKm.objects.create(
+            relatorio=relatorio,
+            ordem=0,
+            data="2026-05-02",
+            origem="Curitiba",
+            destino="Ponta Grossa",
+            km=Decimal("10.00"),
+            valor_km=Decimal("1.35"),
+        )
+        TrechoKMCliente.objects.create(
+            trecho=trecho,
+            cliente=cliente_do_trecho,
+        )
+
+        pendentes = clientes_relatorio_sem_valor_km(relatorio)
+        self.assertEqual([cliente.pk for cliente in pendentes], [cliente_do_trecho.pk])
+
+        cliente_do_trecho.valor_km = Decimal("1.85")
+        cliente_do_trecho.save(update_fields=["valor_km"])
+
+        self.assertEqual(clientes_relatorio_sem_valor_km(relatorio), [])
 
     def test_resumo_financeiro_somente_km_reembolsa_tecnico_a_um_e_trinta_e_cinco(self):
         self.cliente.valor_km = Decimal("1.85")

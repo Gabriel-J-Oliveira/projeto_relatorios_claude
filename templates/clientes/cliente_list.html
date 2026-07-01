@@ -27,7 +27,7 @@
         <input type="text"
                name="busca"
                value="{{ busca }}"
-               placeholder="Nome, CNPJ ou cidade..."
+               placeholder="Razão social, nome fantasia, CNPJ ou CPF..."
                class="form-control">
       </div>
       <div class="col-auto d-flex gap-1">
@@ -38,11 +38,20 @@
           <i class="bi bi-search me-1"></i>Buscar
         </button>
         {% if busca %}
-          <a href="{% url 'relatorios:cliente_list' %}" class="btn btn-outline-secondary">
+          <a href="{% url 'relatorios:cliente_list' %}{% if valor_km_filtro %}?valor_km={{ valor_km_filtro|urlencode }}{% endif %}"
+             class="btn btn-outline-secondary"
+             title="Limpar pesquisa">
             <i class="bi bi-x"></i>
           </a>
         {% endif %}
       </div>
+      {% if filtros_ativos %}
+        <div class="col-auto ms-md-auto">
+          <a href="{% url 'relatorios:cliente_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-list-ul me-1"></i>Visualizar todos
+          </a>
+        </div>
+      {% endif %}
     </form>
   </div>
 </div>
@@ -61,7 +70,7 @@
   <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center gap-2">
     <i class="bi bi-building text-primary"></i>
     <h6 class="mb-0 fw-semibold">
-      Exibindo {{ clientes_qtd_pagina }} cliente{{ clientes_qtd_pagina|pluralize }} de {{ clientes_total_filtrado }} cadastrado{{ clientes_total_filtrado|pluralize }}
+      Exibindo {{ clientes_qtd_pagina }} cliente{{ clientes_qtd_pagina|pluralize }} de {{ clientes_total_cadastrado }} cadastrado{{ clientes_total_cadastrado|pluralize }}
     </h6>
   </div>
   <div class="card-body p-0">
@@ -164,19 +173,19 @@
         <ul class="pagination pagination-sm mb-0 gap-1">
           {% if page_obj.has_previous %}
             <li class="page-item">
-              <a class="page-link rounded" href="?page={{ page_obj.previous_page_number }}">
+              <a class="page-link rounded" href="?{% if pagination_query %}{{ pagination_query }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">
                 <i class="bi bi-chevron-left"></i>
               </a>
             </li>
           {% endif %}
           {% for num in paginator.page_range %}
             <li class="page-item {% if num == page_obj.number %}active{% endif %}">
-              <a class="page-link rounded" href="?page={{ num }}">{{ num }}</a>
+              <a class="page-link rounded" href="?{% if pagination_query %}{{ pagination_query }}&amp;{% endif %}page={{ num }}">{{ num }}</a>
             </li>
           {% endfor %}
           {% if page_obj.has_next %}
             <li class="page-item">
-              <a class="page-link rounded" href="?page={{ page_obj.next_page_number }}">
+              <a class="page-link rounded" href="?{% if pagination_query %}{{ pagination_query }}&amp;{% endif %}page={{ page_obj.next_page_number }}">
                 <i class="bi bi-chevron-right"></i>
               </a>
             </li>

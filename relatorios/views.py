@@ -3673,24 +3673,31 @@ class ClienteListView(AdministrativoMixin, ListView):
             qs = qs.filter(ativo=True).filter(Q(valor_km__isnull=True) | Q(valor_km__lte=0))
         if busca:
             busca_digits = re.sub(r"\D+", "", busca)
-            qs = qs.filter(
+            filtro_busca = (
                 Q(nome__icontains=busca)
                 | Q(razao_social__icontains=busca)
                 | Q(nome_fantasia__icontains=busca)
                 | Q(cnpj_cpf__icontains=busca)
-                | Q(cnpj_cpf__icontains=busca_digits)
                 | Q(cidade__icontains=busca)
                 | Q(uf__icontains=busca)
             )
-        return qs
+            if busca_digits:
+                filtro_busca |= Q(cnpj_cpf__icontains=busca_digits)
+            qs = qs.filter(filtro_busca)
+        return qs.distinct()
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        params = self.request.GET.copy()
+        params.pop("page", None)
         ctx["titulo_pagina"] = "Clientes"
         ctx["busca"] = self.request.GET.get("busca", "")
         ctx["valor_km_filtro"] = self.request.GET.get("valor_km", "")
         ctx["clientes_total_filtrado"] = ctx["paginator"].count if ctx.get("paginator") else len(ctx.get("clientes", []))
+        ctx["clientes_total_cadastrado"] = Cliente.objects.count()
         ctx["clientes_qtd_pagina"] = len(ctx.get("clientes", []))
+        ctx["filtros_ativos"] = bool(ctx["busca"] or ctx["valor_km_filtro"])
+        ctx["pagination_query"] = params.urlencode()
         return ctx
 
 

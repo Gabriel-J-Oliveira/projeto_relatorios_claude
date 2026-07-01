@@ -6,7 +6,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from relatorios.models import Cliente
+from relatorios.models import Cliente, TrechoKm, TrechoKMCliente, TrechoRateioKM
 from relatorios.services.autorizacao_service import (
     usuario_eh_admin_erp,
     usuario_eh_financeiro,
@@ -119,19 +119,46 @@ def salvar_valores_km_clientes(itens, usuario):
 
 
 def clientes_relatorio_sem_valor_km(relatorio):
-    clientes = list(relatorio.clientes_vinculados.select_related("cliente").all())
-    if clientes:
-        qs_ids = [vinculo.cliente_id for vinculo in clientes]
-        return list(
-            Cliente.objects.filter(pk__in=qs_ids, ativo=True).filter(
-                Q(valor_km__isnull=True) | Q(valor_km__lte=0)
-            )
+    if not getattr(relatorio, "pk", None):
+        return []
+
+    trecho_ids = list(
+        TrechoKm.objects.filter(relatorio_id=relatorio.pk).values_list("pk", flat=True)
+    )
+    if not trecho_ids:
+        return []
+
+    cliente_ids = set(
+        TrechoKMCliente.objects.filter(trecho_id__in=trecho_ids).values_list(
+            "cliente_id", flat=True
         )
-    if relatorio.cliente_id:
-        cliente = relatorio.cliente
-        if cliente and cliente.ativo and (cliente.valor_km is None or cliente.valor_km <= 0):
-            return [cliente]
-    return []
+    )
+    cliente_ids.update(
+        TrechoRateioKM.objects.filter(trecho_id__in=trecho_ids).values_list(
+            "cliente_id", flat=True
+        )
+    )
+
+    # Compatibilidade com relatórios antigos de cliente único, anteriores ao vínculo
+    # explícito entre trecho e cliente.
+    if not cliente_ids:
+        clientes_relatorio_ids = list(
+            relatorio.clientes_vinculados.values_list("cliente_id", flat=True)[:2]
+        )
+        if len(clientes_relatorio_ids) == 1:
+            cliente_ids.add(clientes_relatorio_ids[0])
+        elif not clientes_relatorio_ids and relatorio.cliente_id:
+            cliente_ids.add(relatorio.cliente_id)
+
+    if not cliente_ids:
+        return []
+
+    # Consulta nova a cada validação para refletir valor_km recém-atualizado.
+    return list(
+        Cliente.objects.filter(pk__in=cliente_ids, ativo=True)
+        .filter(Q(valor_km__isnull=True) | Q(valor_km__lte=0))
+        .order_by("nome_fantasia", "razao_social", "nome")
+    )
 
 
 def erros_clientes_sem_valor_km_relatorio(relatorio):
