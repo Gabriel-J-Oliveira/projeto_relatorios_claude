@@ -12,6 +12,10 @@ from relatorios.services.autorizacao_service import (
     usuario_eh_financeiro,
     usuario_tem_acesso_total,
 )
+from relatorios.services.km_financeiro_service import (
+    filtro_empresas_internas_grupo_q,
+    valor_km_cliente_contratual,
+)
 
 
 logger = logging.getLogger("relatorios.clientes.valor_km")
@@ -30,6 +34,8 @@ def clientes_pendentes_valor_km(usuario=None, apenas_api_novos=False):
         return Cliente.objects.none()
     qs = Cliente.objects.filter(ativo=True).filter(
         Q(valor_km__isnull=True) | Q(valor_km__lte=0)
+    ).exclude(
+        filtro_empresas_internas_grupo_q()
     ).order_by("nome_fantasia", "razao_social", "nome")
     if apenas_api_novos:
         qs = qs.filter(valor_km_pendente_api_novo=True)
@@ -154,11 +160,16 @@ def clientes_relatorio_sem_valor_km(relatorio):
         return []
 
     # Consulta nova a cada validação para refletir valor_km recém-atualizado.
-    return list(
-        Cliente.objects.filter(pk__in=cliente_ids, ativo=True)
-        .filter(Q(valor_km__isnull=True) | Q(valor_km__lte=0))
-        .order_by("nome_fantasia", "razao_social", "nome")
+    clientes = Cliente.objects.filter(pk__in=cliente_ids, ativo=True).order_by(
+        "nome_fantasia",
+        "razao_social",
+        "nome",
     )
+    return [
+        cliente
+        for cliente in clientes
+        if valor_km_cliente_contratual(cliente) is None
+    ]
 
 
 def erros_clientes_sem_valor_km_relatorio(relatorio):

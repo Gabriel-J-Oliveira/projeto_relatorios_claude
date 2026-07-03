@@ -67,6 +67,10 @@ from .services.clientes_valor_km_service import (
     salvar_valor_km_cliente,
     salvar_valores_km_clientes,
 )
+from .services.km_financeiro_service import (
+    filtro_empresas_internas_grupo_q,
+    valor_km_cliente_contratual,
+)
 from .validators import anexo_tem_tipo_permitido
 from .services.autorizacao_service import (
     exigir_acesso_erp,
@@ -757,11 +761,8 @@ def _get_valor_km_para_cliente(cliente_id) -> float:
     if not cliente_id:
         return 0.0
     try:
-        valor = (
-            Cliente.objects.filter(pk=cliente_id)
-            .values_list("valor_km", flat=True)  # campo real do model
-            .first()
-        )
+        cliente = Cliente.objects.filter(pk=cliente_id).first()
+        valor = valor_km_cliente_contratual(cliente)
         return float(valor) if valor else 0.0
     except (TypeError, ValueError):
         logger.warning(
@@ -3698,7 +3699,9 @@ class ClienteListView(AdministrativoMixin, ListView):
         busca = self.request.GET.get("busca", "").strip()
         valor_km = self.request.GET.get("valor_km", "").strip()
         if valor_km == "pendente":
-            qs = qs.filter(ativo=True).filter(Q(valor_km__isnull=True) | Q(valor_km__lte=0))
+            qs = qs.filter(ativo=True).filter(
+                Q(valor_km__isnull=True) | Q(valor_km__lte=0)
+            ).exclude(filtro_empresas_internas_grupo_q())
         if busca:
             busca_digits = re.sub(r"\D+", "", busca)
             filtro_busca = (

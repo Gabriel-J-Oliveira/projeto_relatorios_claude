@@ -8,6 +8,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 
 from relatorios.models import StatusFinanceiroItem, StatusRelatorio, TipoEventoHistorico
+from relatorios.services.km_financeiro_service import valor_km_cliente_contratual
 from relatorios.services.resumo_cliente_service import resumo_financeiro_por_cliente
 from relatorios.services.snapshot_service import SnapshotError, validar_snapshot_payload
 
@@ -702,9 +703,9 @@ def _trechos_internos_vivos(relatorio):
         if not rateios:
             vinculos = list(trecho.clientes_vinculados.select_related("cliente").all())
             rateios = [
-                _ns(cliente=vinculo.cliente.nome, km=_money(trecho.km), valor_km=vinculo.cliente.valor_km or Decimal("0.00"), valor_km_control_sul=trecho.valor_km_control_sul, valor_reembolso_tecnico=_money(trecho.valor_reembolso_tecnico), excesso_reducao=_money(trecho.excesso_reducao_km), valor_original=solicitado, valor_final=aprovado, status="-", motivo="")
+                _ns(cliente=vinculo.cliente.nome, km=_money(trecho.km), valor_km=valor_km_cliente_contratual(vinculo.cliente) or Decimal("0.00"), valor_km_control_sul=trecho.valor_km_control_sul, valor_reembolso_tecnico=_money(trecho.valor_reembolso_tecnico), excesso_reducao=_money(trecho.excesso_reducao_km), valor_original=solicitado, valor_final=aprovado, status="-", motivo="")
                 for vinculo in vinculos[:1]
-            ] or [_ns(cliente=_cliente_nome(relatorio.cliente), km=_money(trecho.km), valor_km=getattr(relatorio.cliente, "valor_km", None) or Decimal("0.00"), valor_km_control_sul=trecho.valor_km_control_sul, valor_reembolso_tecnico=_money(trecho.valor_reembolso_tecnico), excesso_reducao=_money(trecho.excesso_reducao_km), valor_original=solicitado, valor_final=aprovado, status="-", motivo="")]
+            ] or [_ns(cliente=_cliente_nome(relatorio.cliente), km=_money(trecho.km), valor_km=valor_km_cliente_contratual(relatorio.cliente) or Decimal("0.00"), valor_km_control_sul=trecho.valor_km_control_sul, valor_reembolso_tecnico=_money(trecho.valor_reembolso_tecnico), excesso_reducao=_money(trecho.excesso_reducao_km), valor_original=solicitado, valor_final=aprovado, status="-", motivo="")]
         linhas.append(
             _ns(
                 id=trecho.pk,

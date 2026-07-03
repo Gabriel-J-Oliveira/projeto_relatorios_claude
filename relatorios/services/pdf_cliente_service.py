@@ -14,6 +14,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from relatorios.models import StatusFinanceiroItem, StatusRelatorio
+from relatorios.services.km_financeiro_service import valor_km_cliente_contratual
 from relatorios.services.snapshot_service import SnapshotError, validar_snapshot_payload
 
 
@@ -346,7 +347,7 @@ def _itens_vivos_cliente(relatorio, cliente_id):
             cliente = next((vinculo.cliente for vinculo in clientes if vinculo.cliente_id == cliente_id), None)
             if cliente is None and relatorio.cliente_id == cliente_id:
                 cliente = relatorio.cliente
-            valor_km_cliente = getattr(cliente, "valor_km", None) if cliente else None
+            valor_km_cliente = valor_km_cliente_contratual(cliente) if cliente else None
             valor_cliente = _money(trecho.km * valor_km_cliente) if valor_km_cliente else trecho.valor_final_clientes
             valores = [
                 (valor_cliente, _percentual(valor_cliente, valor_cliente), trecho.km, valor_km_cliente)

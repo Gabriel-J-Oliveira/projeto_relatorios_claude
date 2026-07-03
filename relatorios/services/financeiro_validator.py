@@ -1,7 +1,11 @@
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import logging
 
-from relatorios.models import ItemDespesa, StatusFinanceiroItem, TipoReembolso
+from relatorios.models import Cliente, ItemDespesa, StatusFinanceiroItem, TipoReembolso
+from relatorios.services.km_financeiro_service import (
+    cliente_e_empresa_interna_grupo,
+    valor_km_cliente_contratual,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -69,20 +73,32 @@ def validar_cobertura_clientes_relatorio(relatorio, clientes_relatorio_ids=None)
     if not clientes_relatorio_ids:
         return []
 
+    if relatorio.tipo_reembolso == TipoReembolso.NAO_REEMBOLSAVEL:
+        clientes_internos_ids = set(
+            cliente.pk
+            for cliente in Cliente.objects.filter(pk__in=clientes_relatorio_ids)
+            if cliente_e_empresa_interna_grupo(cliente)
+        )
+        clientes_relatorio_ids = clientes_relatorio_ids - clientes_internos_ids
+        if not clientes_relatorio_ids:
+            return []
+
     clientes_com_movimento = set()
 
     for despesa in relatorio.despesas.all():
         if not _ativo(despesa):
             continue
         clientes_item_ids = _clientes_item_ids(despesa)
-        if not clientes_item_ids and len(clientes_relatorio_ids) == 1:
-            clientes_item_ids = set(clientes_relatorio_ids)
         rateios = _rateios_por_cliente(despesa)
+        if not clientes_item_ids and rateios:
+            clientes_item_ids = set(rateios)
+        elif not clientes_item_ids and len(clientes_relatorio_ids) == 1:
+            clientes_item_ids = set(clientes_relatorio_ids)
         if rateios:
             clientes_com_movimento.update(
                 cliente_id
                 for cliente_id, rateio in rateios.items()
-                if cliente_id in clientes_item_ids
+                if cliente_id in clientes_relatorio_ids
                 and (
                     _valor_positivo(rateio.valor_original)
                     or _valor_positivo(rateio.valor_final)
@@ -95,14 +111,16 @@ def validar_cobertura_clientes_relatorio(relatorio, clientes_relatorio_ids=None)
         if not _ativo(trecho):
             continue
         clientes_item_ids = _clientes_item_ids(trecho)
-        if not clientes_item_ids and len(clientes_relatorio_ids) == 1:
-            clientes_item_ids = set(clientes_relatorio_ids)
         calculos = _rateios_por_cliente(trecho)
+        if not clientes_item_ids and calculos:
+            clientes_item_ids = set(calculos)
+        elif not clientes_item_ids and len(clientes_relatorio_ids) == 1:
+            clientes_item_ids = set(clientes_relatorio_ids)
         if calculos:
             clientes_com_movimento.update(
                 cliente_id
                 for cliente_id, calculo in calculos.items()
-                if cliente_id in clientes_item_ids
+                if cliente_id in clientes_relatorio_ids
                 and (
                     _valor_positivo(calculo.valor_calculado)
                     or _valor_positivo(calculo.valor_final)
@@ -129,6 +147,8 @@ def validar_integridade_despesa(despesa, clientes_relatorio_ids=None):
     if not clientes_item_ids and len(clientes_relatorio_ids) == 1:
         clientes_item_ids = set(clientes_relatorio_ids)
     rateios = _rateios_por_cliente(despesa)
+    if not clientes_item_ids and rateios:
+        clientes_item_ids = set(rateios)
 
     if not clientes_item_ids:
         erros.append(f"Despesa {despesa.pk}: selecione ao menos um cliente.")
@@ -187,6 +207,8 @@ def validar_integridade_trecho(trecho, clientes_relatorio_ids=None):
     if not clientes_item_ids and len(clientes_relatorio_ids) == 1:
         clientes_item_ids = set(clientes_relatorio_ids)
     calculos = _rateios_por_cliente(trecho)
+    if not clientes_item_ids and calculos:
+        clientes_item_ids = set(calculos)
 
     if not clientes_item_ids:
         erros.append(f"Trecho KM {trecho.pk}: selecione ao menos um cliente.")
@@ -207,7 +229,7 @@ def validar_integridade_trecho(trecho, clientes_relatorio_ids=None):
 
     for calculo in calculos.values():
         km_cliente = _km(calculo.km_cliente)
-        valor_km = _valor_km(calculo.valor_km)
+        valor_km = _valor_km(calculo.valor_km) or valor_km_cliente_contratual(calculo.cliente)
         valor_calculado = _money(calculo.valor_calculado)
         valor_final = _money(calculo.valor_final)
 

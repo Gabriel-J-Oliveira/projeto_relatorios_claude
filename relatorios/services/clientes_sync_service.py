@@ -11,6 +11,10 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from relatorios.models import Cliente
+from relatorios.services.km_financeiro_service import (
+    filtro_empresas_internas_grupo_q,
+    valor_km_cliente_contratual,
+)
 from relatorios.services.clientes_api_service import buscar_clientes_api
 
 
@@ -220,7 +224,7 @@ def sincronizar_clientes(dry_run=False, limit=None, force=False, verbose=False):
                 )
             if status == "criado":
                 resultado.criados += 1
-                if cliente is None or cliente.valor_km is None or cliente.valor_km <= 0:
+                if cliente is None or valor_km_cliente_contratual(cliente) is None:
                     resultado.criados_sem_valor_km += 1
             elif status == "atualizado":
                 resultado.atualizados += 1
@@ -242,9 +246,12 @@ def sincronizar_clientes(dry_run=False, limit=None, force=False, verbose=False):
             resultado.detalhes_erros.append(detalhe)
             logger.warning("Cliente API ignorado: %s", detalhe)
 
-    resultado.pendentes_valor_km = Cliente.objects.filter(ativo=True).filter(
-        Q(valor_km__isnull=True) | Q(valor_km__lte=0)
-    ).count()
+    resultado.pendentes_valor_km = (
+        Cliente.objects.filter(ativo=True)
+        .filter(Q(valor_km__isnull=True) | Q(valor_km__lte=0))
+        .exclude(filtro_empresas_internas_grupo_q())
+        .count()
+    )
     duracao = (timezone.now() - inicio).total_seconds()
     logger.info(
         "Sincronizacao de clientes finalizada em %.2fs. recebidos=%s criados=%s criados_sem_valor_km=%s atualizados=%s sem_alteracao=%s inativados=%s pendentes_valor_km=%s erros=%s",

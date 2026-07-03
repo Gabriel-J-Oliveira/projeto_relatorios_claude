@@ -1236,7 +1236,9 @@ class RelatorioTecnico(models.Model):
             if idx == len(clientes) - 1:
                 km_cliente = (km_total - acumulado).quantize(Decimal("0.01"))
             acumulado += km_cliente
-            valor_km = cliente.valor_km or Decimal("0.00")
+            from relatorios.services.km_financeiro_service import valor_km_cliente_contratual
+
+            valor_km = valor_km_cliente_contratual(cliente) or Decimal("0.00")
             valor_reembolso = valor_km_control_sul()
             valor_calculado = _valor_monetario(km_cliente * valor_km)
             valor_reembolso_tecnico = _valor_monetario(km_cliente * valor_reembolso)
@@ -2254,14 +2256,12 @@ class TrechoKm(models.Model):
             clientes = self._clientes_para_cobranca_km()
             if not clientes:
                 return _valor_monetario(self.valor_calculado or Decimal("0.00"))
+            from relatorios.services.km_financeiro_service import valor_km_cliente_contratual
+
             total = sum(
                 (
                     self.km
-                    * (
-                        cliente.valor_km
-                        if cliente.valor_km not in (None, "")
-                        else Decimal("0.00")
-                    )
+                    * (valor_km_cliente_contratual(cliente) or Decimal("0.00"))
                     for cliente in clientes
                 ),
                 Decimal("0.00"),
@@ -2376,7 +2376,9 @@ class TrechoKm(models.Model):
     def km_fora_politica(self):
         valor_km_cliente = None
         if self.relatorio and self.relatorio.cliente:
-            valor_km_cliente = self.relatorio.cliente.valor_km
+            from relatorios.services.km_financeiro_service import valor_km_cliente_contratual
+
+            valor_km_cliente = valor_km_cliente_contratual(self.relatorio.cliente)
         if valor_km_cliente is None:
             return False
         return self.valor_km != valor_km_cliente

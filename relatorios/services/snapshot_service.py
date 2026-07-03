@@ -12,6 +12,7 @@ from relatorios.models import (
     StatusFinanceiroItem,
     StatusRelatorio,
 )
+from relatorios.services.km_financeiro_service import valor_km_cliente_contratual
 from relatorios.services.resumo_cliente_service import resumo_financeiro_por_cliente
 
 
@@ -84,7 +85,7 @@ def _cliente_payload(cliente, ordem=0, motivo_viagem=""):
         "cidade": cliente.cidade or "",
         "uf": cliente.uf or "",
         "cidade_uf": cliente.cidade_uf,
-        "valor_km": _decimal(cliente.valor_km),
+        "valor_km": _decimal(valor_km_cliente_contratual(cliente)),
         "ordem": ordem,
         "motivo_viagem": motivo_viagem or "",
     }

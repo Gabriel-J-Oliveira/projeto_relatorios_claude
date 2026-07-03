@@ -26,8 +26,10 @@ from .models import (
     Tecnico,
     TipoAdiantamento,
     TipoEventoHistorico,
+    TipoReembolso,
     TrechoKm,
     TrechoKMCliente,
+    TrechoRateioKM,
 )
 from .services.identidade.grupo_mapping_service import (
     mapear_grupos_ad_para_django,
@@ -51,6 +53,8 @@ from .services.autorizacao_service import (
 from .services.resumo_cliente_service import resumo_financeiro_por_cliente
 from .services.clientes_valor_km_service import clientes_relatorio_sem_valor_km
 from .services.clientes_relatorio_service import resolver_cliente_empresa_grupo
+from .services.financeiro_validator import validar_integridade_financeira_relatorio
+from .services.km_financeiro_service import calcular_km_financeiro
 from .services.identidade.sincronizacao_service import (
     UsuarioExternoSnapshot,
     sincronizar_usuario_externo,
@@ -1395,6 +1399,120 @@ class RelatorioTecnicoFlowTests(TestCase):
         cliente_do_trecho.save(update_fields=["valor_km"])
 
         self.assertEqual(clientes_relatorio_sem_valor_km(relatorio), [])
+
+    def test_empresa_interna_sem_valor_km_usa_valor_padrao_do_grupo(self):
+        empresa = Cliente.objects.create(
+            nome="FISCALMAX",
+            razao_social="FISCALMAX",
+            valor_km=None,
+            ativo=True,
+        )
+        calculo = calcular_km_financeiro(Decimal("10.00"), empresa)
+
+        self.assertEqual(calculo["valor_km_cliente"], Decimal("1.8500"))
+        self.assertEqual(calculo["valor_cobranca_cliente"], Decimal("18.50"))
+
+        relatorio = self.criar_relatorio("RT-2026-EMPRESA-INTERNA")
+        relatorio.cliente = empresa
+        relatorio.save(update_fields=["cliente"])
+        RelatorioCliente.objects.create(relatorio=relatorio, cliente=empresa)
+        trecho = TrechoKm.objects.create(
+            relatorio=relatorio,
+            ordem=0,
+            data="2026-05-02",
+            origem="Curitiba",
+            destino="Ponta Grossa",
+            km=Decimal("10.00"),
+            valor_km=Decimal("1.35"),
+        )
+        TrechoKMCliente.objects.create(trecho=trecho, cliente=empresa)
+
+        self.assertEqual(clientes_relatorio_sem_valor_km(relatorio), [])
+
+    def test_nao_reembolsavel_com_empresa_interna_nao_exige_participacao_financeira(self):
+        empresa = Cliente.objects.create(
+            nome="CONTROLSUL",
+            razao_social="CONTROLSUL",
+            valor_km=None,
+            ativo=True,
+        )
+        relatorio = self.criar_relatorio("RT-2026-NAO-REEMB-INTERNA")
+        relatorio.tipo_reembolso = TipoReembolso.NAO_REEMBOLSAVEL
+        relatorio.empresa_grupo = EmpresaGrupo.CONTROLSUL
+        relatorio.cliente = empresa
+        relatorio.save(update_fields=["tipo_reembolso", "empresa_grupo", "cliente"])
+        RelatorioCliente.objects.create(relatorio=relatorio, cliente=empresa)
+        ItemDespesa.objects.create(
+            relatorio=relatorio,
+            ordem=0,
+            data="2026-05-02",
+            tipo="outros",
+            descricao="Despesa interna",
+            valor=Decimal("100.00"),
+        )
+
+        erros = validar_integridade_financeira_relatorio(relatorio)
+
+        self.assertNotIn(
+            "Existem clientes no relatório sem participação em despesas ou deslocamentos.",
+            erros,
+        )
+
+    def test_participacao_cliente_considera_rateio_financeiro_mesmo_sem_vinculo_visual(self):
+        relatorio = self.criar_relatorio("RT-2026-RATEIO-PARTICIPACAO")
+        RelatorioCliente.objects.create(relatorio=relatorio, cliente=self.cliente)
+        trecho = TrechoKm.objects.create(
+            relatorio=relatorio,
+            ordem=0,
+            data="2026-05-02",
+            origem="Curitiba",
+            destino="Ponta Grossa",
+            km=Decimal("10.00"),
+            valor_km=Decimal("1.35"),
+        )
+        TrechoRateioKM.objects.create(
+            trecho=trecho,
+            cliente=self.cliente,
+            km_original=Decimal("10.00"),
+            km_final=Decimal("10.00"),
+            valor_rateado=Decimal("18.50"),
+            km_cliente=Decimal("10.00"),
+            valor_km=Decimal("1.8500"),
+            valor_calculado=Decimal("18.50"),
+            valor_final=Decimal("18.50"),
+        )
+
+        erros = validar_integridade_financeira_relatorio(relatorio)
+
+        self.assertNotIn(
+            "Existem clientes no relatório sem participação em despesas ou deslocamentos.",
+            erros,
+        )
+
+    def test_cliente_sem_qualquer_participacao_continua_bloqueado(self):
+        cliente_com_movimento = Cliente.objects.create(
+            nome="Cliente Com Movimento",
+            valor_km=Decimal("1.85"),
+        )
+        relatorio = self.criar_relatorio("RT-2026-SEM-PARTICIPACAO")
+        RelatorioCliente.objects.create(relatorio=relatorio, cliente=self.cliente, ordem=0)
+        RelatorioCliente.objects.create(relatorio=relatorio, cliente=cliente_com_movimento, ordem=1)
+        despesa = ItemDespesa.objects.create(
+            relatorio=relatorio,
+            ordem=0,
+            data="2026-05-02",
+            tipo="outros",
+            descricao="Despesa de outro cliente",
+            valor=Decimal("100.00"),
+        )
+        despesa.clientes_vinculados.create(cliente=cliente_com_movimento)
+
+        erros = validar_integridade_financeira_relatorio(relatorio)
+
+        self.assertIn(
+            "Existem clientes no relatório sem participação em despesas ou deslocamentos.",
+            erros,
+        )
 
     def test_resumo_financeiro_somente_km_reembolsa_tecnico_a_um_e_trinta_e_cinco(self):
         self.cliente.valor_km = Decimal("1.85")
