@@ -82,18 +82,10 @@
     }
   }
 
-  function validateFile(file, maxFileBytes) {
+  function validateFile(file) {
     if (!file) return { ok: true };
     if (file.size <= 0) {
       return { ok: false, state: "rejected", message: "Arquivo vazio.", reason: "arquivo_vazio" };
-    }
-    if (file.size > maxFileBytes) {
-      return {
-        ok: false,
-        state: "rejected",
-        message: `Arquivo acima do limite permitido (${formatBytes(maxFileBytes)}).`,
-        reason: "limite_arquivo",
-      };
     }
     const ext = fileExtension(file.name);
     if (!PERMITTED_EXTENSIONS.has(ext) || !PERMITTED_MIMES.has(file.type || "")) {
@@ -107,13 +99,13 @@
     return { ok: true };
   }
 
-  function collectFiles(form, maxFileBytes) {
+  function collectFiles(form) {
     const items = [];
     const errors = [];
     form.querySelectorAll('input[type="file"][data-upload-comprovante]').forEach((input) => {
       const file = input.files && input.files[0];
       if (!file) return;
-      const validation = validateFile(file, maxFileBytes);
+      const validation = validateFile(file);
       const item = {
         input,
         file,
@@ -128,12 +120,10 @@
   }
 
   function updateMonitor(form) {
-    const maxFileMb = Number(form.dataset.uploadMaxFileMb || "10") || 10;
     const maxTotalMb = Number(form.dataset.uploadMaxTotalMb || "1024") || 1024;
     const existingBytes = Number(form.dataset.uploadExistingBytes || "0") || 0;
-    const maxFileBytes = maxFileMb * BYTES_IN_MB;
     const maxTotalBytes = maxTotalMb * BYTES_IN_MB;
-    const { items, errors } = collectFiles(form, maxFileBytes);
+    const { items, errors } = collectFiles(form);
     const selectedBytes = items.reduce((sum, item) => sum + item.size, 0);
     const totalBytes = existingBytes + selectedBytes;
     const percent = maxTotalBytes ? Math.min(100, (totalBytes / maxTotalBytes) * 100) : 0;

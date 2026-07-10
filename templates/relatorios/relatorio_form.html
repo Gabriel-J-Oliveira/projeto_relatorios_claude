@@ -90,7 +90,6 @@
                 data-autosave-storage-key="relatorio-autosave-{{ instance.pk|default:'novo' }}"
                 data-relatorio-id="{{ instance.pk|default:'' }}"
                 data-autosave-enabled="{% if not instance or instance.status == 'rascunho' %}1{% else %}0{% endif %}"
-                data-upload-max-file-mb="{{ anexo_max_upload_mb|default:10 }}"
                 data-upload-max-total-mb="{{ relatorio_anexos_max_total_mb|default:1024 }}"
                 data-upload-existing-bytes="{{ relatorio_anexos_existente_bytes|default:0 }}"
                 novalidate>

@@ -2,7 +2,6 @@ import logging
 import mimetypes
 from pathlib import Path
 
-from django.conf import settings
 from django.core.exceptions import ValidationError
 
 
@@ -79,17 +78,6 @@ def validar_anexo_upload(arquivo):
     if tamanho == 0:
         security_logger.warning("Upload bloqueado: arquivo vazio. nome=%s", nome)
         raise ValidationError("O arquivo enviado está vazio.")
-
-    limite_mb = getattr(settings, "ANEXO_MAX_UPLOAD_MB", 10)
-    limite_bytes = int(limite_mb) * 1024 * 1024
-    if tamanho and tamanho > limite_bytes:
-        security_logger.warning(
-            "Upload bloqueado: tamanho excedido. nome=%s tamanho=%s limite_mb=%s",
-            nome,
-            tamanho,
-            limite_mb,
-        )
-        raise ValidationError(f"O arquivo excede o limite de {limite_mb} MB.")
 
     if not anexo_tem_tipo_permitido(nome, tipo_mime):
         security_logger.warning(

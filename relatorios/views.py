@@ -917,10 +917,8 @@ def _upload_limite_total_bytes():
 
 
 def _upload_config_context():
-    limite_arquivo_mb = int(getattr(settings, "ANEXO_MAX_UPLOAD_MB", 10) or 10)
     limite_total_mb = int(getattr(settings, "RELATORIO_ANEXOS_MAX_TOTAL_MB", 1024) or 1024)
     return {
-        "anexo_max_upload_mb": limite_arquivo_mb,
         "relatorio_anexos_max_total_mb": limite_total_mb,
     }
 
