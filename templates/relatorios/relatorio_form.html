@@ -46,6 +46,12 @@
             <h6 class="mb-0 fw-semibold">{{ titulo_pagina }}</h6>
           </div>
           <div class="d-flex align-items-center gap-2">
+            <span id="autosave-status"
+                  class="badge rounded-pill text-bg-secondary d-inline-flex align-items-center gap-1"
+                  data-state="saved">
+              <span class="autosave-dot"></span>
+              <span id="autosave-status-text">Rascunho protegido</span>
+            </span>
             {% if not instance %}
               <button type="button"
                       class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1"
@@ -80,9 +86,15 @@
                 data-valor-km-cliente="{{ valor_km_padrao|default:0 }}"
                 data-politica-url="{% url 'relatorios:politica_despesa' %}"
                 data-municipios-url="{% url 'relatorios:municipios_buscar' %}"
+                data-autosave-url="{% url 'relatorios:relatorio_autosave' %}"
+                data-autosave-storage-key="relatorio-autosave-{{ instance.pk|default:'novo' }}"
+                data-relatorio-id="{{ instance.pk|default:'' }}"
+                data-autosave-enabled="{% if not instance or instance.status == 'rascunho' %}1{% else %}0{% endif %}"
                 novalidate>
             {% csrf_token %}
             <input type="hidden" name="acao" value="enviar" id="acao-relatorio-default">
+            <input type="hidden" name="autosave_key" id="id_autosave_key" value="">
+            {% if instance.pk %}<input type="hidden" name="relatorio_id" value="{{ instance.pk }}">{% endif %}
 
             {# Management forms — obrigatórios para Django formsets (Operação Real) #}
             {{ fs_desp.management_form }}
@@ -1123,6 +1135,39 @@
       line-height: 1;
       padding: .18rem .42rem;
     }
+    #autosave-status {
+      border: 1px solid var(--bs-border-color);
+      font-size: .72rem;
+      font-weight: 600;
+      padding: .36rem .55rem;
+    }
+    #autosave-status .autosave-dot {
+      width: .48rem;
+      height: .48rem;
+      border-radius: 999px;
+      background: currentColor;
+      display: inline-block;
+    }
+    #autosave-status[data-state="dirty"] {
+      color: var(--bs-warning-text-emphasis);
+      background: var(--bs-warning-bg-subtle) !important;
+      border-color: var(--bs-warning-border-subtle);
+    }
+    #autosave-status[data-state="saving"] {
+      color: var(--bs-info-text-emphasis);
+      background: var(--bs-info-bg-subtle) !important;
+      border-color: var(--bs-info-border-subtle);
+    }
+    #autosave-status[data-state="saved"] {
+      color: var(--bs-success-text-emphasis);
+      background: var(--bs-success-bg-subtle) !important;
+      border-color: var(--bs-success-border-subtle);
+    }
+    #autosave-status[data-state="error"] {
+      color: var(--bs-danger-text-emphasis);
+      background: var(--bs-danger-bg-subtle) !important;
+      border-color: var(--bs-danger-border-subtle);
+    }
     .linha-trecho.km-divergente {
       box-shadow: inset 3px 0 0 var(--bs-warning);
     }
@@ -1199,6 +1244,7 @@
           {{ motivos_clientes_relatorio|json_script:"motivos-clientes-relatorio-data" }}
           <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
           <script src="https://cdn.jsdelivr.net/npm/driver.js@latest/dist/driver.js.iife.js"></script>
+          <script defer src="{% static 'js/relatorio_autosave.js' %}"></script>
           <script defer src="{% static 'js/relatorio_form_tour.js' %}"></script>
           <script>
   /* ================================================================
@@ -1227,6 +1273,12 @@
   const PREFIX_KM = "trechos";
   const VKM_PADRAO = "{{ valor_km_padrao }}";
   let clienteSelectorTarget = null;
+
+  window.addEventListener("relatorio:autosave-restored", () => {
+    _idxDesp = Number(document.getElementById("id_despesas-TOTAL_FORMS")?.value || _idxDesp) || _idxDesp;
+    _idxKm = Number(document.getElementById("id_trechos-TOTAL_FORMS")?.value || _idxKm) || _idxKm;
+    atualizarBadgesAbasSeguro();
+  });
 
   function logFormEvent(evento, detalhes = {}, nivel = "info") {
     window.RelatorioFormDiagnostics?.log(evento, detalhes, nivel);

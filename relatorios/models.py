@@ -1419,6 +1419,44 @@ class RelatorioTecnico(models.Model):
         return erros
 
 
+class RelatorioAutoSave(models.Model):
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="autosaves_relatorios",
+    )
+    relatorio = models.ForeignKey(
+        RelatorioTecnico,
+        on_delete=models.CASCADE,
+        related_name="autosaves",
+        null=True,
+        blank=True,
+    )
+    chave = models.CharField(max_length=80, db_index=True)
+    payload = models.JSONField(default=dict, blank=True)
+    arquivos = models.JSONField(default=list, blank=True)
+    pagina = models.CharField(max_length=500, blank=True)
+    user_agent = models.CharField(max_length=500, blank=True)
+    campos_count = models.PositiveIntegerField(default=0)
+    despesas_count = models.PositiveIntegerField(default=0)
+    trechos_count = models.PositiveIntegerField(default=0)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "AutoSave de relatorio"
+        verbose_name_plural = "AutoSaves de relatorios"
+        unique_together = [("usuario", "chave")]
+        indexes = [
+            models.Index(fields=["usuario", "chave"]),
+            models.Index(fields=["relatorio", "atualizado_em"]),
+        ]
+
+    def __str__(self):
+        destino = self.relatorio_id or self.chave
+        return f"AutoSave {destino} - {self.usuario}"
+
+
 class HistoricoRelatorio(models.Model):
     relatorio = models.ForeignKey(
         RelatorioTecnico,

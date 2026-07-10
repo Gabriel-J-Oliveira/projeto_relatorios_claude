@@ -18,6 +18,7 @@ from .models import (
     HistoricoRelatorio,
     ItemDespesa,
     PerfilUsuario,
+    RelatorioAutoSave,
     RelatorioCliente,
     RelatorioTecnico,
     RelatorioTecnicoEquipe,
@@ -328,6 +329,59 @@ class RelatorioTecnicoFlowTests(TestCase):
         self.assertEqual(
             list(relatorio.clientes_vinculados.values_list("cliente_id", flat=True)),
             [controlsul.pk],
+        )
+
+    def test_autosave_rascunho_substitui_versao_anterior(self):
+        relatorio = self.criar_relatorio("RT-2026-AUTOSAVE")
+        relatorio.criado_por = self.usuario_financeiro
+        relatorio.status = StatusRelatorio.RASCUNHO
+        relatorio.save(update_fields=["criado_por", "status"])
+        url = reverse("relatorios:relatorio_autosave")
+
+        payload = {
+            "autosave_key": "autosave-teste",
+            "relatorio_id": str(relatorio.pk),
+            "motivo": "Primeira versao",
+            "despesas-TOTAL_FORMS": "1",
+            "trechos-TOTAL_FORMS": "0",
+        }
+        response = self.client.post(url, payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["success"])
+
+        payload["motivo"] = "Segunda versao"
+        payload["despesas-TOTAL_FORMS"] = "2"
+        response = self.client.post(url, payload)
+        self.assertEqual(response.status_code, 200)
+
+        autosaves = RelatorioAutoSave.objects.filter(
+            usuario=self.usuario_financeiro,
+            chave="autosave-teste",
+        )
+        self.assertEqual(autosaves.count(), 1)
+        autosave = autosaves.get()
+        self.assertEqual(autosave.relatorio, relatorio)
+        self.assertEqual(autosave.payload["motivo"], "Segunda versao")
+        self.assertEqual(autosave.despesas_count, 2)
+
+    def test_autosave_bloqueia_relatorio_fora_de_rascunho(self):
+        relatorio = self.criar_relatorio("RT-2026-AUTOSAVE-BLOQUEADO")
+        relatorio.criado_por = self.usuario_financeiro
+        relatorio.status = StatusRelatorio.CONFERENCIA
+        relatorio.save(update_fields=["criado_por", "status"])
+
+        response = self.client.post(
+            reverse("relatorios:relatorio_autosave"),
+            {
+                "autosave_key": "autosave-bloqueado",
+                "relatorio_id": str(relatorio.pk),
+                "motivo": "Nao deve salvar",
+            },
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertFalse(
+            RelatorioAutoSave.objects.filter(chave="autosave-bloqueado").exists()
         )
 
     def test_trecho_calcula_valor_total_no_save(self):

@@ -30,6 +30,7 @@ urlpatterns = [
     path("relatorios/legados/", views.RelatorioLegadoListView.as_view(), name="relatorio_legado_list"),
     path("relatorios/legados/<int:pk>/", views.relatorio_legado_detail_view, name="relatorio_legado_detail"),
     path("relatorios/novo/", views.relatorio_form_view, name="relatorio_create"),
+    path("relatorios/autosave/", views.relatorio_autosave_view, name="relatorio_autosave"),
     path("relatorios/<int:pk>/", views.relatorio_detail_view, name="relatorio_detail"),
     path("relatorios/<int:pk>/consulta/", views.relatorio_consulta_view, name="relatorio_consulta"),
     path("relatorios/<int:pk>/pdf-reembolso/", views.relatorio_reembolso_pdf_view, name="relatorio_reembolso_pdf"),

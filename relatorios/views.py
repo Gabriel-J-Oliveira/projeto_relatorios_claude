@@ -10,11 +10,12 @@ from django.contrib import messages
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import PermissionDenied, RequestDataTooBig, SuspiciousOperation, ValidationError
 from django.db import transaction
 from django.db.utils import OperationalError, ProgrammingError
 from django.db.models import Q, Sum
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
+from django.http.multipartparser import MultiPartParserError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -37,6 +38,7 @@ from .models import (
     Municipio,
     PerfilUsuario,
     PoliticaValor,
+    RelatorioAutoSave,
     RelatorioLegado,
     RelatorioTecnico,
     RelatorioTecnicoEquipe,
@@ -769,6 +771,372 @@ def _get_valor_km_para_cliente(cliente_id) -> float:
             "_get_valor_km_para_cliente: valor inválido para cliente_id=%s", cliente_id
         )
         return 0.0
+
+
+def _autosave_payload_from_request(request):
+    payload = {}
+    for chave, valores in request.POST.lists():
+        if chave in {"csrfmiddlewaretoken"}:
+            continue
+        payload[chave] = valores if len(valores) > 1 else (valores[0] if valores else "")
+    arquivos = [
+        {
+            "campo": campo,
+            "nome": arquivo.name,
+            "tamanho": getattr(arquivo, "size", 0),
+            "content_type": getattr(arquivo, "content_type", ""),
+        }
+        for campo, arquivos_campo in request.FILES.lists()
+        for arquivo in arquivos_campo
+    ]
+    return payload, arquivos
+
+
+def _autosave_key(request, relatorio_id=None):
+    chave = str(request.POST.get("autosave_key") or "").strip()
+    if chave:
+        return chave[:80]
+    if relatorio_id:
+        return f"relatorio-{relatorio_id}"
+    return f"novo-{request.user.pk}"
+
+
+def _autosave_count(prefix, payload):
+    try:
+        return int(payload.get(f"{prefix}-TOTAL_FORMS") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _limpar_autosaves_relatorio(usuario, relatorio=None, chave=""):
+    if not getattr(usuario, "is_authenticated", False):
+        return
+    qs = RelatorioAutoSave.objects.filter(usuario=usuario)
+    filtros = Q()
+    if relatorio and getattr(relatorio, "pk", None):
+        filtros |= Q(relatorio=relatorio)
+    if chave:
+        filtros |= Q(chave=chave)
+    if filtros:
+        qs.filter(filtros).delete()
+
+
+UPLOAD_EXCEPTIONS = (
+    ValidationError,
+    IOError,
+    OSError,
+    SuspiciousOperation,
+    RequestDataTooBig,
+    MultiPartParserError,
+)
+
+
+def _upload_memoria_mb():
+    try:
+        import resource
+
+        uso = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        return round(uso / 1024, 2)
+    except Exception:
+        return None
+
+
+def _upload_arquivo_info(campo, arquivo):
+    return {
+        "campo": campo,
+        "nome": getattr(arquivo, "name", ""),
+        "tamanho": int(getattr(arquivo, "size", 0) or 0),
+        "mime": getattr(arquivo, "content_type", "") or "",
+    }
+
+
+def _upload_recebidos(request):
+    return [
+        _upload_arquivo_info(campo, arquivo)
+        for campo, arquivos_campo in request.FILES.lists()
+        for arquivo in arquivos_campo
+        if getattr(arquivo, "name", "")
+    ]
+
+
+def _upload_contexto_inicial(request, instance=None):
+    inicio = time.perf_counter()
+    arquivos = _upload_recebidos(request)
+    post_keys = list(request.POST.keys())
+    files_keys = list(request.FILES.keys())
+    total_bytes = sum(item["tamanho"] for item in arquivos)
+    contexto = {
+        "inicio": inicio,
+        "arquivos": arquivos,
+        "arquivos_count": len(arquivos),
+        "total_bytes": total_bytes,
+        "content_length": request.META.get("CONTENT_LENGTH", ""),
+        "post_keys": post_keys,
+        "files_keys": files_keys,
+        "despesas_total": request.POST.get("despesas-TOTAL_FORMS", "0"),
+        "trechos_total": request.POST.get("trechos-TOTAL_FORMS", "0"),
+        "persistidos": [],
+        "validado_em": None,
+        "salvando_em": None,
+    }
+    relatorio_ref = getattr(instance, "pk", None) or request.POST.get("relatorio_id") or "novo"
+    logger.info(
+        "UPLOAD_RECEBIDO usuario=%s relatorio=%s acao=%s method=%s arquivos=%s total_bytes=%s content_length=%s nomes=%s memoria_mb=%s",
+        getattr(request.user, "pk", None),
+        relatorio_ref,
+        request.POST.get("acao", ""),
+        request.method,
+        contexto["arquivos_count"],
+        total_bytes,
+        contexto["content_length"],
+        [item["nome"] for item in arquivos],
+        _upload_memoria_mb(),
+    )
+    logger.info(
+        "FILES_KEYS usuario=%s relatorio=%s keys=%s",
+        getattr(request.user, "pk", None),
+        relatorio_ref,
+        files_keys,
+    )
+    logger.info(
+        "POST_KEYS usuario=%s relatorio=%s despesas=%s trechos=%s keys=%s",
+        getattr(request.user, "pk", None),
+        relatorio_ref,
+        contexto["despesas_total"],
+        contexto["trechos_total"],
+        post_keys,
+    )
+    for item in arquivos:
+        logger.info(
+            "UPLOAD_VALIDADO usuario=%s relatorio=%s campo=%s nome=%s tamanho=%s mime=%s",
+            getattr(request.user, "pk", None),
+            relatorio_ref,
+            item["campo"],
+            item["nome"],
+            item["tamanho"],
+            item["mime"],
+        )
+    contexto["validado_em"] = time.perf_counter()
+    return contexto
+
+
+def _upload_log_salvando(contexto, request, relatorio=None):
+    if not contexto:
+        return
+    contexto["salvando_em"] = time.perf_counter()
+    logger.info(
+        "UPLOAD_SALVANDO usuario=%s relatorio=%s arquivos=%s total_bytes=%s memoria_mb=%s",
+        getattr(request.user, "pk", None),
+        getattr(relatorio, "pk", None) or "novo",
+        contexto.get("arquivos_count", 0),
+        contexto.get("total_bytes", 0),
+        _upload_memoria_mb(),
+    )
+
+
+def _upload_registrar_persistido(contexto, item, arquivo_original=None):
+    if not contexto:
+        return
+    if not arquivo_original or not getattr(arquivo_original, "name", ""):
+        return
+    arquivo = getattr(item, "comprovante", None)
+    if not arquivo:
+        return
+    campo = getattr(arquivo_original, "field_name", "") or ""
+    if not campo:
+        nome_original = getattr(arquivo_original, "name", "") or ""
+        tamanho_original = int(getattr(arquivo_original, "size", 0) or 0)
+        for recebido in contexto.get("arquivos", []):
+            if (
+                recebido.get("nome") == nome_original
+                and recebido.get("tamanho") == tamanho_original
+            ):
+                campo = recebido.get("campo", "")
+                break
+    registro = {
+        "tipo": "despesa" if isinstance(item, ItemDespesa) else "trecho",
+        "despesa_id": item.pk if isinstance(item, ItemDespesa) else None,
+        "trecho_id": item.pk if isinstance(item, TrechoKm) else None,
+        "campo": campo,
+        "nome_original": getattr(arquivo_original, "name", "") or "",
+        "nome_persistido": getattr(arquivo, "name", "") or "",
+        "tamanho": int(getattr(arquivo, "size", 0) or 0),
+        "mime": getattr(arquivo_original, "content_type", "") or "",
+    }
+    contexto["persistidos"].append(registro)
+    logger.info(
+        "UPLOAD_SALVO_ITEM tipo=%s despesa_id=%s trecho_id=%s campo=%s nome=%s persistido=%s tamanho=%s mime=%s",
+        registro["tipo"],
+        registro["despesa_id"],
+        registro["trecho_id"],
+        registro["campo"],
+        registro["nome_original"],
+        registro["nome_persistido"],
+        registro["tamanho"],
+        registro["mime"],
+    )
+
+
+def _upload_finalizar_ou_falhar(contexto, request, relatorio=None):
+    if not contexto:
+        return
+    recebidos = contexto.get("arquivos", [])
+    persistidos = contexto.get("persistidos", [])
+    total_ms = int((time.perf_counter() - contexto["inicio"]) * 1000)
+    processamento_ms = int(
+        ((contexto.get("validado_em") or contexto["inicio"]) - contexto["inicio"]) * 1000
+    )
+    gravacao_ms = int(
+        (time.perf_counter() - (contexto.get("salvando_em") or contexto["inicio"])) * 1000
+    )
+    logger.info(
+        "UPLOAD_SALVO usuario=%s relatorio=%s recebidos=%s persistidos=%s ids=%s tempo_total_ms=%s processamento_ms=%s gravacao_ms=%s memoria_mb=%s",
+        getattr(request.user, "pk", None),
+        getattr(relatorio, "pk", None) or "novo",
+        len(recebidos),
+        len(persistidos),
+        [(item["tipo"], item["despesa_id"] or item["trecho_id"]) for item in persistidos],
+        total_ms,
+        processamento_ms,
+        gravacao_ms,
+        _upload_memoria_mb(),
+    )
+    if len(recebidos) != len(persistidos):
+        logger.critical(
+            "UPLOAD_INCONSISTENTE usuario=%s relatorio=%s esperado=%s recebido=%s persistido=%s arquivos_recebidos=%s arquivos_persistidos=%s",
+            getattr(request.user, "pk", None),
+            getattr(relatorio, "pk", None) or "novo",
+            len(recebidos),
+            len(recebidos),
+            len(persistidos),
+            recebidos,
+            persistidos,
+        )
+        raise WorkflowError(
+            "Foi detectado um problema durante o envio dos anexos. Nenhum dado foi perdido. Verifique sua conexão e tente novamente."
+        )
+
+
+def _upload_log_exception(contexto, request, relatorio, exc):
+    total_ms = int((time.perf_counter() - contexto["inicio"]) * 1000) if contexto else 0
+    logger.exception(
+        "UPLOAD_EXCEPTION usuario=%s relatorio=%s tipo=%s tempo_total_ms=%s arquivos=%s persistidos=%s erro=%s",
+        getattr(request.user, "pk", None),
+        getattr(relatorio, "pk", None) or "novo",
+        exc.__class__.__name__,
+        total_ms,
+        len(contexto.get("arquivos", [])) if contexto else 0,
+        len(contexto.get("persistidos", [])) if contexto else 0,
+        exc,
+    )
+
+
+@login_required
+@exigir_acesso_erp
+@require_POST
+def relatorio_autosave_view(request):
+    inicio = time.perf_counter()
+    relatorio = None
+    relatorio_id = request.POST.get("relatorio_id") or request.POST.get("id") or ""
+    logger.info(
+        "AUTOSAVE_START usuario=%s relatorio=%s",
+        getattr(request.user, "pk", None),
+        relatorio_id or "novo",
+    )
+    try:
+        if relatorio_id:
+            relatorio = get_object_or_404(
+                _relatorios_visiveis(request.user, RelatorioTecnico.objects.all()),
+                pk=relatorio_id,
+            )
+            if relatorio.status != StatusRelatorio.RASCUNHO:
+                return JsonResponse(
+                    {
+                        "success": False,
+                        "error": "AutoSave disponivel apenas para relatorios em rascunho.",
+                    },
+                    status=409,
+                )
+            if not _relatorio_editavel_por_usuario(relatorio, request.user):
+                return JsonResponse(
+                    {
+                        "success": False,
+                        "error": "Voce nao tem permissao para salvar este rascunho automaticamente.",
+                    },
+                    status=403,
+                )
+
+        payload, arquivos = _autosave_payload_from_request(request)
+        chave = _autosave_key(request, getattr(relatorio, "pk", None))
+        campos_count = sum(1 for valor in payload.values() if str(valor).strip())
+        despesas_count = _autosave_count("despesas", payload)
+        trechos_count = _autosave_count("trechos", payload)
+        with transaction.atomic():
+            autosave, _created = RelatorioAutoSave.objects.update_or_create(
+                usuario=request.user,
+                chave=chave,
+                defaults={
+                    "relatorio": relatorio,
+                    "payload": payload,
+                    "arquivos": arquivos,
+                    "pagina": request.POST.get("pagina_atual", "")[:500],
+                    "user_agent": request.META.get("HTTP_USER_AGENT", "")[:500],
+                    "campos_count": campos_count,
+                    "despesas_count": despesas_count,
+                    "trechos_count": trechos_count,
+                },
+            )
+        duracao_ms = int((time.perf_counter() - inicio) * 1000)
+        logger.info(
+            "AUTOSAVE_SUCCESS usuario=%s relatorio=%s autosave=%s tempo_ms=%s campos=%s despesas=%s trechos=%s",
+            getattr(request.user, "pk", None),
+            getattr(relatorio, "pk", None) or "novo",
+            autosave.pk,
+            duracao_ms,
+            campos_count,
+            despesas_count,
+            trechos_count,
+        )
+        return JsonResponse(
+            {
+                "success": True,
+                "autosave_id": autosave.pk,
+                "saved_at": timezone.localtime(autosave.atualizado_em).strftime("%H:%M"),
+                "relatorio_id": getattr(relatorio, "pk", None),
+            }
+        )
+    except Http404:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Rascunho nao encontrado para AutoSave.",
+            },
+            status=404,
+        )
+    except PermissionDenied:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Voce nao tem permissao para salvar este rascunho automaticamente.",
+            },
+            status=403,
+        )
+    except Exception as exc:
+        duracao_ms = int((time.perf_counter() - inicio) * 1000)
+        logger.exception(
+            "AUTOSAVE_ERROR usuario=%s relatorio=%s tempo_ms=%s erro=%s",
+            getattr(request.user, "pk", None),
+            relatorio_id or "novo",
+            duracao_ms,
+            exc,
+        )
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Nao foi possivel salvar automaticamente.",
+            },
+            status=500,
+        )
 
 
 def _form_has_content(form) -> bool:
@@ -1946,6 +2314,23 @@ def relatorio_form_view(request, pk=None):
         return redirect("relatorios:relatorio_detail", pk=instance.pk)
 
     resumo_erros = []
+    upload_contexto = None
+
+    if request.method == "POST":
+        try:
+            upload_contexto = _upload_contexto_inicial(request, instance)
+        except UPLOAD_EXCEPTIONS as exc:
+            _upload_log_exception(None, request, instance, exc)
+            messages.error(
+                request,
+                "Foi detectado um problema durante o envio dos anexos. Nenhum dado foi perdido. Verifique sua conexão e tente novamente.",
+            )
+            destino = (
+                reverse("relatorios:relatorio_update", kwargs={"pk": instance.pk})
+                if instance
+                else reverse("relatorios:relatorio_create")
+            )
+            return redirect(destino)
 
     # ── Determinar valor_km_padrao (variável auxiliar) ────────────────────────
     # No POST: lê o cliente enviado no form para recalcular o padrão correto.
@@ -2105,7 +2490,7 @@ def relatorio_form_view(request, pk=None):
 
             # ── Salvar ────────────────────────────────────────────────────────
             # Condição limpa: só usa a flag local + form.errors do principal.
-            # NÃO re-checa fs_desp.errors nem fs_km.errors aqui — eles já
+            # NÃƒO re-checa fs_desp.errors nem fs_km.errors aqui — eles já
             # foram validados pelo is_valid() acima e qualquer erro extra
             # foi capturado pela flag `erros_extras`.
             if not erros_extras and not form.errors:
@@ -2174,6 +2559,8 @@ def relatorio_form_view(request, pk=None):
                             km_excedente_anterior,
                         )
 
+                        _upload_log_salvando(upload_contexto, request, relatorio)
+
                         fs_desp.instance = relatorio
                         for f in fs_desp.forms:
                             if not _form_has_content(f):
@@ -2181,6 +2568,11 @@ def relatorio_form_view(request, pk=None):
                             item = f.save(commit=False)
                             item.relatorio = relatorio
                             item.save()
+                            _upload_registrar_persistido(
+                                upload_contexto,
+                                item,
+                                f.cleaned_data.get("comprovante"),
+                            )
                             _registrar_metadados_comprovante(
                                 relatorio,
                                 usuario_historico,
@@ -2218,6 +2610,11 @@ def relatorio_form_view(request, pk=None):
                             elif len(clientes_trecho) > 1:
                                 trecho.valor_km = Decimal("0.00")
                             trecho.save()
+                            _upload_registrar_persistido(
+                                upload_contexto,
+                                trecho,
+                                f.cleaned_data.get("comprovante"),
+                            )
                             _registrar_auditoria_geografica_trecho(
                                 relatorio,
                                 usuario_historico,
@@ -2240,6 +2637,12 @@ def relatorio_form_view(request, pk=None):
                         if erros_integridade:
                             raise WorkflowError(erros_integridade)
 
+                        _upload_finalizar_ou_falhar(
+                            upload_contexto,
+                            request,
+                            relatorio,
+                        )
+
                         if relatorio_novo:
                             registrar_evento(
                                 relatorio,
@@ -2257,6 +2660,12 @@ def relatorio_form_view(request, pk=None):
                                 relatorio.pk,
                                 usuario_historico,
                             )
+
+                        _limpar_autosaves_relatorio(
+                            request.user,
+                            relatorio,
+                            request.POST.get("autosave_key", ""),
+                        )
 
                         logger.info(
                             "Relatório %s salvo (pk=%s, status=%s, acao=%s).",
@@ -2306,6 +2715,44 @@ def relatorio_form_view(request, pk=None):
                         },
                     )
                 except Exception as exc:
+                    if isinstance(exc, UPLOAD_EXCEPTIONS) or (
+                        upload_contexto and upload_contexto.get("arquivos")
+                    ):
+                        mensagem_upload = (
+                            "Foi detectado um problema durante o envio dos anexos. "
+                            "Nenhum dado foi perdido. Verifique sua conexão e tente novamente."
+                        )
+                        _upload_log_exception(upload_contexto, request, instance, exc)
+                        messages.error(request, mensagem_upload)
+                        return render(
+                            request,
+                            "relatorios/relatorio_form.html",
+                            {
+                                "form": form,
+                                "fs_desp": fs_desp,
+                                "fs_km": fs_km,
+                                "instance": instance,
+                                "clientes_importacao": _clientes_queryset_selecao(),
+                                "tecnicos_importacao": Tecnico.objects.filter(
+                                    ativo=True
+                                ).order_by("nome"),
+                                "titulo_pagina": (
+                                    f"Editar Relatório {instance.identificador}"
+                                    if instance
+                                    else "Novo Relatório"
+                                ),
+                                "salvar_rascunho": "Salvar rascunho",
+                                "enviar": _label_botao_envio_relatorio(instance),
+                                "valor_km_padrao": str(valor_km_padrao),
+                                "valor_km_control_sul": str(valor_km_control_sul()),
+                                "resumo_erros": [mensagem_upload],
+                                "clientes_selecionados_ids": clientes_post_ids,
+                                "clientes_selecionados_nomes": clientes_post_nomes,
+                                "motivos_clientes_relatorio": motivos_clientes,
+                                "tecnicos_selecionados_ids": tecnicos_post_ids,
+                                "tecnicos_selecionados_nomes": tecnicos_post_nomes,
+                            },
+                        )
                     logger.exception("Erro ao salvar relatório: %s", exc)
                     messages.error(request, "Erro interno ao salvar. Tente novamente.")
                     # Não adiciona ao resumo_erros — é erro de infra, não de validação
@@ -2453,7 +2900,7 @@ def nova_linha_km(request):
     Recebe via GET:
     - idx             : índice da linha (int)
     - valor_km_padrao : valor R$/km do cliente atual (float como string)
-                        É uma variável auxiliar — não é campo do model.
+                        Ã‰ uma variável auxiliar — não é campo do model.
                         Usada apenas para pré-preencher o campo valor_km
                         na linha nova (initial do form).
     """
@@ -2714,7 +3161,7 @@ def relatorio_reembolso_pdf_view(request, pk):
             "itens": itens,
             "total": total,
             "emitido_em": emitido_em,
-            "empresa": "CONTROLSUL GESTÃO EMPRESARIAL",
+            "empresa": "CONTROLSUL GESTÃƒO EMPRESARIAL",
         },
         request=request,
     )
@@ -2891,7 +3338,7 @@ def relatorio_pdf_interno_view(request, pk):
         "relatorios/pdf/interno.html",
         {
             "pdf": pdf_contexto,
-            "empresa": "CONTROLSUL GESTÃO EMPRESARIAL",
+            "empresa": "CONTROLSUL GESTÃƒO EMPRESARIAL",
             "emitido_em": emitido_em,
             "usuario_gerador": usuario_gerador,
         },
@@ -3608,7 +4055,7 @@ def relatorio_valores_financeiros_json(request, pk):
 
 
 # ─────────────────────────────────────────────
-# TÉCNICOS
+# TÃ‰CNICOS
 # ─────────────────────────────────────────────
 
 
