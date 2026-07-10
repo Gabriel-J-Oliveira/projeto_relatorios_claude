@@ -99,11 +99,12 @@
 
         <div class="despesa-field despesa-field-anexo" data-tour="despesas-comprovante">
           <label class="despesa-field-label" for="id_despesas-{{ idx }}-comprovante">Comprovante</label>
-          <div class="d-flex align-items-center gap-1">
+          <div class="d-flex align-items-center gap-1 upload-comprovante-control">
             {% if form.instance.comprovante %}
               <a href="{{ form.instance.comprovante.url }}"
                  target="_blank"
-                 class="btn btn-sm btn-outline-success despesa-file-btn">
+                 class="btn btn-sm btn-outline-success despesa-file-btn"
+                 data-upload-existing="1">
                 <i class="bi bi-file-earmark-check"></i>
                 <span>Atual</span>
               </a>
@@ -116,8 +117,19 @@
                      id="id_despesas-{{ idx }}-comprovante"
                      class="form-sm {% if form.comprovante.errors %}is-invalid{% endif %}"
                      accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                     onchange="this.closest('.despesa-file-btn').classList.replace('btn-outline-secondary', 'btn-success'); this.closest('.despesa-file-btn').querySelector('.despesa-file-label').textContent = this.files?.[0]?.name || 'Anexar';">
+                     data-upload-comprovante="1"
+                     data-upload-status-target="id_despesas-{{ idx }}-upload-status">
             </label>
+          </div>
+          <div class="small mt-1 upload-status {% if form.instance.comprovante %}text-success{% else %}text-muted{% endif %}"
+               id="id_despesas-{{ idx }}-upload-status"
+               data-upload-status-line
+               {% if form.instance.comprovante %}data-upload-state="persisted"{% else %}data-upload-state="empty"{% endif %}>
+            {% if form.instance.comprovante %}
+              <i class="bi bi-check-circle me-1"></i>Enviado com sucesso
+            {% else %}
+              Nenhum arquivo selecionado
+            {% endif %}
           </div>
           <div class="invalid-feedback d-block small erro-inline">
             {% if form.comprovante.errors %}{{ form.comprovante.errors.0 }}{% endif %}

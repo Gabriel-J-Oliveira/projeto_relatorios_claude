@@ -118,6 +118,11 @@ MEDIA_ROOT = BASE_DIR / "media"
 ANEXOS_URL = config("ANEXOS_URL", default="/anexos/")
 ANEXOS_ROOT = Path(config("ANEXOS_ROOT", default="/home/app_relatorios_files"))
 ANEXO_MAX_UPLOAD_MB = config("ANEXO_MAX_UPLOAD_MB", default=10, cast=int)
+RELATORIO_ANEXOS_MAX_TOTAL_MB = config(
+    "RELATORIO_ANEXOS_MAX_TOTAL_MB",
+    default=1024,
+    cast=int,
+)
 HELP_IMAGES_ROOT = Path(
     config("HELP_IMAGES_ROOT", default="/home/app_relatorios_files/help_images")
 )

@@ -859,17 +859,111 @@ def _upload_recebidos(request):
     ]
 
 
+def _upload_item_id_por_campo(request, campo):
+    partes = str(campo or "").split("-")
+    if len(partes) < 3:
+        return None, None
+    prefixo, indice = partes[0], partes[1]
+    try:
+        item_id = int(request.POST.get(f"{prefixo}-{indice}-id") or 0)
+    except (TypeError, ValueError):
+        item_id = 0
+    return prefixo, item_id or None
+
+
+def _upload_tamanho_existente_substituido(request, relatorio):
+    if not relatorio or not getattr(relatorio, "pk", None):
+        return 0
+    despesa_ids = []
+    trecho_ids = []
+    for campo, _arquivos_campo in request.FILES.lists():
+        prefixo, item_id = _upload_item_id_por_campo(request, campo)
+        if not item_id:
+            continue
+        if prefixo == "despesas":
+            despesa_ids.append(item_id)
+        elif prefixo == "trechos":
+            trecho_ids.append(item_id)
+    filtro = Q()
+    if despesa_ids:
+        filtro |= Q(despesa_id__in=despesa_ids)
+    if trecho_ids:
+        filtro |= Q(trecho_id__in=trecho_ids)
+    if not filtro:
+        return 0
+    return (
+        AnexoRelatorio.objects.filter(relatorio=relatorio)
+        .filter(filtro)
+        .aggregate(total=Sum("tamanho_bytes"))
+        .get("total")
+        or 0
+    )
+
+
+def _upload_tamanho_existente_relatorio(relatorio):
+    if not relatorio or not getattr(relatorio, "pk", None):
+        return 0
+    return (
+        AnexoRelatorio.objects.filter(relatorio=relatorio)
+        .aggregate(total=Sum("tamanho_bytes"))
+        .get("total")
+        or 0
+    )
+
+
+def _upload_limite_total_bytes():
+    limite_mb = int(getattr(settings, "RELATORIO_ANEXOS_MAX_TOTAL_MB", 1024) or 1024)
+    return limite_mb * 1024 * 1024
+
+
+def _upload_config_context():
+    limite_arquivo_mb = int(getattr(settings, "ANEXO_MAX_UPLOAD_MB", 10) or 10)
+    limite_total_mb = int(getattr(settings, "RELATORIO_ANEXOS_MAX_TOTAL_MB", 1024) or 1024)
+    return {
+        "anexo_max_upload_mb": limite_arquivo_mb,
+        "relatorio_anexos_max_total_mb": limite_total_mb,
+    }
+
+
+def _upload_validar_capacidade_total(contexto, request, relatorio=None):
+    if not contexto:
+        return
+    limite = _upload_limite_total_bytes()
+    total = contexto.get("total_relatorio_bytes", contexto.get("total_bytes", 0))
+    if total <= limite:
+        return
+    logger.warning(
+        "UPLOAD_CANCELADO usuario=%s relatorio=%s motivo=limite_total_excedido total_bytes=%s existente_bytes=%s substituido_bytes=%s total_relatorio_bytes=%s limite_bytes=%s arquivos=%s",
+        getattr(request.user, "pk", None),
+        getattr(relatorio, "pk", None) or request.POST.get("relatorio_id") or "novo",
+        contexto.get("total_bytes", 0),
+        contexto.get("existente_bytes", 0),
+        contexto.get("substituido_bytes", 0),
+        total,
+        limite,
+        contexto.get("arquivos", []),
+    )
+    raise WorkflowError(
+        "O total de anexos deste relatório excede o limite permitido. Remova ou reduza arquivos grandes e tente novamente."
+    )
+
+
 def _upload_contexto_inicial(request, instance=None):
     inicio = time.perf_counter()
     arquivos = _upload_recebidos(request)
     post_keys = list(request.POST.keys())
     files_keys = list(request.FILES.keys())
     total_bytes = sum(item["tamanho"] for item in arquivos)
+    existente_bytes = int(_upload_tamanho_existente_relatorio(instance) or 0)
+    substituido_bytes = int(_upload_tamanho_existente_substituido(request, instance) or 0)
     contexto = {
         "inicio": inicio,
         "arquivos": arquivos,
         "arquivos_count": len(arquivos),
         "total_bytes": total_bytes,
+        "existente_bytes": existente_bytes,
+        "substituido_bytes": substituido_bytes,
+        "total_relatorio_bytes": max(0, existente_bytes - substituido_bytes) + total_bytes,
         "content_length": request.META.get("CONTENT_LENGTH", ""),
         "post_keys": post_keys,
         "files_keys": files_keys,
@@ -881,13 +975,24 @@ def _upload_contexto_inicial(request, instance=None):
     }
     relatorio_ref = getattr(instance, "pk", None) or request.POST.get("relatorio_id") or "novo"
     logger.info(
-        "UPLOAD_RECEBIDO usuario=%s relatorio=%s acao=%s method=%s arquivos=%s total_bytes=%s content_length=%s nomes=%s memoria_mb=%s",
+        "UPLOAD_INICIO usuario=%s relatorio=%s acao=%s method=%s content_length=%s",
+        getattr(request.user, "pk", None),
+        relatorio_ref,
+        request.POST.get("acao", ""),
+        request.method,
+        contexto["content_length"],
+    )
+    logger.info(
+        "UPLOAD_RECEBIDO usuario=%s relatorio=%s acao=%s method=%s arquivos=%s total_bytes=%s existente_bytes=%s substituido_bytes=%s total_relatorio_bytes=%s content_length=%s nomes=%s memoria_mb=%s",
         getattr(request.user, "pk", None),
         relatorio_ref,
         request.POST.get("acao", ""),
         request.method,
         contexto["arquivos_count"],
         total_bytes,
+        contexto["existente_bytes"],
+        contexto["substituido_bytes"],
+        contexto["total_relatorio_bytes"],
         contexto["content_length"],
         [item["nome"] for item in arquivos],
         _upload_memoria_mb(),
@@ -965,6 +1070,25 @@ def _upload_registrar_persistido(contexto, item, arquivo_original=None):
     }
     contexto["persistidos"].append(registro)
     logger.info(
+        "UPLOAD_SALVO_STORAGE tipo=%s despesa_id=%s trecho_id=%s campo=%s nome=%s storage=%s tamanho=%s mime=%s",
+        registro["tipo"],
+        registro["despesa_id"],
+        registro["trecho_id"],
+        registro["campo"],
+        registro["nome_original"],
+        registro["nome_persistido"],
+        registro["tamanho"],
+        registro["mime"],
+    )
+    logger.info(
+        "UPLOAD_SALVO_BANCO tipo=%s despesa_id=%s trecho_id=%s campo=%s arquivo=%s",
+        registro["tipo"],
+        registro["despesa_id"],
+        registro["trecho_id"],
+        registro["campo"],
+        registro["nome_persistido"],
+    )
+    logger.info(
         "UPLOAD_SALVO_ITEM tipo=%s despesa_id=%s trecho_id=%s campo=%s nome=%s persistido=%s tamanho=%s mime=%s",
         registro["tipo"],
         registro["despesa_id"],
@@ -1019,6 +1143,16 @@ def _upload_finalizar_ou_falhar(contexto, request, relatorio=None):
 
 def _upload_log_exception(contexto, request, relatorio, exc):
     total_ms = int((time.perf_counter() - contexto["inicio"]) * 1000) if contexto else 0
+    logger.error(
+        "UPLOAD_ERRO usuario=%s relatorio=%s tipo=%s tempo_total_ms=%s arquivos=%s persistidos=%s erro=%s",
+        getattr(request.user, "pk", None),
+        getattr(relatorio, "pk", None) or "novo",
+        exc.__class__.__name__,
+        total_ms,
+        len(contexto.get("arquivos", [])) if contexto else 0,
+        len(contexto.get("persistidos", [])) if contexto else 0,
+        exc,
+    )
     logger.exception(
         "UPLOAD_EXCEPTION usuario=%s relatorio=%s tipo=%s tempo_total_ms=%s arquivos=%s persistidos=%s erro=%s",
         getattr(request.user, "pk", None),
@@ -2315,15 +2449,24 @@ def relatorio_form_view(request, pk=None):
 
     resumo_erros = []
     upload_contexto = None
+    upload_config = {
+        **_upload_config_context(),
+        "relatorio_anexos_existente_bytes": int(
+            _upload_tamanho_existente_relatorio(instance) or 0
+        ),
+    }
 
     if request.method == "POST":
         try:
             upload_contexto = _upload_contexto_inicial(request, instance)
-        except UPLOAD_EXCEPTIONS as exc:
+            _upload_validar_capacidade_total(upload_contexto, request, instance)
+        except (UPLOAD_EXCEPTIONS, WorkflowError) as exc:
             _upload_log_exception(None, request, instance, exc)
             messages.error(
                 request,
-                "Foi detectado um problema durante o envio dos anexos. Nenhum dado foi perdido. Verifique sua conexão e tente novamente.",
+                str(exc)
+                if isinstance(exc, WorkflowError)
+                else "Foi detectado um problema durante o envio dos anexos. Nenhum dado foi perdido. Verifique sua conexão e tente novamente.",
             )
             destino = (
                 reverse("relatorios:relatorio_update", kwargs={"pk": instance.pk})
@@ -2712,6 +2855,7 @@ def relatorio_form_view(request, pk=None):
                             "motivos_clientes_relatorio": motivos_clientes,
                             "tecnicos_selecionados_ids": tecnicos_post_ids,
                             "tecnicos_selecionados_nomes": tecnicos_post_nomes,
+                            **upload_config,
                         },
                     )
                 except Exception as exc:
@@ -2751,6 +2895,7 @@ def relatorio_form_view(request, pk=None):
                                 "motivos_clientes_relatorio": motivos_clientes,
                                 "tecnicos_selecionados_ids": tecnicos_post_ids,
                                 "tecnicos_selecionados_nomes": tecnicos_post_nomes,
+                                **upload_config,
                             },
                         )
                     logger.exception("Erro ao salvar relatório: %s", exc)
@@ -2783,6 +2928,7 @@ def relatorio_form_view(request, pk=None):
                             "motivos_clientes_relatorio": motivos_clientes,
                             "tecnicos_selecionados_ids": tecnicos_post_ids,
                             "tecnicos_selecionados_nomes": tecnicos_post_nomes,
+                            **upload_config,
                         },
                     )
 
@@ -2842,6 +2988,7 @@ def relatorio_form_view(request, pk=None):
             "motivos_clientes_relatorio": motivos_clientes,
             "tecnicos_selecionados_ids": tecnicos_post_ids,
             "tecnicos_selecionados_nomes": tecnicos_post_nomes,
+            **upload_config,
         },
     )
 

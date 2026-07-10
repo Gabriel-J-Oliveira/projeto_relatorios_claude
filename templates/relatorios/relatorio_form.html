@@ -90,6 +90,9 @@
                 data-autosave-storage-key="relatorio-autosave-{{ instance.pk|default:'novo' }}"
                 data-relatorio-id="{{ instance.pk|default:'' }}"
                 data-autosave-enabled="{% if not instance or instance.status == 'rascunho' %}1{% else %}0{% endif %}"
+                data-upload-max-file-mb="{{ anexo_max_upload_mb|default:10 }}"
+                data-upload-max-total-mb="{{ relatorio_anexos_max_total_mb|default:1024 }}"
+                data-upload-existing-bytes="{{ relatorio_anexos_existente_bytes|default:0 }}"
                 novalidate>
             {% csrf_token %}
             <input type="hidden" name="acao" value="enviar" id="acao-relatorio-default">
@@ -157,6 +160,49 @@
                 </button>
               </li>
             </ul>
+
+            <div class="card border-0 bg-body-tertiary shadow-sm mb-4"
+                 id="upload-usage-card"
+                 data-upload-monitor-card>
+              <div class="card-body py-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                  <div>
+                    <h6 class="mb-1 fw-semibold d-flex align-items-center gap-2">
+                      <i class="bi bi-cloud-arrow-up text-primary"></i>
+                      Utilização de anexos
+                    </h6>
+                    <div class="small text-muted" data-upload-summary>
+                      Nenhum anexo novo selecionado.
+                    </div>
+                  </div>
+                  <span class="badge rounded-pill text-bg-success" data-upload-status>
+                    Dentro do limite
+                  </span>
+                </div>
+                <div class="progress mt-3" style="height: .55rem;" role="progressbar" aria-label="Uso de anexos">
+                  <div class="progress-bar" data-upload-progress style="width: 0%;"></div>
+                </div>
+                <div class="row g-3 mt-1 small">
+                  <div class="col-md-4">
+                    <span class="text-muted">Arquivos:</span>
+                    <strong data-upload-count>0 anexos</strong>
+                  </div>
+                  <div class="col-md-4">
+                    <span class="text-muted">Espaço utilizado:</span>
+                    <strong data-upload-size>0 B</strong>
+                  </div>
+                  <div class="col-md-4">
+                    <span class="text-muted">Tempo estimado:</span>
+                    <strong data-upload-time>-</strong>
+                  </div>
+                </div>
+                <div class="mt-3 d-none" data-upload-largest-wrap>
+                  <div class="small fw-semibold text-muted mb-1">Maiores arquivos selecionados</div>
+                  <div class="d-flex flex-column gap-1" data-upload-largest></div>
+                </div>
+                <div class="alert alert-warning py-2 px-3 small mt-3 mb-0 d-none" data-upload-alert></div>
+              </div>
+            </div>
 
             {% if resumo_erros %}
               <div class="alert alert-danger border-0 shadow-sm mb-4" data-tour="resumo-alertas">
@@ -1168,6 +1214,30 @@
       background: var(--bs-danger-bg-subtle) !important;
       border-color: var(--bs-danger-border-subtle);
     }
+    .upload-status {
+      line-height: 1.25;
+      max-width: 11rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .upload-status[data-upload-state="pending"] {
+      color: var(--bs-info-text-emphasis) !important;
+    }
+    .upload-status[data-upload-state="sending"] {
+      color: var(--bs-primary-text-emphasis) !important;
+    }
+    .upload-status[data-upload-state="error"],
+    .upload-status[data-upload-state="rejected"] {
+      color: var(--bs-danger-text-emphasis) !important;
+      white-space: normal;
+    }
+    .upload-largest-item {
+      border: 1px solid var(--bs-border-color);
+      border-radius: .5rem;
+      padding: .35rem .5rem;
+      background: var(--bs-body-bg);
+    }
     .linha-trecho.km-divergente {
       box-shadow: inset 3px 0 0 var(--bs-warning);
     }
@@ -1245,6 +1315,7 @@
           <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
           <script src="https://cdn.jsdelivr.net/npm/driver.js@latest/dist/driver.js.iife.js"></script>
           <script defer src="{% static 'js/relatorio_autosave.js' %}"></script>
+          <script defer src="{% static 'js/relatorio_upload_monitor.js' %}"></script>
           <script defer src="{% static 'js/relatorio_form_tour.js' %}"></script>
           <script>
   /* ================================================================
