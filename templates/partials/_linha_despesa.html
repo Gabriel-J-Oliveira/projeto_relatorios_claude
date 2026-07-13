@@ -171,6 +171,7 @@
                      id="id_despesas-{{ idx }}-comprovante"
                      class="form-sm {% if form.comprovante.errors %}is-invalid{% endif %}"
                      accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                     multiple
                      data-upload-comprovante="1"
                      data-upload-status-target="id_despesas-{{ idx }}-upload-status">
             </label>
@@ -187,6 +188,8 @@
               Nenhum arquivo selecionado
             {% endif %}
           </div>
+          <div class="comprovantes-pendentes small mt-1 d-none"
+               data-upload-selected-list></div>
           <div class="invalid-feedback d-block small erro-inline">
             {% if form.comprovante.errors %}{{ form.comprovante.errors.0 }}{% endif %}
           </div>
@@ -305,12 +308,12 @@
         </div>
 
         <div class="despesa-field despesa-field-observacao">
-          <label class="despesa-field-label" for="id_despesas-{{ idx }}-observacoes">Observacao</label>
+          <label class="despesa-field-label" for="id_despesas-{{ idx }}-observacoes">Observação</label>
           <input type="text"
                  name="despesas-{{ idx }}-observacoes"
                  id="id_despesas-{{ idx }}-observacoes"
                  value="{{ form.observacoes.value|default:'' }}"
-                 placeholder="Observacao"
+                 placeholder="Observação"
                  class="form-control form-control-sm w-100">
           <div class="text-warning small aviso-inline"></div>
         </div>

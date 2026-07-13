@@ -33,12 +33,15 @@
   document.addEventListener("change", (event) => {
     const input = event.target;
     if (!(input instanceof HTMLInputElement) || input.type !== "file") return;
-    const file = input.files && input.files[0];
-    if (isAllowedFile(file)) {
+    const files = Array.from(input.files || []);
+    if (files.every(isAllowedFile)) {
       input.classList.remove("is-invalid");
       return;
     }
     input.value = "";
+    if (input._relatorioUploadTransfer && window.DataTransfer) {
+      input._relatorioUploadTransfer = new DataTransfer();
+    }
     showInputError(input, message);
   });
 

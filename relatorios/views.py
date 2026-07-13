@@ -3168,7 +3168,12 @@ def relatorio_form_view(request, pk=None):
                         for f in fs_desp.forms:
                             if not _form_has_content(f):
                                 continue
-                            comprovante_upload = request.FILES.get(f"{f.prefix}-comprovante")
+                            comprovantes_upload = [
+                                arquivo
+                                for arquivo in request.FILES.getlist(f"{f.prefix}-comprovante")
+                                if getattr(arquivo, "name", "")
+                            ]
+                            comprovante_upload = comprovantes_upload[0] if comprovantes_upload else None
                             comprovante_anterior = ""
                             tem_anexos_anteriores = False
                             if f.instance.pk:
@@ -3189,20 +3194,23 @@ def relatorio_form_view(request, pk=None):
                             item.relatorio = relatorio
                             if salvar_upload_como_anexo:
                                 item.comprovante = comprovante_anterior or None
+                            elif comprovante_upload:
+                                item.comprovante = comprovante_upload
                             item.save()
-                            if comprovante_upload and salvar_upload_como_anexo:
-                                anexo = _criar_anexo_comprovante_adicional(
-                                    relatorio,
-                                    usuario_historico,
-                                    item,
-                                    comprovante_upload,
-                                )
-                                if anexo:
-                                    _upload_registrar_persistido(
-                                        upload_contexto,
-                                        anexo,
-                                        comprovante_upload,
+                            if comprovantes_upload and salvar_upload_como_anexo:
+                                for arquivo_upload in comprovantes_upload:
+                                    anexo = _criar_anexo_comprovante_adicional(
+                                        relatorio,
+                                        usuario_historico,
+                                        item,
+                                        arquivo_upload,
                                     )
+                                    if anexo:
+                                        _upload_registrar_persistido(
+                                            upload_contexto,
+                                            anexo,
+                                            arquivo_upload,
+                                        )
                             else:
                                 _upload_registrar_persistido(
                                     upload_contexto,
@@ -3215,6 +3223,19 @@ def relatorio_form_view(request, pk=None):
                                     item,
                                     comprovante_upload,
                                 )
+                                for arquivo_upload in comprovantes_upload[1:]:
+                                    anexo = _criar_anexo_comprovante_adicional(
+                                        relatorio,
+                                        usuario_historico,
+                                        item,
+                                        arquivo_upload,
+                                    )
+                                    if anexo:
+                                        _upload_registrar_persistido(
+                                            upload_contexto,
+                                            anexo,
+                                            arquivo_upload,
+                                        )
                             erros_item = sync_clientes_despesa(
                                 item,
                                 _clientes_item_post(request, f.prefix),

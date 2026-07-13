@@ -82,6 +82,52 @@
     }
   }
 
+  function fileKey(file) {
+    return [
+      file.name || "",
+      file.size || 0,
+      file.lastModified || 0,
+      file.type || "",
+    ].join("|");
+  }
+
+  function ensureTransfer(input) {
+    if (!input._relatorioUploadTransfer) {
+      input._relatorioUploadTransfer = new DataTransfer();
+    }
+    return input._relatorioUploadTransfer;
+  }
+
+  function acumularArquivosSelecionados(input) {
+    if (!window.DataTransfer || !input.multiple) return;
+    const transfer = ensureTransfer(input);
+    const existentes = new Set(Array.from(transfer.files || []).map(fileKey));
+    Array.from(input.files || []).forEach((file) => {
+      const key = fileKey(file);
+      if (existentes.has(key)) return;
+      transfer.items.add(file);
+      existentes.add(key);
+    });
+    input.files = transfer.files;
+  }
+
+  function selectedList(input) {
+    return input.closest(".despesa-field-anexo")?.querySelector("[data-upload-selected-list]");
+  }
+
+  function renderSelectedList(input) {
+    const list = selectedList(input);
+    if (!list) return;
+    const files = Array.from(input.files || []);
+    list.classList.toggle("d-none", files.length === 0);
+    list.innerHTML = files.map((file, index) => (
+      `<div class="d-flex align-items-center justify-content-between gap-2 upload-selected-item">` +
+      `<span class="text-truncate"><i class="bi bi-paperclip me-1"></i>${escapeHtml(file.name)}</span>` +
+      `<span class="text-muted flex-shrink-0">${formatBytes(file.size || 0)}</span>` +
+      `</div>`
+    )).join("");
+  }
+
   function validateFile(file) {
     if (!file) return { ok: true };
     if (file.size <= 0) {
@@ -103,18 +149,20 @@
     const items = [];
     const errors = [];
     form.querySelectorAll('input[type="file"][data-upload-comprovante]').forEach((input) => {
-      const file = input.files && input.files[0];
-      if (!file) return;
-      const validation = validateFile(file);
-      const item = {
-        input,
-        file,
-        name: file.name,
-        size: file.size || 0,
-        validation,
-      };
-      items.push(item);
-      if (!validation.ok) errors.push(item);
+      const files = Array.from(input.files || []);
+      renderSelectedList(input);
+      files.forEach((file) => {
+        const validation = validateFile(file);
+        const item = {
+          input,
+          file,
+          name: file.name,
+          size: file.size || 0,
+          validation,
+        };
+        items.push(item);
+        if (!validation.ok) errors.push(item);
+      });
     });
     return { items, errors };
   }
@@ -133,7 +181,11 @@
         setStatus(item.input, item.validation.state, item.validation.message, "bi-x-circle");
         setButtonState(item.input, item.validation.state);
       } else {
-        setStatus(item.input, "pending", `${item.name} pronto para envio (${formatBytes(item.size)})`, "bi-clock-history");
+        const totalInputFiles = item.input.files ? item.input.files.length : 1;
+        const mensagem = totalInputFiles > 1
+          ? `${totalInputFiles} arquivos prontos para envio`
+          : `${item.name} pronto para envio (${formatBytes(item.size)})`;
+        setStatus(item.input, "pending", mensagem, "bi-clock-history");
         setButtonState(item.input, "pending");
       }
     });
@@ -237,6 +289,7 @@
     form.addEventListener("change", (event) => {
       const input = event.target.closest('input[type="file"][data-upload-comprovante]');
       if (!input) return;
+      acumularArquivosSelecionados(input);
       updateMonitor(form);
     });
 

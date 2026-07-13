@@ -227,10 +227,18 @@ header.navbar {
 }
 
 .despesa-extra-row {
-  grid-template-columns: 145px 145px 112px 112px 82px 120px minmax(200px, 1fr);
+  grid-template-columns: 145px 145px 118px 118px 88px 118px minmax(280px, 1fr);
   margin-top: .55rem;
   padding-top: .55rem;
   border-top: 1px dashed var(--bs-border-color);
+}
+
+.linha-despesa:not(.despesa-hospedagem) .despesa-field-tecnicos {
+  grid-column: 3 / 4;
+}
+
+.linha-despesa:not(.despesa-hospedagem) .despesa-field-observacao {
+  grid-column: 4 / -1;
 }
 
 .despesa-field {
@@ -254,6 +262,7 @@ header.navbar {
 }
 
 .despesa-row .clientes-item-btn,
+.despesa-row .tecnicos-item-btn,
 .despesa-row .despesa-actions .btn,
 .despesa-file-btn {
   display: inline-flex;
@@ -267,10 +276,30 @@ header.navbar {
   overflow: hidden;
 }
 
-.despesa-row .clientes-item-label {
+.despesa-row .clientes-item-label,
+.despesa-row .tecnicos-item-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.despesa-row .tecnicos-item-btn {
+  min-height: 31px;
+  padding: .25rem .45rem;
+  font-size: .78rem;
+  line-height: 1.15;
+  overflow: hidden;
+}
+
+.despesa-row .tecnicos-item-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 .25rem;
+  font-size: .66rem;
+  line-height: 1;
 }
 
 .despesa-file-btn {
@@ -283,6 +312,22 @@ header.navbar {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.comprovantes-pendentes {
+  max-width: 100%;
+}
+
+.upload-selected-item {
+  min-width: 0;
+  padding: .1rem .35rem;
+  border-radius: .35rem;
+  background: var(--bs-tertiary-bg);
+  color: var(--bs-body-color);
+}
+
+.upload-selected-item + .upload-selected-item {
+  margin-top: .15rem;
 }
 
 .despesa-field-anexo input[type="file"] {
@@ -329,7 +374,7 @@ header.navbar {
   }
 
   .despesa-extra-row {
-    grid-template-columns: 128px 132px 102px 102px 76px 112px minmax(190px, 1fr);
+    grid-template-columns: 128px 132px 108px 108px 72px 108px minmax(260px, 1fr);
     gap: .45rem;
   }
 
