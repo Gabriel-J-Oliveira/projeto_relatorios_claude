@@ -142,7 +142,10 @@
            id="id_trechos-{{ idx }}-observacao"
            value="{{ form.observacao.value|default:'' }}"
            placeholder="Observação"
-           class="form-control form-control-sm">
+           class="form-control form-control-sm {% if form.observacao.errors %}is-invalid{% endif %}">
+    <div class="invalid-feedback d-block small erro-inline">
+      {% if form.observacao.errors %}{{ form.observacao.errors.0 }}{% endif %}
+    </div>
   </td>
   <td class="p-1 pt-3">
     <input type="hidden"

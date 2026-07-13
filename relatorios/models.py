@@ -1777,6 +1777,59 @@ class KmLegado(models.Model):
         return f"KM legado do relatório {self.relatorio_id}"
 
 
+class CidadeAtendimento(models.Model):
+    relatorio = models.ForeignKey(
+        RelatorioTecnico,
+        on_delete=models.CASCADE,
+        related_name="cidades_atendimento",
+        verbose_name="Relatório",
+    )
+    municipio = models.ForeignKey(
+        Municipio,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="cidades_atendimento",
+        verbose_name="Município",
+    )
+    cidade = models.CharField("Cidade", max_length=120)
+    uf = models.CharField("UF", max_length=2, choices=UF.choices, blank=True)
+    tipo_localidade = models.CharField(
+        "Localidade",
+        max_length=12,
+        choices=TipoLocalidade.choices,
+        blank=True,
+    )
+    endereco = models.CharField("Endereço", max_length=255, blank=True)
+    ordem = models.PositiveIntegerField("Ordem", default=0)
+    observacao = models.CharField("Observação", max_length=255, blank=True)
+
+    class Meta:
+        verbose_name = "Cidade de atendimento"
+        verbose_name_plural = "Cidades de atendimento"
+        ordering = ["ordem", "pk"]
+        indexes = [
+            models.Index(fields=["relatorio", "ordem"]),
+            models.Index(fields=["cidade", "uf"]),
+        ]
+
+    def __str__(self):
+        return f"{self.cidade}/{self.uf}" if self.uf else self.cidade
+
+    def sincronizar_municipio(self):
+        if not self.municipio_id:
+            self.cidade = (self.cidade or "").strip()
+            self.uf = (self.uf or "").strip().upper()
+            return
+        self.cidade = self.municipio.nome
+        self.uf = self.municipio.uf
+        self.tipo_localidade = self.municipio.tipo_localidade_padrao
+
+    def save(self, *args, **kwargs):
+        self.sincronizar_municipio()
+        super().save(*args, **kwargs)
+
+
 # ─────────────────────────────────────────────────────────────────
 # EQUIPE DO RELATÓRIO
 # ─────────────────────────────────────────────────────────────────
@@ -1896,6 +1949,16 @@ class ItemDespesa(models.Model):
         blank=True,
         null=True,
     )
+    data_inicio_hospedagem = models.DateField(
+        "Entrada da hospedagem",
+        null=True,
+        blank=True,
+    )
+    data_fim_hospedagem = models.DateField(
+        "Saída da hospedagem",
+        null=True,
+        blank=True,
+    )
     tipo_documento_comprovante = models.CharField(
         "Tipo do documento",
         max_length=20,
@@ -1943,7 +2006,27 @@ class ItemDespesa(models.Model):
     @property
     def valor_politica(self):
         politica = self.politica_aplicavel
+        if not politica:
+            return None
+        if self.tipo == TipoDespesa.HOSPEDAGEM and self.quantidade_diarias_hospedagem > 0:
+            return _valor_monetario(politica.valor * self.quantidade_diarias_hospedagem)
+        return politica.valor
+
+    @property
+    def valor_politica_diaria(self):
+        politica = self.politica_aplicavel
         return politica.valor if politica else None
+
+    @property
+    def quantidade_diarias_hospedagem(self):
+        if self.tipo != TipoDespesa.HOSPEDAGEM:
+            return 0
+        from relatorios.services.periodo_despesa_service import calcular_diarias_periodo
+
+        return calcular_diarias_periodo(
+            self.data_inicio_hospedagem,
+            self.data_fim_hospedagem,
+        )
 
     @property
     def politica_aplicavel(self):
@@ -2016,6 +2099,24 @@ class ItemDespesa(models.Model):
             erros["numero_documento_comprovante"] = (
                 "Informe o número do documento para Nota Fiscal."
             )
+        validar_periodo_hospedagem = (
+            self.tipo == TipoDespesa.HOSPEDAGEM
+            and (
+                not self.pk
+                or self.data_inicio_hospedagem
+                or self.data_fim_hospedagem
+            )
+        )
+        if validar_periodo_hospedagem:
+            if not self.data_inicio_hospedagem:
+                erros["data_inicio_hospedagem"] = "Informe a data de entrada da hospedagem."
+            if not self.data_fim_hospedagem:
+                erros["data_fim_hospedagem"] = "Informe a data de saída da hospedagem."
+            if self.data_inicio_hospedagem and self.data_fim_hospedagem:
+                if self.data_fim_hospedagem <= self.data_inicio_hospedagem:
+                    erros["data_fim_hospedagem"] = (
+                        "A data de saída deve ser posterior à data de entrada."
+                    )
         if numero_normalizado:
             duplicados = ItemDespesa.objects.filter(
                 numero_documento_comprovante__iexact=numero_normalizado
@@ -2049,6 +2150,27 @@ class DespesaCliente(models.Model):
 
     def __str__(self):
         return f"{self.despesa_id} - {self.cliente}"
+
+
+class DespesaTecnico(models.Model):
+    despesa = models.ForeignKey(
+        ItemDespesa,
+        on_delete=models.CASCADE,
+        related_name="tecnicos_vinculados",
+    )
+    tecnico = models.ForeignKey(
+        Tecnico,
+        on_delete=models.PROTECT,
+        related_name="despesas_participantes",
+    )
+
+    class Meta:
+        verbose_name = "Técnico da Despesa"
+        verbose_name_plural = "Técnicos da Despesa"
+        unique_together = [("despesa", "tecnico")]
+
+    def __str__(self):
+        return f"{self.despesa_id} - {self.tecnico}"
 
 
 # ─────────────────────────────────────────────────────────────────

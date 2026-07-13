@@ -68,16 +68,6 @@
         </div>
 
         <div class="card-body py-4 px-4">
-          {% if resumo_erros %}
-              <div class="alert alert-warning">
-                <ul class="mb-0">
-                  {% for erro in resumo_erros %}
-                    <li>{{ erro }}</li>
-                  {% endfor %}
-                </ul>
-              </div>
-          {% endif %}
-
           <form method="post"
                 enctype="multipart/form-data"
                 id="form-relatorio"
@@ -99,6 +89,7 @@
             {% if instance.pk %}<input type="hidden" name="relatorio_id" value="{{ instance.pk }}">{% endif %}
 
             {# Management forms — obrigatórios para Django formsets (Operação Real) #}
+            {{ fs_cidades.management_form }}
             {{ fs_desp.management_form }}
             {{ fs_km.management_form }}
             {{ form.municipio_atendimento }}
@@ -207,11 +198,23 @@
               <div class="alert alert-danger border-0 shadow-sm mb-4" data-tour="resumo-alertas">
                 <div class="d-flex align-items-center mb-2">
                   <i class="bi bi-exclamation-octagon-fill me-2"></i>
-                  <strong>Não foi possível salvar o relatório</strong>
+                  <strong>
+                    Foram encontrados {{ resumo_erros|length }} problema{{ resumo_erros|length|pluralize }} no relatório.
+                  </strong>
                 </div>
                 <ul class="small mb-0 ps-3">
                   {% for erro in resumo_erros %}
-                    <li>{{ erro }}</li>
+                    <li>
+                      {% if erro.href %}
+                        <a href="{{ erro.href }}"
+                           class="alert-link text-decoration-none relatorio-error-link"
+                           data-error-tab="{{ erro.tab|default:'' }}">
+                          {{ erro.mensagem|default:erro }}
+                        </a>
+                      {% else %}
+                        {{ erro.mensagem|default:erro }}
+                      {% endif %}
+                    </li>
                   {% endfor %}
                 </ul>
               </div>
@@ -362,7 +365,104 @@
                   </div>
 
                   {# Localidade #}
-                  <div class="col-md-5 position-relative" data-tour="relatorio-cidade-uf">
+                  <div class="col-12 order-4" data-tour="relatorio-cidades-atendidas">
+                    <div class="border rounded-2 bg-body-tertiary p-3">
+                      <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+                        <div>
+                          <h6 class="mb-0 fw-semibold">Cidades atendidas</h6>
+                          <small class="text-muted">Adicione uma linha para cada cidade visitada no atendimento.</small>
+                        </div>
+                        <button type="button"
+                                id="btn-adicionar-cidade"
+                                class="btn btn-sm btn-primary d-flex align-items-center gap-2">
+                          <i class="bi bi-plus-circle"></i>Adicionar cidade
+                        </button>
+                      </div>
+                      <div id="lista-cidades-atendimento" class="d-flex flex-column gap-2">
+                        {% for f in fs_cidades %}
+                          <div class="cidade-atendimento-row border rounded-2 bg-body p-2{% if f.DELETE.value %} linha-removida{% endif %}">
+                            {{ f.id }}
+                            {{ f.ordem }}
+                            {{ f.municipio }}
+                            <div class="row g-2 align-items-start">
+                              <div class="col-md-4 position-relative">
+                                <label class="form-label fw-medium small text-muted">Cidade *</label>
+                                {{ f.cidade }}
+                                <div class="cidade-sugestoes list-group position-absolute w-100 shadow-sm d-none z-3"></div>
+                                {% if f.cidade.errors %}
+                                  <div class="text-danger small mt-1">{{ f.cidade.errors.0 }}</div>
+                                {% endif %}
+                              </div>
+                              <div class="col-md-4">
+                                <label class="form-label fw-medium small text-muted">EndereÃ§o</label>
+                                {{ f.endereco }}
+                              </div>
+                              <div class="col-md-1">
+                                <label class="form-label fw-medium small text-muted">UF</label>
+                                {{ f.uf }}
+                              </div>
+                              <div class="col-md-2">
+                                <label class="form-label fw-medium small text-muted">Localidade</label>
+                                {{ f.tipo_localidade }}
+                              </div>
+                              <div class="col-md-1 d-flex justify-content-end pt-4">
+                                <button type="button"
+                                        class="btn btn-outline-danger btn-sm btn-remover-cidade"
+                                        title="Remover cidade">
+                                  <i class="bi bi-trash"></i>
+                                </button>
+                              </div>
+                              <div class="col-12">
+                                <label class="form-label fw-medium small text-muted">ObservaÃ§Ã£o</label>
+                                {{ f.observacao }}
+                              </div>
+                            </div>
+                            <div class="d-none">{{ f.DELETE }}</div>
+                          </div>
+                        {% endfor %}
+                      </div>
+                      <template id="template-cidade-atendimento">
+                        <div class="cidade-atendimento-row border rounded-2 bg-body p-2">
+                          {{ fs_cidades.empty_form.id }}
+                          {{ fs_cidades.empty_form.ordem }}
+                          {{ fs_cidades.empty_form.municipio }}
+                          <div class="row g-2 align-items-start">
+                            <div class="col-md-4 position-relative">
+                              <label class="form-label fw-medium small text-muted">Cidade *</label>
+                              {{ fs_cidades.empty_form.cidade }}
+                              <div class="cidade-sugestoes list-group position-absolute w-100 shadow-sm d-none z-3"></div>
+                            </div>
+                            <div class="col-md-4">
+                              <label class="form-label fw-medium small text-muted">EndereÃ§o</label>
+                              {{ fs_cidades.empty_form.endereco }}
+                            </div>
+                            <div class="col-md-1">
+                              <label class="form-label fw-medium small text-muted">UF</label>
+                              {{ fs_cidades.empty_form.uf }}
+                            </div>
+                            <div class="col-md-2">
+                              <label class="form-label fw-medium small text-muted">Localidade</label>
+                              {{ fs_cidades.empty_form.tipo_localidade }}
+                            </div>
+                            <div class="col-md-1 d-flex justify-content-end pt-4">
+                              <button type="button"
+                                      class="btn btn-outline-danger btn-sm btn-remover-cidade"
+                                      title="Remover cidade">
+                                <i class="bi bi-trash"></i>
+                              </button>
+                            </div>
+                            <div class="col-12">
+                              <label class="form-label fw-medium small text-muted">ObservaÃ§Ã£o</label>
+                              {{ fs_cidades.empty_form.observacao }}
+                            </div>
+                          </div>
+                          <div class="d-none">{{ fs_cidades.empty_form.DELETE }}</div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+
+                  <div class="col-md-5 position-relative d-none" data-tour="relatorio-cidade-uf">
                     <label class="form-label fw-medium small text-muted">Cidade de Atendimento *</label>
                     {{ form.cidade_atendimento }}
                     <div id="municipio-sugestoes" class="list-group position-absolute w-100 shadow-sm d-none z-3"></div>
@@ -372,19 +472,23 @@
                     {% endif %}
                   </div>
 
-                  <div class="col-md-2" data-tour="relatorio-uf">
+                  <div class="col-md-2 d-none" data-tour="relatorio-uf">
                     <label class="form-label fw-medium small text-muted">UF</label>
                     {{ form.uf_atendimento }}
                     <div class="form-text small">Automático</div>
                   </div>
 
-                  <div class="col-md-2" data-tour="relatorio-localidade">
+                  <div class="col-md-2 d-none" data-tour="relatorio-localidade">
                     <label class="form-label fw-medium small text-muted">Localidade</label>
                     {{ form.tipo_localidade }}
                     <div class="form-text small">Automática pela cidade selecionada</div>
                   </div>
 
-                  <div class="col-md-3" data-tour="relatorio-adiantamento">
+                  <div class="col-12 order-3 mt-2">
+                    <h6 class="mb-0 fw-semibold">Dados da Viagem</h6>
+                  </div>
+
+                  <div class="col-md-3 order-3" data-tour="relatorio-adiantamento">
                     <label class="form-label fw-medium small text-muted">Adiantamento (R$)</label>
                     <div class="input-group input-group-sm">
                       <span class="input-group-text bg-light border-end-0">R$</span>
@@ -393,7 +497,7 @@
                   </div>
 
                   {# Período #}
-                  <div class="col-md-3" data-tour="relatorio-periodo">
+                  <div class="col-md-3 order-3" data-tour="relatorio-periodo">
                     <label class="form-label fw-medium small text-muted">Data Início *</label>
                     {{ form.data_inicio }}
                     {% if form.data_inicio.errors %}
@@ -401,7 +505,7 @@
                     {% endif %}
                   </div>
 
-                  <div class="col-md-3" data-tour="relatorio-periodo-fim">
+                  <div class="col-md-3 order-3" data-tour="relatorio-periodo-fim">
                     <label class="form-label fw-medium small text-muted">Data Fim *</label>
                     {{ form.data_fim }}
                     {% if form.data_fim.errors %}
@@ -419,7 +523,7 @@
                   </div>
 
                   {# Observações #}
-                  <div class="col-12">
+                  <div class="col-12 order-5">
                     <label class="form-label fw-medium small text-muted">
                       Observações
                       <span class="fw-normal opacity-75">(opcional)</span>
@@ -1231,6 +1335,16 @@
       color: var(--bs-danger-text-emphasis) !important;
       white-space: normal;
     }
+    .comprovantes-lista {
+      max-width: 12rem;
+    }
+    .comprovante-item .anexo-preview-btn {
+      max-width: 8rem;
+      color: inherit;
+    }
+    .comprovante-item .btn-link {
+      line-height: 1;
+    }
     .upload-largest-item {
       border: 1px solid var(--bs-border-color);
       border-radius: .5rem;
@@ -1316,6 +1430,7 @@
           <script defer src="{% static 'js/relatorio_autosave.js' %}"></script>
           <script defer src="{% static 'js/relatorio_upload_monitor.js' %}"></script>
           <script defer src="{% static 'js/relatorio_form_tour.js' %}"></script>
+          <script defer src="{% static 'js/relatorio_novidades_tour.js' %}"></script>
           <script>
   /* ================================================================
     CONTROLE DO FORMULARIO - Single Save sem HTMX
@@ -1330,6 +1445,7 @@
   const VALOR_KM_CONTROLSUL = Number("{{ valor_km_control_sul|default:'1.35' }}".replace(",", ".")) || 1.35;
 
   // ── Contadores de índice (nunca reutilizados) ──────────────────
+  let _idxCidades = {{ fs_cidades.total_form_count }};
   let _idxDesp = {{ fs_desp.total_form_count }};
   let _idxKm = {{ fs_km.total_form_count }};
   const enderecoTimers = new WeakMap();
@@ -1343,11 +1459,59 @@
   const PREFIX_KM = "trechos";
   const VKM_PADRAO = "{{ valor_km_padrao }}";
   let clienteSelectorTarget = null;
+  let tecnicoSelectorTarget = null;
 
   window.addEventListener("relatorio:autosave-restored", () => {
+    _idxCidades = Number(document.getElementById("id_cidades-TOTAL_FORMS")?.value || _idxCidades) || _idxCidades;
     _idxDesp = Number(document.getElementById("id_despesas-TOTAL_FORMS")?.value || _idxDesp) || _idxDesp;
     _idxKm = Number(document.getElementById("id_trechos-TOTAL_FORMS")?.value || _idxKm) || _idxKm;
     atualizarBadgesAbasSeguro();
+    atualizarBadgesTecnicosDespesas();
+  });
+
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest(".relatorio-error-link");
+    if (!link) return;
+    const tabSelector = link.dataset.errorTab;
+    if (tabSelector) {
+      const tabButton = document.querySelector(`[data-bs-target="${tabSelector}"]`);
+      if (tabButton && window.bootstrap?.Tab) {
+        bootstrap.Tab.getOrCreateInstance(tabButton).show();
+      }
+    }
+    const targetId = decodeURIComponent((link.getAttribute("href") || "").replace(/^#/, ""));
+    if (targetId) {
+      window.setTimeout(() => {
+        const target = document.getElementById(targetId);
+        if (!target) return;
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        if (typeof target.focus === "function") target.focus({ preventScroll: true });
+      }, 120);
+    }
+  });
+
+  document.addEventListener("click", async (event) => {
+    const button = event.target.closest(".comprovante-delete-btn");
+    if (!button) return;
+    const url = button.dataset.deleteUrl;
+    if (!url) return;
+    if (!window.confirm("Remover este comprovante?")) return;
+    button.disabled = true;
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]")?.value || "",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: new URLSearchParams({ next: window.location.pathname + window.location.search }),
+      });
+      if (!response.ok) throw new Error("Falha ao remover comprovante.");
+      window.location.reload();
+    } catch (error) {
+      button.disabled = false;
+      alert("Não foi possível remover o comprovante. Tente novamente.");
+    }
   });
 
   function logFormEvent(evento, detalhes = {}, nivel = "info") {
@@ -1683,6 +1847,21 @@
     atualizarMapaFormulario();
   }
 
+  function atualizarBadgesTecnicosDespesas() {
+    const relatorioIds = getTecnicosEquipeIds();
+    document.querySelectorAll(".tecnicos-item-input").forEach(input => {
+      const ids = idsFromValue(input.value).filter(id => relatorioIds.includes(id));
+      if (ids.join(",") !== input.value) input.value = ids.join(",");
+      const wrapper = input.closest(".despesa-field-tecnicos");
+      const count = wrapper?.querySelector(".tecnicos-item-count");
+      const label = wrapper?.querySelector(".tecnicos-item-label");
+      const erro = wrapper?.querySelector(".erro-tecnicos-item");
+      if (count) count.textContent = ids.length;
+      if (label) label.textContent = "Técnicos";
+      if (erro) erro.textContent = "";
+    });
+  }
+
   function trechoTemMultiplosClientes(linha) {
     const input = linha?.querySelector(".clientes-item-input");
     return idsFromValue(input?.value).length > 1;
@@ -1735,9 +1914,22 @@
     atualizarFiltroClientesModal();
   }
 
-  function abrirSeletorTecnicos() {
-    const selecionados = new Set(getTecnicosEquipeIds());
-    document.querySelectorAll(".tecnico-opcao").forEach(opcao => {
+  function abrirSeletorTecnicos(botao = null) {
+    tecnicoSelectorTarget = botao || null;
+    const tipo = botao?.dataset.tecnicoSelector || "relatorio";
+    const input = tipo === "item"
+      ? document.getElementById(botao?.dataset.tecnicoTarget)
+      : null;
+    const selecionados = new Set(
+      tipo === "item"
+        ? idsFromValue(input?.value)
+        : getTecnicosEquipeIds()
+    );
+    const permitidos = tipo === "item" ? new Set(getTecnicosEquipeIds()) : null;
+    document.querySelectorAll(".tecnico-opcao-linha").forEach(row => {
+      const opcao = row.querySelector(".tecnico-opcao");
+      const permitido = !permitidos || permitidos.has(opcao.dataset.tecnicoId);
+      row.dataset.tecnicoPermitido = permitido ? "1" : "0";
       opcao.classList.toggle("btn-success", selecionados.has(opcao.dataset.tecnicoId));
       opcao.classList.toggle("btn-outline-secondary", !selecionados.has(opcao.dataset.tecnicoId));
       opcao.textContent = selecionados.has(opcao.dataset.tecnicoId) ? "Selecionado" : "Selecionar";
@@ -1772,8 +1964,9 @@
   function atualizarFiltroTecnicosModal() {
     const termo = (document.getElementById("tecnicos-filtro-busca")?.value || "").toLowerCase();
     document.querySelectorAll(".tecnico-opcao-linha").forEach(row => {
+      const permitido = row.dataset.tecnicoPermitido !== "0";
       const texto = (row.dataset.tecnicoSearch || "").toLowerCase();
-      row.classList.toggle("d-none", Boolean(termo && !texto.includes(termo)));
+      row.classList.toggle("d-none", !permitido || Boolean(termo && !texto.includes(termo)));
     });
   }
 
@@ -1793,9 +1986,21 @@
 
   function aplicarSelecaoTecnicos() {
     const ids = Array.from(document.querySelectorAll(".tecnico-opcao.btn-success"))
+      .filter(btn => !btn.closest("tr")?.classList.contains("d-none"))
       .map(btn => btn.dataset.tecnicoId);
-    setTecnicosEquipe(ids);
-    atualizarBadgesTecnicosEquipe();
+    const tipo = tecnicoSelectorTarget?.dataset.tecnicoSelector || "relatorio";
+    if (tipo === "item") {
+      const input = document.getElementById(tecnicoSelectorTarget?.dataset.tecnicoTarget);
+      if (input) {
+        input.value = Array.from(new Set(ids.map(String))).join(",");
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      atualizarBadgesTecnicosDespesas();
+    } else {
+      setTecnicosEquipe(ids);
+      atualizarBadgesTecnicosEquipe();
+      atualizarBadgesTecnicosDespesas();
+    }
     bootstrap.Modal.getInstance(document.getElementById("modalSelecionarTecnicos"))?.hide();
   }
 
@@ -1957,6 +2162,8 @@
     const tipo = linha.querySelector('[name$="-tipo"]')?.value || "";
     const data = linha.querySelector('[name$="-data"]')?.value || "";
     const descricao = linha.querySelector('[name$="-descricao"]')?.value || "";
+    const entradaHospedagem = linha.querySelector(".campo-hospedagem-entrada")?.value || "";
+    const saidaHospedagem = linha.querySelector(".campo-hospedagem-saida")?.value || "";
     const aviso = linha.querySelector(".aviso-inline");
     if (["passagem", "hospedagem", "transporte"].includes(tipo) && aviso?.textContent?.includes("despesas altas")) {
       aviso.textContent = "";
@@ -1975,7 +2182,7 @@
     const municipioId = document.getElementById("id_municipio_atendimento")?.value || "";
     const tipoLocalidade = document.getElementById("id_tipo_localidade")?.value || "";
     const valor = normalizarNumero(linha.querySelector(".campo-valor-desp")?.value);
-    const chave = `${tipo}|${data}|${tipoLocalidade}|${cidade}|${municipioId}|${descricao}|${valor}`;
+    const chave = `${tipo}|${data}|${tipoLocalidade}|${cidade}|${municipioId}|${descricao}|${valor}|${entradaHospedagem}|${saidaHospedagem}`;
     if (info.dataset.policyKey === chave) return;
     info.dataset.policyKey = chave;
 
@@ -1992,6 +2199,10 @@
     url.searchParams.set("municipio_id", municipioId);
     url.searchParams.set("descricao", descricao);
     url.searchParams.set("valor", String(valor));
+    if (tipo === "hospedagem") {
+      url.searchParams.set("data_inicio_hospedagem", entradaHospedagem);
+      url.searchParams.set("data_fim_hospedagem", saidaHospedagem);
+    }
     try {
       const response = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
       const payload = await response.json();
@@ -2001,9 +2212,13 @@
         return;
       }
       const excedeu = valor > limite;
+      const diarias = Number(payload?.data?.diarias || 0);
+      const detalheHospedagem = tipo === "hospedagem" && diarias > 0
+        ? ` para ${diarias} diária${diarias === 1 ? "" : "s"}`
+        : "";
       info.textContent = excedeu
-        ? `${payload.data.descricao}: ${formatMoney(limite)}. Excesso: ${formatMoney(valor - limite)}`
-        : `${payload.data.descricao}: ${formatMoney(limite)}`;
+        ? `${payload.data.descricao}: limite${detalheHospedagem} ${formatMoney(limite)}. Excesso: ${formatMoney(valor - limite)}`
+        : `${payload.data.descricao}: limite${detalheHospedagem} ${formatMoney(limite)}`;
       info.className = excedeu
         ? "small mt-1 politica-despesa-info alert alert-warning py-1 px-2 mb-0"
         : "small mt-1 politica-despesa-info text-muted";
@@ -2015,6 +2230,143 @@
     } catch (error) {
       limparPolitica();
     }
+  }
+
+  function cidadeRowAtiva(row) {
+    return row && !row.classList.contains("linha-removida") && !row.querySelector('[name$="-DELETE"]')?.checked;
+  }
+
+  function sincronizarPrimeiraCidadeLegada() {
+    const row = Array.from(document.querySelectorAll(".cidade-atendimento-row")).find(cidadeRowAtiva);
+    const municipioLegado = document.getElementById("id_municipio_atendimento");
+    const cidadeLegado = document.getElementById("id_cidade_atendimento");
+    const ufLegado = document.getElementById("id_uf_atendimento");
+    const localidadeLegado = document.getElementById("id_tipo_localidade");
+    if (!row) {
+      if (municipioLegado) municipioLegado.value = "";
+      if (cidadeLegado) cidadeLegado.value = "";
+      return;
+    }
+    const municipio = row.querySelector('[name$="-municipio"]')?.value || "";
+    const cidade = row.querySelector('[name$="-cidade"]')?.value || "";
+    const uf = row.querySelector('[name$="-uf"]')?.value || "";
+    const localidade = row.querySelector('[name$="-tipo_localidade"]')?.value || "";
+    if (municipioLegado) municipioLegado.value = municipio;
+    if (cidadeLegado) cidadeLegado.value = cidade;
+    if (ufLegado) ufLegado.value = uf;
+    if (localidadeLegado) localidadeLegado.value = localidade;
+  }
+
+  function aplicarMunicipioCidadeRow(row, municipio) {
+    if (!row || !municipio) return;
+    const municipioInput = row.querySelector('[name$="-municipio"]');
+    const cidadeInput = row.querySelector('[name$="-cidade"]');
+    const ufInput = row.querySelector('[name$="-uf"]');
+    const localidadeInput = row.querySelector('[name$="-tipo_localidade"]');
+    if (municipioInput) municipioInput.value = municipio.id;
+    if (cidadeInput) {
+      cidadeInput.value = municipio.label || `${municipio.nome}/${municipio.uf}`;
+      cidadeInput.classList.remove("is-invalid");
+    }
+    if (ufInput) ufInput.value = municipio.uf;
+    if (localidadeInput) localidadeInput.value = municipio.tipo_localidade;
+    const box = row.querySelector(".cidade-sugestoes");
+    if (box) {
+      box.innerHTML = "";
+      box.classList.add("d-none");
+    }
+    sincronizarPrimeiraCidadeLegada();
+    recalcular();
+  }
+
+  function renderSugestoesCidadeRow(row, lista) {
+    const box = row?.querySelector(".cidade-sugestoes");
+    if (!box) return;
+    box.innerHTML = "";
+    if (!lista?.length) {
+      box.innerHTML = '<div class="list-group-item small text-muted">Nenhuma cidade encontrada.</div>';
+      box.classList.remove("d-none");
+      return;
+    }
+    lista.forEach(municipio => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "list-group-item list-group-item-action d-flex justify-content-between align-items-center";
+      btn.innerHTML = `<span>${escapeHtmlMapa(municipio.label)}</span><small class="text-muted">${escapeHtmlMapa(municipio.uf_nome)} · ${escapeHtmlMapa(municipio.tipo_localidade_label || localidadeLabel(municipio.tipo_localidade))}</small>`;
+      btn.addEventListener("mousedown", event => {
+        event.preventDefault();
+        aplicarMunicipioCidadeRow(row, municipio);
+      });
+      box.appendChild(btn);
+    });
+    box.classList.remove("d-none");
+  }
+
+  async function buscarMunicipiosCidadeRow(row, termo) {
+    const form = document.getElementById("form-relatorio");
+    if (!form || !row || !termo || termo.trim().length < 2) return [];
+    const url = new URL(form.dataset.municipiosUrl || "/municipios/buscar/", window.location.origin);
+    url.searchParams.set("q", termo.trim());
+    try {
+      const response = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+      const payload = await response.json();
+      const dados = payload.success ? (payload.data || []) : [];
+      renderSugestoesCidadeRow(row, dados);
+      return dados;
+    } catch (error) {
+      renderSugestoesCidadeRow(row, []);
+      return [];
+    }
+  }
+
+  function atualizarOrdensCidades() {
+    document.querySelectorAll(".cidade-atendimento-row").forEach((row, index) => {
+      const ordem = row.querySelector('[name$="-ordem"]');
+      if (ordem) ordem.value = index;
+    });
+  }
+
+  function adicionarLinhaCidade() {
+    const template = document.getElementById("template-cidade-atendimento");
+    const lista = document.getElementById("lista-cidades-atendimento");
+    if (!template || !lista) return null;
+    const html = template.innerHTML.replace(/__prefix__/g, String(_idxCidades));
+    const wrapper = document.createElement("div");
+    wrapper.innerHTML = html.trim();
+    const row = wrapper.firstElementChild;
+    lista.appendChild(row);
+    _idxCidades++;
+    atualizarTotalForms("cidades", _idxCidades);
+    atualizarOrdensCidades();
+    return row;
+  }
+
+  function calcularDiariasHospedagemLinha(linha) {
+    if (!linha?.classList.contains("linha-despesa")) return 0;
+    const tipo = linha.querySelector('[name$="-tipo"]')?.value || "";
+    const entrada = linha.querySelector(".campo-hospedagem-entrada")?.value || "";
+    const saida = linha.querySelector(".campo-hospedagem-saida")?.value || "";
+    const display = linha.querySelector(".hospedagem-diarias");
+    const isHospedagem = tipo === "hospedagem";
+    linha.classList.toggle("despesa-hospedagem", isHospedagem);
+    if (!isHospedagem) {
+      if (display) display.textContent = "-";
+      return 0;
+    }
+    let diarias = 0;
+    if (entrada && saida) {
+      const entradaDate = new Date(`${entrada}T00:00:00`);
+      const saidaDate = new Date(`${saida}T00:00:00`);
+      if (!Number.isNaN(entradaDate.getTime()) && !Number.isNaN(saidaDate.getTime())) {
+        diarias = Math.max(Math.round((saidaDate - entradaDate) / 86400000), 0);
+      }
+    }
+    if (display) {
+      display.textContent = diarias > 0
+        ? `${diarias} diária${diarias === 1 ? "" : "s"}`
+        : "Informe entrada e saída";
+    }
+    return diarias;
   }
 
   function formatarDecimalCampo(campo, casas = 2) {
@@ -2660,8 +3012,9 @@
       opcaoCliente.textContent = opcaoCliente.classList.contains("btn-success") ? "Selecionado" : "Selecionar";
     }
 
-    if (event.target.closest('[data-bs-target="#modalSelecionarTecnicos"]')) {
-      abrirSeletorTecnicos();
+    const botaoTecnico = event.target.closest('[data-bs-target="#modalSelecionarTecnicos"]');
+    if (botaoTecnico) {
+      abrirSeletorTecnicos(botaoTecnico);
     }
 
     const opcaoTecnico = event.target.closest(".tecnico-opcao");
@@ -2676,6 +3029,7 @@
       const ids = getTecnicosEquipeIds().filter(id => id !== String(removerTecnico.dataset.tecnicoId));
       setTecnicosEquipe(ids);
       atualizarBadgesTecnicosEquipe();
+      atualizarBadgesTecnicosDespesas();
       document.querySelectorAll(`.tecnico-opcao[data-tecnico-id="${removerTecnico.dataset.tecnicoId}"]`).forEach(btn => {
         btn.classList.remove("btn-success");
         btn.classList.add("btn-outline-secondary");
@@ -2712,6 +3066,7 @@
   document.getElementById("btn-limpar-tecnicos-selecao")
     ?.addEventListener("click", () => {
       document.querySelectorAll(".tecnico-opcao").forEach(btn => {
+        if (btn.closest("tr")?.classList.contains("d-none")) return;
         btn.classList.remove("btn-success");
         btn.classList.add("btn-outline-secondary");
         btn.textContent = "Selecionar";
@@ -2769,6 +3124,7 @@
       aplicarMascarasNumericas(novaLinha);
       aplicarLimiteDatas(novaLinha);
       atualizarBadgesClientesItens();
+      atualizarBadgesTecnicosDespesas();
       recalcular();
       atualizarBadgesAbasSeguro();
       logFormEvent("adicionar_despesa_sucesso", { idx, novoTotalForms: _idxDesp });
@@ -3000,6 +3356,7 @@ async function adicionarLinhaKm() {
     // Despesas
     document.querySelectorAll(".linha-despesa").forEach(tr => {
       if (linhaEstaRemovida(tr)) return;
+      calcularDiariasHospedagemLinha(tr);
       const val = normalizarNumero(tr.querySelector(".campo-valor-desp")?.value);
       const quem = tr.querySelector(".campo-quem-pagou")?.value || "tecnico";
       if (quem === "tecnico") totalTec += val;
@@ -3252,6 +3609,54 @@ function validarKmGlobal() {
         event.preventDefault();
         adicionarLinhaDespesa();
       });
+    document.getElementById("btn-adicionar-cidade")
+      ?.addEventListener("click", event => {
+        event.preventDefault();
+        adicionarLinhaCidade();
+        sincronizarPrimeiraCidadeLegada();
+      });
+    document.getElementById("lista-cidades-atendimento")
+      ?.addEventListener("input", event => {
+        const campo = event.target.closest(".cidade-atendimento-input");
+        if (!campo) return;
+        const row = campo.closest(".cidade-atendimento-row");
+        const municipioInput = row?.querySelector('[name$="-municipio"]');
+        if (municipioInput) municipioInput.value = "";
+        window.clearTimeout(row?._cidadeBuscaTimer);
+        row._cidadeBuscaTimer = window.setTimeout(() => buscarMunicipiosCidadeRow(row, campo.value), 220);
+        sincronizarPrimeiraCidadeLegada();
+        recalcular();
+      });
+    document.getElementById("lista-cidades-atendimento")
+      ?.addEventListener("click", event => {
+        const btn = event.target.closest(".btn-remover-cidade");
+        if (!btn) return;
+        const row = btn.closest(".cidade-atendimento-row");
+        const del = row?.querySelector('[name$="-DELETE"]');
+        if (del) {
+          del.checked = true;
+          row.classList.add("linha-removida");
+          row.style.display = "none";
+        } else {
+          row?.remove();
+        }
+        sincronizarPrimeiraCidadeLegada();
+      });
+    document.addEventListener("click", event => {
+      if (event.target.closest(".cidade-sugestoes") || event.target.closest(".cidade-atendimento-input")) return;
+      document.querySelectorAll(".cidade-sugestoes").forEach(box => {
+        box.innerHTML = "";
+        box.classList.add("d-none");
+      });
+    });
+    document.getElementById("corpo-despesas")
+      ?.addEventListener("change", event => {
+        if (event.target.matches('[name$="-tipo"], .campo-hospedagem-entrada, .campo-hospedagem-saida')) {
+          const linha = event.target.closest(".linha-despesa");
+          calcularDiariasHospedagemLinha(linha);
+          recalcular();
+        }
+      });
     document.getElementById("btn-adicionar-km")
       ?.addEventListener("click", event => {
         event.preventDefault();
@@ -3317,6 +3722,8 @@ function validarKmGlobal() {
     atualizarBadgesClientesRelatorio();
     atualizarBadgesClientesItens();
     atualizarBadgesTecnicosEquipe();
+    atualizarBadgesTecnicosDespesas();
+    sincronizarPrimeiraCidadeLegada();
     atualizarTipoReembolsoUI();
     linhasAtivasFormulario(".linha-trecho").forEach(prepararLinhaMapaKm);
     aplicarMascarasNumericas();
@@ -3343,6 +3750,7 @@ function validarKmGlobal() {
       });
     document.getElementById("form-relatorio")?.addEventListener("submit", event => {
       const form = event.currentTarget;
+      sincronizarPrimeiraCidadeLegada();
       const acaoSubmit =
         event.submitter?.value ||
         form.querySelector('input[type="hidden"][name="acao"]')?.value ||

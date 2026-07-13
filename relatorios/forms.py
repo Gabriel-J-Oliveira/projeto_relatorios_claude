@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from .models import (
     RelatorioTecnico,
+    CidadeAtendimento,
     ItemDespesa,
     TrechoKm,
     Tecnico,
@@ -516,6 +517,115 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
 # ─────────────────────────────────────────────
 
 
+class CidadeAtendimentoForm(BootstrapMixin, forms.ModelForm):
+    class Meta:
+        model = CidadeAtendimento
+        fields = [
+            "municipio",
+            "cidade",
+            "uf",
+            "tipo_localidade",
+            "endereco",
+            "ordem",
+            "observacao",
+        ]
+        widgets = {
+            "municipio": forms.HiddenInput(),
+            "cidade": forms.TextInput(
+                attrs={
+                    "autocomplete": "off",
+                    "placeholder": "Digite e selecione a cidade",
+                    "class": "form-control form-control-sm cidade-atendimento-input",
+                }
+            ),
+            "uf": forms.TextInput(
+                attrs={
+                    "readonly": "readonly",
+                    "class": "form-control form-control-sm cidade-uf-input",
+                }
+            ),
+            "tipo_localidade": forms.Select(
+                attrs={
+                    "class": "form-select form-select-sm cidade-localidade-input",
+                    "data-auto-localidade": "true",
+                    "tabindex": "-1",
+                    "style": "pointer-events: none;",
+                }
+            ),
+            "endereco": forms.TextInput(
+                attrs={
+                    "placeholder": "Endereço de referência",
+                    "class": "form-control form-control-sm",
+                }
+            ),
+            "ordem": forms.HiddenInput(),
+            "observacao": forms.TextInput(
+                attrs={
+                    "placeholder": "Observação",
+                    "class": "form-control form-control-sm",
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["municipio"].queryset = Municipio.objects.filter(ativo=True).order_by("nome", "uf")
+        self.fields["cidade"].required = False
+        self.fields["uf"].required = False
+        self.fields["tipo_localidade"].required = False
+        self.fields["endereco"].required = False
+        self.fields["observacao"].required = False
+        self.fields["ordem"].required = False
+
+    def clean(self):
+        cd = super().clean()
+        if cd.get("DELETE"):
+            return cd
+        municipio = cd.get("municipio")
+        cidade = (cd.get("cidade") or "").strip()
+        endereco = (cd.get("endereco") or "").strip()
+        observacao = (cd.get("observacao") or "").strip()
+        if not municipio and not cidade and not endereco and not observacao:
+            return cd
+        if municipio:
+            cd["cidade"] = municipio.nome
+            cd["uf"] = municipio.uf
+            cd["tipo_localidade"] = municipio.tipo_localidade_padrao
+        elif not cidade:
+            self.add_error("cidade", "Informe a cidade de atendimento.")
+        return cd
+
+
+class BaseCidadeAtendimentoFormSet(BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        ordem = 0
+        for form in self.forms:
+            if not hasattr(form, "cleaned_data") or form.cleaned_data.get("DELETE"):
+                continue
+            municipio = form.cleaned_data.get("municipio")
+            cidade = (form.cleaned_data.get("cidade") or "").strip()
+            endereco = (form.cleaned_data.get("endereco") or "").strip()
+            observacao = (form.cleaned_data.get("observacao") or "").strip()
+            if not municipio and not cidade and not endereco and not observacao:
+                continue
+            if not municipio and not cidade:
+                form.add_error("cidade", "Informe a cidade de atendimento.")
+            form.cleaned_data["ordem"] = ordem
+            ordem += 1
+
+
+CidadeAtendimentoFormSet = inlineformset_factory(
+    RelatorioTecnico,
+    CidadeAtendimento,
+    form=CidadeAtendimentoForm,
+    formset=BaseCidadeAtendimentoFormSet,
+    extra=1,
+    min_num=0,
+    can_delete=True,
+)
+
+
 class ItemDespesaForm(BootstrapMixin, forms.ModelForm):
 
     class Meta:
@@ -528,12 +638,22 @@ class ItemDespesaForm(BootstrapMixin, forms.ModelForm):
             "valor",
             "quem_pagou",
             "comprovante",
+            "data_inicio_hospedagem",
+            "data_fim_hospedagem",
             "tipo_documento_comprovante",
             "numero_documento_comprovante",
             "observacoes",
         ]
         widgets = {
             "data": forms.DateInput(
+                attrs={"type": "date", "class": "form-control form-control-sm"},
+                format="%Y-%m-%d",
+            ),
+            "data_inicio_hospedagem": forms.DateInput(
+                attrs={"type": "date", "class": "form-control form-control-sm"},
+                format="%Y-%m-%d",
+            ),
+            "data_fim_hospedagem": forms.DateInput(
                 attrs={"type": "date", "class": "form-control form-control-sm"},
                 format="%Y-%m-%d",
             ),
@@ -552,12 +672,22 @@ class ItemDespesaForm(BootstrapMixin, forms.ModelForm):
             "valor",
             "quem_pagou",
             "comprovante",
+            "data_inicio_hospedagem",
+            "data_fim_hospedagem",
             "tipo_documento_comprovante",
             "numero_documento_comprovante",
             "observacoes",
         ]:
             self.fields[name].required = False
         self.fields["descricao"].widget.attrs["placeholder"] = "Fornecedor / Detalhe"
+        self.fields["data_inicio_hospedagem"].input_formats = ["%Y-%m-%d", "%d/%m/%Y"]
+        self.fields["data_fim_hospedagem"].input_formats = ["%Y-%m-%d", "%d/%m/%Y"]
+        self.fields["data_inicio_hospedagem"].widget.attrs.update(
+            {"class": "form-control form-control-sm campo-hospedagem-entrada"}
+        )
+        self.fields["data_fim_hospedagem"].widget.attrs.update(
+            {"class": "form-control form-control-sm campo-hospedagem-saida"}
+        )
         self.fields["valor"].widget.attrs["placeholder"] = "0,00"
         self.fields["valor"].widget.attrs.update(
             {
@@ -590,7 +720,7 @@ class ItemDespesaForm(BootstrapMixin, forms.ModelForm):
 class BaseItemDespesaFormSet(BaseInlineFormSet):
     def clean(self):
         if any(self.errors):
-            return
+            logger.debug("validacao_despesas_formset_continuando_com_erros_iniciais errors=%s", self.errors)
 
         relatorio = self.instance
         documentos_vistos = {}
@@ -608,13 +738,24 @@ class BaseItemDespesaFormSet(BaseInlineFormSet):
             valor = form.cleaned_data.get("valor")
             quem_pagou = form.cleaned_data.get("quem_pagou")
             comprovante = form.cleaned_data.get("comprovante")
+            data_inicio_hospedagem = form.cleaned_data.get("data_inicio_hospedagem")
+            data_fim_hospedagem = form.cleaned_data.get("data_fim_hospedagem")
             tipo_documento = form.cleaned_data.get("tipo_documento_comprovante")
             numero_documento = form.cleaned_data.get("numero_documento_comprovante")
             observacoes = form.cleaned_data.get("observacoes")
 
             # linha vazia
             if not form.instance.pk and not any(
-                [data, tipo, descricao, valor, comprovante, observacoes]
+                [
+                    data,
+                    tipo,
+                    descricao,
+                    valor,
+                    comprovante,
+                    data_inicio_hospedagem,
+                    data_fim_hospedagem,
+                    observacoes,
+                ]
             ):
                 continue
 
@@ -635,6 +776,32 @@ class BaseItemDespesaFormSet(BaseInlineFormSet):
             if data and data > timezone.localdate():
                 form.add_error("data", "Data não pode ser futura.")
 
+            validar_periodo_hospedagem = (
+                tipo == TipoDespesa.HOSPEDAGEM
+                and (
+                    not form.instance.pk
+                    or data_inicio_hospedagem
+                    or data_fim_hospedagem
+                )
+            )
+            if validar_periodo_hospedagem:
+                if not data_inicio_hospedagem:
+                    form.add_error(
+                        "data_inicio_hospedagem",
+                        "Informe a data de entrada da hospedagem.",
+                    )
+                if not data_fim_hospedagem:
+                    form.add_error(
+                        "data_fim_hospedagem",
+                        "Informe a data de saída da hospedagem.",
+                    )
+                if data_inicio_hospedagem and data_fim_hospedagem:
+                    if data_fim_hospedagem <= data_inicio_hospedagem:
+                        form.add_error(
+                            "data_fim_hospedagem",
+                            "A data de saída deve ser posterior à data de entrada.",
+                        )
+
             if (
                 tipo_documento == TipoDocumentoComprovante.NOTA_FISCAL
                 and not numero_documento
@@ -642,6 +809,16 @@ class BaseItemDespesaFormSet(BaseInlineFormSet):
                 form.add_error(
                     "numero_documento_comprovante",
                     "Informe o número do documento para Nota Fiscal.",
+                )
+            if comprovante and not tipo_documento:
+                form.add_error(
+                    "tipo_documento_comprovante",
+                    "Informe o tipo do comprovante desta despesa.",
+                )
+            if numero_documento and not tipo_documento:
+                form.add_error(
+                    "tipo_documento_comprovante",
+                    "Informe o tipo do comprovante para este documento.",
                 )
 
             numero_normalizado = _normalizar_numero_documento(numero_documento)
@@ -832,7 +1009,7 @@ class TrechoKmForm(BootstrapMixin, forms.ModelForm):
 class BaseTrechoKmFormSet(BaseInlineFormSet):
     def clean(self):
         if any(self.errors):
-            return
+            logger.debug("validacao_km_formset_continuando_com_erros_iniciais errors=%s", self.errors)
 
         relatorio = self.instance
 

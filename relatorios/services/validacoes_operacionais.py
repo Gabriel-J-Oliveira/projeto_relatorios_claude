@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -9,6 +10,8 @@ from relatorios.services.clientes_valor_km_service import (
     erros_clientes_sem_valor_km_relatorio,
 )
 
+
+logger = logging.getLogger(__name__)
 
 ESTADOS_FINAIS = {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
 
@@ -34,6 +37,23 @@ class ResultadoValidacaoOperacional:
 
 def calcular_total_aprovado(relatorio):
     return relatorio.total_aprovado
+
+
+def _log_validacao(nome, relatorio, campo, item, mensagem):
+    logger.debug(
+        "VALIDACAO_OPERACIONAL nome=%s relatorio_id=%s campo=%s item=%s mensagem_original=%s mensagem_exibida=%s",
+        nome,
+        getattr(relatorio, "pk", None),
+        campo,
+        item,
+        mensagem,
+        mensagem,
+    )
+
+
+def _adicionar_erro(erros, relatorio, nome, mensagem, *, campo="", item=""):
+    erros.append(mensagem)
+    _log_validacao(nome, relatorio, campo, item, mensagem)
 
 
 def _item_despesa_ativo(despesa):
@@ -75,16 +95,32 @@ def relatorio_tem_itens_ativos(relatorio):
 def validar_motivos_clientes_relatorio(relatorio):
     vinculos = list(relatorio.clientes_vinculados.select_related("cliente").all())
     if not vinculos and relatorio.cliente_id:
-        return [] if (relatorio.motivo or "").strip() else [
-            "Informe o motivo da viagem para todos os clientes do relatorio."
-        ]
+        if (relatorio.motivo or "").strip():
+            return []
+        mensagem = "Informe o motivo da viagem para todos os clientes do relatorio."
+        _log_validacao(
+            "validar_motivos_clientes_relatorio",
+            relatorio,
+            "motivo",
+            f"cliente:{relatorio.cliente_id}",
+            mensagem,
+        )
+        return [mensagem]
     sem_motivo = [
         vinculo.cliente.nome
         for vinculo in vinculos
         if not (vinculo.motivo_viagem or "").strip()
     ]
     if sem_motivo:
-        return ["Informe o motivo da viagem para todos os clientes do relatorio."]
+        mensagem = "Informe o motivo da viagem para todos os clientes do relatorio."
+        _log_validacao(
+            "validar_motivos_clientes_relatorio",
+            relatorio,
+            "motivo_viagem",
+            ",".join(sem_motivo),
+            mensagem,
+        )
+        return [mensagem]
     return []
 
 
@@ -93,26 +129,74 @@ def validar_valores_negativos(relatorio):
 
     for despesa in relatorio.despesas.all():
         if despesa.valor is not None and despesa.valor < 0:
-            erros.append(f"Despesa {despesa.pk} possui valor solicitado negativo.")
+            _adicionar_erro(
+                erros,
+                relatorio,
+                "validar_valores_negativos",
+                f"Despesa {despesa.pk} possui valor solicitado negativo.",
+                campo="valor",
+                item=f"despesa:{despesa.pk}",
+            )
         if despesa.valor_aprovado is not None and despesa.valor_aprovado < 0:
-            erros.append(f"Despesa {despesa.pk} possui valor aprovado negativo.")
+            _adicionar_erro(
+                erros,
+                relatorio,
+                "validar_valores_negativos",
+                f"Despesa {despesa.pk} possui valor aprovado negativo.",
+                campo="valor_aprovado",
+                item=f"despesa:{despesa.pk}",
+            )
 
     for trecho in relatorio.trechos.all():
         if trecho.km is not None and trecho.km < 0:
-            erros.append(f"Trecho KM {trecho.pk} possui quilometragem negativa.")
+            _adicionar_erro(
+                erros,
+                relatorio,
+                "validar_valores_negativos",
+                f"Trecho KM {trecho.pk} possui quilometragem negativa.",
+                campo="km",
+                item=f"trecho:{trecho.pk}",
+            )
         if trecho.valor_km is not None and trecho.valor_km < 0:
-            erros.append(f"Trecho KM {trecho.pk} possui valor por KM negativo.")
+            _adicionar_erro(
+                erros,
+                relatorio,
+                "validar_valores_negativos",
+                f"Trecho KM {trecho.pk} possui valor por KM negativo.",
+                campo="valor_km",
+                item=f"trecho:{trecho.pk}",
+            )
         if trecho.valor_km_aprovado is not None and trecho.valor_km_aprovado < 0:
-            erros.append(f"Trecho KM {trecho.pk} possui valor por KM aprovado negativo.")
+            _adicionar_erro(
+                erros,
+                relatorio,
+                "validar_valores_negativos",
+                f"Trecho KM {trecho.pk} possui valor por KM aprovado negativo.",
+                campo="valor_km_aprovado",
+                item=f"trecho:{trecho.pk}",
+            )
 
     if relatorio.km_excedente_interno is not None and relatorio.km_excedente_interno < 0:
-        erros.append("KM excedente / deslocamento interno nao pode ser negativo.")
+        _adicionar_erro(
+            erros,
+            relatorio,
+            "validar_valores_negativos",
+            "KM excedente / deslocamento interno nao pode ser negativo.",
+            campo="km_excedente_interno",
+        )
 
     return erros
 
 
 def validar_relatorio_para_edicao(relatorio):
     if relatorio.status in ESTADOS_FINAIS:
+        _log_validacao(
+            "validar_relatorio_para_edicao",
+            relatorio,
+            "status",
+            "",
+            "Relatorio aprovado ou rejeitado esta bloqueado para alteracoes.",
+        )
         return ResultadoValidacaoOperacional.falha(
             ["Relatorio aprovado ou rejeitado esta bloqueado para alteracoes."]
         )
@@ -123,13 +207,31 @@ def validar_relatorio_para_envio(relatorio):
     erros = []
 
     if relatorio.status not in {StatusRelatorio.RASCUNHO, StatusRelatorio.AJUSTE}:
-        erros.append("Este relatorio nao pode ser enviado no status atual.")
+        _adicionar_erro(
+            erros,
+            relatorio,
+            "validar_relatorio_para_envio",
+            "Este relatorio nao pode ser enviado no status atual.",
+            campo="status",
+        )
 
     if relatorio.status in ESTADOS_FINAIS:
-        erros.append("Relatorio finalizado nao pode ser reenviado.")
+        _adicionar_erro(
+            erros,
+            relatorio,
+            "validar_relatorio_para_envio",
+            "Relatorio finalizado nao pode ser reenviado.",
+            campo="status",
+        )
 
     if not relatorio_tem_itens_validos(relatorio):
-        erros.append("Adicione pelo menos uma despesa ou trecho de KM antes de enviar.")
+        _adicionar_erro(
+            erros,
+            relatorio,
+            "validar_relatorio_para_envio",
+            "Adicione pelo menos uma despesa ou trecho de KM antes de enviar.",
+            campo="itens",
+        )
 
     erros.extend(validar_valores_negativos(relatorio))
     erros.extend(validar_motivos_clientes_relatorio(relatorio))
@@ -146,20 +248,50 @@ def validar_relatorio_para_aprovacao(relatorio):
     erros = []
 
     if relatorio.status != StatusRelatorio.CONFERENCIA:
-        erros.append("Somente relatorios em conferencia pendente podem ser aprovados.")
+        _adicionar_erro(
+            erros,
+            relatorio,
+            "validar_relatorio_para_aprovacao",
+            "Somente relatorios em conferencia pendente podem ser aprovados.",
+            campo="status",
+        )
 
     if relatorio.status in ESTADOS_FINAIS:
-        erros.append("Relatorio finalizado nao pode sofrer nova aprovacao.")
+        _adicionar_erro(
+            erros,
+            relatorio,
+            "validar_relatorio_para_aprovacao",
+            "Relatorio finalizado nao pode sofrer nova aprovacao.",
+            campo="status",
+        )
 
     if not relatorio_tem_itens_validos(relatorio):
-        erros.append("O relatorio nao possui despesas ou trechos de KM.")
+        _adicionar_erro(
+            erros,
+            relatorio,
+            "validar_relatorio_para_aprovacao",
+            "O relatorio nao possui despesas ou trechos de KM.",
+            campo="itens",
+        )
 
     if not relatorio_tem_itens_ativos(relatorio):
-        erros.append("Todos os itens do relatorio estao rejeitados ou inativos.")
+        _adicionar_erro(
+            erros,
+            relatorio,
+            "validar_relatorio_para_aprovacao",
+            "Todos os itens do relatorio estao rejeitados ou inativos.",
+            campo="itens",
+        )
 
     total_aprovado = calcular_total_aprovado(relatorio)
     if total_aprovado <= Decimal("0.00"):
-        erros.append("O valor aprovado total e R$ 0,00.")
+        _adicionar_erro(
+            erros,
+            relatorio,
+            "validar_relatorio_para_aprovacao",
+            "O valor aprovado total e R$ 0,00.",
+            campo="total_aprovado",
+        )
 
     erros.extend(validar_valores_negativos(relatorio))
     erros.extend(validar_motivos_clientes_relatorio(relatorio))
@@ -173,7 +305,13 @@ def validar_transicao_status(relatorio, novo_status):
     erros = []
 
     if relatorio.status in ESTADOS_FINAIS:
-        erros.append("Relatorio aprovado ou rejeitado esta bloqueado para alteracoes.")
+        _adicionar_erro(
+            erros,
+            relatorio,
+            "validar_transicao_status",
+            "Relatorio aprovado ou rejeitado esta bloqueado para alteracoes.",
+            campo="status",
+        )
 
     transicoes = {
         StatusRelatorio.RASCUNHO: {StatusRelatorio.CONFERENCIA},
@@ -186,8 +324,12 @@ def validar_transicao_status(relatorio, novo_status):
     }
 
     if novo_status not in transicoes.get(relatorio.status, set()):
-        erros.append(
-            f"Transicao invalida de {relatorio.get_status_display()} para {novo_status}."
+        _adicionar_erro(
+            erros,
+            relatorio,
+            "validar_transicao_status",
+            f"Transicao invalida de {relatorio.get_status_display()} para {novo_status}.",
+            campo="status",
         )
 
     return ResultadoValidacaoOperacional.falha(erros)

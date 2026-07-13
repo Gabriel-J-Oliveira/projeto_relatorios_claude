@@ -1,5 +1,5 @@
 {% load l10n %}
-<tr class="linha-despesa"
+<tr class="linha-despesa {% if form.tipo.value == 'hospedagem' %}despesa-hospedagem{% endif %}"
     id="linha-despesa-nova-{{ idx }}"
     data-form-index="{{ idx }}"
     {% if form.instance.pk %}data-pk="{{ form.instance.pk }}"{% endif %}>
@@ -98,20 +98,74 @@
         </div>
 
         <div class="despesa-field despesa-field-anexo" data-tour="despesas-comprovante">
-          <label class="despesa-field-label" for="id_despesas-{{ idx }}-comprovante">Comprovante</label>
+          <label class="despesa-field-label" for="id_despesas-{{ idx }}-comprovante">Comprovantes</label>
+          {% if form.instance.pk %}
+            <div class="comprovantes-lista small mb-1">
+              {% if form.instance.comprovante %}
+                <div class="comprovante-item d-flex align-items-center gap-1 mb-1">
+                  <i class="bi bi-check-circle text-success"></i>
+                  <button type="button"
+                          class="btn btn-link btn-sm p-0 text-truncate anexo-preview-btn"
+                          data-preview-url="{% url 'relatorios:despesa_comprovante_preview' form.instance.pk %}"
+                          data-download-url="{% url 'relatorios:despesa_comprovante_baixar' form.instance.pk %}"
+                          data-file-name="{{ form.instance.comprovante.name|cut:'comprovantes/' }}"
+                          data-file-type="">
+                    {{ form.instance.comprovante.name|cut:"comprovantes/" }}
+                  </button>
+                  <a href="{% url 'relatorios:despesa_comprovante_baixar' form.instance.pk %}"
+                     class="btn btn-link btn-sm p-0"
+                     title="Baixar comprovante">
+                    <i class="bi bi-download"></i>
+                  </a>
+                  <button type="button"
+                          class="btn btn-link btn-sm p-0 text-danger comprovante-delete-btn"
+                          title="Excluir comprovante"
+                          data-delete-url="{% url 'relatorios:despesa_comprovante_remover' form.instance.pk %}">
+                    <i class="bi bi-trash3"></i>
+                  </button>
+                </div>
+              {% endif %}
+              {% with comprovante_legado=form.instance.comprovante.name %}
+                {% for anexo in form.instance.anexos.all %}
+                  {% if anexo.arquivo.name != comprovante_legado %}
+                    <div class="comprovante-item d-flex align-items-center gap-1 mb-1">
+                      <i class="bi bi-check-circle text-success"></i>
+                      <button type="button"
+                              class="btn btn-link btn-sm p-0 text-truncate anexo-preview-btn"
+                              data-preview-url="{% url 'relatorios:anexo_preview' anexo.pk %}"
+                              data-download-url="{% url 'relatorios:anexo_baixar' anexo.pk %}"
+                              data-file-name="{{ anexo.nome_original|default:anexo.arquivo.name }}"
+                              data-file-type="{{ anexo.tipo_mime }}">
+                        {{ anexo.nome_original|default:anexo.arquivo.name }}
+                      </button>
+                      <a href="{% url 'relatorios:anexo_baixar' anexo.pk %}"
+                         class="btn btn-link btn-sm p-0"
+                         title="Baixar comprovante">
+                        <i class="bi bi-download"></i>
+                      </a>
+                      <button type="button"
+                              class="btn btn-link btn-sm p-0 text-danger comprovante-delete-btn"
+                              title="Excluir comprovante"
+                              data-delete-url="{% url 'relatorios:anexo_remover' anexo.pk %}">
+                        <i class="bi bi-trash3"></i>
+                      </button>
+                    </div>
+                  {% endif %}
+                {% endfor %}
+              {% endwith %}
+            </div>
+          {% endif %}
           <div class="d-flex align-items-center gap-1 upload-comprovante-control">
             {% if form.instance.comprovante %}
-              <a href="{{ form.instance.comprovante.url }}"
-                 target="_blank"
-                 class="btn btn-sm btn-outline-success despesa-file-btn"
-                 data-upload-existing="1">
+              <span class="btn btn-sm btn-outline-success despesa-file-btn disabled"
+                    data-upload-existing="1">
                 <i class="bi bi-file-earmark-check"></i>
                 <span>Atual</span>
-              </a>
+              </span>
             {% endif %}
             <label class="btn btn-sm btn-outline-secondary despesa-file-btn mb-0 cursor-pointer">
               <i class="bi bi-paperclip"></i>
-              <span class="despesa-file-label">Anexar</span>
+              <span class="despesa-file-label">Adicionar</span>
               <input type="file"
                      name="despesas-{{ idx }}-comprovante"
                      id="id_despesas-{{ idx }}-comprovante"
@@ -121,12 +175,14 @@
                      data-upload-status-target="id_despesas-{{ idx }}-upload-status">
             </label>
           </div>
-          <div class="small mt-1 upload-status {% if form.instance.comprovante %}text-success{% else %}text-muted{% endif %}"
+          <div class="small mt-1 upload-status {% if form.instance.comprovante or form.instance.pk and form.instance.anexos.all %}text-success{% else %}text-muted{% endif %}"
                id="id_despesas-{{ idx }}-upload-status"
                data-upload-status-line
-               {% if form.instance.comprovante %}data-upload-state="persisted"{% else %}data-upload-state="empty"{% endif %}>
+               {% if form.instance.comprovante or form.instance.pk and form.instance.anexos.all %}data-upload-state="persisted"{% else %}data-upload-state="empty"{% endif %}>
             {% if form.instance.comprovante %}
               <i class="bi bi-check-circle me-1"></i>Enviado com sucesso
+            {% elif form.instance.pk and form.instance.anexos.all %}
+              <i class="bi bi-check-circle me-1"></i>Comprovante salvo
             {% else %}
               Nenhum arquivo selecionado
             {% endif %}
@@ -196,6 +252,56 @@
           <div class="invalid-feedback d-block small erro-inline">
             {% if form.numero_documento_comprovante.errors %}{{ form.numero_documento_comprovante.errors.0 }}{% endif %}
           </div>
+        </div>
+
+        <div class="despesa-field despesa-field-hospedagem hospedagem-field" data-tour="despesas-hospedagem-entrada">
+          <label class="despesa-field-label" for="id_despesas-{{ idx }}-data_inicio_hospedagem">Entrada</label>
+          <input type="date"
+                 name="despesas-{{ idx }}-data_inicio_hospedagem"
+                 id="id_despesas-{{ idx }}-data_inicio_hospedagem"
+                 value="{% if form.data_inicio_hospedagem.value %}{{ form.data_inicio_hospedagem.value|date:'Y-m-d'|default:form.data_inicio_hospedagem.value }}{% endif %}"
+                 class="form-control form-control-sm campo-hospedagem-entrada {% if form.data_inicio_hospedagem.errors %}is-invalid{% endif %}">
+          <div class="invalid-feedback d-block small erro-inline">
+            {% if form.data_inicio_hospedagem.errors %}{{ form.data_inicio_hospedagem.errors.0 }}{% endif %}
+          </div>
+        </div>
+
+        <div class="despesa-field despesa-field-hospedagem hospedagem-field" data-tour="despesas-hospedagem-saida">
+          <label class="despesa-field-label" for="id_despesas-{{ idx }}-data_fim_hospedagem">Saída</label>
+          <input type="date"
+                 name="despesas-{{ idx }}-data_fim_hospedagem"
+                 id="id_despesas-{{ idx }}-data_fim_hospedagem"
+                 value="{% if form.data_fim_hospedagem.value %}{{ form.data_fim_hospedagem.value|date:'Y-m-d'|default:form.data_fim_hospedagem.value }}{% endif %}"
+                 class="form-control form-control-sm campo-hospedagem-saida {% if form.data_fim_hospedagem.errors %}is-invalid{% endif %}">
+          <div class="invalid-feedback d-block small erro-inline">
+            {% if form.data_fim_hospedagem.errors %}{{ form.data_fim_hospedagem.errors.0 }}{% endif %}
+          </div>
+        </div>
+
+        <div class="despesa-field despesa-field-hospedagem hospedagem-field" data-tour="despesas-hospedagem-diarias">
+          <label class="despesa-field-label">Diárias</label>
+          <div class="form-control form-control-sm bg-body-tertiary hospedagem-diarias" aria-live="polite">-</div>
+        </div>
+
+        <div class="despesa-field despesa-field-tecnicos" data-tour="despesas-tecnicos">
+          <label class="despesa-field-label" for="id_despesas-{{ idx }}-tecnicos">Técnicos</label>
+          <input type="hidden"
+                 class="tecnicos-item-input"
+                 name="despesas-{{ idx }}-tecnicos"
+                 id="id_despesas-{{ idx }}-tecnicos"
+                 value="{% if form.tecnicos_value_set %}{{ form.tecnicos_value }}{% elif form.instance.pk %}{% for vinculo in form.instance.tecnicos_vinculados.all %}{{ vinculo.tecnico_id }}{% if not forloop.last %},{% endif %}{% endfor %}{% endif %}">
+          <button type="button"
+                  class="btn btn-sm btn-outline-secondary w-100 tecnicos-item-btn"
+                  data-bs-toggle="modal"
+                  data-bs-target="#modalSelecionarTecnicos"
+                  data-tecnico-selector="item"
+                  data-tecnico-target="id_despesas-{{ idx }}-tecnicos"
+                  title="Selecionar técnicos participantes desta despesa">
+            <i class="bi bi-person-lines-fill me-1"></i>
+            <span class="tecnicos-item-label">Técnicos</span>
+            <span class="badge rounded-pill text-bg-secondary ms-1 tecnicos-item-count">0</span>
+          </button>
+          <div class="invalid-feedback d-block small erro-tecnicos-item"></div>
         </div>
 
         <div class="despesa-field despesa-field-observacao">

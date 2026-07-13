@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import date
 import sys
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -17,7 +18,9 @@ from .models import (
     EmpresaGrupo,
     HistoricoRelatorio,
     ItemDespesa,
+    DespesaTecnico,
     PerfilUsuario,
+    PoliticaValor,
     RelatorioAutoSave,
     RelatorioCliente,
     RelatorioTecnico,
@@ -26,6 +29,7 @@ from .models import (
     StatusRelatorio,
     Tecnico,
     TipoAdiantamento,
+    TipoDespesa,
     TipoEventoHistorico,
     TipoReembolso,
     TrechoKm,
@@ -56,6 +60,11 @@ from .services.clientes_valor_km_service import clientes_relatorio_sem_valor_km
 from .services.clientes_relatorio_service import resolver_cliente_empresa_grupo
 from .services.financeiro_validator import validar_integridade_financeira_relatorio
 from .services.km_financeiro_service import calcular_km_financeiro
+from .services.periodo_despesa_service import calcular_diarias_periodo
+from .services.tecnicos_despesa_service import (
+    remover_tecnicos_despesas_fora_relatorio,
+    sync_tecnicos_despesa,
+)
 from .services.identidade.sincronizacao_service import (
     UsuarioExternoSnapshot,
     sincronizar_usuario_externo,
@@ -115,6 +124,130 @@ class ExtraAdminUsersTests(SimpleTestCase):
         self.assertFalse(usuario_eh_admin_extra(usuario))
         self.assertTrue(usuario_tem_acesso_total(usuario))
         self.assertTrue(usuario_eh_administrativo(usuario))
+
+
+class HospedagemPeriodoTests(TestCase):
+    def test_calcula_diarias_por_periodo(self):
+        self.assertEqual(
+            calcular_diarias_periodo(date(2026, 8, 1), date(2026, 8, 8)),
+            7,
+        )
+        self.assertEqual(
+            calcular_diarias_periodo(date(2026, 8, 1), date(2026, 8, 2)),
+            1,
+        )
+
+    def test_limite_politica_hospedagem_multiplica_diarias(self):
+        usuario = get_user_model().objects.create_user("hospedagem")
+        tecnico = Tecnico.objects.create(nome="Tecnico Hospedagem", usuario=usuario)
+        cliente = Cliente.objects.create(nome="Cliente Hospedagem", cidade="Curitiba", uf="PR")
+        relatorio = RelatorioTecnico.objects.create(
+            numero=900101,
+            cliente=cliente,
+            tecnico_responsavel=tecnico,
+            cidade_atendimento="Curitiba",
+            uf_atendimento="PR",
+            tipo_localidade="capital",
+            data_inicio=date(2026, 8, 1),
+            data_fim=date(2026, 8, 8),
+            motivo="Hospedagem",
+        )
+        PoliticaValor.objects.create(
+            chave="HOSPEDAGEM_CURITIBA",
+            tipo_politica="hospedagem",
+            tipo_despesa=TipoDespesa.HOSPEDAGEM,
+            cidade="Curitiba",
+            descricao="Hospedagem Curitiba",
+            limite_valor=Decimal("250.00"),
+            vigencia_inicio=date(2026, 1, 1),
+            ativo=True,
+        )
+        despesa = ItemDespesa(
+            relatorio=relatorio,
+            data=date(2026, 8, 1),
+            tipo=TipoDespesa.HOSPEDAGEM,
+            descricao="Hotel Curitiba",
+            valor=Decimal("1620.00"),
+            data_inicio_hospedagem=date(2026, 8, 1),
+            data_fim_hospedagem=date(2026, 8, 8),
+        )
+
+        self.assertEqual(despesa.quantidade_diarias_hospedagem, 7)
+        self.assertEqual(despesa.valor_politica_diaria, Decimal("250.00"))
+        self.assertEqual(despesa.valor_politica, Decimal("1750.00"))
+        self.assertFalse(despesa.acima_politica)
+
+
+class DespesaTecnicoParticipanteTests(TestCase):
+    def setUp(self):
+        self.usuario = get_user_model().objects.create_user("tecnico-despesa")
+        self.tecnico_a = Tecnico.objects.create(nome="Tecnico A", usuario=self.usuario)
+        self.tecnico_b = Tecnico.objects.create(nome="Tecnico B")
+        self.tecnico_c = Tecnico.objects.create(nome="Tecnico C")
+        self.cliente = Cliente.objects.create(nome="Cliente Tecnicos")
+        self.relatorio = RelatorioTecnico.objects.create(
+            numero=900102,
+            cliente=self.cliente,
+            tecnico_responsavel=self.tecnico_a,
+            cidade_atendimento="Curitiba",
+            uf_atendimento="PR",
+            tipo_localidade="capital",
+            data_inicio=date(2026, 8, 1),
+            data_fim=date(2026, 8, 2),
+            motivo="Atendimento",
+        )
+        RelatorioTecnicoEquipe.objects.create(
+            relatorio=self.relatorio,
+            tecnico=self.tecnico_b,
+        )
+        self.despesa = ItemDespesa.objects.create(
+            relatorio=self.relatorio,
+            data=date(2026, 8, 1),
+            tipo=TipoDespesa.ALIMENTACAO,
+            descricao="Almoço equipe",
+            valor=Decimal("420.00"),
+        )
+
+    def test_sync_permite_multiplos_tecnicos_do_relatorio(self):
+        erros = sync_tecnicos_despesa(
+            self.despesa,
+            [self.tecnico_a.pk, self.tecnico_b.pk],
+            self.usuario,
+        )
+
+        self.assertEqual(erros, [])
+        self.assertEqual(
+            set(self.despesa.tecnicos_vinculados.values_list("tecnico_id", flat=True)),
+            {self.tecnico_a.pk, self.tecnico_b.pk},
+        )
+
+    def test_sync_bloqueia_tecnico_fora_do_relatorio(self):
+        erros = sync_tecnicos_despesa(
+            self.despesa,
+            [self.tecnico_c.pk],
+            self.usuario,
+        )
+
+        self.assertEqual(
+            erros,
+            ["Selecione apenas técnicos vinculados ao relatório para esta despesa."],
+        )
+        self.assertFalse(DespesaTecnico.objects.filter(despesa=self.despesa).exists())
+
+    def test_remove_participacao_quando_tecnico_sai_do_relatorio(self):
+        sync_tecnicos_despesa(
+            self.despesa,
+            [self.tecnico_a.pk, self.tecnico_b.pk],
+            self.usuario,
+        )
+        self.relatorio.equipe.filter(tecnico=self.tecnico_b).delete()
+
+        remover_tecnicos_despesas_fora_relatorio(self.relatorio, self.usuario)
+
+        self.assertEqual(
+            set(self.despesa.tecnicos_vinculados.values_list("tecnico_id", flat=True)),
+            {self.tecnico_a.pk},
+        )
 
 
 class ClienteListViewTests(TestCase):

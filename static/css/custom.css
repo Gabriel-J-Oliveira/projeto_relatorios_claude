@@ -227,7 +227,7 @@ header.navbar {
 }
 
 .despesa-extra-row {
-  grid-template-columns: 160px 160px minmax(260px, 1fr);
+  grid-template-columns: 145px 145px 112px 112px 82px 120px minmax(200px, 1fr);
   margin-top: .55rem;
   padding-top: .55rem;
   border-top: 1px dashed var(--bs-border-color);
@@ -292,6 +292,14 @@ header.navbar {
   pointer-events: none;
 }
 
+.linha-despesa:not(.despesa-hospedagem) .hospedagem-field {
+  display: none;
+}
+
+.hospedagem-diarias {
+  font-weight: 600;
+}
+
 .politica-despesa-info:empty,
 .aviso-inline:empty,
 .aviso-refeicao:empty,
@@ -321,7 +329,7 @@ header.navbar {
   }
 
   .despesa-extra-row {
-    grid-template-columns: 145px 150px minmax(240px, 1fr);
+    grid-template-columns: 128px 132px 102px 102px 76px 112px minmax(190px, 1fr);
     gap: .45rem;
   }
 

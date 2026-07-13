@@ -63,6 +63,11 @@ from .services.clientes_relatorio_service import (
     sync_clientes_relatorio,
     sync_clientes_trecho,
 )
+from .services.tecnicos_despesa_service import (
+    normalizar_ids_tecnicos,
+    remover_tecnicos_despesas_fora_relatorio,
+    sync_tecnicos_despesa,
+)
 from .services.clientes_valor_km_service import (
     clientes_pendentes_valor_km,
     clientes_relatorio_sem_valor_km,
@@ -141,6 +146,7 @@ from .forms import (
     ArtigoAjudaForm,
     ClienteForm,
     CompletarCadastroUsuarioForm,
+    CidadeAtendimentoFormSet,
     ItemDespesaForm,
     ItemDespesaFormSet,
     RelatorioFiltroForm,
@@ -443,6 +449,10 @@ def marcar_tour_guiado_visto(request):
         "relatorioFormTourVisto:v1",
         "relatoriosListTourVisto:v1",
         "relatorioDetailTourVisto:v1",
+        "relatorioNovidadeMultiplosAnexos:v1",
+        "relatorioNovidadeHospedagemPeriodo:v1",
+        "relatorioNovidadeMultiplosTecnicos:v1",
+        "relatorioNovidadeMultiplasCidades:v1",
     }
     if chave not in chaves_permitidas:
         return JsonResponse({"success": False, "error": "Tour invalido."}, status=400)
@@ -1042,7 +1052,7 @@ def _upload_registrar_persistido(contexto, item, arquivo_original=None):
         return
     if not arquivo_original or not getattr(arquivo_original, "name", ""):
         return
-    arquivo = getattr(item, "comprovante", None)
+    arquivo = getattr(item, "arquivo", None) if isinstance(item, AnexoRelatorio) else getattr(item, "comprovante", None)
     if not arquivo:
         return
     campo = getattr(arquivo_original, "field_name", "") or ""
@@ -1056,10 +1066,18 @@ def _upload_registrar_persistido(contexto, item, arquivo_original=None):
             ):
                 campo = recebido.get("campo", "")
                 break
+    if isinstance(item, AnexoRelatorio):
+        tipo_item = "anexo_despesa" if item.despesa_id else "anexo_trecho"
+        despesa_id = item.despesa_id
+        trecho_id = item.trecho_id
+    else:
+        tipo_item = "despesa" if isinstance(item, ItemDespesa) else "trecho"
+        despesa_id = item.pk if isinstance(item, ItemDespesa) else None
+        trecho_id = item.pk if isinstance(item, TrechoKm) else None
     registro = {
-        "tipo": "despesa" if isinstance(item, ItemDespesa) else "trecho",
-        "despesa_id": item.pk if isinstance(item, ItemDespesa) else None,
-        "trecho_id": item.pk if isinstance(item, TrechoKm) else None,
+        "tipo": tipo_item,
+        "despesa_id": despesa_id,
+        "trecho_id": trecho_id,
         "campo": campo,
         "nome_original": getattr(arquivo_original, "name", "") or "",
         "nome_persistido": getattr(arquivo, "name", "") or "",
@@ -1161,6 +1179,161 @@ def _upload_log_exception(contexto, request, relatorio, exc):
         len(contexto.get("persistidos", [])) if contexto else 0,
         exc,
     )
+
+
+def _erro_resumo(mensagem, *, contexto="", campo="", href="", tab=""):
+    texto = str(mensagem or "").strip()
+    if contexto:
+        texto = f"{contexto}: {texto}"
+    return {
+        "mensagem": texto,
+        "contexto": contexto,
+        "campo": campo,
+        "href": href,
+        "tab": tab,
+    }
+
+
+def _campo_label(form, campo):
+    if campo == "__all__":
+        return ""
+    field = form.fields.get(campo)
+    return str(getattr(field, "label", "") or campo).strip()
+
+
+def _campo_href(form, campo):
+    if campo == "__all__":
+        return ""
+    try:
+        bound = form[campo]
+    except Exception:
+        return ""
+    field_id = getattr(bound, "id_for_label", "") or ""
+    return f"#{field_id}" if field_id else ""
+
+
+def _descricao_despesa_form(form, indice):
+    descricao = ""
+    try:
+        descricao = (form.cleaned_data.get("descricao") or "").strip()
+    except Exception:
+        pass
+    if not descricao and getattr(form, "data", None):
+        descricao = (form.data.get(f"{form.prefix}-descricao") or "").strip()
+    return f'Despesa {indice} ({descricao})' if descricao else f"Despesa {indice}"
+
+
+def _descricao_trecho_form(form, indice):
+    origem = destino = ""
+    try:
+        origem = (form.cleaned_data.get("origem") or "").strip()
+        destino = (form.cleaned_data.get("destino") or "").strip()
+    except Exception:
+        pass
+    if not origem and getattr(form, "data", None):
+        origem = (form.data.get(f"{form.prefix}-origem") or "").strip()
+    if not destino and getattr(form, "data", None):
+        destino = (form.data.get(f"{form.prefix}-destino") or "").strip()
+    rota = " -> ".join([parte for parte in [origem, destino] if parte])
+    return f"Trecho {indice} ({rota})" if rota else f"Trecho {indice}"
+
+
+def _normalizar_mensagem_campo(prefixo, campo, mensagem):
+    texto = str(mensagem or "").strip()
+    campo_lower = str(campo or "").lower()
+    if campo_lower == "tipo_documento_comprovante" and "tipo do comprovante" in texto.lower():
+        return "Informe o tipo do comprovante."
+    if campo_lower == "observacao_km_excedente":
+        return "Informe a observação da quilometragem interna."
+    if texto:
+        return texto
+    return "Revise este campo."
+
+
+def _coletar_erros_formulario(form, fs_desp=None, fs_km=None):
+    resumo = []
+    vistos = set()
+
+    def adicionar(item, origem="", campo=""):
+        chave = (item.get("mensagem"), item.get("href"))
+        if chave in vistos:
+            return
+        vistos.add(chave)
+        logger.debug(
+            "VALIDACAO_RESUMO origem=%s campo=%s mensagem_exibida=%s href=%s",
+            origem,
+            campo,
+            item.get("mensagem"),
+            item.get("href"),
+        )
+        resumo.append(item)
+
+    if form is not None:
+        for campo, mensagens in form.errors.items():
+            contexto = "Dados Gerais"
+            label = _campo_label(form, campo)
+            href = _campo_href(form, campo)
+            for mensagem in mensagens:
+                texto = _normalizar_mensagem_campo("form", campo, mensagem)
+                if label and campo != "__all__":
+                    texto = f"{label}: {texto}"
+                adicionar(
+                    _erro_resumo(texto, contexto=contexto, campo=label, href=href, tab="#tab-dados"),
+                    "form",
+                    campo,
+                )
+    if fs_desp is not None:
+        for idx, item_form in enumerate(fs_desp.forms, start=1):
+            contexto = _descricao_despesa_form(item_form, idx)
+            for campo, mensagens in item_form.errors.items():
+                label = _campo_label(item_form, campo)
+                href = _campo_href(item_form, campo)
+                for mensagem in mensagens:
+                    texto = _normalizar_mensagem_campo("despesa", campo, mensagem)
+                    if label and campo != "__all__":
+                        texto = f"{label}: {texto}"
+                    adicionar(
+                        _erro_resumo(texto, contexto=contexto, campo=label, href=href, tab="#tab-despesas"),
+                        "despesa",
+                        campo,
+                    )
+        for mensagem in fs_desp.non_form_errors():
+            adicionar(
+                _erro_resumo(mensagem, contexto="Despesas", tab="#tab-despesas"),
+                "despesas_non_form",
+                "__all__",
+            )
+
+    if fs_km is not None:
+        for idx, item_form in enumerate(fs_km.forms, start=1):
+            contexto = _descricao_trecho_form(item_form, idx)
+            for campo, mensagens in item_form.errors.items():
+                label = _campo_label(item_form, campo)
+                href = _campo_href(item_form, campo)
+                for mensagem in mensagens:
+                    texto = _normalizar_mensagem_campo("trecho", campo, mensagem)
+                    if label and campo != "__all__":
+                        texto = f"{label}: {texto}"
+                    adicionar(
+                        _erro_resumo(texto, contexto=contexto, campo=label, href=href, tab="#tab-km"),
+                        "trecho",
+                        campo,
+                    )
+        for mensagem in fs_km.non_form_errors():
+            adicionar(
+                _erro_resumo(mensagem, contexto="KM", tab="#tab-km"),
+                "km_non_form",
+                "__all__",
+            )
+    return resumo
+
+
+def _adicionar_erros_resumo(resumo, itens, *, contexto="", tab=""):
+    for item in itens or []:
+        if isinstance(item, dict):
+            resumo.append(item)
+        else:
+            resumo.append(_erro_resumo(item, contexto=contexto, tab=tab))
 
 
 @login_required
@@ -1285,6 +1458,65 @@ def _form_has_content(form) -> bool:
     return any(v not in (None, "", [], ()) for v in values)
 
 
+def _cidade_form_has_content(form) -> bool:
+    if not hasattr(form, "cleaned_data"):
+        return False
+    if form.cleaned_data.get("DELETE"):
+        return False
+    return any(
+        [
+            form.cleaned_data.get("municipio"),
+            (form.cleaned_data.get("cidade") or "").strip(),
+            (form.cleaned_data.get("endereco") or "").strip(),
+            (form.cleaned_data.get("observacao") or "").strip(),
+        ]
+    )
+
+
+def _primeira_cidade_atendimento_form(fs_cidades):
+    for form in getattr(fs_cidades, "forms", []):
+        if _cidade_form_has_content(form):
+            return form
+    return None
+
+
+def _sincronizar_relatorio_com_primeira_cidade(relatorio, fs_cidades):
+    form_cidade = _primeira_cidade_atendimento_form(fs_cidades)
+    if not form_cidade:
+        return
+    dados = form_cidade.cleaned_data
+    municipio = dados.get("municipio")
+    if municipio:
+        relatorio.municipio_atendimento = municipio
+        relatorio.cidade_atendimento = municipio.nome
+        relatorio.uf_atendimento = municipio.uf
+        if not relatorio.localidade_override:
+            relatorio.tipo_localidade = municipio.tipo_localidade_padrao
+        return
+    cidade = (dados.get("cidade") or "").strip()
+    if cidade:
+        relatorio.municipio_atendimento = None
+        relatorio.cidade_atendimento = cidade
+        relatorio.uf_atendimento = (dados.get("uf") or relatorio.uf_atendimento or "").strip().upper()[:2]
+        relatorio.tipo_localidade = dados.get("tipo_localidade") or relatorio.tipo_localidade
+
+
+def _salvar_cidades_atendimento_formset(fs_cidades, relatorio):
+    fs_cidades.instance = relatorio
+    for form in fs_cidades.deleted_forms:
+        if form.instance.pk:
+            form.instance.delete()
+    ordem = 0
+    for form in fs_cidades.forms:
+        if not _cidade_form_has_content(form):
+            continue
+        cidade = form.save(commit=False)
+        cidade.relatorio = relatorio
+        cidade.ordem = ordem
+        cidade.save()
+        ordem += 1
+
+
 def _clientes_queryset_selecao():
     return Cliente.objects.filter(ativo=True).order_by(
         "nome_fantasia",
@@ -1334,7 +1566,7 @@ def _tecnicos_selecionados_do_request(request, instance=None):
         if responsavel_id:
             ids.append(responsavel_id)
         ids.extend(request.POST.getlist("tecnicos_equipe"))
-        ids = normalizar_ids_clientes(ids)
+        ids = normalizar_ids_tecnicos(ids)
         tecnicos = {
             tecnico.pk: tecnico.nome
             for tecnico in Tecnico.objects.filter(pk__in=ids)
@@ -1356,6 +1588,10 @@ def _clientes_item_post(request, prefix):
     return normalizar_ids_clientes(request.POST.get(f"{prefix}-clientes"))
 
 
+def _tecnicos_item_post(request, prefix):
+    return normalizar_ids_tecnicos(request.POST.get(f"{prefix}-tecnicos"))
+
+
 def _clientes_item_instance_value(instance):
     if not getattr(instance, "pk", None):
         return ""
@@ -1364,6 +1600,16 @@ def _clientes_item_instance_value(instance):
     except Exception:
         return ""
     return ",".join(str(cliente_id) for cliente_id in ids)
+
+
+def _tecnicos_item_instance_value(instance):
+    if not getattr(instance, "pk", None):
+        return ""
+    try:
+        ids = instance.tecnicos_vinculados.values_list("tecnico_id", flat=True)
+    except Exception:
+        return ""
+    return ",".join(str(tecnico_id) for tecnico_id in ids)
 
 
 def _popular_clientes_formset_para_template(formset, request):
@@ -1377,8 +1623,20 @@ def _popular_clientes_formset_para_template(formset, request):
         form.clientes_value_set = True
 
 
+def _popular_tecnicos_despesa_formset_para_template(formset, request):
+    for form in getattr(formset, "forms", []):
+        chave = f"{form.prefix}-tecnicos"
+        if request.method == "POST":
+            valor = request.POST.get(chave, "")
+        else:
+            valor = _tecnicos_item_instance_value(form.instance)
+        form.tecnicos_value = valor
+        form.tecnicos_value_set = True
+
+
 def _popular_clientes_formsets_para_template(request, fs_desp, fs_km):
     _popular_clientes_formset_para_template(fs_desp, request)
+    _popular_tecnicos_despesa_formset_para_template(fs_desp, request)
     _popular_clientes_formset_para_template(fs_km, request)
 
 
@@ -1396,12 +1654,70 @@ def _registrar_metadados_comprovante(relatorio, usuario, item, arquivo_original=
         )
 
 
+def _criar_anexo_comprovante_adicional(relatorio, usuario, despesa, arquivo_original):
+    if not relatorio or not despesa or not arquivo_original:
+        return None
+    anexo = AnexoRelatorio.objects.create(
+        relatorio=relatorio,
+        despesa=despesa,
+        arquivo=arquivo_original,
+        nome_original=getattr(arquivo_original, "name", "") or "comprovante",
+        tipo_mime=getattr(arquivo_original, "content_type", "") or "",
+        tamanho_bytes=getattr(arquivo_original, "size", 0) or 0,
+        enviado_por=usuario if getattr(usuario, "is_authenticated", False) else None,
+        tipo_documento=getattr(despesa, "tipo_documento_comprovante", "") or "",
+        numero_documento=getattr(despesa, "numero_documento_comprovante", "") or "",
+        observacao="Comprovante adicional da despesa.",
+    )
+    logger.info(
+        "UPLOAD_COMPROVANTE relatorio=%s despesa=%s usuario=%s anexo=%s nome=%s tamanho=%s",
+        relatorio.pk,
+        despesa.pk,
+        getattr(usuario, "pk", None),
+        anexo.pk,
+        anexo.nome_original,
+        anexo.tamanho_bytes,
+    )
+    logger.info(
+        "UPLOAD_CONCLUIDO relatorio=%s despesa=%s usuario=%s anexo=%s nome=%s tamanho=%s",
+        relatorio.pk,
+        despesa.pk,
+        getattr(usuario, "pk", None),
+        anexo.pk,
+        anexo.nome_original,
+        anexo.tamanho_bytes,
+    )
+    return anexo
+
+
 def _nome_arquivo_anexo(arquivo):
     return (getattr(arquivo, "name", "") or "anexo").rsplit("/", 1)[-1]
 
 
 def _tipo_mime_arquivo(nome_arquivo, tipo_mime=""):
     return tipo_mime or mimetypes.guess_type(nome_arquivo or "")[0] or "application/octet-stream"
+
+
+def _despesa_tem_comprovante(despesa):
+    if getattr(despesa, "comprovante", None):
+        return True
+    try:
+        return despesa.anexos.exists()
+    except Exception:
+        return False
+
+
+def _anexos_adicionais_despesa(despesa):
+    try:
+        anexos = list(despesa.anexos.all())
+    except Exception:
+        return []
+    legado = getattr(getattr(despesa, "comprovante", None), "name", "") or ""
+    return [
+        anexo
+        for anexo in anexos
+        if (getattr(getattr(anexo, "arquivo", None), "name", "") or "") != legado
+    ]
 
 
 def _responder_arquivo_anexo(arquivo, *, nome_original="", tipo_mime="", download=False):
@@ -1439,20 +1755,32 @@ def _validar_acesso_relatorio_arquivo(user, relatorio, request=None):
 def _anexos_visualizacao_relatorio(relatorio):
     anexos = []
     for despesa in relatorio.despesas.all():
-        if not despesa.comprovante:
-            continue
-        nome = _nome_arquivo_anexo(despesa.comprovante)
-        tipo_mime = _tipo_mime_arquivo(nome)
-        anexos.append(
-            SimpleNamespace(
-                tipo="Comprovante",
-                descricao=despesa.descricao,
-                nome=nome,
-                tipo_mime=tipo_mime,
-                preview_url=reverse("relatorios:despesa_comprovante_preview", kwargs={"pk": despesa.pk}),
-                download_url=reverse("relatorios:despesa_comprovante_baixar", kwargs={"pk": despesa.pk}),
+        if despesa.comprovante:
+            nome = _nome_arquivo_anexo(despesa.comprovante)
+            tipo_mime = _tipo_mime_arquivo(nome)
+            anexos.append(
+                SimpleNamespace(
+                    tipo="Comprovante",
+                    descricao=despesa.descricao,
+                    nome=nome,
+                    tipo_mime=tipo_mime,
+                    preview_url=reverse("relatorios:despesa_comprovante_preview", kwargs={"pk": despesa.pk}),
+                    download_url=reverse("relatorios:despesa_comprovante_baixar", kwargs={"pk": despesa.pk}),
+                )
             )
-        )
+        for anexo in _anexos_adicionais_despesa(despesa):
+            nome = anexo.nome_original or _nome_arquivo_anexo(anexo.arquivo)
+            tipo_mime = _tipo_mime_arquivo(nome, anexo.tipo_mime)
+            anexos.append(
+                SimpleNamespace(
+                    tipo="Comprovante",
+                    descricao=despesa.descricao,
+                    nome=nome,
+                    tipo_mime=tipo_mime,
+                    preview_url=reverse("relatorios:anexo_preview", kwargs={"pk": anexo.pk}),
+                    download_url=reverse("relatorios:anexo_baixar", kwargs={"pk": anexo.pk}),
+                )
+            )
     for anexo in relatorio.anexos.filter(despesa__isnull=True, trecho__isnull=True):
         nome = anexo.nome_original or _nome_arquivo_anexo(anexo.arquivo)
         tipo_mime = _tipo_mime_arquivo(nome, anexo.tipo_mime)
@@ -1474,12 +1802,19 @@ def _validar_clientes_formsets(request, fs_desp, fs_km, cliente_ids_relatorio):
     clientes_relatorio = set(cliente_ids_relatorio)
 
     if not cliente_ids_relatorio:
-        erros.append("Selecione ao menos um cliente para o relatório.")
+        erros.append(
+            _erro_resumo(
+                "Selecione ao menos um cliente para o relatório.",
+                contexto="Clientes",
+                href="#id_clientes_relatorio",
+                tab="#tab-dados",
+            )
+        )
 
     def linha_tem_conteudo(form):
         return _form_has_content(form)
 
-    for form in fs_desp.forms:
+    for indice, form in enumerate(fs_desp.forms, start=1):
         if not hasattr(form, "cleaned_data") or form.cleaned_data.get("DELETE"):
             continue
         if not linha_tem_conteudo(form):
@@ -1487,12 +1822,28 @@ def _validar_clientes_formsets(request, fs_desp, fs_km, cliente_ids_relatorio):
         ids = _clientes_item_post(request, form.prefix)
         if not ids and len(clientes_relatorio) == 1:
             continue
+        contexto = _descricao_despesa_form(form, indice)
+        href = f"#id_{form.prefix}-clientes"
         if not ids:
-            erros.append("Toda despesa deve informar os clientes envolvidos.")
+            erros.append(
+                _erro_resumo(
+                    "Informe pelo menos um cliente para esta despesa.",
+                    contexto=contexto,
+                    href=href,
+                    tab="#tab-despesas",
+                )
+            )
         elif set(ids) - clientes_relatorio:
-            erros.append("Despesa referencia cliente fora do relatório.")
+            erros.append(
+                _erro_resumo(
+                    "Selecione apenas clientes vinculados ao relatório.",
+                    contexto=contexto,
+                    href=href,
+                    tab="#tab-despesas",
+                )
+            )
 
-    for form in fs_km.forms:
+    for indice, form in enumerate(fs_km.forms, start=1):
         if not hasattr(form, "cleaned_data") or form.cleaned_data.get("DELETE"):
             continue
         if not linha_tem_conteudo(form):
@@ -1500,12 +1851,80 @@ def _validar_clientes_formsets(request, fs_desp, fs_km, cliente_ids_relatorio):
         ids = _clientes_item_post(request, form.prefix)
         if not ids and len(clientes_relatorio) == 1:
             continue
+        contexto = _descricao_trecho_form(form, indice)
+        href = f"#id_{form.prefix}-clientes"
         if not ids:
-            erros.append("Todo trecho de KM deve informar os clientes envolvidos.")
+            erros.append(
+                _erro_resumo(
+                    "Informe pelo menos um cliente para este trecho de KM.",
+                    contexto=contexto,
+                    href=href,
+                    tab="#tab-km",
+                )
+            )
         elif set(ids) - clientes_relatorio:
-            erros.append("Trecho de KM referencia cliente fora do relatório.")
+            erros.append(
+                _erro_resumo(
+                    "Selecione apenas clientes vinculados ao relatório.",
+                    contexto=contexto,
+                    href=href,
+                    tab="#tab-km",
+                )
+            )
 
-    return list(dict.fromkeys(erros))
+    unicos = []
+    vistos = set()
+    for erro in erros:
+        chave = (
+            erro.get("mensagem") if isinstance(erro, dict) else str(erro),
+            erro.get("href") if isinstance(erro, dict) else "",
+        )
+        if chave in vistos:
+            continue
+        vistos.add(chave)
+        unicos.append(erro)
+    return unicos
+
+
+def _validar_tecnicos_despesas_formset(request, fs_desp, tecnico_ids_relatorio):
+    erros = []
+    tecnicos_relatorio = set(normalizar_ids_tecnicos(tecnico_ids_relatorio))
+
+    def linha_tem_conteudo(form):
+        return _form_has_content(form)
+
+    for indice, form in enumerate(fs_desp.forms, start=1):
+        if not hasattr(form, "cleaned_data") or form.cleaned_data.get("DELETE"):
+            continue
+        if not linha_tem_conteudo(form):
+            continue
+        ids = _tecnicos_item_post(request, form.prefix)
+        if not ids:
+            continue
+        contexto = _descricao_despesa_form(form, indice)
+        href = f"#id_{form.prefix}-tecnicos"
+        if set(ids) - tecnicos_relatorio:
+            erros.append(
+                _erro_resumo(
+                    "Selecione apenas técnicos vinculados ao relatório para esta despesa.",
+                    contexto=contexto,
+                    href=href,
+                    tab="#tab-despesas",
+                )
+            )
+
+    unicos = []
+    vistos = set()
+    for erro in erros:
+        chave = (
+            erro.get("mensagem") if isinstance(erro, dict) else str(erro),
+            erro.get("href") if isinstance(erro, dict) else "",
+        )
+        if chave in vistos:
+            continue
+        vistos.add(chave)
+        unicos.append(erro)
+    return unicos
 
 
 def _diagnostico_exception_salvamento(exc):
@@ -1949,16 +2368,32 @@ def politica_despesa_json(request):
         return JsonResponse(
             {"success": True, "data": {"limite": None, "mensagem": "Sem politica definida"}}
         )
+    limite = politica.valor
+    diarias = 0
+    limite_diario = None
+    if tipo == TipoDespesa.HOSPEDAGEM:
+        from relatorios.services.periodo_despesa_service import calcular_diarias_periodo
+
+        entrada = parse_date((request.GET.get("data_inicio_hospedagem") or "").strip())
+        saida = parse_date((request.GET.get("data_fim_hospedagem") or "").strip())
+        diarias = calcular_diarias_periodo(entrada, saida)
+        limite_diario = politica.valor
+        if diarias > 0:
+            limite = (politica.valor * diarias).quantize(Decimal("0.01"))
+    valor_informado = Decimal(str(request.GET.get("valor") or "0").replace(",", ".") or "0")
+    excesso = max(valor_informado - limite, Decimal("0.00")).quantize(Decimal("0.01"))
     return JsonResponse(
         {
             "success": True,
             "data": {
                 "chave": politica.chave,
                 "descricao": politica.descricao,
-                "limite": str(politica.valor),
-                "excede": politica.excede,
-                "excesso": str(politica.excesso),
-                "mensagem": f"{politica.descricao} - R$ {politica.valor:.2f}",
+                "limite": str(limite),
+                "limite_diario": str(limite_diario) if limite_diario is not None else None,
+                "diarias": diarias,
+                "excede": excesso > 0,
+                "excesso": str(excesso),
+                "mensagem": f"{politica.descricao} - R$ {limite:.2f}",
             },
         }
     )
@@ -2135,7 +2570,7 @@ def _avisos_financeiro(relatorio):
                 despesa.valor_politica,
             )
 
-        if not despesa.comprovante:
+        if not _despesa_tem_comprovante(despesa):
             despesas_sem_comprovante.append((idx, despesa))
 
         chave_duplicada = (despesa.data, despesa.tipo, despesa.valor)
@@ -2533,6 +2968,12 @@ def relatorio_form_view(request, pk=None):
             prefix="despesas",
         )
 
+        fs_cidades = CidadeAtendimentoFormSet(
+            request.POST,
+            instance=instance,
+            prefix="cidades",
+        )
+
         fs_km = TrechoKmFormSet(
             request.POST,
             request.FILES,
@@ -2543,6 +2984,7 @@ def relatorio_form_view(request, pk=None):
         _popular_clientes_formsets_para_template(request, fs_desp, fs_km)
 
         form_ok = form.is_valid()
+        cidades_ok = fs_cidades.is_valid()
         desp_ok = fs_desp.is_valid()
         km_ok = fs_km.is_valid()
 
@@ -2556,10 +2998,12 @@ def relatorio_form_view(request, pk=None):
             logger.debug("Erros form principal: %s", form.errors)
         if not desp_ok:
             logger.debug("Erros fs_desp: %s", fs_desp.errors)
+        if not cidades_ok:
+            logger.debug("Erros fs_cidades: %s", fs_cidades.errors)
         if not km_ok:
             logger.debug("Erros fs_km: %s", fs_km.errors)
 
-        if form_ok and desp_ok and km_ok:
+        if form_ok and cidades_ok and desp_ok and km_ok:
             if form.cleaned_data.get("tipo_reembolso") == "nao_reembolsavel":
                 cliente_empresa = resolver_cliente_empresa_grupo(
                     form.cleaned_data.get("empresa_grupo")
@@ -2574,33 +3018,49 @@ def relatorio_form_view(request, pk=None):
                         "empresa_grupo",
                         "Não foi possível localizar de forma única o cadastro desta empresa do grupo.",
                     )
-                    resumo_erros.append(
-                        "Revise o cadastro da empresa do grupo antes de salvar o relatório."
-                    )
                     form_ok = False
             else:
                 cliente_ids_relatorio = normalizar_ids_clientes(
                     request.POST.get("clientes_relatorio")
                 )
 
-        if form_ok and desp_ok and km_ok:
+        if form_ok and cidades_ok and desp_ok and km_ok:
             erros_clientes = _validar_clientes_formsets(
                 request,
                 fs_desp,
                 fs_km,
                 cliente_ids_relatorio,
             )
+            erros_tecnicos_despesa = _validar_tecnicos_despesas_formset(
+                request,
+                fs_desp,
+                tecnicos_post_ids,
+            )
             if erros_clientes:
-                resumo_erros.extend(erros_clientes)
+                _adicionar_erros_resumo(
+                    resumo_erros,
+                    erros_clientes,
+                    contexto="Clientes",
+                    tab="#tab-dados",
+                )
+                form_ok = False
+            if erros_tecnicos_despesa:
+                _adicionar_erros_resumo(
+                    resumo_erros,
+                    erros_tecnicos_despesa,
+                    contexto="Técnicos",
+                    tab="#tab-despesas",
+                )
                 form_ok = False
 
-        if form_ok and desp_ok and km_ok:
+        if form_ok and cidades_ok and desp_ok and km_ok:
             # ── Determinar ação ───────────────────────────────────────────────
             # "acao" vem do name/value do botão clicado:
             #   "rascunho" → botão Salvar rascunho
             #   "enviar"   → botão Salvar relatório (ou confirmação do modal)
             acao = _acao_relatorio_post(request.POST)
             relatorio = form.save(commit=False)
+            _sincronizar_relatorio_com_primeira_cidade(relatorio, fs_cidades)
             logger.info(
                 "RELATORIO_SAVE_DEBUG etapa=commit_false acao=%s user_id=%s username=%s "
                 "relatorio_id=%s status=%s criado_por_id=%s tecnico_responsavel_id=%s "
@@ -2615,15 +3075,12 @@ def relatorio_form_view(request, pk=None):
                 getattr(relatorio, "tecnico_reembolso_id", None),
                 getattr(instance, "pk", None),
             )
-            if acao != "rascunho" and not relatorio.municipio_atendimento_id:
+            if acao != "rascunho" and not _primeira_cidade_atendimento_form(fs_cidades):
                 form.add_error(
                     "cidade_atendimento",
                     "Selecione uma cidade válida da lista para aplicar corretamente a política de valores.",
                 )
                 form_ok = False
-                resumo_erros.append(
-                    "Selecione uma cidade oficial para enviar o relatório à conferência."
-                )
 
             relatorio = preparar_rascunho_para_salvar(relatorio, instance)
 
@@ -2683,6 +3140,7 @@ def relatorio_form_view(request, pk=None):
                             getattr(relatorio, "tecnico_reembolso_id", None),
                         )
                         form.save_m2m()
+                        _salvar_cidades_atendimento_formset(fs_cidades, relatorio)
                         sync_clientes_relatorio(
                             relatorio,
                             cliente_ids_relatorio,
@@ -2693,6 +3151,10 @@ def relatorio_form_view(request, pk=None):
                         _sync_equipe(relatorio, tecnicos_apoio)
                         usuario_historico = (
                             request.user if request.user.is_authenticated else None
+                        )
+                        remover_tecnicos_despesas_fora_relatorio(
+                            relatorio,
+                            usuario_historico,
                         )
                         _registrar_auditoria_km_excedente(
                             relatorio,
@@ -2706,26 +3168,66 @@ def relatorio_form_view(request, pk=None):
                         for f in fs_desp.forms:
                             if not _form_has_content(f):
                                 continue
+                            comprovante_upload = request.FILES.get(f"{f.prefix}-comprovante")
+                            comprovante_anterior = ""
+                            tem_anexos_anteriores = False
+                            if f.instance.pk:
+                                comprovante_anterior = (
+                                    ItemDespesa.objects.filter(pk=f.instance.pk)
+                                    .values_list("comprovante", flat=True)
+                                    .first()
+                                    or ""
+                                )
+                                tem_anexos_anteriores = AnexoRelatorio.objects.filter(
+                                    despesa_id=f.instance.pk
+                                ).exists()
+                            salvar_upload_como_anexo = bool(
+                                comprovante_upload
+                                and (comprovante_anterior or tem_anexos_anteriores)
+                            )
                             item = f.save(commit=False)
                             item.relatorio = relatorio
+                            if salvar_upload_como_anexo:
+                                item.comprovante = comprovante_anterior or None
                             item.save()
-                            _upload_registrar_persistido(
-                                upload_contexto,
-                                item,
-                                f.cleaned_data.get("comprovante"),
-                            )
-                            _registrar_metadados_comprovante(
-                                relatorio,
-                                usuario_historico,
-                                item,
-                                f.cleaned_data.get("comprovante"),
-                            )
+                            if comprovante_upload and salvar_upload_como_anexo:
+                                anexo = _criar_anexo_comprovante_adicional(
+                                    relatorio,
+                                    usuario_historico,
+                                    item,
+                                    comprovante_upload,
+                                )
+                                if anexo:
+                                    _upload_registrar_persistido(
+                                        upload_contexto,
+                                        anexo,
+                                        comprovante_upload,
+                                    )
+                            else:
+                                _upload_registrar_persistido(
+                                    upload_contexto,
+                                    item,
+                                    comprovante_upload,
+                                )
+                                _registrar_metadados_comprovante(
+                                    relatorio,
+                                    usuario_historico,
+                                    item,
+                                    comprovante_upload,
+                                )
                             erros_item = sync_clientes_despesa(
                                 item,
                                 _clientes_item_post(request, f.prefix),
                             )
                             if erros_item:
                                 raise WorkflowError(erros_item)
+                            erros_tecnicos_item = sync_tecnicos_despesa(
+                                item,
+                                _tecnicos_item_post(request, f.prefix),
+                                usuario_historico,
+                            )
+                            if erros_tecnicos_item:
+                                raise WorkflowError(erros_tecnicos_item)
                         for f in fs_desp.deleted_forms:
                             if f.instance.pk:
                                 f.instance.delete()
@@ -2754,7 +3256,7 @@ def relatorio_form_view(request, pk=None):
                             _upload_registrar_persistido(
                                 upload_contexto,
                                 trecho,
-                                f.cleaned_data.get("comprovante"),
+                                request.FILES.get(f"{f.prefix}-comprovante"),
                             )
                             _registrar_auditoria_geografica_trecho(
                                 relatorio,
@@ -2825,12 +3327,17 @@ def relatorio_form_view(request, pk=None):
                 except WorkflowError as exc:
                     erros = _lista_erros_operacionais(exc)
                     _adicionar_erros_operacionais(request, erros)
-                    resumo_erros.extend(erros)
+                    _adicionar_erros_resumo(
+                        resumo_erros,
+                        erros,
+                        contexto="Validação do relatório",
+                    )
                     return render(
                         request,
                         "relatorios/relatorio_form.html",
                         {
                             "form": form,
+                            "fs_cidades": fs_cidades,
                             "fs_desp": fs_desp,
                             "fs_km": fs_km,
                             "instance": instance,
@@ -2871,6 +3378,7 @@ def relatorio_form_view(request, pk=None):
                             "relatorios/relatorio_form.html",
                             {
                                 "form": form,
+                                "fs_cidades": fs_cidades,
                                 "fs_desp": fs_desp,
                                 "fs_km": fs_km,
                                 "instance": instance,
@@ -2904,6 +3412,7 @@ def relatorio_form_view(request, pk=None):
                         "relatorios/relatorio_form.html",
                         {
                             "form": form,
+                            "fs_cidades": fs_cidades,
                             "fs_desp": fs_desp,
                             "fs_km": fs_km,
                             "instance": instance,
@@ -2933,20 +3442,26 @@ def relatorio_form_view(request, pk=None):
         # ── Chegou aqui = alguma validação falhou ─────────────────────────────
         messages.error(request, "Corrija os erros indicados antes de salvar.")
 
-        if not form_ok:
+        _adicionar_erros_resumo(
+            resumo_erros,
+            _coletar_erros_formulario(form, fs_desp, fs_km),
+        )
+        if not resumo_erros:
             resumo_erros.append(
-                "Dados Gerais possui campos inválidos ou obrigatórios não preenchidos."
+                _erro_resumo(
+                    "Revise os campos destacados no formulário.",
+                    contexto="Relatório",
+                )
             )
-        if not desp_ok:
-            qtd = sum(1 for e in fs_desp.errors if e)
-            resumo_erros.append(f"Despesas possui {qtd} inconsistência(s).")
-        if not km_ok:
-            qtd = sum(1 for e in fs_km.errors if e)
-            resumo_erros.append(f"Trechos/KM possui {qtd} inconsistência(s).")
 
     # ── GET ───────────────────────────────────────────────────────────────────
     else:
         form = RelatorioTecnicoForm(instance=instance)
+
+        fs_cidades = CidadeAtendimentoFormSet(
+            instance=instance,
+            prefix="cidades",
+        )
 
         fs_desp = ItemDespesaFormSet(
             instance=instance,
@@ -2966,6 +3481,7 @@ def relatorio_form_view(request, pk=None):
         "relatorios/relatorio_form.html",
         {
             "form": form,
+            "fs_cidades": fs_cidades,
             "fs_desp": fs_desp,
             "fs_km": fs_km,
             "instance": instance,
@@ -3120,6 +3636,34 @@ def anexo_baixar_view(request, pk):
     )
 
 
+@require_POST
+@login_required
+@exigir_acesso_erp
+def anexo_remover_view(request, pk):
+    anexo = get_object_or_404(
+        AnexoRelatorio.objects.select_related("relatorio", "despesa", "trecho"),
+        pk=pk,
+    )
+    relatorio = anexo.relatorio
+    if not usuario_pode_editar_relatorio(request.user, relatorio):
+        raise PermissionDenied("Você não tem permissão para remover este comprovante.")
+    nome = anexo.nome_original or _nome_arquivo_anexo(anexo.arquivo)
+    despesa_id = anexo.despesa_id
+    tamanho = anexo.tamanho_bytes
+    anexo.delete()
+    logger.info(
+        "UPLOAD_REMOVIDO relatorio=%s despesa=%s usuario=%s anexo=%s nome=%s tamanho=%s",
+        relatorio.pk,
+        despesa_id,
+        getattr(request.user, "pk", None),
+        pk,
+        nome,
+        tamanho,
+    )
+    messages.success(request, "Comprovante removido.")
+    return redirect(request.POST.get("next") or reverse("relatorios:relatorio_update", kwargs={"pk": relatorio.pk}))
+
+
 @require_GET
 @login_required
 @exigir_acesso_erp
@@ -3144,6 +3688,33 @@ def despesa_comprovante_baixar_view(request, pk):
     return _responder_arquivo_anexo(despesa.comprovante, download=True)
 
 
+@require_POST
+@login_required
+@exigir_acesso_erp
+def despesa_comprovante_remover_view(request, pk):
+    despesa = get_object_or_404(
+        ItemDespesa.objects.select_related("relatorio"),
+        pk=pk,
+    )
+    relatorio = despesa.relatorio
+    if not usuario_pode_editar_relatorio(request.user, relatorio):
+        raise PermissionDenied("Você não tem permissão para remover este comprovante.")
+    nome = _nome_arquivo_anexo(despesa.comprovante)
+    tamanho = getattr(despesa.comprovante, "size", 0) if despesa.comprovante else 0
+    despesa.comprovante = None
+    despesa.save(update_fields=["comprovante"])
+    logger.info(
+        "UPLOAD_REMOVIDO relatorio=%s despesa=%s usuario=%s anexo=legado nome=%s tamanho=%s",
+        relatorio.pk,
+        despesa.pk,
+        getattr(request.user, "pk", None),
+        nome,
+        tamanho,
+    )
+    messages.success(request, "Comprovante removido.")
+    return redirect(request.POST.get("next") or reverse("relatorios:relatorio_update", kwargs={"pk": relatorio.pk}))
+
+
 @login_required
 @exigir_acesso_erp
 def relatorio_detail_view(request, pk):
@@ -3155,6 +3726,7 @@ def relatorio_detail_view(request, pk):
             ).prefetch_related(
                 "clientes_vinculados__cliente",
                 "despesas__clientes_vinculados__cliente",
+                "despesas__tecnicos_vinculados__tecnico",
                 "despesas__rateios__cliente",
                 "despesas__anexos",
                 "trechos__clientes_vinculados__cliente",

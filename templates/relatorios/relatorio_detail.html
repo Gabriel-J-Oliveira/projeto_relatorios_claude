@@ -384,24 +384,44 @@
                   {% endif %}
                 </td>
                 <td class="text-center">
-                  {% if d.comprovante %}
-                  <button type="button"
-                     class="btn btn-sm btn-outline-success rounded-circle px-2 py-1 anexo-preview-btn"
-                     title="Visualizar comprovante"
-                     aria-label="Visualizar comprovante"
-                     data-preview-url="{% url 'relatorios:despesa_comprovante_preview' d.pk %}"
-                     data-download-url="{% url 'relatorios:despesa_comprovante_baixar' d.pk %}"
-                     data-file-name="{{ d.comprovante.name|cut:'comprovantes/' }}"
-                     data-file-type=""
-                     data-tour="detail-despesa-comprovante">
-                    <i class="bi bi-paperclip"></i>
-                  </button>
-                  {% else %}
-                  <span class="btn btn-sm btn-outline-secondary rounded-circle px-2 py-1 disabled opacity-50"
-                        title="Sem comprovante">
-                    <i class="bi bi-paperclip"></i>
-                  </span>
-                  {% endif %}
+                  <div class="d-flex justify-content-center gap-1 flex-wrap">
+                    {% if d.comprovante %}
+                    <button type="button"
+                       class="btn btn-sm btn-outline-success rounded-circle px-2 py-1 anexo-preview-btn"
+                       title="Visualizar comprovante"
+                       aria-label="Visualizar comprovante"
+                       data-preview-url="{% url 'relatorios:despesa_comprovante_preview' d.pk %}"
+                       data-download-url="{% url 'relatorios:despesa_comprovante_baixar' d.pk %}"
+                       data-file-name="{{ d.comprovante.name|cut:'comprovantes/' }}"
+                       data-file-type=""
+                       data-tour="detail-despesa-comprovante">
+                      <i class="bi bi-paperclip"></i>
+                    </button>
+                    {% endif %}
+                    {% with comprovante_legado=d.comprovante.name %}
+                      {% for anexo in d.anexos.all %}
+                        {% if anexo.arquivo.name != comprovante_legado %}
+                          <button type="button"
+                             class="btn btn-sm btn-outline-success rounded-circle px-2 py-1 anexo-preview-btn"
+                             title="Visualizar {{ anexo.nome_original|default:'comprovante' }}"
+                             aria-label="Visualizar {{ anexo.nome_original|default:'comprovante' }}"
+                             data-preview-url="{% url 'relatorios:anexo_preview' anexo.pk %}"
+                             data-download-url="{% url 'relatorios:anexo_baixar' anexo.pk %}"
+                             data-file-name="{{ anexo.nome_original|default:anexo.arquivo.name }}"
+                             data-file-type="{{ anexo.tipo_mime }}"
+                             data-tour="detail-despesa-comprovante">
+                            <i class="bi bi-paperclip"></i>
+                          </button>
+                        {% endif %}
+                      {% endfor %}
+                    {% endwith %}
+                    {% if not d.comprovante and not d.anexos.all %}
+                    <span class="btn btn-sm btn-outline-secondary rounded-circle px-2 py-1 disabled opacity-50"
+                          title="Sem comprovante">
+                      <i class="bi bi-paperclip"></i>
+                    </span>
+                    {% endif %}
+                  </div>
                 </td>
                 <td class="text-center">
                   <button type="button"
@@ -444,11 +464,24 @@
                       <span class="text-muted">Valor final</span>
                       <div class="fw-semibold text-success total-aprovado-despesa-linha">R$ {{ d.valor_final|floatformat:2 }}</div>
                     </div>
+                    {% if d.tecnicos_vinculados.all %}
+                    <div class="col-md-3">
+                      <span class="text-muted">Técnicos participantes</span>
+                      <div class="d-flex flex-wrap gap-1 mt-1">
+                        {% for vinculo in d.tecnicos_vinculados.all %}
+                          <span class="badge rounded-pill text-bg-secondary">{{ vinculo.tecnico.nome }}</span>
+                        {% endfor %}
+                      </div>
+                    </div>
+                    {% endif %}
                     <div class="col-md-3">
                       <span class="text-muted">Politica</span>
                       {% if d.valor_politica %}
                       <div class="{% if d.acima_politica %}alert alert-warning py-1 px-2 mb-0{% else %}fw-semibold{% endif %}">
                         R$ {{ d.valor_politica|floatformat:2 }} / {{ d.politica_localidade_label }}
+                        {% if d.tipo == "hospedagem" and d.quantidade_diarias_hospedagem %}
+                        <div class="small">{{ d.quantidade_diarias_hospedagem }} diária{{ d.quantidade_diarias_hospedagem|pluralize }} considerada{{ d.quantidade_diarias_hospedagem|pluralize }}</div>
+                        {% endif %}
                         {% if d.acima_politica %}
                         <div class="small">Excesso: R$ {{ d.excesso_politica|floatformat:2 }}</div>
                         {% endif %}
