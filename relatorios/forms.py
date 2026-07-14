@@ -15,6 +15,7 @@ from .models import (
     Cliente,
     Adiantamento,
     EmpresaGrupo,
+    TipoDespesa,
     TipoDocumentoComprovante,
     TipoReembolso,
     Municipio,
