@@ -2976,6 +2976,11 @@ def relatorio_form_view(request, pk=None):
     if instance and not _relatorio_editavel_por_usuario(instance, request.user):
         if instance.status == StatusRelatorio.AJUSTE:
             messages.error(request, "Relatório em ajuste deve ser editado pelo técnico.")
+        elif instance.status == StatusRelatorio.CONFERENCIA:
+            messages.error(
+                request,
+                "Relatório em conferência só pode ser editado pelo Financeiro ou pelos sócios.",
+            )
         else:
             messages.error(request, "Relatório aprovado ou rejeitado não pode ser editado.")
         return redirect("relatorios:relatorio_detail", pk=instance.pk)

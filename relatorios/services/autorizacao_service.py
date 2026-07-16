@@ -150,6 +150,10 @@ def usuario_pode_gerenciar_cadastros(user):
     return _usuario_tem_algum_grupo(user, [GRUPO_GESTOR, GRUPO_ADMIN_ERP])
 
 
+def usuario_pode_editar_relatorio_em_conferencia(user):
+    return usuario_eh_financeiro(user) or usuario_tem_acesso_total(user)
+
+
 def _usuario_log_context(user):
     return {
         "id": getattr(user, "pk", None),
@@ -237,23 +241,38 @@ def _log_autorizacao_relatorio(acao, user, relatorio, validacoes, resultado):
 def usuario_pode_editar_relatorio(user, relatorio):
     acesso_total = usuario_tem_acesso_total(user)
     administrativo = usuario_eh_administrativo(user)
+    financeiro_ou_socio = usuario_pode_editar_relatorio_em_conferencia(user)
     status_finalizado = relatorio.status in {
         StatusRelatorio.APROVADO,
         StatusRelatorio.REJEITADO,
+    }
+    status_em_conferencia = relatorio.status == StatusRelatorio.CONFERENCIA
+    status_editavel_por_tecnico = relatorio.status in {
+        StatusRelatorio.RASCUNHO,
+        StatusRelatorio.AJUSTE,
     }
     eh_dono = usuario_eh_dono_relatorio(user, relatorio)
     eh_responsavel = usuario_eh_responsavel_relatorio(user, relatorio)
     validacoes = {
         "usuario_tem_acesso_total": acesso_total,
         "usuario_eh_administrativo": administrativo,
+        "usuario_financeiro_ou_socio": financeiro_ou_socio,
         "status_nao_finalizado": not status_finalizado,
+        "status_em_conferencia": status_em_conferencia,
+        "status_editavel_por_tecnico": status_editavel_por_tecnico,
         "usuario_eh_dono_relatorio": eh_dono,
         "usuario_eh_responsavel_relatorio": eh_responsavel,
     }
     if status_finalizado:
         _log_autorizacao_relatorio("editar_relatorio", user, relatorio, validacoes, False)
         return False
-    resultado = acesso_total or administrativo or eh_dono or eh_responsavel
+    if status_em_conferencia:
+        resultado = financeiro_ou_socio
+    else:
+        resultado = bool(
+            status_editavel_por_tecnico
+            and (acesso_total or administrativo or eh_dono or eh_responsavel)
+        )
     _log_autorizacao_relatorio(
         "editar_relatorio",
         user,
@@ -325,8 +344,8 @@ def usuario_pode_enviar_relatorio(user, relatorio):
     }
     eh_dono = usuario_eh_dono_relatorio(user, relatorio)
     eh_responsavel = usuario_eh_responsavel_relatorio(user, relatorio)
-    pode_editar = acesso_total or administrativo or (
-        not status_finalizado and (eh_dono or eh_responsavel)
+    pode_editar = status_permitido and (
+        acesso_total or administrativo or eh_dono or eh_responsavel
     )
     validacoes = {
         "usuario_tem_acesso_total": acesso_total,

@@ -159,6 +159,36 @@ class ExtraAdminUsersTests(SimpleTestCase):
 
         self.assertFalse(usuario_pode_enviar_relatorio(usuario, relatorio))
 
+    def test_dono_nao_edita_relatorio_em_conferencia(self):
+        usuario = _UsuarioFake("tecnico.dono")
+        relatorio = SimpleNamespace(
+            pk=56,
+            numero=None,
+            status=StatusRelatorio.CONFERENCIA,
+            criado_por_id=usuario.pk,
+            criado_por=None,
+            tecnico_responsavel=None,
+            tecnico_reembolso=None,
+        )
+
+        self.assertFalse(usuario_pode_editar_relatorio(usuario, relatorio))
+        self.assertFalse(usuario_pode_enviar_relatorio(usuario, relatorio))
+
+    def test_financeiro_edita_relatorio_em_conferencia(self):
+        usuario = _UsuarioFake("financeiro", grupos=["Financeiro"])
+        relatorio = SimpleNamespace(
+            pk=57,
+            numero=None,
+            status=StatusRelatorio.CONFERENCIA,
+            criado_por_id=999,
+            criado_por=None,
+            tecnico_responsavel=None,
+            tecnico_reembolso=None,
+        )
+
+        self.assertTrue(usuario_pode_editar_relatorio(usuario, relatorio))
+        self.assertFalse(usuario_pode_enviar_relatorio(usuario, relatorio))
+
 
 class HospedagemPeriodoTests(TestCase):
     def test_calcula_diarias_por_periodo(self):
