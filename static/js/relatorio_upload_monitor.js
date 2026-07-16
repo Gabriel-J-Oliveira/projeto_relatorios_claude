@@ -167,11 +167,36 @@
     return { items, errors };
   }
 
+  function ensureExpectedManifestInput(form) {
+    let input = form.querySelector('input[name="upload_expected_manifest"]');
+    if (!input) {
+      input = document.createElement("input");
+      input.type = "hidden";
+      input.name = "upload_expected_manifest";
+      input.value = "[]";
+      form.appendChild(input);
+    }
+    return input;
+  }
+
+  function syncExpectedManifest(form, items) {
+    const manifestInput = ensureExpectedManifestInput(form);
+    const manifest = (items || []).map((item) => ({
+      campo: item.input?.name || "",
+      nome: item.name || "",
+      tamanho: Number(item.size || 0),
+      mime: item.file?.type || "",
+    }));
+    manifestInput.value = JSON.stringify(manifest);
+    return manifest;
+  }
+
   function updateMonitor(form) {
     const maxTotalMb = Number(form.dataset.uploadMaxTotalMb || "1024") || 1024;
     const existingBytes = Number(form.dataset.uploadExistingBytes || "0") || 0;
     const maxTotalBytes = maxTotalMb * BYTES_IN_MB;
     const { items, errors } = collectFiles(form);
+    syncExpectedManifest(form, items);
     const selectedBytes = items.reduce((sum, item) => sum + item.size, 0);
     const totalBytes = existingBytes + selectedBytes;
     const percent = maxTotalBytes ? Math.min(100, (totalBytes / maxTotalBytes) * 100) : 0;

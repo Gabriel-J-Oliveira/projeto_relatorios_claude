@@ -3,6 +3,7 @@ import json
 import mimetypes
 import re
 import time
+from collections import Counter
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -869,6 +870,51 @@ def _upload_recebidos(request):
     ]
 
 
+def _upload_manifesto_esperado(request):
+    raw = request.POST.get("upload_expected_manifest") or "[]"
+    try:
+        payload = json.loads(raw)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        logger.warning(
+            "UPLOAD_MANIFESTO_INVALIDO usuario=%s relatorio=%s payload_len=%s",
+            getattr(request.user, "pk", None),
+            request.POST.get("relatorio_id") or "novo",
+            len(str(raw)),
+        )
+        return []
+    if not isinstance(payload, list):
+        return []
+    esperados = []
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        nome = str(item.get("nome") or "").strip()
+        campo = str(item.get("campo") or "").strip()
+        if not nome or not campo:
+            continue
+        try:
+            tamanho = int(item.get("tamanho") or 0)
+        except (TypeError, ValueError):
+            tamanho = 0
+        esperados.append(
+            {
+                "campo": campo,
+                "nome": nome,
+                "tamanho": max(0, tamanho),
+                "mime": str(item.get("mime") or "").strip(),
+            }
+        )
+    return esperados
+
+
+def _upload_manifest_key(item):
+    return (
+        str(item.get("campo") or ""),
+        str(item.get("nome") or ""),
+        int(item.get("tamanho") or 0),
+    )
+
+
 def _upload_item_id_por_campo(request, campo):
     partes = str(campo or "").split("-")
     if len(partes) < 3:
@@ -959,6 +1005,7 @@ def _upload_validar_capacidade_total(contexto, request, relatorio=None):
 def _upload_contexto_inicial(request, instance=None):
     inicio = time.perf_counter()
     arquivos = _upload_recebidos(request)
+    arquivos_esperados = _upload_manifesto_esperado(request)
     post_keys = list(request.POST.keys())
     files_keys = list(request.FILES.keys())
     total_bytes = sum(item["tamanho"] for item in arquivos)
@@ -968,6 +1015,8 @@ def _upload_contexto_inicial(request, instance=None):
         "inicio": inicio,
         "arquivos": arquivos,
         "arquivos_count": len(arquivos),
+        "arquivos_esperados": arquivos_esperados,
+        "arquivos_esperados_count": len(arquivos_esperados),
         "total_bytes": total_bytes,
         "existente_bytes": existente_bytes,
         "substituido_bytes": substituido_bytes,
@@ -1006,6 +1055,15 @@ def _upload_contexto_inicial(request, instance=None):
         _upload_memoria_mb(),
     )
     logger.info(
+        "UPLOAD_ESPERADO usuario=%s relatorio=%s esperados=%s recebidos=%s nomes_esperados=%s nomes_recebidos=%s",
+        getattr(request.user, "pk", None),
+        relatorio_ref,
+        contexto["arquivos_esperados_count"],
+        contexto["arquivos_count"],
+        [item["nome"] for item in arquivos_esperados],
+        [item["nome"] for item in arquivos],
+    )
+    logger.info(
         "FILES_KEYS usuario=%s relatorio=%s keys=%s",
         getattr(request.user, "pk", None),
         relatorio_ref,
@@ -1031,6 +1089,43 @@ def _upload_contexto_inicial(request, instance=None):
         )
     contexto["validado_em"] = time.perf_counter()
     return contexto
+
+
+def _upload_validar_manifesto_esperado(contexto, request, relatorio=None):
+    if not contexto:
+        return
+    esperados = contexto.get("arquivos_esperados", [])
+    if not esperados:
+        return
+    recebidos = contexto.get("arquivos", [])
+    esperados_counter = Counter(_upload_manifest_key(item) for item in esperados)
+    recebidos_counter = Counter(_upload_manifest_key(item) for item in recebidos)
+    faltantes_counter = esperados_counter - recebidos_counter
+    extras_counter = recebidos_counter - esperados_counter
+    if not faltantes_counter:
+        return
+    faltantes = []
+    for chave, quantidade in faltantes_counter.items():
+        campo, nome, tamanho = chave
+        for _index in range(quantidade):
+            faltantes.append({"campo": campo, "nome": nome, "tamanho": tamanho})
+    logger.critical(
+        "UPLOAD_INCONSISTENTE_FRONTEND usuario=%s relatorio=%s esperados=%s recebidos=%s faltantes=%s extras=%s arquivos_esperados=%s arquivos_recebidos=%s content_length=%s files_keys=%s",
+        getattr(request.user, "pk", None),
+        getattr(relatorio, "pk", None) or request.POST.get("relatorio_id") or "novo",
+        len(esperados),
+        len(recebidos),
+        faltantes,
+        list(extras_counter.elements()),
+        esperados,
+        recebidos,
+        contexto.get("content_length", ""),
+        contexto.get("files_keys", []),
+    )
+    raise WorkflowError(
+        "Foi detectado que havia anexos selecionados no navegador, mas eles não chegaram ao servidor. "
+        "Nenhum dado foi salvo. Selecione os anexos novamente e tente salvar."
+    )
 
 
 def _upload_log_salvando(contexto, request, relatorio=None):
@@ -1121,6 +1216,7 @@ def _upload_finalizar_ou_falhar(contexto, request, relatorio=None):
     if not contexto:
         return
     recebidos = contexto.get("arquivos", [])
+    esperados = contexto.get("arquivos_esperados", [])
     persistidos = contexto.get("persistidos", [])
     total_ms = int((time.perf_counter() - contexto["inicio"]) * 1000)
     processamento_ms = int(
@@ -1130,9 +1226,10 @@ def _upload_finalizar_ou_falhar(contexto, request, relatorio=None):
         (time.perf_counter() - (contexto.get("salvando_em") or contexto["inicio"])) * 1000
     )
     logger.info(
-        "UPLOAD_SALVO usuario=%s relatorio=%s recebidos=%s persistidos=%s ids=%s tempo_total_ms=%s processamento_ms=%s gravacao_ms=%s memoria_mb=%s",
+        "UPLOAD_SALVO usuario=%s relatorio=%s esperados=%s recebidos=%s persistidos=%s ids=%s tempo_total_ms=%s processamento_ms=%s gravacao_ms=%s memoria_mb=%s",
         getattr(request.user, "pk", None),
         getattr(relatorio, "pk", None) or "novo",
+        len(esperados),
         len(recebidos),
         len(persistidos),
         [(item["tipo"], item["despesa_id"] or item["trecho_id"]) for item in persistidos],
@@ -2895,9 +2992,10 @@ def relatorio_form_view(request, pk=None):
     if request.method == "POST":
         try:
             upload_contexto = _upload_contexto_inicial(request, instance)
+            _upload_validar_manifesto_esperado(upload_contexto, request, instance)
             _upload_validar_capacidade_total(upload_contexto, request, instance)
         except (UPLOAD_EXCEPTIONS, WorkflowError) as exc:
-            _upload_log_exception(None, request, instance, exc)
+            _upload_log_exception(upload_contexto, request, instance, exc)
             messages.error(
                 request,
                 str(exc)
@@ -3390,6 +3488,8 @@ def relatorio_form_view(request, pk=None):
                 except Exception as exc:
                     if isinstance(exc, UPLOAD_EXCEPTIONS) or (
                         upload_contexto and upload_contexto.get("arquivos")
+                    ) or (
+                        upload_contexto and upload_contexto.get("arquivos_esperados")
                     ):
                         mensagem_upload = (
                             "Foi detectado um problema durante o envio dos anexos. "

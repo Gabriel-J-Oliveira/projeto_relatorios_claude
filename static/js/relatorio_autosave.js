@@ -67,6 +67,12 @@
     return entries;
   }
 
+  function hasPendingFiles(form) {
+    return Array.from(form.querySelectorAll('input[type="file"]')).some((input) => {
+      return input.files && input.files.length > 0;
+    });
+  }
+
   function applyEntries(form, entries) {
     const grouped = new Map();
     (entries || []).forEach(([key, value]) => {
@@ -194,6 +200,9 @@
 
     function buildServerFormData() {
       const data = new FormData(form);
+      form.querySelectorAll('input[type="file"]').forEach((input) => {
+        if (input.name) data.delete(input.name);
+      });
       data.set("autosave_key", autosaveKeyInput?.value || generatedKey);
       data.set("pagina_atual", window.location.href);
       data.set("relatorio_id", form.dataset.relatorioId || "");
@@ -236,6 +245,12 @@
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || payload.success === false) {
           throw new Error(payload.error || `HTTP ${response.status}`);
+        }
+        if (hasPendingFiles(form)) {
+          dirty = true;
+          lastServerSaveAt = Date.now();
+          setStatus("dirty", "Dados salvos; anexos pendentes de envio");
+          return true;
         }
         dirty = false;
         lastServerSaveAt = Date.now();
