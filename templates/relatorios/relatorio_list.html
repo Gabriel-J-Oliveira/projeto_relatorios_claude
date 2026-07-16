@@ -144,7 +144,23 @@
               </div>
               {% endwith %}
               {% endif %}
-              <div class="text-muted" style="font-size:.78rem;">{{ r.cidade_atendimento }}</div>
+              {% with cidade_principal=r.cidade_principal_exibicao cidades_secundarias=r.cidades_secundarias_exibicao %}
+              <div class="text-muted" style="font-size:.78rem;">
+                {{ cidade_principal|default:"Não informado" }}
+                {% if cidades_secundarias %}
+                <span class="badge bg-secondary rounded-pill ms-1"
+                      role="button"
+                      tabindex="0"
+                      data-bs-toggle="popover"
+                      data-bs-trigger="hover focus click"
+                      data-bs-html="true"
+                      data-bs-title="Cidades do relatório"
+                      data-bs-content="<div class='popover-lista-vinculos'><div>{{ cidade_principal }}</div>{% for cidade in cidades_secundarias %}<div>{{ cidade }}</div>{% endfor %}</div>">
+                  +{{ cidades_secundarias|length }}
+                </span>
+                {% endif %}
+              </div>
+              {% endwith %}
             </td>
             <td class="small" data-label="Técnico">
               {% with tecnico_principal=r.tecnico_principal_exibicao tecnicos_secundarios=r.tecnicos_secundarios_exibicao %}

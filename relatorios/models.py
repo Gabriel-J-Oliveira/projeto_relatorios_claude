@@ -43,6 +43,20 @@ def valor_km_control_sul():
         )
 
 
+class _CidadeAtendimentoLegada:
+    def __init__(self, cidade="", uf="", tipo_localidade="", tipo_localidade_label=""):
+        self.cidade = cidade or ""
+        self.uf = uf or ""
+        self.tipo_localidade = tipo_localidade or ""
+        self.tipo_localidade_label = tipo_localidade_label or ""
+        self.endereco = ""
+        self.observacao = ""
+        self.municipio_id = None
+
+    def __str__(self):
+        return f"{self.cidade}/{self.uf}" if self.uf else self.cidade
+
+
 def _numero_documento_normalizado(valor):
     return " ".join(str(valor or "").strip().split()).upper()
 
@@ -1153,6 +1167,36 @@ class RelatorioTecnico(models.Model):
 
     def tecnicos_total_exibicao(self):
         return len(self.tecnicos_exibicao())
+
+    def cidades_exibicao(self):
+        prefetched = getattr(self, "_prefetched_objects_cache", {})
+        if "cidades_atendimento" in prefetched:
+            cidades = sorted(
+                prefetched["cidades_atendimento"],
+                key=lambda cidade: (cidade.ordem, cidade.pk or 0),
+            )
+        else:
+            cidades = list(self.cidades_atendimento.order_by("ordem", "pk"))
+        if not cidades and (self.cidade_atendimento or self.uf_atendimento):
+            cidades = [
+                _CidadeAtendimentoLegada(
+                    cidade=self.cidade_atendimento,
+                    uf=self.uf_atendimento,
+                    tipo_localidade=self.tipo_localidade_efetiva,
+                    tipo_localidade_label=self.get_tipo_localidade_display(),
+                )
+            ]
+        return cidades
+
+    def cidade_principal_exibicao(self):
+        cidades = self.cidades_exibicao()
+        return cidades[0] if cidades else None
+
+    def cidades_secundarias_exibicao(self):
+        return self.cidades_exibicao()[1:]
+
+    def cidades_total_exibicao(self):
+        return len(self.cidades_exibicao())
 
     # ── Financeiro ──────────────────────────────────────────────
 

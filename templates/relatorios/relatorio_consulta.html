@@ -90,6 +90,26 @@
           </strong>
         </div>
         <div>
+          <span>Cidades</span>
+          <strong>
+            {% with cidade_principal=consulta.cidades.0 %}
+              {{ cidade_principal.nome|default:"Não informado" }}
+              {% if consulta.cidades|length > 1 %}
+                <span class="badge bg-primary rounded-pill ms-1"
+                      role="button"
+                      tabindex="0"
+                      data-bs-toggle="popover"
+                      data-bs-trigger="hover focus click"
+                      data-bs-html="true"
+                      data-bs-title="Cidades do relatório"
+                      data-bs-content="<div class='popover-lista-vinculos'>{% for cidade in consulta.cidades %}<div>{{ cidade.nome }}</div>{% endfor %}</div>">
+                  +{{ consulta.cidades|length|add:"-1" }}
+                </span>
+              {% endif %}
+            {% endwith %}
+          </strong>
+        </div>
+        <div>
           <span>Finalização</span>
           <strong>{{ consulta.finalizado_em|default:"Não finalizado" }}</strong>
         </div>

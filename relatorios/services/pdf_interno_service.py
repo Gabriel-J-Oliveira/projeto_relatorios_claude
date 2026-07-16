@@ -88,11 +88,29 @@ def _tecnicos_snapshot(payload):
     return [_ns(**tecnico) for tecnico in payload.get("tecnicos") or []]
 
 
+def _cidades_snapshot(payload):
+    relatorio = payload.get("relatorio") or {}
+    cidades = payload.get("cidades_atendimento") or relatorio.get("cidades_atendimento") or []
+    if not cidades and (relatorio.get("cidade_atendimento") or relatorio.get("uf_atendimento")):
+        cidades = [
+            {
+                "nome": "%s/%s" % (
+                    relatorio.get("cidade_atendimento") or "",
+                    relatorio.get("uf_atendimento") or "",
+                ),
+                "cidade": relatorio.get("cidade_atendimento") or "",
+                "uf": relatorio.get("uf_atendimento") or "",
+            }
+        ]
+    return [_ns(**cidade) for cidade in cidades]
+
+
 def _relatorio_snapshot(payload):
     relatorio = payload.get("relatorio") or {}
     assinatura = payload.get("assinatura_temporal") or {}
     clientes = _clientes_snapshot(payload)
     tecnicos = _tecnicos_snapshot(payload)
+    cidades = _cidades_snapshot(payload)
     return _ns(
         identificador=relatorio.get("identificador") or relatorio.get("numero") or "",
         numero=relatorio.get("numero") or "",
@@ -112,6 +130,9 @@ def _relatorio_snapshot(payload):
         aprovado_por=(assinatura.get("aprovado_por") or {}).get("nome") or "",
         cidade_atendimento=relatorio.get("cidade_atendimento") or "",
         uf_atendimento=relatorio.get("uf_atendimento") or "",
+        cidades=cidades,
+        cidade_principal=cidades[0].nome if cidades else "NÃ£o informado",
+        cidade_extra_count=max(len(cidades) - 1, 0),
         clientes=clientes,
         tecnicos=tecnicos,
         cliente_principal=clientes[0].nome if clientes else "Não informado",
@@ -352,6 +373,15 @@ def _payload_snapshot(relatorio):
 def _relatorio_vivo(relatorio):
     clientes = [_ns(nome=cliente.nome) for cliente in relatorio.clientes_exibicao()]
     tecnicos = [_ns(nome=tecnico.nome) for tecnico in relatorio.tecnicos_exibicao()]
+    cidades = [
+        _ns(
+            nome=str(cidade),
+            cidade=cidade.cidade,
+            uf=cidade.uf,
+            tipo_localidade=getattr(cidade, "tipo_localidade", ""),
+        )
+        for cidade in relatorio.cidades_exibicao()
+    ]
     return _ns(
         identificador=relatorio.identificador,
         numero=relatorio.numero or relatorio.identificador,
@@ -374,6 +404,9 @@ def _relatorio_vivo(relatorio):
         aprovado_por=(relatorio.aprovado_por.get_full_name() or relatorio.aprovado_por.username) if relatorio.aprovado_por else "",
         cidade_atendimento=relatorio.cidade_atendimento,
         uf_atendimento=relatorio.uf_atendimento,
+        cidades=cidades,
+        cidade_principal=cidades[0].nome if cidades else "NÃ£o informado",
+        cidade_extra_count=max(len(cidades) - 1, 0),
         clientes=clientes,
         tecnicos=tecnicos,
         cliente_principal=clientes[0].nome if clientes else "Não informado",

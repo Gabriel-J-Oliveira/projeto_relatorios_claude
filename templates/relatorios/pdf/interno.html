@@ -44,8 +44,11 @@
         {% endif %}
       </div>
       <div>
-        <span class="label">Cidade</span>
-        <strong>{{ pdf.relatorio.cidade_atendimento }}/{{ pdf.relatorio.uf_atendimento }}</strong>
+        <span class="label">Cidade(s)</span>
+        <strong>{{ pdf.relatorio.cidade_principal }}{% if pdf.relatorio.cidade_extra_count %} +{{ pdf.relatorio.cidade_extra_count }}{% endif %}</strong>
+        {% if pdf.relatorio.cidades|length > 1 %}
+        <small>{% for cidade in pdf.relatorio.cidades %}{{ cidade.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}</small>
+        {% endif %}
       </div>
       <div>
         <span class="label">Tipo de reembolso</span>

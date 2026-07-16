@@ -86,6 +86,17 @@
       <span>{{ itens|length }} lançamento(s)</span>
     </div>
     <table class="items-table">
+      <colgroup>
+        <col class="col-data">
+        <col class="col-doc">
+        <col class="col-numero">
+        <col class="col-descricao">
+        <col class="col-km">
+        <col class="col-valor-km">
+        <col class="col-total">
+        <col class="col-pagar">
+        <col class="col-participacao">
+      </colgroup>
       <thead>
         <tr>
           <th>Data</th>
@@ -101,16 +112,25 @@
       </thead>
       <tbody>
         {% for item in itens %}
-        <tr>
-          <td>{{ item.data|date:"d/m/Y"|default:"-" }}</td>
-          <td>{{ item.documento }}</td>
-          <td>{{ item.numero_documento|default:"-" }}</td>
-          <td>{{ item.descricao }}</td>
-          <td class="amount">{% if item.origem_item == "trecho" %}{{ item.km|floatformat:2 }}{% else %}-{% endif %}</td>
-          <td class="amount">{% if item.origem_item == "trecho" %}R$ {{ item.valor_km_unitario|floatformat:2 }}{% else %}-{% endif %}</td>
-          <td class="amount">{{ item.valor_total|floatformat:2 }}</td>
-          <td class="amount">{{ item.valor|floatformat:2 }}</td>
-          <td class="amount">{% if item.percentual %}{{ item.percentual|floatformat:2 }}%{% else %}-{% endif %}</td>
+        <tr class="item-row item-{{ item.origem_item|default:'despesa' }}">
+          <td class="cell-data"><span>{{ item.data|date:"d/m/Y"|default:"-" }}</span></td>
+          <td class="cell-doc"><span>{{ item.documento }}</span></td>
+          <td class="cell-numero"><span>{{ item.numero_documento|default:"-" }}</span></td>
+          <td class="cell-descricao">
+            <div class="description-block">
+              {% if item.origem_item == "trecho" %}
+                <span class="description-kicker">Trecho KM</span>
+                <span class="route-text">{{ item.descricao }}</span>
+              {% else %}
+                <span class="description-text">{{ item.descricao }}</span>
+              {% endif %}
+            </div>
+          </td>
+          <td class="amount cell-km"><span>{% if item.origem_item == "trecho" %}{{ item.km|floatformat:2 }}{% else %}-{% endif %}</span></td>
+          <td class="amount cell-valor-km"><span>{% if item.origem_item == "trecho" %}R$ {{ item.valor_km_unitario|floatformat:2 }}{% else %}-{% endif %}</span></td>
+          <td class="amount cell-total"><span>{{ item.valor_total|floatformat:2 }}</span></td>
+          <td class="amount cell-pagar"><span>{{ item.valor|floatformat:2 }}</span></td>
+          <td class="amount cell-participacao"><span>{% if item.percentual %}{{ item.percentual|floatformat:2 }}%{% else %}-{% endif %}</span></td>
         </tr>
         {% empty %}
         <tr>
@@ -118,6 +138,9 @@
         </tr>
         {% endfor %}
       </tbody>
+      <tfoot>
+        <tr><td colspan="9"></td></tr>
+      </tfoot>
     </table>
   </section>
 

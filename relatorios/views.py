@@ -2886,6 +2886,7 @@ class RelatorioListView(AcessoErpMixin, ListView):
                 "cliente", "tecnico_responsavel", "aprovado_por", "criado_por", "snapshot_financeiro"
             ).prefetch_related(
                 "clientes_vinculados__cliente",
+                "cidades_atendimento__municipio",
                 "equipe__tecnico",
                 "despesas",
                 "trechos",
@@ -2915,7 +2916,9 @@ class RelatorioListView(AcessoErpMixin, ListView):
                     | Q(cliente__cnpj_cpf__icontains=q_digits or q)
                     | Q(tecnico_responsavel__nome__icontains=q)
                     | Q(cidade_atendimento__icontains=q)
-                )
+                    | Q(cidades_atendimento__cidade__icontains=q)
+                    | Q(cidades_atendimento__uf__icontains=q)
+                ).distinct()
         sort = self.request.GET.get("sort")
         direction = self.request.GET.get("dir")
         if sort == "numero":
@@ -3854,6 +3857,7 @@ def relatorio_detail_view(request, pk):
                 "cliente", "tecnico_responsavel"
             ).prefetch_related(
                 "clientes_vinculados__cliente",
+                "cidades_atendimento__municipio",
                 "despesas__clientes_vinculados__cliente",
                 "despesas__tecnicos_vinculados__tecnico",
                 "despesas__rateios__cliente",
@@ -3881,6 +3885,7 @@ def relatorio_detail_view(request, pk):
         )
         .prefetch_related(
             "clientes_vinculados__cliente",
+            "cidades_atendimento__municipio",
             "despesas__clientes_vinculados__cliente",
             "despesas__rateios__cliente",
             "trechos__clientes_vinculados__cliente",
@@ -3944,6 +3949,7 @@ def relatorio_consulta_view(request, pk):
                 "snapshot_financeiro",
             ).prefetch_related(
                 "clientes_vinculados__cliente",
+                "cidades_atendimento__municipio",
                 "despesas__clientes_vinculados__cliente",
                 "despesas__rateios__cliente",
                 "despesas__anexos",

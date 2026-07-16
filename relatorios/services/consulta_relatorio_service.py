@@ -494,6 +494,18 @@ def _montar_consulta_snapshot(snapshot):
     contagens = payload.get("contagens") or {}
     data_inicio = relatorio.get("data_inicio")
     data_fim = relatorio.get("data_fim")
+    cidades = payload.get("cidades_atendimento") or relatorio.get("cidades_atendimento") or []
+    if not cidades and (relatorio.get("cidade_atendimento") or relatorio.get("uf_atendimento")):
+        cidades = [
+            {
+                "cidade": relatorio.get("cidade_atendimento") or "",
+                "uf": relatorio.get("uf_atendimento") or "",
+                "nome": "%s/%s" % (
+                    relatorio.get("cidade_atendimento") or "",
+                    relatorio.get("uf_atendimento") or "",
+                ),
+            }
+        ]
 
     return {
         "usa_snapshot": True,
@@ -517,6 +529,7 @@ def _montar_consulta_snapshot(snapshot):
         ),
         "clientes": [_ns(**cliente) for cliente in payload.get("clientes") or []],
         "tecnicos": [_ns(**tecnico) for tecnico in payload.get("tecnicos") or []],
+        "cidades": [_ns(**cidade) for cidade in cidades],
         "periodo": _ns(
             inicio=_formatar_data(data_inicio),
             fim=_formatar_data(data_fim),
@@ -869,6 +882,20 @@ def _montar_consulta_viva(relatorio):
         ),
         "clientes": [_ns(nome=cliente.nome) for cliente in relatorio.clientes_exibicao()],
         "tecnicos": [_ns(nome=tecnico.nome) for tecnico in relatorio.tecnicos_exibicao()],
+        "cidades": [
+            _ns(
+                nome=str(cidade),
+                cidade=cidade.cidade,
+                uf=cidade.uf,
+                tipo_localidade=getattr(cidade, "tipo_localidade", ""),
+                tipo_localidade_label=(
+                    cidade.get_tipo_localidade_display()
+                    if hasattr(cidade, "get_tipo_localidade_display")
+                    else getattr(cidade, "tipo_localidade_label", "")
+                ),
+            )
+            for cidade in relatorio.cidades_exibicao()
+        ],
         "periodo": _ns(
             inicio=_formatar_data(relatorio.data_inicio),
             fim=_formatar_data(relatorio.data_fim),

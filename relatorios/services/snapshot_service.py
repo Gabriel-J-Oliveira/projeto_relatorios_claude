@@ -101,6 +101,34 @@ def _tecnico_payload(tecnico, papel=""):
     }
 
 
+def _cidade_atendimento_payload(cidade):
+    return {
+        "id": getattr(cidade, "pk", None),
+        "cidade": cidade.cidade,
+        "uf": cidade.uf,
+        "nome": str(cidade),
+        "tipo_localidade": getattr(cidade, "tipo_localidade", "") or "",
+        "tipo_localidade_label": (
+            cidade.get_tipo_localidade_display()
+            if hasattr(cidade, "get_tipo_localidade_display")
+            else getattr(cidade, "tipo_localidade_label", "")
+        ),
+        "endereco": getattr(cidade, "endereco", "") or "",
+        "observacao": getattr(cidade, "observacao", "") or "",
+        "ordem": getattr(cidade, "ordem", 0) or 0,
+        "municipio": (
+            {
+                "id": cidade.municipio_id,
+                "codigo_ibge": cidade.municipio.codigo_ibge,
+                "nome": cidade.municipio.nome,
+                "uf": cidade.municipio.uf,
+            }
+            if getattr(cidade, "municipio_id", None)
+            else None
+        ),
+    }
+
+
 def _status_rejeitado(item):
     return (
         getattr(item, "rejeitado", False)
@@ -357,6 +385,10 @@ def construir_snapshot_financeiro(relatorio, usuario=None):
     for idx, tecnico in enumerate(relatorio.tecnicos_exibicao()):
         papel = "Responsavel" if idx == 0 else "Apoio"
         tecnicos.append(_tecnico_payload(tecnico, papel=papel))
+    cidades_atendimento = [
+        _cidade_atendimento_payload(cidade)
+        for cidade in relatorio.cidades_exibicao()
+    ]
 
     despesas = [_despesa_payload(despesa) for despesa in relatorio.despesas.all()]
     trechos = [_trecho_payload(trecho) for trecho in relatorio.trechos.all()]
@@ -449,6 +481,7 @@ def construir_snapshot_financeiro(relatorio, usuario=None):
         },
         "clientes": clientes,
         "tecnicos": tecnicos,
+        "cidades_atendimento": cidades_atendimento,
         "despesas": despesas,
         "trechos_km": trechos,
         "km_excedente": km_excedente,

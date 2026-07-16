@@ -2,7 +2,7 @@
 
 @page {
   size: A4;
-  margin: 16mm 15mm 19mm;
+  margin: 16mm 14mm 23mm;
 
   @bottom-left {
     content: "ControlSul Gestão Empresarial";
@@ -177,6 +177,7 @@ h1 {
 
 .items-section {
   margin-top: 4px;
+  padding-bottom: 7mm;
 }
 
 .section-heading {
@@ -203,9 +204,10 @@ h1 {
 }
 
 .items-table {
-  border-collapse: separate;
+  border-collapse: collapse;
   border-spacing: 0;
   page-break-inside: auto;
+  table-layout: fixed;
   width: 100%;
 }
 
@@ -213,7 +215,27 @@ h1 {
   display: table-header-group;
 }
 
-.items-table tr {
+.items-table tbody {
+  display: table-row-group;
+}
+
+.items-table tfoot {
+  display: table-footer-group;
+}
+
+.items-table tfoot td {
+  border: 0;
+  height: 7mm;
+  padding: 0;
+}
+
+.items-table tr,
+.items-table td,
+.items-table th,
+.item-row,
+.item-row > td,
+.description-block {
+  break-inside: avoid;
   page-break-inside: avoid;
 }
 
@@ -221,26 +243,28 @@ h1 {
   background: #eef2f7;
   border-bottom: 1px solid #d4dce8;
   color: #334155;
-  font-size: 7.8pt;
-  letter-spacing: .06em;
-  padding: 8px 7px;
+  font-size: 6.8pt;
+  letter-spacing: .035em;
+  line-height: 1.15;
+  padding: 6px 4px;
   text-align: left;
   text-transform: uppercase;
+  vertical-align: middle;
 }
 
-.items-table th:first-child {
-  border-radius: 9px 0 0 0;
-}
-
-.items-table th:last-child {
-  border-radius: 0 9px 0 0;
+.items-table th,
+.items-table td {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 .items-table td {
   border-bottom: 1px solid #e6ebf2;
   color: #263244;
-  padding: 8px 7px;
-  vertical-align: top;
+  font-size: 8pt;
+  line-height: 1.22;
+  padding: 6px 4px;
+  vertical-align: middle;
 }
 
 .items-table tbody tr:nth-child(even) td {
@@ -251,14 +275,79 @@ h1 {
   background: #ffffff;
 }
 
-.items-table td:nth-child(2) {
+.col-data { width: 8%; }
+.col-doc { width: 10%; }
+.col-numero { width: 9%; }
+.col-descricao { width: 27%; }
+.col-km { width: 8%; }
+.col-valor-km { width: 9%; }
+.col-total { width: 10%; }
+.col-pagar { width: 10%; }
+.col-participacao { width: 9%; }
+
+.cell-data,
+.cell-doc,
+.cell-numero {
   color: #5f6b7c;
-  font-size: 8.8pt;
-  white-space: nowrap;
+  font-size: 7.8pt;
+}
+
+.cell-data,
+.cell-doc,
+.cell-numero,
+.cell-km,
+.cell-valor-km,
+.cell-total,
+.cell-pagar,
+.cell-participacao {
+  vertical-align: middle;
+}
+
+.cell-data span,
+.cell-doc span,
+.cell-numero span,
+.amount span {
+  display: block;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.cell-descricao {
+  vertical-align: top;
+}
+
+.description-block {
+  display: block;
+  max-width: 100%;
+}
+
+.description-text,
+.route-text {
+  display: block;
+  hyphens: auto;
+  line-height: 1.24;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.description-kicker {
+  color: #64748b;
+  display: block;
+  font-size: 6.8pt;
+  font-weight: 800;
+  letter-spacing: .04em;
+  margin-bottom: 2px;
+  text-transform: uppercase;
+}
+
+.route-text {
+  color: #1f2937;
+  font-size: 7.8pt;
 }
 
 .amount {
   font-variant-numeric: tabular-nums;
+  font-size: 7.6pt;
   font-weight: 700;
   text-align: right;
   white-space: nowrap;

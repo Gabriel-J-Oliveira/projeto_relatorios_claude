@@ -277,16 +277,36 @@
 
           <dt class="col-sm-4 text-muted fw-medium">Local</dt>
           <dd class="col-sm-8">
-            {{ relatorio.cidade_atendimento }}/{{ relatorio.uf_atendimento }}
-            <span class="badge bg-body-tertiary text-muted ms-1">
-              {{ relatorio.get_tipo_localidade_display }}
-            </span>
-            {% if relatorio.municipio_atendimento_id %}
-              <span class="badge bg-success-subtle text-success ms-1">Município oficial</span>
+            {% with cidade_principal=relatorio.cidade_principal_exibicao cidades_secundarias=relatorio.cidades_secundarias_exibicao %}
+            {% if cidade_principal %}
+              <span class="fw-medium">{{ cidade_principal }}</span>
+              {% if cidade_principal.tipo_localidade %}
+              <span class="badge bg-body-tertiary text-muted ms-1">
+                {{ cidade_principal.get_tipo_localidade_display|default:cidade_principal.tipo_localidade_label }}
+              </span>
+              {% endif %}
+              {% if cidade_principal.municipio_id %}
+                <span class="badge bg-success-subtle text-success ms-1">Município oficial</span>
+              {% endif %}
+              {% if cidades_secundarias %}
+              <span class="badge bg-primary rounded-pill ms-1"
+                    role="button"
+                    tabindex="0"
+                    data-bs-toggle="popover"
+                    data-bs-trigger="hover focus click"
+                    data-bs-html="true"
+                    data-bs-title="Cidades do relatório"
+                    data-bs-content="<div class='popover-lista-vinculos'><div>{{ cidade_principal }}</div>{% for cidade in cidades_secundarias %}<div>{{ cidade }}</div>{% endfor %}</div>">
+                +{{ cidades_secundarias|length }}
+              </span>
+              {% endif %}
+              {% if relatorio.localidade_override %}
+                <span class="badge bg-warning-subtle text-warning ms-1">Localidade alterada</span>
+              {% endif %}
+            {% else %}
+              <span class="text-muted">Não informado</span>
             {% endif %}
-            {% if relatorio.localidade_override %}
-              <span class="badge bg-warning-subtle text-warning ms-1">Localidade alterada</span>
-            {% endif %}
+            {% endwith %}
           </dd>
 
           <dt class="col-sm-4 text-muted fw-medium">Período</dt>
