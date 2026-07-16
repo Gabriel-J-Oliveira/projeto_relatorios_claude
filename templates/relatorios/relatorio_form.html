@@ -938,7 +938,7 @@
                                   {% if cliente.razao_social and cliente.razao_social != cliente.nome_exibicao %}
                                     <div class="text-muted small">{{ cliente.razao_social }}</div>
                                   {% endif %}
-                                  {% if not cliente.valor_km or cliente.valor_km <= 0 %}
+                                  {% if not cliente.valor_km_efetivo or cliente.valor_km_efetivo <= 0 %}
                                     <span class="badge text-bg-warning mt-1">Sem valor KM</span>
                                   {% endif %}
                                 </td>
@@ -949,7 +949,7 @@
                                           class="btn btn-outline-secondary btn-sm cliente-opcao"
                                           data-cliente-id="{{ cliente.pk }}"
                                           data-cliente-nome="{{ cliente.nome_exibicao }}"
-                                          data-cliente-valor-km="{{ cliente.valor_km|default:'0' }}">
+                                          data-cliente-valor-km="{{ cliente.valor_km_efetivo|default:'0' }}">
                                     Selecionar
                                   </button>
                                 </td>
@@ -1707,7 +1707,12 @@
 
   function setClientesInput(input, ids) {
     if (!input) return;
-    input.value = Array.from(new Set(ids.map(String))).join(",");
+    const idsUnicos = Array.from(new Set(ids.map(String)));
+    input.value = idsUnicos.join(",");
+    if (input.id === "id_clientes_relatorio") {
+      const valorKm = idsUnicos.length === 1 ? obterValorKmCliente(idsUnicos[0]) : 0;
+      if (valorKm) atualizarValorKmPadraoAtual(valorKm);
+    }
     input.dispatchEvent(new Event("change", { bubbles: true }));
   }
 

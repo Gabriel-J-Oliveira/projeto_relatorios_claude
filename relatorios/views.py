@@ -1518,11 +1518,14 @@ def _salvar_cidades_atendimento_formset(fs_cidades, relatorio):
 
 
 def _clientes_queryset_selecao():
-    return Cliente.objects.filter(ativo=True).order_by(
+    clientes = list(Cliente.objects.filter(ativo=True).order_by(
         "nome_fantasia",
         "razao_social",
         "nome",
-    )
+    ))
+    for cliente in clientes:
+        cliente.valor_km_efetivo = valor_km_cliente_contratual(cliente)
+    return clientes
 
 
 def _nome_cliente(cliente):

@@ -51,8 +51,11 @@ from .services.identidade.ldap_utils import (
     usuario_ad_ativo,
 )
 from .services.autorizacao_service import (
+    GRUPO_ADMIN_ERP,
     usuario_eh_administrativo,
     usuario_eh_admin_extra,
+    usuario_pode_editar_relatorio,
+    usuario_pode_enviar_relatorio,
     usuario_tem_acesso_total,
 )
 from .services.resumo_cliente_service import resumo_financeiro_por_cliente
@@ -124,6 +127,37 @@ class ExtraAdminUsersTests(SimpleTestCase):
         self.assertFalse(usuario_eh_admin_extra(usuario))
         self.assertTrue(usuario_tem_acesso_total(usuario))
         self.assertTrue(usuario_eh_administrativo(usuario))
+
+    def test_usuario_administrativo_pode_editar_e_enviar_rascunho(self):
+        usuario = _UsuarioFake("jaciara.colvero", grupos=[GRUPO_ADMIN_ERP])
+        relatorio = SimpleNamespace(
+            pk=55,
+            numero=None,
+            status=StatusRelatorio.RASCUNHO,
+            criado_por_id=999,
+            criado_por=None,
+            tecnico_responsavel=None,
+            tecnico_reembolso=None,
+        )
+
+        self.assertFalse(usuario_tem_acesso_total(usuario))
+        self.assertTrue(usuario_eh_administrativo(usuario))
+        self.assertTrue(usuario_pode_editar_relatorio(usuario, relatorio))
+        self.assertTrue(usuario_pode_enviar_relatorio(usuario, relatorio))
+
+    def test_usuario_administrativo_nao_envia_status_nao_permitido(self):
+        usuario = _UsuarioFake("jaciara.colvero", grupos=[GRUPO_ADMIN_ERP])
+        relatorio = SimpleNamespace(
+            pk=55,
+            numero=None,
+            status=StatusRelatorio.CONFERENCIA,
+            criado_por_id=999,
+            criado_por=None,
+            tecnico_responsavel=None,
+            tecnico_reembolso=None,
+        )
+
+        self.assertFalse(usuario_pode_enviar_relatorio(usuario, relatorio))
 
 
 class HospedagemPeriodoTests(TestCase):

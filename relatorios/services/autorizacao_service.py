@@ -236,6 +236,7 @@ def _log_autorizacao_relatorio(acao, user, relatorio, validacoes, resultado):
 
 def usuario_pode_editar_relatorio(user, relatorio):
     acesso_total = usuario_tem_acesso_total(user)
+    administrativo = usuario_eh_administrativo(user)
     status_finalizado = relatorio.status in {
         StatusRelatorio.APROVADO,
         StatusRelatorio.REJEITADO,
@@ -244,17 +245,15 @@ def usuario_pode_editar_relatorio(user, relatorio):
     eh_responsavel = usuario_eh_responsavel_relatorio(user, relatorio)
     validacoes = {
         "usuario_tem_acesso_total": acesso_total,
+        "usuario_eh_administrativo": administrativo,
         "status_nao_finalizado": not status_finalizado,
         "usuario_eh_dono_relatorio": eh_dono,
         "usuario_eh_responsavel_relatorio": eh_responsavel,
     }
-    if acesso_total:
-        _log_autorizacao_relatorio("editar_relatorio", user, relatorio, validacoes, True)
-        return True
     if status_finalizado:
         _log_autorizacao_relatorio("editar_relatorio", user, relatorio, validacoes, False)
         return False
-    resultado = eh_dono or eh_responsavel
+    resultado = acesso_total or administrativo or eh_dono or eh_responsavel
     _log_autorizacao_relatorio(
         "editar_relatorio",
         user,
@@ -315,6 +314,7 @@ def usuario_pode_visualizar_relatorio(user, relatorio):
 
 def usuario_pode_enviar_relatorio(user, relatorio):
     acesso_total = usuario_tem_acesso_total(user)
+    administrativo = usuario_eh_administrativo(user)
     status_permitido = relatorio.status in {
         StatusRelatorio.RASCUNHO,
         StatusRelatorio.AJUSTE,
@@ -325,19 +325,18 @@ def usuario_pode_enviar_relatorio(user, relatorio):
     }
     eh_dono = usuario_eh_dono_relatorio(user, relatorio)
     eh_responsavel = usuario_eh_responsavel_relatorio(user, relatorio)
-    pode_editar = acesso_total or (
+    pode_editar = acesso_total or administrativo or (
         not status_finalizado and (eh_dono or eh_responsavel)
     )
     validacoes = {
         "usuario_tem_acesso_total": acesso_total,
+        "usuario_eh_administrativo": administrativo,
         "status_permitido_para_envio": status_permitido,
         "usuario_eh_dono_relatorio": eh_dono,
         "usuario_eh_responsavel_relatorio": eh_responsavel,
         "usuario_pode_editar_relatorio": pode_editar,
     }
-    if acesso_total:
-        resultado = True
-    elif not status_permitido:
+    if not status_permitido:
         resultado = False
     else:
         resultado = pode_editar
