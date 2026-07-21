@@ -108,11 +108,7 @@ def _cidade_atendimento_payload(cidade):
         "uf": cidade.uf,
         "nome": str(cidade),
         "tipo_localidade": getattr(cidade, "tipo_localidade", "") or "",
-        "tipo_localidade_label": (
-            cidade.get_tipo_localidade_display()
-            if hasattr(cidade, "get_tipo_localidade_display")
-            else getattr(cidade, "tipo_localidade_label", "")
-        ),
+        "tipo_localidade_label": getattr(cidade, "tipo_localidade_label", ""),
         "endereco": getattr(cidade, "endereco", "") or "",
         "observacao": getattr(cidade, "observacao", "") or "",
         "ordem": getattr(cidade, "ordem", 0) or 0,

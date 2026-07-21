@@ -379,6 +379,7 @@ def _relatorio_vivo(relatorio):
             cidade=cidade.cidade,
             uf=cidade.uf,
             tipo_localidade=getattr(cidade, "tipo_localidade", ""),
+            tipo_localidade_label=getattr(cidade, "tipo_localidade_label", ""),
         )
         for cidade in relatorio.cidades_exibicao()
     ]

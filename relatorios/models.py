@@ -56,6 +56,14 @@ class _CidadeAtendimentoLegada:
     def __str__(self):
         return f"{self.cidade}/{self.uf}" if self.uf else self.cidade
 
+    @property
+    def nome(self):
+        return str(self)
+
+    @property
+    def municipio_oficial(self):
+        return False
+
 
 def _numero_documento_normalizado(valor):
     return " ".join(str(valor or "").strip().split()).upper()
@@ -1859,6 +1867,18 @@ class CidadeAtendimento(models.Model):
 
     def __str__(self):
         return f"{self.cidade}/{self.uf}" if self.uf else self.cidade
+
+    @property
+    def nome(self):
+        return str(self)
+
+    @property
+    def tipo_localidade_label(self):
+        return self.get_tipo_localidade_display() if self.tipo_localidade else ""
+
+    @property
+    def municipio_oficial(self):
+        return bool(self.municipio_id)
 
     def sincronizar_municipio(self):
         if not self.municipio_id:

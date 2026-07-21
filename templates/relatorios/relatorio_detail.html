@@ -280,12 +280,12 @@
             {% with cidade_principal=relatorio.cidade_principal_exibicao cidades_secundarias=relatorio.cidades_secundarias_exibicao %}
             {% if cidade_principal %}
               <span class="fw-medium">{{ cidade_principal }}</span>
-              {% if cidade_principal.tipo_localidade %}
+              {% if cidade_principal.tipo_localidade_label %}
               <span class="badge bg-body-tertiary text-muted ms-1">
-                {{ cidade_principal.get_tipo_localidade_display|default:cidade_principal.tipo_localidade_label }}
+                {{ cidade_principal.tipo_localidade_label }}
               </span>
               {% endif %}
-              {% if cidade_principal.municipio_id %}
+              {% if cidade_principal.municipio_oficial %}
                 <span class="badge bg-success-subtle text-success ms-1">Município oficial</span>
               {% endif %}
               {% if cidades_secundarias %}

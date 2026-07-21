@@ -888,11 +888,7 @@ def _montar_consulta_viva(relatorio):
                 cidade=cidade.cidade,
                 uf=cidade.uf,
                 tipo_localidade=getattr(cidade, "tipo_localidade", ""),
-                tipo_localidade_label=(
-                    cidade.get_tipo_localidade_display()
-                    if hasattr(cidade, "get_tipo_localidade_display")
-                    else getattr(cidade, "tipo_localidade_label", "")
-                ),
+                tipo_localidade_label=getattr(cidade, "tipo_localidade_label", ""),
             )
             for cidade in relatorio.cidades_exibicao()
         ],
