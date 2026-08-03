@@ -11,7 +11,6 @@ CENTAVO = Decimal("0.01")
 DECIMAL_KM = Decimal("0.01")
 DECIMAL_VALOR_KM = Decimal("0.0001")
 VALOR_KM_REEMBOLSO_TECNICO = Decimal("1.35")
-VALOR_KM_EMPRESA_GRUPO = Decimal("1.85")
 EMPRESAS_INTERNAS_GRUPO_TERMOS = (
     "BLAZIUS E LORENZETTI",
     "CONTROLSUL",
@@ -77,13 +76,13 @@ def filtro_empresas_internas_grupo_q():
 
 
 def valor_km_cliente_contratual(cliente):
+    if cliente_e_empresa_interna_grupo(cliente):
+        return valor_km_reembolso_tecnico()
     valor = getattr(cliente, "valor_km", None)
     if valor not in (None, ""):
         valor = valor_km_decimal(valor)
         if valor > 0:
             return valor
-    if cliente_e_empresa_interna_grupo(cliente):
-        return valor_km_decimal(VALOR_KM_EMPRESA_GRUPO)
     return None
 
 

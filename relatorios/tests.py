@@ -1651,17 +1651,17 @@ class RelatorioTecnicoFlowTests(TestCase):
 
         self.assertEqual(clientes_relatorio_sem_valor_km(relatorio), [])
 
-    def test_empresa_interna_sem_valor_km_usa_valor_padrao_do_grupo(self):
+    def test_empresa_interna_usa_valor_km_reembolso_control_sul(self):
         empresa = Cliente.objects.create(
             nome="FISCALMAX",
             razao_social="FISCALMAX",
-            valor_km=None,
+            valor_km=Decimal("1.85"),
             ativo=True,
         )
         calculo = calcular_km_financeiro(Decimal("10.00"), empresa)
 
-        self.assertEqual(calculo["valor_km_cliente"], Decimal("1.8500"))
-        self.assertEqual(calculo["valor_cobranca_cliente"], Decimal("18.50"))
+        self.assertEqual(calculo["valor_km_cliente"], Decimal("1.3500"))
+        self.assertEqual(calculo["valor_cobranca_cliente"], Decimal("13.50"))
 
         relatorio = self.criar_relatorio("RT-2026-EMPRESA-INTERNA")
         relatorio.cliente = empresa
