@@ -64,6 +64,7 @@ from .services.clientes_relatorio_service import resolver_cliente_empresa_grupo
 from .services.financeiro_validator import validar_integridade_financeira_relatorio
 from .services.km_financeiro_service import calcular_km_financeiro
 from .services.periodo_despesa_service import calcular_diarias_periodo
+from .services.snapshot_service import criar_snapshot_financeiro
 from .services.tecnicos_despesa_service import (
     remover_tecnicos_despesas_fora_relatorio,
     sync_tecnicos_despesa,
@@ -1154,6 +1155,134 @@ class RelatorioTecnicoFlowTests(TestCase):
         self.assertEqual(adiantamento.valor, Decimal("100.00"))
         self.assertEqual(adiantamento.tecnico, self.tecnico)
         self.assertIn(relatorio.numero, adiantamento.descricao)
+
+    def test_usuario_autorizado_reabre_relatorio_aprovado_sem_alterar_financeiro(self):
+        usuario_autorizado = get_user_model().objects.create_user(
+            username=r"control.local\gabriel.oliveira",
+            password="senha-teste",
+        )
+        usuario_autorizado.groups.add(self.grupo_financeiro)
+        relatorio = self.criar_relatorio("RT-2026-REABRIR")
+        relatorio.status = StatusRelatorio.APROVADO
+        relatorio.aprovado_em = timezone.now()
+        relatorio.aprovado_por = self.usuario_financeiro
+        relatorio.save(update_fields=["status", "aprovado_em", "aprovado_por"])
+        despesa = ItemDespesa.objects.create(
+            relatorio=relatorio,
+            ordem=0,
+            data="2026-05-02",
+            tipo="alimentacao",
+            descricao="Almoco aprovado",
+            valor=Decimal("50.00"),
+            valor_aprovado=Decimal("45.00"),
+            quem_pagou="tecnico",
+        )
+        snapshot = criar_snapshot_financeiro(relatorio, self.usuario_financeiro)
+        checksum = snapshot.checksum
+        aprovado_em = relatorio.aprovado_em
+        aprovado_por_id = relatorio.aprovado_por_id
+        totais_antes = {
+            "total_aprovado": relatorio.total_aprovado,
+            "total_solicitado": relatorio.total_solicitado,
+            "despesas": relatorio.despesas.count(),
+            "trechos": relatorio.trechos.count(),
+            "valor_aprovado": despesa.valor_aprovado,
+        }
+
+        self.client.force_login(usuario_autorizado)
+        response = self.client.post(
+            reverse("relatorios:relatorio_reabrir", kwargs={"pk": relatorio.pk})
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("relatorios:relatorio_detail", kwargs={"pk": relatorio.pk}),
+        )
+        relatorio.refresh_from_db()
+        despesa.refresh_from_db()
+        snapshot.refresh_from_db()
+        self.assertEqual(relatorio.status, StatusRelatorio.CONFERENCIA)
+        self.assertEqual(relatorio.aprovado_em, aprovado_em)
+        self.assertEqual(relatorio.aprovado_por_id, aprovado_por_id)
+        self.assertEqual(snapshot.checksum, checksum)
+        self.assertEqual(relatorio.total_aprovado, totais_antes["total_aprovado"])
+        self.assertEqual(relatorio.total_solicitado, totais_antes["total_solicitado"])
+        self.assertEqual(relatorio.despesas.count(), totais_antes["despesas"])
+        self.assertEqual(relatorio.trechos.count(), totais_antes["trechos"])
+        self.assertEqual(despesa.valor_aprovado, totais_antes["valor_aprovado"])
+        self.assertTrue(
+            HistoricoRelatorio.objects.filter(
+                relatorio=relatorio,
+                usuario=usuario_autorizado,
+                tipo_evento=TipoEventoHistorico.REABERTO,
+            ).exists()
+        )
+
+    def test_usuario_nao_autorizado_nao_reabre_relatorio_aprovado(self):
+        relatorio = self.criar_relatorio("RT-2026-REABRIR-NEGADO")
+        relatorio.status = StatusRelatorio.APROVADO
+        relatorio.aprovado_em = timezone.now()
+        relatorio.aprovado_por = self.usuario_financeiro
+        relatorio.save(update_fields=["status", "aprovado_em", "aprovado_por"])
+        ItemDespesa.objects.create(
+            relatorio=relatorio,
+            ordem=0,
+            data="2026-05-02",
+            tipo="alimentacao",
+            descricao="Despesa aprovada",
+            valor=Decimal("50.00"),
+            quem_pagou="tecnico",
+        )
+        snapshot = criar_snapshot_financeiro(relatorio, self.usuario_financeiro)
+        checksum = snapshot.checksum
+
+        self.client.force_login(self.usuario_financeiro)
+        response = self.client.post(
+            reverse("relatorios:relatorio_reabrir", kwargs={"pk": relatorio.pk})
+        )
+
+        self.assertEqual(response.status_code, 403)
+        relatorio.refresh_from_db()
+        snapshot.refresh_from_db()
+        self.assertEqual(relatorio.status, StatusRelatorio.APROVADO)
+        self.assertEqual(snapshot.checksum, checksum)
+        self.assertFalse(
+            HistoricoRelatorio.objects.filter(
+                relatorio=relatorio,
+                tipo_evento=TipoEventoHistorico.REABERTO,
+            ).exists()
+        )
+
+    def test_botao_reabrir_aparece_apenas_para_usuario_autorizado(self):
+        usuario_autorizado = get_user_model().objects.create_user(
+            username=r"control.local\gabriel.oliveira",
+            password="senha-teste",
+        )
+        usuario_autorizado.groups.add(self.grupo_financeiro)
+        relatorio = self.criar_relatorio("RT-2026-REABRIR-BOTAO")
+        relatorio.status = StatusRelatorio.APROVADO
+        relatorio.aprovado_em = timezone.now()
+        relatorio.aprovado_por = self.usuario_financeiro
+        relatorio.save(update_fields=["status", "aprovado_em", "aprovado_por"])
+        ItemDespesa.objects.create(
+            relatorio=relatorio,
+            ordem=0,
+            data="2026-05-02",
+            tipo="alimentacao",
+            descricao="Despesa aprovada",
+            valor=Decimal("50.00"),
+            quem_pagou="tecnico",
+        )
+        criar_snapshot_financeiro(relatorio, self.usuario_financeiro)
+        url = reverse("relatorios:relatorio_consulta", kwargs={"pk": relatorio.pk})
+
+        self.client.force_login(self.usuario_financeiro)
+        response = self.client.get(url)
+        self.assertNotContains(response, "Reabrir relatório")
+
+        self.client.force_login(usuario_autorizado)
+        response = self.client.get(url)
+        self.assertContains(response, "Reabrir relatório")
 
     def test_usuario_comum_sem_grupo_financeiro_nao_aprova_relatorio(self):
         usuario_comum = get_user_model().objects.create_user(

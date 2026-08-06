@@ -7,6 +7,7 @@ EVENTOS_LEGADOS = {
     "Relatório reenviado para conferência": TipoEventoHistorico.REENVIADO,
     "Financeiro solicitou ajustes": TipoEventoHistorico.AJUSTE_SOLICITADO,
     "Relatório rejeitado definitivamente": TipoEventoHistorico.REJEITADO,
+    "Relatório reaberto": TipoEventoHistorico.REABERTO,
     "Relatório aprovado": TipoEventoHistorico.APROVADO,
     "Despesa rejeitada pelo financeiro": TipoEventoHistorico.ITEM_REJEITADO,
     "Trecho KM rejeitado pelo financeiro": TipoEventoHistorico.ITEM_REJEITADO,

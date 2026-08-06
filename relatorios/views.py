@@ -90,6 +90,7 @@ from .services.autorizacao_service import (
     usuario_pode_atuar_como_financeiro,
     usuario_pode_editar_relatorio,
     usuario_pode_enviar_relatorio,
+    usuario_pode_reabrir_relatorio,
     usuario_pode_visualizar_relatorio,
     usuario_eh_superadmin,
     usuario_pode_acessar_manutencao,
@@ -120,6 +121,10 @@ from .services.rateio_service import (
     salvar_rateio_despesa,
     salvar_rateio_trecho,
     serializar_rateio,
+)
+from .services.reabertura_relatorio_service import (
+    ReabrirRelatorioError,
+    reabrir_relatorio_aprovado,
 )
 from .services.resumo_cliente_service import resumo_financeiro_por_cliente
 from .services.consulta_relatorio_service import montar_consulta_relatorio
@@ -3980,9 +3985,34 @@ def relatorio_consulta_view(request, pk):
             "anexos_visualizacao": _anexos_visualizacao_relatorio(relatorio),
             "mapa_trechos_json": consulta.get("mapa_trechos", []),
             "pode_gerar_pdf_interno": usuario_pode_atuar_como_financeiro(request.user),
+            "pode_reabrir_relatorio": usuario_pode_reabrir_relatorio(request.user),
             "titulo_pagina": f"Consulta {consulta['relatorio'].identificador}",
         },
     )
+
+
+@require_POST
+@login_required
+@exigir_acesso_erp
+def relatorio_reabrir_view(request, pk):
+    if not usuario_pode_reabrir_relatorio(request.user):
+        logger.warning(
+            "RELATORIO_REABRIR_NEGADO usuario=%s relatorio=%s",
+            getattr(request.user, "username", ""),
+            pk,
+        )
+        raise PermissionDenied("Você não tem permissão para reabrir relatórios.")
+
+    try:
+        relatorio = reabrir_relatorio_aprovado(pk, request.user)
+    except RelatorioTecnico.DoesNotExist:
+        raise Http404("Relatório não encontrado.")
+    except ReabrirRelatorioError as exc:
+        messages.error(request, str(exc))
+        return redirect("relatorios:relatorio_consulta", pk=pk)
+
+    messages.success(request, "Relatório reaberto com sucesso.")
+    return redirect("relatorios:relatorio_detail", pk=relatorio.pk)
 
 
 # ─────────────────────────────────────────────

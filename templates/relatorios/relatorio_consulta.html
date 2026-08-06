@@ -31,10 +31,47 @@
     <i class="bi bi-file-earmark-pdf me-1"></i>Gerar PDF
   </a>
   {% endif %}
+  {% if pode_reabrir_relatorio and consulta.relatorio.status == 'aprovado' %}
+  <button type="button"
+          class="btn btn-outline-warning btn-sm"
+          data-bs-toggle="modal"
+          data-bs-target="#modalReabrirRelatorio">
+    <i class="bi bi-arrow-counterclockwise me-1"></i>Reabrir relatório
+  </button>
+  {% endif %}
 </div>
 {% endblock %}
 
 {% block content %}
+
+{% if pode_reabrir_relatorio and consulta.relatorio.status == 'aprovado' %}
+<div class="modal fade" id="modalReabrirRelatorio" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-arrow-counterclockwise me-2"></i>Reabrir relatório
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">
+          Esta ação retornará o relatório para “Conferência pendente”. O histórico da aprovação será preservado e nenhuma informação financeira será alterada.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <form method="post" action="{% url 'relatorios:relatorio_reabrir' relatorio.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-warning text-dark">
+            Confirmar reabertura
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 <section class="consulta-hero mb-4">
   <div class="d-flex flex-column flex-xl-row justify-content-between gap-4">

@@ -130,6 +130,7 @@ class TipoEventoHistorico(models.TextChoices):
     REENVIADO = "reenviado", "Relatório reenviado para conferência"
     APROVADO = "aprovado", "Relatório aprovado"
     REJEITADO = "rejeitado", "Relatório rejeitado definitivamente"
+    REABERTO = "reaberto", "Relatório reaberto"
     ITEM_REJEITADO = "item_rejeitado", "Item rejeitado pelo financeiro"
     ITEM_REATIVADO = "item_reativado", "Item reativado pelo financeiro"
     VALOR_ALTERADO = "valor_alterado", "Valor aprovado alterado"
@@ -1552,6 +1553,7 @@ class HistoricoRelatorio(models.Model):
             TipoEventoHistorico.REENVIADO: "warning",
             TipoEventoHistorico.APROVADO: "success",
             TipoEventoHistorico.REJEITADO: "danger",
+            TipoEventoHistorico.REABERTO: "warning",
             TipoEventoHistorico.ITEM_REJEITADO: "danger",
             TipoEventoHistorico.ITEM_REATIVADO: "primary",
             TipoEventoHistorico.VALOR_ALTERADO: "info",

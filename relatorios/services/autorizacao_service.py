@@ -18,6 +18,7 @@ GRUPO_TECNICO = "Tecnico"
 GRUPO_GESTOR = "Gestor"
 GRUPO_ADMIN_ERP = "Administrador ERP"
 GRUPO_DOMAIN_ADMINS = "Domain Admins"
+USUARIO_REABRIR_RELATORIO = "gabriel.oliveira"
 
 GRUPOS_ERP = [
     GRUPO_FINANCEIRO,
@@ -144,6 +145,16 @@ def usuario_pode_acessar_erp(user):
 
 def usuario_pode_atuar_como_financeiro(user):
     return usuario_eh_administrativo(user)
+
+
+def usuario_pode_reabrir_relatorio(user):
+    if not getattr(user, "is_authenticated", False):
+        return False
+    candidatos = {
+        _normalizar_login_usuario(getattr(user, "username", "")),
+        _normalizar_login_usuario(user.get_username() if hasattr(user, "get_username") else ""),
+    }
+    return USUARIO_REABRIR_RELATORIO in candidatos
 
 
 def usuario_pode_gerenciar_cadastros(user):
