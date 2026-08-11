@@ -103,7 +103,8 @@
             <div class="comprovantes-lista small mb-1">
               {% if form.instance.comprovante %}
                 <div class="comprovante-item d-flex align-items-center gap-1 mb-1"
-                     data-upload-persisted-item>
+                     data-upload-persisted-item
+                     data-upload-persisted-bytes="{{ form.instance.comprovante.size|default:0 }}">
                   <i class="bi bi-check-circle text-success"></i>
                   <button type="button"
                           class="btn btn-link btn-sm p-0 text-truncate anexo-preview-btn"
@@ -121,6 +122,7 @@
                   <button type="button"
                           class="btn btn-link btn-sm p-0 text-danger comprovante-delete-btn"
                           title="Excluir comprovante"
+                          data-delete-kind="legacy"
                           data-delete-url="{% url 'relatorios:despesa_comprovante_remover' form.instance.pk %}">
                     <i class="bi bi-trash3"></i>
                   </button>
@@ -130,7 +132,8 @@
                 {% for anexo in form.instance.anexos.all %}
                   {% if anexo.arquivo.name != comprovante_legado %}
                     <div class="comprovante-item d-flex align-items-center gap-1 mb-1"
-                         data-upload-persisted-item>
+                         data-upload-persisted-item
+                         data-upload-persisted-bytes="{{ anexo.tamanho_bytes|default:0 }}">
                       <i class="bi bi-check-circle text-success"></i>
                       <button type="button"
                               class="btn btn-link btn-sm p-0 text-truncate anexo-preview-btn"
@@ -148,6 +151,7 @@
                       <button type="button"
                               class="btn btn-link btn-sm p-0 text-danger comprovante-delete-btn"
                               title="Excluir comprovante"
+                              data-delete-kind="additional"
                               data-delete-url="{% url 'relatorios:anexo_remover' anexo.pk %}">
                         <i class="bi bi-trash3"></i>
                       </button>
@@ -160,7 +164,8 @@
           <div class="d-flex align-items-center gap-1 upload-comprovante-control">
             {% if form.instance.comprovante %}
               <span class="btn btn-sm btn-outline-success despesa-file-btn disabled"
-                    data-upload-existing="1">
+                    data-upload-existing="1"
+                    data-upload-existing-badge>
                 <i class="bi bi-file-earmark-check"></i>
                 <span>Atual</span>
               </span>

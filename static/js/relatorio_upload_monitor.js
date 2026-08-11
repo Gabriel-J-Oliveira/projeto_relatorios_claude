@@ -262,8 +262,26 @@
     const maxTotalBytes = maxTotalMb * BYTES_IN_MB;
     const { items, errors } = collectFiles(form);
     syncExpectedManifest(form, items);
+    form.querySelectorAll('input[type="file"][data-upload-comprovante]').forEach((input) => {
+      const files = Array.from(input.files || []);
+      if (files.length) return;
+      const field = input.closest(".despesa-field-anexo");
+      const persistedCountField = field?.querySelectorAll("[data-upload-persisted-item]").length || 0;
+      if (persistedCountField) {
+        setStatus(input, "persisted", "Enviado com sucesso", "bi-check-circle");
+      } else {
+        setStatus(input, "empty", "Nenhum arquivo selecionado", "");
+      }
+      setButtonState(input, "empty");
+    });
     const selectedBytes = items.reduce((sum, item) => sum + item.size, 0);
-    const totalBytes = existingBytes + selectedBytes;
+    const persistedElements = Array.from(form.querySelectorAll("[data-upload-persisted-item]"));
+    const persistedBytesFromDom = persistedElements.reduce(
+      (sum, item) => sum + Number(item.dataset.uploadPersistedBytes || 0),
+      0
+    );
+    const persistedBytes = persistedElements.length ? persistedBytesFromDom : existingBytes;
+    const totalBytes = persistedBytes + selectedBytes;
     const percent = maxTotalBytes ? Math.min(100, (totalBytes / maxTotalBytes) * 100) : 0;
 
     items.forEach((item) => {
@@ -293,8 +311,8 @@
     const largestWrap = card.querySelector("[data-upload-largest-wrap]");
     const largest = card.querySelector("[data-upload-largest]");
 
-    const persistedItems = form.querySelectorAll("[data-upload-persisted-item]").length;
-    const persistedCount = persistedItems || form.querySelectorAll('[data-upload-status-line][data-upload-state="persisted"]').length;
+    const persistedCount = persistedElements.length
+      || form.querySelectorAll('[data-upload-status-line][data-upload-state="persisted"]').length;
     if (count) {
       const totalCount = persistedCount + items.length;
       count.textContent = `${totalCount} anexo${totalCount === 1 ? "" : "s"}`;

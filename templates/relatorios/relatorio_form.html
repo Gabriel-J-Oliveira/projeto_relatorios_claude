@@ -611,7 +611,7 @@
                         <th class="px-3 py-2 fw-semibold text-muted small" style="width: 120px;">Total R$</th>
                         <th class="px-3 py-2 fw-semibold text-muted small">Obs.</th>
                         <th class="px-3 py-2 fw-semibold text-muted small">Clientes</th>
-                        <th class="px-3 py-2" style="width: 90px;">Ações</th>
+                        <th class="px-3 py-2" style="width: 150px;">Ações</th>
                       </tr>
                     </thead>
 
@@ -1439,9 +1439,9 @@
           <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
           <script src="https://cdn.jsdelivr.net/npm/driver.js@latest/dist/driver.js.iife.js"></script>
           <script defer src="{% static 'js/relatorio_autosave.js' %}?v={{ static_version|default:'20260807' }}"></script>
-          <script defer src="{% static 'js/relatorio_upload_monitor.js' %}?v={{ static_version|default:'20260807' }}"></script>
+          <script defer src="{% static 'js/relatorio_upload_monitor.js' %}?v={{ static_version|default:'20260811' }}"></script>
           <script defer src="{% static 'js/relatorio_form_tour.js' %}?v={{ static_version|default:'20260807' }}"></script>
-          <script defer src="{% static 'js/relatorio_novidades_tour.js' %}?v={{ static_version|default:'20260807' }}"></script>
+          <script defer src="{% static 'js/relatorio_novidades_tour.js' %}?v={{ static_version|default:'20260811' }}"></script>
           <script>
   /* ================================================================
     CONTROLE DO FORMULARIO - Single Save sem HTMX
@@ -1521,6 +1521,9 @@
       const item = button.closest(".comprovante-item");
       const field = button.closest(".despesa-field-anexo");
       item?.remove();
+      if (button.dataset.deleteKind === "legacy") {
+        field?.querySelector("[data-upload-existing-badge]")?.remove();
+      }
       const restantes = field?.querySelectorAll(".comprovante-item").length || 0;
       const status = field?.querySelector("[data-upload-status-line]");
       if (status && restantes === 0) {
@@ -1849,7 +1852,7 @@
     const naoReembolsavel =
       document.querySelector('[name="tipo_reembolso"]')?.value === "nao_reembolsavel";
     document.querySelectorAll(".clientes-item-input").forEach(input => {
-      if (!input.value && relatorioIds.length === 1) {
+      if (relatorioIds.length === 1 && input.value !== relatorioIds[0]) {
         input.value = relatorioIds[0];
       }
       const ids = idsFromValue(input.value).filter(id => relatorioIds.includes(id));
@@ -1877,7 +1880,7 @@
   function atualizarBadgesTecnicosDespesas() {
     const relatorioIds = getTecnicosEquipeIds();
     document.querySelectorAll(".tecnicos-item-input").forEach(input => {
-      if (!input.value && relatorioIds.length === 1) {
+      if (relatorioIds.length === 1 && input.value !== relatorioIds[0]) {
         input.value = relatorioIds[0];
       }
       const ids = idsFromValue(input.value).filter(id => relatorioIds.includes(id));
@@ -1921,6 +1924,12 @@
         const clienteId = idsFromValue(linha.querySelector(".clientes-item-input")?.value)[0] || getClientesRelatorioIds()[0];
         const valorPadrao = obterValorKmCliente(clienteId) || normalizarNumero(document.getElementById("form-relatorio")?.dataset?.valorKmCliente);
         if (valorPadrao) campoValorKm.value = valorPadrao.toFixed(2).replace(".", ",");
+      } else {
+        const clienteId = idsFromValue(linha.querySelector(".clientes-item-input")?.value)[0] || getClientesRelatorioIds()[0];
+        const valorPadrao = obterValorKmCliente(clienteId);
+        if (valorPadrao && Math.abs(normalizarNumero(campoValorKm.value) - valorPadrao) > 0.0001) {
+          campoValorKm.value = valorPadrao.toFixed(2).replace(".", ",");
+        }
       }
     }
     if (aviso) {

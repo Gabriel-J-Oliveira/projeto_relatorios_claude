@@ -58,6 +58,10 @@ def sync_tecnicos_despesa(despesa, tecnico_ids, usuario=None):
         raise ValueError("Relatório finalizado não pode ter técnicos da despesa alterados.")
 
     tecnico_ids = normalizar_ids_tecnicos(tecnico_ids)
+    if not tecnico_ids:
+        permitidos = sorted(tecnicos_relatorio_ids(despesa.relatorio))
+        if len(permitidos) == 1:
+            tecnico_ids = permitidos
     erros = validar_tecnicos_despesa_no_relatorio(despesa.relatorio, tecnico_ids)
     if erros:
         return erros

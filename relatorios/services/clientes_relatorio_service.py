@@ -4,10 +4,12 @@ from django.db.models import Q
 from relatorios.models import (
     Cliente,
     DespesaCliente,
+    DespesaRateio,
     EmpresaGrupo,
     RelatorioCliente,
     StatusRelatorio,
     TrechoKMCliente,
+    TrechoRateioKM,
     normalizar_texto_busca,
 )
 
@@ -93,6 +95,50 @@ def obter_motivos_clientes_relatorio(relatorio):
     }
 
 
+def _propagar_cliente_unico_relatorio(relatorio, cliente_id):
+    for despesa in relatorio.despesas.all():
+        atuais = list(
+            DespesaCliente.objects.filter(despesa=despesa).values_list(
+                "cliente_id", flat=True
+            )
+        )
+        rateios_atuais = list(
+            DespesaRateio.objects.filter(despesa=despesa).values_list(
+                "cliente_id", flat=True
+            )
+        )
+        if len(set(atuais)) > 1 or len(set(rateios_atuais)) > 1:
+            continue
+        DespesaCliente.objects.filter(despesa=despesa).exclude(
+            cliente_id=cliente_id
+        ).delete()
+        DespesaCliente.objects.get_or_create(despesa=despesa, cliente_id=cliente_id)
+        DespesaRateio.objects.filter(despesa=despesa).exclude(
+            cliente_id=cliente_id
+        ).delete()
+
+    for trecho in relatorio.trechos.all():
+        atuais = list(
+            TrechoKMCliente.objects.filter(trecho=trecho).values_list(
+                "cliente_id", flat=True
+            )
+        )
+        rateios_atuais = list(
+            TrechoRateioKM.objects.filter(trecho=trecho).values_list(
+                "cliente_id", flat=True
+            )
+        )
+        if len(set(atuais)) > 1 or len(set(rateios_atuais)) > 1:
+            continue
+        TrechoKMCliente.objects.filter(trecho=trecho).exclude(
+            cliente_id=cliente_id
+        ).delete()
+        TrechoKMCliente.objects.get_or_create(trecho=trecho, cliente_id=cliente_id)
+        TrechoRateioKM.objects.filter(trecho=trecho).exclude(
+            cliente_id=cliente_id
+        ).delete()
+
+
 def clientes_despesa(despesa):
     qs = Cliente.objects.filter(despesas_cliente__despesa=despesa).order_by("nome")
     if qs.exists():
@@ -149,6 +195,9 @@ def sync_clientes_relatorio(relatorio, cliente_ids, motivos_por_cliente=None):
         garantir_rateio_despesa,
         garantir_rateio_trecho,
     )
+
+    if len(ids_validos) == 1:
+        _propagar_cliente_unico_relatorio(relatorio, ids_validos[0])
 
     for despesa in relatorio.despesas.all():
         garantir_rateio_despesa(despesa)

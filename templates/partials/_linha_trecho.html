@@ -166,16 +166,18 @@
     <div class="invalid-feedback d-block small erro-clientes-item"></div>
   </td>
   <td class="p-1 text-center pe-3 pt-3">
-    <button type="button"
-            class="btn btn-sm btn-outline-primary w-100 mb-1 btn-ida-volta"
-            title="Criar trecho de volta invertendo origem e destino">
-      <i class="bi bi-arrow-left-right"></i> Ida e volta
-    </button>
-    <button type="button"
-            class="btn btn-sm btn-outline-danger w-100"
-            onclick="removerLinha(this)">
-      <i class="bi bi-trash3"></i> Remover
-    </button>
+    <div class="d-grid gap-1">
+      <button type="button"
+              class="btn btn-sm btn-outline-primary btn-ida-volta"
+              title="Criar trecho de volta invertendo origem e destino">
+        <i class="bi bi-arrow-left-right me-1"></i>Ida e volta
+      </button>
+      <button type="button"
+              class="btn btn-sm btn-outline-danger"
+              onclick="removerLinha(this)">
+        <i class="bi bi-trash3 me-1"></i>Remover
+      </button>
+    </div>
   </td>
 </tr>
 
