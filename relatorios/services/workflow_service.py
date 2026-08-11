@@ -20,6 +20,9 @@ from relatorios.services.autorizacao_service import (
     usuario_pode_enviar_relatorio,
 )
 from relatorios.services.historico_service import registrar_evento
+from relatorios.services.politica_aprovacao_service import (
+    aplicar_politica_valor_aprovado_inicial,
+)
 from relatorios.services.rateio_service import (
     RateioError,
     garantir_rateio_despesa,
@@ -139,6 +142,20 @@ def _parse_decimal_financeiro(valor):
     return numero
 
 
+def _aplicar_politicas_iniciais_relatorio(relatorio):
+    alterou = False
+    for despesa in relatorio.despesas.select_for_update().prefetch_related(
+        "tecnicos_vinculados"
+    ):
+        if aplicar_politica_valor_aprovado_inicial(despesa, preservar_manual=True):
+            try:
+                garantir_rateio_despesa(despesa)
+            except RateioError as exc:
+                raise WorkflowError(f"Despesa {despesa.pk}: {exc}") from exc
+            alterou = True
+    return alterou
+
+
 def _extrair_sequencial(numero):
     match = re.search(r"(\d+)$", str(numero or ""))
     return int(match.group(1)) if match else 0
@@ -241,14 +258,15 @@ def _salvar_valores_aprovados(post_data, relatorio, usuario, consolidar=False):
 
     for despesa in despesas:
         nome_campo = f"despesa_{despesa.pk}_valor_aprovado"
-        valor_postado = post_data.get(nome_campo)
+        campo_presente = nome_campo in post_data
+        valor_postado = post_data.get(nome_campo) if campo_presente else None
         valor_postado_preenchido = str(valor_postado or "").strip() != ""
         if despesa.rejeitado or despesa.status_financeiro == StatusFinanceiroItem.REJEITADO:
             valor_aprovado = Decimal("0.00") if consolidar else despesa.valor_aprovado
+        elif not campo_presente:
+            valor_aprovado = despesa.valor_aprovado
         else:
             valor_aprovado = _parse_decimal_financeiro(valor_postado)
-        if consolidar and valor_aprovado is None:
-            valor_aprovado = despesa.valor
         registrar_alteracao = (
             valor_postado_preenchido
             and valor_aprovado is not None
@@ -346,6 +364,7 @@ def enviar_para_conferencia(relatorio_id, usuario=None):
             garantir_rateios_relatorio(relatorio)
         except RateioError as exc:
             raise WorkflowError(str(exc)) from exc
+        _aplicar_politicas_iniciais_relatorio(relatorio)
         resultado_envio = validar_relatorio_para_envio(relatorio)
         if not resultado_envio.ok:
             raise WorkflowError(resultado_envio.errors)
@@ -430,6 +449,7 @@ def aprovar_relatorio(relatorio_id, usuario=None, post_data=None):
         _validar_permissao_financeira(usuario)
         validar_transicao(relatorio, StatusRelatorio.APROVADO)
         status_anterior = relatorio.status
+        _aplicar_politicas_iniciais_relatorio(relatorio)
         _salvar_valores_aprovados(post_data or {}, relatorio, _usuario(usuario), consolidar=True)
         _validar_dados_reembolso_relatorio(relatorio)
         _validar_aprovacao_financeira(relatorio)

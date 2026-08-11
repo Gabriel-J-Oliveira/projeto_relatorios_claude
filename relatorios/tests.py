@@ -65,6 +65,7 @@ from .services.financeiro_validator import validar_integridade_financeira_relato
 from .services.km_financeiro_service import calcular_km_financeiro
 from .services.periodo_despesa_service import calcular_diarias_periodo
 from .services.politica_aprovacao_service import aplicar_politica_valor_aprovado_inicial
+from .services.workflow_service import aprovar_relatorio
 from .services.snapshot_service import criar_snapshot_financeiro
 from .services.tecnicos_despesa_service import (
     remover_tecnicos_despesas_fora_relatorio,
@@ -286,6 +287,29 @@ class DespesaTecnicoParticipanteTests(TestCase):
             ativo=True,
         )
 
+    def criar_politica_hospedagem_sao_paulo(self, valor="900.00"):
+        return PoliticaValor.objects.create(
+            chave="HOSPEDAGEM_SAO_PAULO",
+            tipo_politica=PoliticaValor.TipoPolitica.HOSPEDAGEM,
+            tipo_despesa=TipoDespesa.HOSPEDAGEM,
+            cidade="Sao Paulo",
+            descricao="Hospedagem Sao Paulo",
+            limite_valor=Decimal(valor),
+            vigencia_inicio=date(2026, 1, 1),
+            ativo=True,
+        )
+
+    def usuario_financeiro(self):
+        usuario = get_user_model().objects.create_user("financeiro-politica")
+        grupo, _criado = Group.objects.get_or_create(name="Financeiro")
+        usuario.groups.add(grupo)
+        return usuario
+
+    def preparar_relatorio_para_aprovacao(self):
+        self.relatorio.status = StatusRelatorio.CONFERENCIA
+        self.relatorio.tecnico_reembolso = self.tecnico_a
+        self.relatorio.save(update_fields=["status", "tecnico_reembolso"])
+
     def test_sync_permite_multiplos_tecnicos_do_relatorio(self):
         erros = sync_tecnicos_despesa(
             self.despesa,
@@ -451,6 +475,136 @@ class DespesaTecnicoParticipanteTests(TestCase):
         self.assertIsNone(self.despesa.valor_politica)
         self.assertIsNone(self.despesa.valor_aprovado)
         self.assertEqual(self.despesa.valor_final, Decimal("200.00"))
+
+    def test_aprovado_inicial_nao_converte_politica_ausente_em_zero(self):
+        PoliticaValor.objects.create(
+            chave="REFEICAO_CAPITAL",
+            tipo_politica=PoliticaValor.TipoPolitica.REFEICAO,
+            tipo_despesa=TipoDespesa.ALIMENTACAO,
+            tipo_localidade="capital",
+            descricao="Refeicao Capital sem limite",
+            limite_valor=None,
+            valor_km=None,
+            vigencia_inicio=date(2026, 1, 1),
+            ativo=True,
+        )
+        self.despesa.valor = Decimal("90.00")
+        self.despesa.save(update_fields=["valor"])
+        sync_tecnicos_despesa(self.despesa, [self.tecnico_a.pk], self.usuario)
+
+        alterou = aplicar_politica_valor_aprovado_inicial(self.despesa)
+        self.despesa.refresh_from_db()
+
+        self.assertIsNone(self.despesa.valor_politica)
+        self.assertFalse(alterou)
+        self.assertIsNone(self.despesa.valor_aprovado)
+        self.assertEqual(self.despesa.valor_final, Decimal("90.00"))
+
+    def test_aprovacao_aplica_politica_encontrada_mesmo_sem_input_no_post(self):
+        self.criar_politica_refeicao_capital("80.00")
+        self.despesa.valor = Decimal("90.20")
+        self.despesa.valor_aprovado = None
+        self.despesa.save(update_fields=["valor", "valor_aprovado"])
+        sync_tecnicos_despesa(self.despesa, [self.tecnico_a.pk], self.usuario)
+        self.preparar_relatorio_para_aprovacao()
+
+        aprovar_relatorio(self.relatorio.pk, self.usuario_financeiro(), post_data={})
+        self.despesa.refresh_from_db()
+        rateio = self.despesa.rateios.get(cliente=self.cliente)
+
+        self.assertEqual(self.despesa.valor_politica, Decimal("80.00"))
+        self.assertEqual(self.despesa.valor_aprovado, Decimal("80.00"))
+        self.assertEqual(self.despesa.valor_final, Decimal("80.00"))
+        self.assertEqual(rateio.valor_original, Decimal("90.20"))
+        self.assertEqual(rateio.valor_final, Decimal("80.00"))
+
+    def test_aprovacao_preserva_limite_automatico_quando_post_nao_traz_campo(self):
+        self.criar_politica_refeicao_capital("80.00")
+        self.despesa.valor = Decimal("90.20")
+        self.despesa.valor_aprovado = Decimal("80.00")
+        self.despesa.save(update_fields=["valor", "valor_aprovado"])
+        sync_tecnicos_despesa(self.despesa, [self.tecnico_a.pk], self.usuario)
+        self.preparar_relatorio_para_aprovacao()
+
+        aprovar_relatorio(self.relatorio.pk, self.usuario_financeiro(), post_data={})
+        self.despesa.refresh_from_db()
+
+        self.assertEqual(self.despesa.valor_aprovado, Decimal("80.00"))
+        self.assertEqual(self.despesa.valor_final, Decimal("80.00"))
+
+    def test_aprovacao_nao_grava_valor_solicitado_quando_aprovacao_integral(self):
+        self.criar_politica_refeicao_capital("80.00")
+        self.despesa.valor = Decimal("70.00")
+        self.despesa.valor_aprovado = None
+        self.despesa.save(update_fields=["valor", "valor_aprovado"])
+        sync_tecnicos_despesa(self.despesa, [self.tecnico_a.pk], self.usuario)
+        self.preparar_relatorio_para_aprovacao()
+
+        aprovar_relatorio(self.relatorio.pk, self.usuario_financeiro(), post_data={})
+        self.despesa.refresh_from_db()
+
+        self.assertIsNone(self.despesa.valor_aprovado)
+        self.assertEqual(self.despesa.valor_final, Decimal("70.00"))
+
+    def test_aprovacao_hospedagem_aplica_tecnicos_e_diarias(self):
+        self.criar_politica_hospedagem_sao_paulo("900.00")
+        self.relatorio.cidade_atendimento = "Sao Paulo"
+        self.relatorio.tipo_localidade = "capital"
+        self.relatorio.save(update_fields=["cidade_atendimento", "tipo_localidade"])
+        self.despesa.tipo = TipoDespesa.HOSPEDAGEM
+        self.despesa.descricao = "Hotel Sao Paulo"
+        self.despesa.valor = Decimal("2013.91")
+        self.despesa.valor_aprovado = None
+        self.despesa.data_inicio_hospedagem = date(2026, 8, 1)
+        self.despesa.data_fim_hospedagem = date(2026, 8, 2)
+        self.despesa.save(
+            update_fields=[
+                "tipo",
+                "descricao",
+                "valor",
+                "valor_aprovado",
+                "data_inicio_hospedagem",
+                "data_fim_hospedagem",
+            ]
+        )
+        sync_tecnicos_despesa(self.despesa, [self.tecnico_a.pk], self.usuario)
+        self.preparar_relatorio_para_aprovacao()
+
+        aprovar_relatorio(self.relatorio.pk, self.usuario_financeiro(), post_data={})
+        self.despesa.refresh_from_db()
+
+        self.assertEqual(self.despesa.quantidade_diarias_hospedagem, 1)
+        self.assertEqual(self.despesa.valor_politica, Decimal("900.00"))
+        self.assertEqual(self.despesa.valor_aprovado, Decimal("900.00"))
+        self.assertEqual(self.despesa.valor_final, Decimal("900.00"))
+
+    def test_hospedagem_sem_periodo_valido_nao_multiplica_por_zero(self):
+        self.criar_politica_hospedagem_sao_paulo("900.00")
+        self.relatorio.cidade_atendimento = "Sao Paulo"
+        self.relatorio.save(update_fields=["cidade_atendimento"])
+        self.despesa.tipo = TipoDespesa.HOSPEDAGEM
+        self.despesa.descricao = "Hotel Sao Paulo"
+        self.despesa.valor = Decimal("1010.90")
+        self.despesa.data_inicio_hospedagem = None
+        self.despesa.data_fim_hospedagem = None
+        self.despesa.save(
+            update_fields=[
+                "tipo",
+                "descricao",
+                "valor",
+                "data_inicio_hospedagem",
+                "data_fim_hospedagem",
+            ]
+        )
+        sync_tecnicos_despesa(self.despesa, [self.tecnico_a.pk], self.usuario)
+
+        aplicar_politica_valor_aprovado_inicial(self.despesa)
+        self.despesa.refresh_from_db()
+
+        self.assertEqual(self.despesa.quantidade_diarias_hospedagem, 0)
+        self.assertEqual(self.despesa.valor_politica, Decimal("900.00"))
+        self.assertEqual(self.despesa.valor_aprovado, Decimal("900.00"))
+        self.assertEqual(self.despesa.valor_final, Decimal("900.00"))
 
     def test_aprovado_inicial_preserva_edicao_manual_do_financeiro(self):
         self.criar_politica_refeicao_capital()

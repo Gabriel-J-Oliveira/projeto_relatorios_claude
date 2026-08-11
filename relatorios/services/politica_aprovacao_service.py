@@ -8,8 +8,10 @@ CENTAVO = Decimal("0.01")
 
 
 def _money(valor):
+    if valor is None or valor == "":
+        return None
     try:
-        return Decimal(valor or "0").quantize(CENTAVO, rounding=ROUND_HALF_UP)
+        return Decimal(valor).quantize(CENTAVO, rounding=ROUND_HALF_UP)
     except (InvalidOperation, TypeError, ValueError):
         return None
 
@@ -24,7 +26,7 @@ def valor_aprovado_inicial_por_politica(despesa):
     return None
 
 
-def aplicar_politica_valor_aprovado_inicial(despesa, preservar_manual=False):
+def aplicar_politica_valor_aprovado_inicial(despesa, preservar_manual=True):
     valor_anterior = getattr(despesa, "valor_aprovado", None)
     valor_novo = valor_aprovado_inicial_por_politica(despesa)
     limite_atual = _money(getattr(despesa, "valor_politica", None))

@@ -36,7 +36,14 @@ def _normalizar(texto):
 
 
 def _money(valor):
-    return Decimal(str(valor or "0.00")).quantize(Decimal("0.01"))
+    if valor is None or valor == "":
+        return None
+    return Decimal(str(valor)).quantize(Decimal("0.01"))
+
+
+def _money_zero(valor):
+    numero = _money(valor)
+    return numero if numero is not None else Decimal("0.00")
 
 
 def _positive_int(valor, default=1):
@@ -63,13 +70,17 @@ def calcular_limite_politica_despesa(
     if not politica:
         return None
 
+    valor_base = _money(getattr(politica, "valor", None))
+    if valor_base is None:
+        return None
+
     multiplicador = Decimal("1")
     if despesa_usa_politica_por_tecnico(tipo_despesa):
         multiplicador *= Decimal(_positive_int(quantidade_tecnicos))
     if tipo_despesa == TipoDespesa.HOSPEDAGEM and _positive_int(diarias, default=0) > 0:
         multiplicador *= Decimal(_positive_int(diarias, default=0))
 
-    return _money(politica.valor * multiplicador)
+    return _money(valor_base * multiplicador)
 
 
 def _buscar_chave(chave, data):
@@ -82,9 +93,18 @@ def _buscar_chave(chave, data):
 def _politica_payload(politica, valor_informado=None):
     if not politica:
         return None
-    valor = _money(politica.limite_valor or politica.valor_km)
-    informado = _money(valor_informado)
-    excesso = _money(max(informado - valor, Decimal("0.00")))
+    valor_origem = politica.limite_valor if politica.limite_valor is not None else politica.valor_km
+    valor = _money(valor_origem)
+    if valor is None:
+        logger.warning(
+            "politica_sem_valor chave=%s tipo=%s data_inicio=%s",
+            getattr(politica, "chave", ""),
+            getattr(politica, "tipo_politica", ""),
+            getattr(politica, "vigencia_inicio", None),
+        )
+        return None
+    informado = _money_zero(valor_informado)
+    excesso = _money_zero(max(informado - valor, Decimal("0.00")))
     return PoliticaAplicavel(
         chave=politica.chave,
         descricao=politica.descricao,
@@ -179,5 +199,5 @@ def resolver_politica_despesa(
 def valor_km_control_sul(data=None):
     politica = _buscar_chave("VALOR_KM_CONTROLSUL", data or timezone.localdate())
     if politica and politica.valor_km:
-        return _money(politica.valor_km)
+        return _money(politica.valor_km) or Decimal("1.35")
     return Decimal("1.35")
