@@ -583,30 +583,41 @@ def criar_snapshot_financeiro(relatorio, usuario=None):
         )
         raise SnapshotError("Snapshot financeiro so pode ser criado para relatorio finalizado.")
 
-    try:
-        logger.info("Snapshot financeiro ja existente reutilizado para relatorio %s.", relatorio.pk)
-        return relatorio.snapshot_financeiro
-    except ObjectDoesNotExist:
-        pass
-
     logger.info("Iniciando criacao de snapshot financeiro do relatorio %s.", relatorio.pk)
     payload = construir_snapshot_financeiro(relatorio, usuario)
     validar_snapshot_payload(payload)
     checksum = calcular_checksum(payload)
     finalizado_em = timezone.now()
-    snapshot = RelatorioSnapshotFinanceiro.objects.create(
-        relatorio=relatorio,
-        schema_version=SCHEMA_VERSION,
-        numero=relatorio.numero or relatorio.identificador,
-        status=relatorio.status,
-        total_solicitado=_money(relatorio.total_solicitado),
-        total_aprovado=_money(relatorio.total_aprovado),
-        diferenca_removida=_money(relatorio.diferenca_removida),
-        payload=payload,
-        checksum=checksum,
-        finalizado_em=finalizado_em,
-        finalizado_por=usuario if getattr(usuario, "is_authenticated", False) else None,
-    )
+    dados_snapshot = {
+        "schema_version": SCHEMA_VERSION,
+        "numero": relatorio.numero or relatorio.identificador,
+        "status": relatorio.status,
+        "total_solicitado": _money(relatorio.total_solicitado),
+        "total_aprovado": _money(relatorio.total_aprovado),
+        "diferenca_removida": _money(relatorio.diferenca_removida),
+        "payload": payload,
+        "checksum": checksum,
+        "finalizado_em": finalizado_em,
+        "finalizado_por": usuario if getattr(usuario, "is_authenticated", False) else None,
+    }
+    try:
+        snapshot = relatorio.snapshot_financeiro
+    except ObjectDoesNotExist:
+        snapshot = RelatorioSnapshotFinanceiro.objects.create(
+            relatorio=relatorio,
+            **dados_snapshot,
+        )
+    else:
+        for campo, valor in dados_snapshot.items():
+            setattr(snapshot, campo, valor)
+        snapshot._permitir_atualizacao_snapshot = True
+        snapshot.save(update_fields=[*dados_snapshot.keys()])
+        logger.info(
+            "Snapshot financeiro substituido para relatorio %s com checksum %s.",
+            relatorio.pk,
+            checksum,
+        )
+        return snapshot
     logger.info(
         "Snapshot financeiro criado para relatorio %s com checksum %s.",
         relatorio.pk,

@@ -1494,37 +1494,54 @@ class RelatorioTecnicoFlowTests(TestCase):
         self.assertEqual(adiantamento.tecnico, self.tecnico)
         self.assertIn(relatorio.numero, adiantamento.descricao)
 
-    def test_usuario_autorizado_reabre_relatorio_aprovado_sem_alterar_financeiro(self):
+    def test_usuario_autorizado_reabre_relatorio_aprovado_recalculando_financeiro_vivo(self):
         usuario_autorizado = get_user_model().objects.create_user(
             username=r"control.local\gabriel.oliveira",
             password="senha-teste",
         )
         usuario_autorizado.groups.add(self.grupo_financeiro)
+        PoliticaValor.objects.create(
+            chave="REFEICAO_INTERIOR",
+            tipo_politica=PoliticaValor.TipoPolitica.REFEICAO,
+            tipo_despesa=TipoDespesa.ALIMENTACAO,
+            tipo_localidade="interior",
+            descricao="Refeicao Interior",
+            limite_valor=Decimal("80.00"),
+            vigencia_inicio=date(2026, 1, 1),
+            ativo=True,
+        )
         relatorio = self.criar_relatorio("RT-2026-REABRIR")
         relatorio.status = StatusRelatorio.APROVADO
         relatorio.aprovado_em = timezone.now()
         relatorio.aprovado_por = self.usuario_financeiro
-        relatorio.save(update_fields=["status", "aprovado_em", "aprovado_por"])
+        relatorio.tecnico_reembolso = self.tecnico
+        relatorio.save(
+            update_fields=[
+                "status",
+                "aprovado_em",
+                "aprovado_por",
+                "tecnico_reembolso",
+            ]
+        )
         despesa = ItemDespesa.objects.create(
             relatorio=relatorio,
             ordem=0,
             data="2026-05-02",
             tipo="alimentacao",
             descricao="Almoco aprovado",
-            valor=Decimal("50.00"),
-            valor_aprovado=Decimal("45.00"),
+            valor=Decimal("90.20"),
+            valor_aprovado=Decimal("90.20"),
             quem_pagou="tecnico",
         )
         snapshot = criar_snapshot_financeiro(relatorio, self.usuario_financeiro)
+        snapshot_pk = snapshot.pk
         checksum = snapshot.checksum
         aprovado_em = relatorio.aprovado_em
         aprovado_por_id = relatorio.aprovado_por_id
         totais_antes = {
-            "total_aprovado": relatorio.total_aprovado,
             "total_solicitado": relatorio.total_solicitado,
             "despesas": relatorio.despesas.count(),
             "trechos": relatorio.trechos.count(),
-            "valor_aprovado": despesa.valor_aprovado,
         }
 
         self.client.force_login(usuario_autorizado)
@@ -1543,11 +1560,16 @@ class RelatorioTecnicoFlowTests(TestCase):
         self.assertEqual(relatorio.aprovado_em, aprovado_em)
         self.assertEqual(relatorio.aprovado_por_id, aprovado_por_id)
         self.assertEqual(snapshot.checksum, checksum)
-        self.assertEqual(relatorio.total_aprovado, totais_antes["total_aprovado"])
         self.assertEqual(relatorio.total_solicitado, totais_antes["total_solicitado"])
         self.assertEqual(relatorio.despesas.count(), totais_antes["despesas"])
         self.assertEqual(relatorio.trechos.count(), totais_antes["trechos"])
-        self.assertEqual(despesa.valor_aprovado, totais_antes["valor_aprovado"])
+        self.assertEqual(despesa.valor_politica, Decimal("80.00"))
+        self.assertEqual(despesa.valor_aprovado, Decimal("80.00"))
+        self.assertEqual(despesa.valor_final, Decimal("80.00"))
+        self.assertEqual(relatorio.total_aprovado, Decimal("80.00"))
+        rateio = despesa.rateios.get(cliente=self.cliente)
+        self.assertEqual(rateio.valor_original, Decimal("90.20"))
+        self.assertEqual(rateio.valor_final, Decimal("80.00"))
         self.assertTrue(
             HistoricoRelatorio.objects.filter(
                 relatorio=relatorio,
@@ -1555,6 +1577,15 @@ class RelatorioTecnicoFlowTests(TestCase):
                 tipo_evento=TipoEventoHistorico.REABERTO,
             ).exists()
         )
+
+        aprovar_relatorio(relatorio.pk, self.usuario_financeiro, post_data={})
+        relatorio.refresh_from_db()
+        snapshot.refresh_from_db()
+        self.assertEqual(relatorio.status, StatusRelatorio.APROVADO)
+        self.assertEqual(snapshot.pk, snapshot_pk)
+        self.assertNotEqual(snapshot.checksum, checksum)
+        self.assertEqual(snapshot.total_aprovado, Decimal("80.00"))
+        self.assertEqual(snapshot.payload["despesas"][0]["valor_final"], "80.00")
 
     def test_usuario_nao_autorizado_nao_reabre_relatorio_aprovado(self):
         relatorio = self.criar_relatorio("RT-2026-REABRIR-NEGADO")
