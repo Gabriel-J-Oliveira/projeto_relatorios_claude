@@ -258,7 +258,6 @@
 
   function updateMonitor(form) {
     const maxTotalMb = Number(form.dataset.uploadMaxTotalMb || "1024") || 1024;
-    const existingBytes = Number(form.dataset.uploadExistingBytes || "0") || 0;
     const maxTotalBytes = maxTotalMb * BYTES_IN_MB;
     const { items, errors } = collectFiles(form);
     syncExpectedManifest(form, items);
@@ -280,7 +279,7 @@
       (sum, item) => sum + Number(item.dataset.uploadPersistedBytes || 0),
       0
     );
-    const persistedBytes = persistedElements.length ? persistedBytesFromDom : existingBytes;
+    const persistedBytes = persistedBytesFromDom;
     const totalBytes = persistedBytes + selectedBytes;
     const percent = maxTotalBytes ? Math.min(100, (totalBytes / maxTotalBytes) * 100) : 0;
 
