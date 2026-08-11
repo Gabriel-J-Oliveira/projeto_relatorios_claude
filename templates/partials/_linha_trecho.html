@@ -132,11 +132,11 @@
       {% if form.valor_km.errors %}{{ form.valor_km.errors.0 }}{% endif %}
     </div>
   </td>
-  <td class="p-1 px-3 pt-4 fw-bold small total-trecho text-start">
+  <td class="p-1 pe-2 pt-4 fw-bold small total-trecho text-start">
     R$ 0,00
     <div class="text-warning fw-normal small aviso-km-multicliente"></div>
   </td>
-  <td class="p-1 pt-3" data-tour="km-clientes">
+  <td class="p-1 pe-2 pt-3" data-tour="km-clientes">
     <input type="text"
            name="trechos-{{ idx }}-observacao"
            id="id_trechos-{{ idx }}-observacao"
@@ -153,31 +153,31 @@
            name="trechos-{{ idx }}-clientes"
            id="id_trechos-{{ idx }}-clientes"
            value="{% if form.clientes_value_set %}{{ form.clientes_value }}{% elif form.instance.pk %}{% for vinculo in form.instance.clientes_vinculados.all %}{{ vinculo.cliente_id }}{% if not forloop.last %},{% endif %}{% endfor %}{% endif %}">
-    <button type="button"
-            class="btn btn-sm btn-outline-secondary w-100 clientes-item-btn"
-            data-bs-toggle="modal"
-            data-bs-target="#modalSelecionarClientes"
-            data-client-selector="item"
-            data-client-target="id_trechos-{{ idx }}-clientes">
-      <i class="bi bi-people me-1"></i>
-      <span class="clientes-item-label">Clientes envolvidos</span>
-      <span class="badge rounded-pill text-bg-secondary ms-1 clientes-item-count">0</span>
-    </button>
-    <div class="invalid-feedback d-block small erro-clientes-item"></div>
-  </td>
-  <td class="p-1 text-center pe-3 pt-3">
-    <div class="d-grid gap-1">
+    <div class="d-flex align-items-stretch gap-1">
       <button type="button"
-              class="btn btn-sm btn-outline-primary btn-ida-volta"
+              class="btn btn-sm btn-outline-secondary flex-grow-1 clientes-item-btn"
+              data-bs-toggle="modal"
+              data-bs-target="#modalSelecionarClientes"
+              data-client-selector="item"
+              data-client-target="id_trechos-{{ idx }}-clientes">
+        <i class="bi bi-people me-1"></i>
+        <span class="clientes-item-label">Clientes</span>
+        <span class="badge rounded-pill text-bg-secondary ms-1 clientes-item-count">0</span>
+      </button>
+      <button type="button"
+              class="btn btn-sm btn-outline-primary flex-shrink-0 btn-ida-volta"
               title="Criar trecho de volta invertendo origem e destino">
         <i class="bi bi-arrow-left-right me-1"></i>Ida e volta
       </button>
-      <button type="button"
-              class="btn btn-sm btn-outline-danger"
-              onclick="removerLinha(this)">
-        <i class="bi bi-trash3 me-1"></i>Remover
-      </button>
     </div>
+    <div class="invalid-feedback d-block small erro-clientes-item"></div>
+  </td>
+  <td class="p-1 text-center pe-3 pt-3">
+    <button type="button"
+            class="btn btn-sm btn-outline-danger w-100"
+            onclick="removerLinha(this)">
+      <i class="bi bi-trash3 me-1"></i>Remover
+    </button>
   </td>
 </tr>
 
