@@ -38,6 +38,7 @@ class ClienteResumoFinanceiroDTO:
     itens_rejeitados: int = 0
     status_financeiro: str = "Sem itens"
     tem_divergencia: bool = False
+    tem_politica_aplicada: bool = False
 
 
 def _clientes_despesa(despesa, clientes_relatorio_ids):
@@ -125,6 +126,8 @@ def resumo_financeiro_por_cliente(relatorio):
                 cliente_id,
                 Decimal("0.00") if despesa.rejeitado or despesa.status_financeiro == "rejeitado" else solicitados.get(cliente_id, Decimal("0.00")),
             )
+            if despesa.politica_aplicada_automaticamente:
+                resumo.tem_politica_aplicada = True
             if despesa.rejeitado or despesa.status_financeiro == "rejeitado":
                 resumo.itens_rejeitados += 1
 

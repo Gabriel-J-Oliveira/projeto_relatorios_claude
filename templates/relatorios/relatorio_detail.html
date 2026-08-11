@@ -394,13 +394,28 @@
                          {% if not superadmin_django %}{% if not pode_atuar_financeiro or relatorio.status == 'aprovado' or relatorio.status == 'rejeitado' or d.rejeitado or d.status_financeiro == 'rejeitado' %}disabled{% endif %}{% endif %}>
                   <div class="small text-muted mt-1">Final: <span class="total-aprovado-despesa-linha">R$ {{ d.valor_final|floatformat:2 }}</span></div>
                   {% if d.valor_politica %}
-                  <button type="button"
-                          class="btn btn-link btn-sm p-0 mt-1 aplicar-politica-despesa"
-                          data-target="despesa_{{ d.pk }}_valor_aprovado"
-                          data-valor-politica="{{ d.valor_politica }}"
-                          {% if not pode_atuar_financeiro or relatorio.status == 'aprovado' or relatorio.status == 'rejeitado' or d.rejeitado or d.status_financeiro == 'rejeitado' %}disabled{% endif %}>
-                    Aplicar politica
-                  </button>
+                    <div class="alert alert-warning py-1 px-2 mt-2 mb-0 small politica-aplicada-info js-politica-automatica {% if not d.politica_aplicada_automaticamente %}d-none{% endif %}">
+                      <div class="fw-semibold">
+                        <i class="bi bi-info-circle me-1"></i>Politica aplicada automaticamente
+                      </div>
+                      <div>
+                        {% if d.valor_politica_diaria %}
+                          R$ {{ d.valor_politica_diaria|floatformat:2 }} x {{ d.quantidade_tecnicos_participantes }} tecnico{{ d.quantidade_tecnicos_participantes|pluralize }}{% if d.tipo == "hospedagem" and d.quantidade_diarias_hospedagem %} x {{ d.quantidade_diarias_hospedagem }} diaria{{ d.quantidade_diarias_hospedagem|pluralize }}{% endif %} = R$ {{ d.valor_politica|floatformat:2 }}
+                        {% else %}
+                          Limite: R$ {{ d.valor_politica|floatformat:2 }}
+                        {% endif %}
+                      </div>
+                    </div>
+                    <div class="alert alert-info py-1 px-2 mt-2 mb-0 small politica-aplicada-info js-politica-manual {% if not d.politica_alterada_manualmente %}d-none{% endif %}">
+                      <div class="fw-semibold">
+                        <i class="bi bi-pencil-square me-1"></i>Valor aprovado alterado manualmente
+                      </div>
+                      <div>Limite da politica: R$ {{ d.valor_politica|floatformat:2 }}</div>
+                    </div>
+                    <div class="alert alert-warning py-1 px-2 mt-2 mb-0 small politica-aplicada-info js-politica-acima {% if d.politica_aplicada_automaticamente or d.politica_alterada_manualmente or not d.acima_politica %}d-none{% endif %}">
+                      <div class="fw-semibold">Valor acima da politica vigente</div>
+                      <div>Limite: R$ {{ d.valor_politica|floatformat:2 }}</div>
+                    </div>
                   {% endif %}
                 </td>
                 <td class="text-center">
@@ -498,9 +513,18 @@
                       <span class="text-muted">Politica</span>
                       {% if d.valor_politica %}
                       <div class="{% if d.acima_politica %}alert alert-warning py-1 px-2 mb-0{% else %}fw-semibold{% endif %}">
-                        R$ {{ d.valor_politica|floatformat:2 }} / {{ d.politica_localidade_label }}
+                        <div class="fw-semibold">{{ d.politica_localidade_label }}</div>
+                        {% if d.valor_politica_diaria %}
+                        <div>R$ {{ d.valor_politica_diaria|floatformat:2 }} x {{ d.quantidade_tecnicos_participantes }} tecnico{{ d.quantidade_tecnicos_participantes|pluralize }}{% if d.tipo == "hospedagem" and d.quantidade_diarias_hospedagem %} x {{ d.quantidade_diarias_hospedagem }} diaria{{ d.quantidade_diarias_hospedagem|pluralize }}{% endif %}</div>
+                        {% endif %}
+                        <div>Limite: R$ {{ d.valor_politica|floatformat:2 }}</div>
                         {% if d.tipo == "hospedagem" and d.quantidade_diarias_hospedagem %}
                         <div class="small">{{ d.quantidade_diarias_hospedagem }} diária{{ d.quantidade_diarias_hospedagem|pluralize }} considerada{{ d.quantidade_diarias_hospedagem|pluralize }}</div>
+                        {% endif %}
+                        {% if d.politica_aplicada_automaticamente %}
+                        <div class="small fw-semibold text-warning-emphasis">Valor limitado automaticamente.</div>
+                        {% elif d.politica_alterada_manualmente %}
+                        <div class="small fw-semibold text-info-emphasis">Valor aprovado editado pelo financeiro.</div>
                         {% endif %}
                         {% if d.acima_politica %}
                         <div class="small">Excesso: R$ {{ d.excesso_politica|floatformat:2 }}</div>
@@ -933,6 +957,13 @@
         </div>
         {% endif %}
 
+        {% if relatorio.tem_politica_aplicada_automaticamente %}
+        <div class="alert alert-info border-0 shadow-sm mt-3 mb-0 py-2 small">
+          <i class="bi bi-info-circle me-1"></i>
+          Ha valores aprovados limitados automaticamente conforme as politicas financeiras aplicaveis.
+        </div>
+        {% endif %}
+
         <div class="mt-3 p-3 rounded-3
              {% if relatorio.total_a_reembolsar >= 0 %}bg-success-subtle{% else %}bg-danger-subtle{% endif %}">
           <div class="d-flex justify-content-between align-items-center">
@@ -1066,6 +1097,10 @@
                   </tr>
                 </tbody>
               </table>
+            </div>
+            <div class="alert alert-info border-0 py-2 px-2 mt-2 mb-0 small js-politica-cliente-info {% if not resumo.tem_politica_aplicada %}d-none{% endif %}">
+              <i class="bi bi-info-circle me-1"></i>
+              Valores acima das politicas aplicaveis foram automaticamente limitados conforme a quantidade de tecnicos participantes.
             </div>
           </div>
           {% endfor %}
@@ -1809,8 +1844,8 @@
         totalDespesas += valor;
         if (input.dataset.quemPagou === "tecnico") {
           totalDespesasReembolsaveis += valor;
-          if (!ativo) valorRemovidoReembolso += original;
         }
+        valorRemovidoReembolso += Math.max(original - valor, 0);
         const linha = input.closest("tr");
         const itemId = linha?.dataset.itemId;
         const modalRateio = itemId ? document.getElementById(`modal-rateio-despesa-${itemId}`) : null;
@@ -1931,6 +1966,15 @@
         const valorFinal = parseMoney(item.valor_final);
         linha.querySelectorAll(".total-aprovado-despesa-linha").forEach(el => el.textContent = formatMoney(valorFinal));
         linha.nextElementSibling?.querySelectorAll(".total-aprovado-despesa-linha").forEach(el => el.textContent = formatMoney(valorFinal));
+        const politicaAutomatica = Boolean(item.politica_aplicada_automaticamente);
+        const politicaManual = Boolean(item.politica_alterada_manualmente);
+        const politicaAcima = Boolean(item.acima_politica) && !politicaAutomatica && !politicaManual;
+        [linha, linha.nextElementSibling].forEach(function (container) {
+          if (!container) return;
+          container.querySelectorAll(".js-politica-automatica").forEach(el => el.classList.toggle("d-none", !politicaAutomatica));
+          container.querySelectorAll(".js-politica-manual").forEach(el => el.classList.toggle("d-none", !politicaManual));
+          container.querySelectorAll(".js-politica-acima").forEach(el => el.classList.toggle("d-none", !politicaAcima));
+        });
         const input = linha.querySelector(".campo-aprovado-despesa");
         if (input) input.dataset.valorFinalOriginal = item.valor_final || "0";
         const modal = document.getElementById(`modal-rateio-despesa-${item.id}`);
@@ -2003,6 +2047,9 @@
         });
         const diff = slide.querySelector('[data-cliente-field="diferenca_removida"]');
         if (diff) diff.classList.toggle("text-danger", parseMoney(cliente.diferenca_removida) > 0);
+        slide.querySelectorAll(".js-politica-cliente-info").forEach(function (info) {
+          info.classList.toggle("d-none", !cliente.tem_politica_aplicada);
+        });
         const excessoReducao = slide.querySelector('[data-cliente-field="excesso_reducao_km"]');
         if (excessoReducao) {
           const valor = parseMoney(cliente.excesso_reducao_km);
@@ -2075,16 +2122,6 @@
         salvarValoresFinanceiros();
       });
       input.addEventListener("blur", function () {
-        formatarDecimalCampo(input, 2);
-        atualizarTotaisFinanceiros();
-        salvarValoresFinanceiros();
-      });
-    });
-    document.querySelectorAll(".aplicar-politica-despesa").forEach(function (button) {
-      button.addEventListener("click", function () {
-        const input = document.querySelector(`[name="${button.dataset.target}"]`);
-        if (!input || button.disabled) return;
-        input.value = String(button.dataset.valorPolitica || "").replace(".", ",");
         formatarDecimalCampo(input, 2);
         atualizarTotaisFinanceiros();
         salvarValoresFinanceiros();

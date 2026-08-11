@@ -64,6 +64,7 @@ from .services.clientes_relatorio_service import resolver_cliente_empresa_grupo
 from .services.financeiro_validator import validar_integridade_financeira_relatorio
 from .services.km_financeiro_service import calcular_km_financeiro
 from .services.periodo_despesa_service import calcular_diarias_periodo
+from .services.politica_aprovacao_service import aplicar_politica_valor_aprovado_inicial
 from .services.snapshot_service import criar_snapshot_financeiro
 from .services.tecnicos_despesa_service import (
     remover_tecnicos_despesas_fora_relatorio,
@@ -273,6 +274,18 @@ class DespesaTecnicoParticipanteTests(TestCase):
             valor=Decimal("420.00"),
         )
 
+    def criar_politica_refeicao_capital(self, valor="80.00"):
+        return PoliticaValor.objects.create(
+            chave="REFEICAO_CAPITAL",
+            tipo_politica=PoliticaValor.TipoPolitica.REFEICAO,
+            tipo_despesa=TipoDespesa.ALIMENTACAO,
+            tipo_localidade="capital",
+            descricao="Refeicao Capital",
+            limite_valor=Decimal(valor),
+            vigencia_inicio=date(2026, 1, 1),
+            ativo=True,
+        )
+
     def test_sync_permite_multiplos_tecnicos_do_relatorio(self):
         erros = sync_tecnicos_despesa(
             self.despesa,
@@ -310,6 +323,152 @@ class DespesaTecnicoParticipanteTests(TestCase):
         self.assertEqual(self.despesa.valor_politica, Decimal("160.00"))
         self.assertEqual(self.despesa.excesso_politica, Decimal("0.00"))
         self.assertFalse(self.despesa.acima_politica)
+
+    def test_aprovado_inicial_abaixo_da_politica_permanece_integral(self):
+        self.criar_politica_refeicao_capital()
+        self.despesa.valor = Decimal("100.00")
+        self.despesa.save(update_fields=["valor"])
+        sync_tecnicos_despesa(
+            self.despesa,
+            [self.tecnico_a.pk, self.tecnico_b.pk],
+            self.usuario,
+        )
+
+        alterou = aplicar_politica_valor_aprovado_inicial(self.despesa)
+        self.despesa.refresh_from_db()
+
+        self.assertFalse(alterou)
+        self.assertEqual(self.despesa.valor_politica, Decimal("160.00"))
+        self.assertIsNone(self.despesa.valor_aprovado)
+        self.assertEqual(self.despesa.valor_final, Decimal("100.00"))
+
+    def test_aprovado_inicial_no_limite_permanece_integral(self):
+        self.criar_politica_refeicao_capital()
+        self.despesa.valor = Decimal("160.00")
+        self.despesa.save(update_fields=["valor"])
+        sync_tecnicos_despesa(
+            self.despesa,
+            [self.tecnico_a.pk, self.tecnico_b.pk],
+            self.usuario,
+        )
+
+        alterou = aplicar_politica_valor_aprovado_inicial(
+            self.despesa,
+            preservar_manual=True,
+        )
+        self.despesa.refresh_from_db()
+
+        self.assertFalse(alterou)
+        self.assertEqual(self.despesa.valor_politica, Decimal("160.00"))
+        self.assertIsNone(self.despesa.valor_aprovado)
+        self.assertEqual(self.despesa.valor_final, Decimal("160.00"))
+
+    def test_aprovado_inicial_acima_da_politica_persiste_limite(self):
+        self.criar_politica_refeicao_capital()
+        self.despesa.valor = Decimal("200.00")
+        self.despesa.save(update_fields=["valor"])
+        sync_tecnicos_despesa(
+            self.despesa,
+            [self.tecnico_a.pk, self.tecnico_b.pk],
+            self.usuario,
+        )
+
+        alterou = aplicar_politica_valor_aprovado_inicial(self.despesa)
+        self.despesa.refresh_from_db()
+
+        self.assertTrue(alterou)
+        self.assertEqual(self.despesa.valor_politica, Decimal("160.00"))
+        self.assertEqual(self.despesa.valor_aprovado, Decimal("160.00"))
+        self.assertEqual(self.despesa.valor_final, Decimal("160.00"))
+
+    def test_aprovado_inicial_considera_muitos_tecnicos_participantes(self):
+        self.criar_politica_refeicao_capital()
+        tecnicos = [self.tecnico_a, self.tecnico_b]
+        for indice in range(6):
+            tecnico = Tecnico.objects.create(nome=f"Tecnico Extra {indice}")
+            RelatorioTecnicoEquipe.objects.create(
+                relatorio=self.relatorio,
+                tecnico=tecnico,
+            )
+            tecnicos.append(tecnico)
+        self.despesa.valor = Decimal("800.00")
+        self.despesa.save(update_fields=["valor"])
+        sync_tecnicos_despesa(
+            self.despesa,
+            [tecnico.pk for tecnico in tecnicos],
+            self.usuario,
+        )
+
+        aplicar_politica_valor_aprovado_inicial(self.despesa)
+        self.despesa.refresh_from_db()
+
+        self.assertEqual(self.despesa.quantidade_tecnicos_participantes, 8)
+        self.assertEqual(self.despesa.valor_politica, Decimal("640.00"))
+        self.assertEqual(self.despesa.valor_aprovado, Decimal("640.00"))
+
+    def test_aprovado_inicial_usa_tecnicos_da_propria_despesa(self):
+        self.criar_politica_refeicao_capital()
+        self.despesa.valor = Decimal("100.00")
+        self.despesa.save(update_fields=["valor"])
+        outra_despesa = ItemDespesa.objects.create(
+            relatorio=self.relatorio,
+            data=date(2026, 8, 1),
+            tipo=TipoDespesa.ALIMENTACAO,
+            descricao="Jantar individual",
+            valor=Decimal("100.00"),
+        )
+        sync_tecnicos_despesa(
+            self.despesa,
+            [self.tecnico_a.pk, self.tecnico_b.pk],
+            self.usuario,
+        )
+        sync_tecnicos_despesa(outra_despesa, [self.tecnico_a.pk], self.usuario)
+
+        aplicar_politica_valor_aprovado_inicial(self.despesa)
+        aplicar_politica_valor_aprovado_inicial(outra_despesa)
+        self.despesa.refresh_from_db()
+        outra_despesa.refresh_from_db()
+
+        self.assertIsNone(self.despesa.valor_aprovado)
+        self.assertEqual(self.despesa.valor_politica, Decimal("160.00"))
+        self.assertEqual(outra_despesa.valor_aprovado, Decimal("80.00"))
+        self.assertEqual(outra_despesa.valor_politica, Decimal("80.00"))
+
+    def test_aprovado_inicial_sem_politica_mantem_integral(self):
+        self.despesa.tipo = TipoDespesa.PEDAGIO
+        self.despesa.valor = Decimal("200.00")
+        self.despesa.save(update_fields=["tipo", "valor"])
+        sync_tecnicos_despesa(
+            self.despesa,
+            [self.tecnico_a.pk, self.tecnico_b.pk],
+            self.usuario,
+        )
+
+        alterou = aplicar_politica_valor_aprovado_inicial(self.despesa)
+        self.despesa.refresh_from_db()
+
+        self.assertFalse(alterou)
+        self.assertIsNone(self.despesa.valor_politica)
+        self.assertIsNone(self.despesa.valor_aprovado)
+        self.assertEqual(self.despesa.valor_final, Decimal("200.00"))
+
+    def test_aprovado_inicial_preserva_edicao_manual_do_financeiro(self):
+        self.criar_politica_refeicao_capital()
+        self.despesa.valor = Decimal("200.00")
+        self.despesa.valor_aprovado = Decimal("170.00")
+        self.despesa.save(update_fields=["valor", "valor_aprovado"])
+        sync_tecnicos_despesa(
+            self.despesa,
+            [self.tecnico_a.pk, self.tecnico_b.pk],
+            self.usuario,
+        )
+
+        alterou = aplicar_politica_valor_aprovado_inicial(self.despesa)
+        self.despesa.refresh_from_db()
+
+        self.assertFalse(alterou)
+        self.assertEqual(self.despesa.valor_politica, Decimal("160.00"))
+        self.assertEqual(self.despesa.valor_aprovado, Decimal("170.00"))
 
     def test_sync_bloqueia_tecnico_fora_do_relatorio(self):
         erros = sync_tecnicos_despesa(
@@ -1689,7 +1848,7 @@ class RelatorioTecnicoFlowTests(TestCase):
         self.assertEqual(relatorio.total_aprovado_despesas, Decimal("80.00"))
         self.assertEqual(relatorio.total_aprovado_km, Decimal("135.00"))
         self.assertEqual(relatorio.total_aprovado, Decimal("215.00"))
-        self.assertEqual(relatorio.valor_removido_reembolso, Decimal("117.50"))
+        self.assertEqual(relatorio.valor_removido_reembolso, Decimal("137.50"))
 
     def test_resumo_financeiro_km_usa_reembolso_tecnico_e_separa_cobranca_cliente(self):
         self.cliente.valor_km = Decimal("1.85")
@@ -1731,6 +1890,56 @@ class RelatorioTecnicoFlowTests(TestCase):
         self.assertEqual(resumo_clientes["clientes"][0].valor_km_reembolso_tecnico, Decimal("140.40"))
         self.assertEqual(resumo_clientes["clientes"][0].total_solicitado, Decimal("801.05"))
         self.assertEqual(resumo_clientes["clientes"][0].total_aprovado, Decimal("801.05"))
+
+    def test_politica_automatica_reflete_reducao_no_resumo_financeiro(self):
+        PoliticaValor.objects.create(
+            chave="REFEICAO_CAPITAL",
+            tipo_politica=PoliticaValor.TipoPolitica.REFEICAO,
+            tipo_despesa=TipoDespesa.ALIMENTACAO,
+            tipo_localidade="capital",
+            descricao="Refeicao Capital",
+            limite_valor=Decimal("80.00"),
+            vigencia_inicio=date(2026, 1, 1),
+            ativo=True,
+        )
+        tecnico_extra = Tecnico.objects.create(
+            nome="Tecnico Extra",
+            email="extra@example.com",
+        )
+        relatorio = self.criar_relatorio("RT-2026-POLITICA-RESUMO")
+        relatorio.tipo_localidade = "capital"
+        relatorio.save(update_fields=["tipo_localidade"])
+        despesa = ItemDespesa.objects.create(
+            relatorio=relatorio,
+            ordem=0,
+            data="2026-05-02",
+            tipo=TipoDespesa.ALIMENTACAO,
+            descricao="Almoco equipe",
+            valor=Decimal("200.00"),
+            quem_pagou="tecnico",
+        )
+        DespesaTecnico.objects.create(despesa=despesa, tecnico=self.tecnico)
+        DespesaTecnico.objects.create(despesa=despesa, tecnico=tecnico_extra)
+
+        aplicar_politica_valor_aprovado_inicial(despesa)
+        despesa.refresh_from_db()
+
+        self.assertEqual(despesa.valor_politica, Decimal("160.00"))
+        self.assertEqual(despesa.valor_aprovado, Decimal("160.00"))
+        self.assertTrue(despesa.politica_aplicada_automaticamente)
+        self.assertFalse(despesa.politica_alterada_manualmente)
+        self.assertEqual(relatorio.total_despesas_reembolsaveis, Decimal("160.00"))
+        self.assertEqual(relatorio.valor_removido_reembolso, Decimal("40.00"))
+        resumo_clientes = resumo_financeiro_por_cliente(relatorio)
+        self.assertEqual(resumo_clientes["clientes"][0].total_solicitado, Decimal("200.00"))
+        self.assertEqual(resumo_clientes["clientes"][0].total_aprovado, Decimal("160.00"))
+        self.assertEqual(resumo_clientes["clientes"][0].diferenca_removida, Decimal("40.00"))
+        self.assertTrue(resumo_clientes["clientes"][0].tem_politica_aplicada)
+
+        despesa.valor_aprovado = Decimal("150.00")
+        despesa.save(update_fields=["valor_aprovado"])
+        self.assertFalse(despesa.politica_aplicada_automaticamente)
+        self.assertTrue(despesa.politica_alterada_manualmente)
 
     def test_cobranca_cliente_menor_que_reembolso_nao_gera_valor_removido(self):
         self.cliente.valor_km = Decimal("1.00")

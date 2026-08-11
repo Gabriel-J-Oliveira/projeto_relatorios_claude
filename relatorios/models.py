@@ -1389,8 +1389,10 @@ class RelatorioTecnico(models.Model):
     def diferenca_removida(self):
         total = Decimal("0.00")
         for despesa in self.despesas.all():
-            if despesa.rejeitado or despesa.status_financeiro == StatusFinanceiroItem.REJEITADO:
-                total += despesa.valor
+            total += max(
+                _valor_monetario(despesa.valor) - _valor_monetario(despesa.valor_final),
+                Decimal("0.00"),
+            )
         for trecho in self.trechos.all():
             if trecho.rejeitado or trecho.status_financeiro == StatusFinanceiroItem.REJEITADO:
                 total += trecho.valor_reembolso_tecnico_solicitado
@@ -1399,6 +1401,13 @@ class RelatorioTecnico(models.Model):
     @property
     def valor_removido_reembolso(self):
         return self.diferenca_removida
+
+    @property
+    def tem_politica_aplicada_automaticamente(self):
+        return any(
+            despesa.politica_aplicada_automaticamente
+            for despesa in self.despesas.all()
+        )
 
     @property
     def total_a_reembolsar(self):
@@ -2067,6 +2076,32 @@ class ItemDespesa(models.Model):
             and self.status_financeiro == StatusFinanceiroItem.APROVADO
             and self.valor_aprovado is not None
             and self.valor_aprovado != self.valor
+        )
+
+    @property
+    def politica_aplicada_automaticamente(self):
+        limite = self.valor_politica
+        if limite is None:
+            return False
+        return (
+            not self.rejeitado
+            and self.status_financeiro == StatusFinanceiroItem.APROVADO
+            and self.valor_aprovado is not None
+            and _valor_monetario(self.valor_aprovado) == _valor_monetario(limite)
+            and _valor_monetario(self.valor) > _valor_monetario(limite)
+        )
+
+    @property
+    def politica_alterada_manualmente(self):
+        limite = self.valor_politica
+        if limite is None:
+            return False
+        return (
+            not self.rejeitado
+            and self.status_financeiro == StatusFinanceiroItem.APROVADO
+            and self.valor_aprovado is not None
+            and _valor_monetario(self.valor) > _valor_monetario(limite)
+            and _valor_monetario(self.valor_aprovado) != _valor_monetario(limite)
         )
 
     @property

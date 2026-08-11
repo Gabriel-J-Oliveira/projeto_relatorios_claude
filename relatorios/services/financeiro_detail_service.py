@@ -46,6 +46,7 @@ def carregar_relatorio_financeiro(relatorio_id):
                 queryset=ItemDespesa.objects.prefetch_related(
                     "clientes_vinculados__cliente",
                     "rateios__cliente",
+                    "tecnicos_vinculados__tecnico",
                 ).order_by("ordem", "data", "tipo"),
             ),
             Prefetch(
@@ -72,6 +73,15 @@ def _serializar_despesa(despesa):
         "valor_politica": _str_money(despesa.valor_politica)
         if despesa.valor_politica is not None
         else "",
+        "valor_politica_diaria": _str_money(despesa.valor_politica_diaria)
+        if despesa.valor_politica_diaria is not None
+        else "",
+        "politica_descricao": despesa.politica_localidade_label,
+        "politica_aplicada_automaticamente": bool(
+            despesa.politica_aplicada_automaticamente
+        ),
+        "politica_alterada_manualmente": bool(despesa.politica_alterada_manualmente),
+        "quantidade_tecnicos_participantes": despesa.quantidade_tecnicos_participantes,
         "excesso_politica": _str_money(despesa.excesso_politica),
         "acima_politica": bool(despesa.acima_politica),
         "rateios": [
@@ -140,6 +150,7 @@ def _serializar_clientes(relatorio):
                 "itens_rejeitados": resumo.itens_rejeitados,
                 "status_financeiro": resumo.status_financeiro,
                 "tem_divergencia": resumo.tem_divergencia,
+                "tem_politica_aplicada": resumo.tem_politica_aplicada,
             }
             for resumo in distribuicao["clientes"]
         ],

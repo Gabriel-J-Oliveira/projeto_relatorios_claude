@@ -139,6 +139,7 @@ from .services.pdf_cliente_service import (
 from .services.pdf_interno_service import montar_contexto_pdf_interno
 from .services.maps_service import MapsServiceError, buscar_endereco, calcular_rota
 from .services.dashboard_service import get_dashboard_context, get_dashboard_data
+from .services.politica_aprovacao_service import aplicar_politica_valor_aprovado_inicial
 from .services.help_center_service import (
     contexto_central_ajuda,
     materializar_artigo_arquivo,
@@ -3377,6 +3378,20 @@ def relatorio_form_view(request, pk=None):
                             )
                             if erros_tecnicos_item:
                                 raise WorkflowError(erros_tecnicos_item)
+                            if relatorio.status in {
+                                StatusRelatorio.RASCUNHO,
+                                StatusRelatorio.AJUSTE,
+                            }:
+                                politica_alterou_aprovado = (
+                                    aplicar_politica_valor_aprovado_inicial(
+                                        item,
+                                        preservar_manual=(
+                                            relatorio.status != StatusRelatorio.RASCUNHO
+                                        ),
+                                    )
+                                )
+                                if politica_alterou_aprovado:
+                                    garantir_rateio_despesa(item)
                         for f in fs_desp.deleted_forms:
                             if f.instance.pk:
                                 f.instance.delete()
