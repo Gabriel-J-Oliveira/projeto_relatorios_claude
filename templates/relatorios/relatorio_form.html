@@ -1345,6 +1345,17 @@
     .comprovante-item .btn-link {
       line-height: 1;
     }
+    .upload-selected-item {
+      min-width: 0;
+    }
+    .upload-selected-remove {
+      line-height: 1;
+      opacity: .9;
+    }
+    .upload-selected-remove:hover,
+    .upload-selected-remove:focus {
+      opacity: 1;
+    }
     .upload-largest-item {
       border: 1px solid var(--bs-border-color);
       border-radius: .5rem;
@@ -1427,10 +1438,10 @@
           {{ motivos_clientes_relatorio|json_script:"motivos-clientes-relatorio-data" }}
           <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
           <script src="https://cdn.jsdelivr.net/npm/driver.js@latest/dist/driver.js.iife.js"></script>
-          <script defer src="{% static 'js/relatorio_autosave.js' %}"></script>
-          <script defer src="{% static 'js/relatorio_upload_monitor.js' %}"></script>
-          <script defer src="{% static 'js/relatorio_form_tour.js' %}"></script>
-          <script defer src="{% static 'js/relatorio_novidades_tour.js' %}"></script>
+          <script defer src="{% static 'js/relatorio_autosave.js' %}?v={{ static_version|default:'20260807' }}"></script>
+          <script defer src="{% static 'js/relatorio_upload_monitor.js' %}?v={{ static_version|default:'20260807' }}"></script>
+          <script defer src="{% static 'js/relatorio_form_tour.js' %}?v={{ static_version|default:'20260807' }}"></script>
+          <script defer src="{% static 'js/relatorio_novidades_tour.js' %}?v={{ static_version|default:'20260807' }}"></script>
           <script>
   /* ================================================================
     CONTROLE DO FORMULARIO - Single Save sem HTMX
@@ -1864,7 +1875,18 @@
       if (count) count.textContent = ids.length;
       if (label) label.textContent = "Técnicos";
       if (erro) erro.textContent = "";
+      const linha = input.closest(".linha-despesa");
+      if (linha) {
+        const info = linha.querySelector(".politica-despesa-info");
+        if (info) info.dataset.policyKey = "";
+        atualizarPoliticaDespesa(linha);
+      }
     });
+  }
+
+  function quantidadeTecnicosDespesa(linha) {
+    const input = linha?.querySelector(".tecnicos-item-input");
+    return Math.max(idsFromValue(input?.value).length || 1, 1);
   }
 
   function trechoTemMultiplosClientes(linha) {
@@ -2187,7 +2209,8 @@
     const municipioId = document.getElementById("id_municipio_atendimento")?.value || "";
     const tipoLocalidade = document.getElementById("id_tipo_localidade")?.value || "";
     const valor = normalizarNumero(linha.querySelector(".campo-valor-desp")?.value);
-    const chave = `${tipo}|${data}|${tipoLocalidade}|${cidade}|${municipioId}|${descricao}|${valor}|${entradaHospedagem}|${saidaHospedagem}`;
+    const quantidadeTecnicos = quantidadeTecnicosDespesa(linha);
+    const chave = `${tipo}|${data}|${tipoLocalidade}|${cidade}|${municipioId}|${descricao}|${valor}|${entradaHospedagem}|${saidaHospedagem}|${quantidadeTecnicos}`;
     if (info.dataset.policyKey === chave) return;
     info.dataset.policyKey = chave;
 
@@ -2204,6 +2227,7 @@
     url.searchParams.set("municipio_id", municipioId);
     url.searchParams.set("descricao", descricao);
     url.searchParams.set("valor", String(valor));
+    url.searchParams.set("quantidade_tecnicos", String(quantidadeTecnicos));
     if (tipo === "hospedagem") {
       url.searchParams.set("data_inicio_hospedagem", entradaHospedagem);
       url.searchParams.set("data_fim_hospedagem", saidaHospedagem);
@@ -2221,9 +2245,18 @@
       const detalheHospedagem = tipo === "hospedagem" && diarias > 0
         ? ` para ${diarias} diária${diarias === 1 ? "" : "s"}`
         : "";
+      const quantidadeTecnicosPolitica = Number(payload?.data?.quantidade_tecnicos || quantidadeTecnicos);
+      const detalhesLimite = [];
+      if (payload?.data?.politica_por_tecnico && quantidadeTecnicosPolitica > 1) {
+        detalhesLimite.push(`${quantidadeTecnicosPolitica} tecnicos`);
+      }
+      if (tipo === "hospedagem" && diarias > 0) {
+        detalhesLimite.push(`${diarias} diaria${diarias === 1 ? "" : "s"}`);
+      }
+      const detalhePolitica = detalhesLimite.length ? ` para ${detalhesLimite.join(" x ")}` : detalheHospedagem;
       info.textContent = excedeu
-        ? `${payload.data.descricao}: limite${detalheHospedagem} ${formatMoney(limite)}. Excesso: ${formatMoney(valor - limite)}`
-        : `${payload.data.descricao}: limite${detalheHospedagem} ${formatMoney(limite)}`;
+        ? `${payload.data.descricao}: limite${detalhePolitica} ${formatMoney(limite)}. Excesso: ${formatMoney(valor - limite)}`
+        : `${payload.data.descricao}: limite${detalhePolitica} ${formatMoney(limite)}`;
       info.className = excedeu
         ? "small mt-1 politica-despesa-info alert alert-warning py-1 px-2 mb-0"
         : "small mt-1 politica-despesa-info text-muted";

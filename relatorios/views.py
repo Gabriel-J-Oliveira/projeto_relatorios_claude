@@ -2451,7 +2451,11 @@ def politica_despesa_json(request):
             {"success": False, "error": "Data invalida para consultar politica."},
             status=400,
         )
-    from relatorios.services.politica_valor_service import resolver_politica_despesa
+    from relatorios.services.politica_valor_service import (
+        calcular_limite_politica_despesa,
+        despesa_usa_politica_por_tecnico,
+        resolver_politica_despesa,
+    )
 
     politica = resolver_politica_despesa(
         tipo_despesa=tipo,
@@ -2473,7 +2477,11 @@ def politica_despesa_json(request):
         return JsonResponse(
             {"success": True, "data": {"limite": None, "mensagem": "Sem politica definida"}}
         )
-    limite = politica.valor
+    try:
+        quantidade_tecnicos = int(request.GET.get("quantidade_tecnicos") or "1")
+    except (TypeError, ValueError):
+        quantidade_tecnicos = 1
+    quantidade_tecnicos = max(quantidade_tecnicos, 1)
     diarias = 0
     limite_diario = None
     if tipo == TipoDespesa.HOSPEDAGEM:
@@ -2483,8 +2491,12 @@ def politica_despesa_json(request):
         saida = parse_date((request.GET.get("data_fim_hospedagem") or "").strip())
         diarias = calcular_diarias_periodo(entrada, saida)
         limite_diario = politica.valor
-        if diarias > 0:
-            limite = (politica.valor * diarias).quantize(Decimal("0.01"))
+    limite = calcular_limite_politica_despesa(
+        politica,
+        tipo_despesa=tipo,
+        quantidade_tecnicos=quantidade_tecnicos,
+        diarias=diarias,
+    )
     valor_informado = Decimal(str(request.GET.get("valor") or "0").replace(",", ".") or "0")
     excesso = max(valor_informado - limite, Decimal("0.00")).quantize(Decimal("0.01"))
     return JsonResponse(
@@ -2496,6 +2508,8 @@ def politica_despesa_json(request):
                 "limite": str(limite),
                 "limite_diario": str(limite_diario) if limite_diario is not None else None,
                 "diarias": diarias,
+                "quantidade_tecnicos": quantidade_tecnicos,
+                "politica_por_tecnico": despesa_usa_politica_por_tecnico(tipo),
                 "excede": excesso > 0,
                 "excesso": str(excesso),
                 "mensagem": f"{politica.descricao} - R$ {limite:.2f}",

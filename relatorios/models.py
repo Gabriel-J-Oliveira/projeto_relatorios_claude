@@ -2074,14 +2074,25 @@ class ItemDespesa(models.Model):
         politica = self.politica_aplicavel
         if not politica:
             return None
-        if self.tipo == TipoDespesa.HOSPEDAGEM and self.quantidade_diarias_hospedagem > 0:
-            return _valor_monetario(politica.valor * self.quantidade_diarias_hospedagem)
-        return politica.valor
+        from relatorios.services.politica_valor_service import calcular_limite_politica_despesa
+
+        return calcular_limite_politica_despesa(
+            politica,
+            tipo_despesa=self.tipo,
+            quantidade_tecnicos=self.quantidade_tecnicos_participantes,
+            diarias=self.quantidade_diarias_hospedagem,
+        )
 
     @property
     def valor_politica_diaria(self):
         politica = self.politica_aplicavel
         return politica.valor if politica else None
+
+    @property
+    def quantidade_tecnicos_participantes(self):
+        if not self.pk:
+            return 1
+        return max(self.tecnicos_vinculados.count(), 1)
 
     @property
     def quantidade_diarias_hospedagem(self):

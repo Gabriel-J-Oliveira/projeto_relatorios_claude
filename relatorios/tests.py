@@ -286,6 +286,31 @@ class DespesaTecnicoParticipanteTests(TestCase):
             {self.tecnico_a.pk, self.tecnico_b.pk},
         )
 
+    def test_politica_alimentacao_considera_tecnicos_participantes(self):
+        PoliticaValor.objects.create(
+            chave="REFEICAO_CAPITAL",
+            tipo_politica=PoliticaValor.TipoPolitica.REFEICAO,
+            tipo_despesa=TipoDespesa.ALIMENTACAO,
+            tipo_localidade="capital",
+            descricao="Refeição Capital",
+            limite_valor=Decimal("80.00"),
+            vigencia_inicio=date(2026, 1, 1),
+            ativo=True,
+        )
+        self.despesa.valor = Decimal("146.00")
+        self.despesa.save(update_fields=["valor"])
+
+        sync_tecnicos_despesa(
+            self.despesa,
+            [self.tecnico_a.pk, self.tecnico_b.pk],
+            self.usuario,
+        )
+
+        self.assertEqual(self.despesa.quantidade_tecnicos_participantes, 2)
+        self.assertEqual(self.despesa.valor_politica, Decimal("160.00"))
+        self.assertEqual(self.despesa.excesso_politica, Decimal("0.00"))
+        self.assertFalse(self.despesa.acima_politica)
+
     def test_sync_bloqueia_tecnico_fora_do_relatorio(self):
         erros = sync_tecnicos_despesa(
             self.despesa,

@@ -111,6 +111,21 @@
     input.files = transfer.files;
   }
 
+  function removerArquivoSelecionado(input, index) {
+    if (!window.DataTransfer || !input) return false;
+    const files = Array.from(input.files || []);
+    const posicao = Number(index);
+    if (!Number.isInteger(posicao) || posicao < 0 || posicao >= files.length) return false;
+
+    const transfer = new DataTransfer();
+    files.forEach((file, fileIndex) => {
+      if (fileIndex !== posicao) transfer.items.add(file);
+    });
+    input._relatorioUploadTransfer = transfer;
+    input.files = transfer.files;
+    return true;
+  }
+
   function selectedList(input) {
     return input.closest(".despesa-field-anexo")?.querySelector("[data-upload-selected-list]");
   }
@@ -124,6 +139,10 @@
       `<div class="d-flex align-items-center justify-content-between gap-2 upload-selected-item">` +
       `<span class="text-truncate"><i class="bi bi-paperclip me-1"></i>${escapeHtml(file.name)}</span>` +
       `<span class="text-muted flex-shrink-0">${formatBytes(file.size || 0)}</span>` +
+      `<button type="button" class="btn btn-link btn-sm p-0 text-danger upload-selected-remove" ` +
+      `data-upload-remove-index="${index}" title="Remover anexo" aria-label="Remover ${escapeHtml(file.name)}">` +
+      `<i class="bi bi-x-circle-fill"></i>` +
+      `</button>` +
       `</div>`
     )).join("");
   }
@@ -189,6 +208,52 @@
     }));
     manifestInput.value = JSON.stringify(manifest);
     return manifest;
+  }
+
+  function formDataManifest(form) {
+    const data = new FormData(form);
+    const files = [];
+    data.forEach((value, key) => {
+      if (value instanceof File && value.name) {
+        files.push({
+          campo: key,
+          nome: value.name,
+          tamanho: Number(value.size || 0),
+          mime: value.type || "",
+        });
+      }
+    });
+    return files;
+  }
+
+  function manifestKey(item) {
+    return `${item.campo || ""}|${item.nome || ""}|${Number(item.tamanho || 0)}`;
+  }
+
+  function validarFormDataComArquivos(form, items) {
+    const esperados = (items || []).map((item) => ({
+      campo: item.input?.name || "",
+      nome: item.name || "",
+      tamanho: Number(item.size || 0),
+      mime: item.file?.type || "",
+    }));
+    const enviados = formDataManifest(form);
+    const enviadosCount = new Map();
+    enviados.forEach((item) => {
+      const key = manifestKey(item);
+      enviadosCount.set(key, (enviadosCount.get(key) || 0) + 1);
+    });
+    const faltantes = [];
+    esperados.forEach((item) => {
+      const key = manifestKey(item);
+      const count = enviadosCount.get(key) || 0;
+      if (count <= 0) {
+        faltantes.push(item);
+        return;
+      }
+      enviadosCount.set(key, count - 1);
+    });
+    return { ok: faltantes.length === 0, esperados, enviados, faltantes };
   }
 
   function updateMonitor(form) {
@@ -319,6 +384,17 @@
     });
 
     form.addEventListener("click", (event) => {
+      const removeButton = event.target.closest("[data-upload-remove-index]");
+      if (removeButton) {
+        event.preventDefault();
+        const field = removeButton.closest(".despesa-field-anexo");
+        const input = field?.querySelector('input[type="file"][data-upload-comprovante]');
+        if (removerArquivoSelecionado(input, removeButton.dataset.uploadRemoveIndex)) {
+          updateMonitor(form);
+        }
+        return;
+      }
+
       if (event.target.closest("[onclick*='removerLinha']")) {
         setTimeout(() => updateMonitor(form), 50);
       }
@@ -337,6 +413,16 @@
         );
         return;
       }
+      const formDataState = validarFormDataComArquivos(form, state.items);
+      if (!formDataState.ok) {
+        event.preventDefault();
+        console.error("UPLOAD_FORMDATA_INCONSISTENTE", formDataState);
+        showFormError(
+          form,
+          "Foi detectado um problema ao preparar os anexos para envio. Remova e selecione os arquivos novamente."
+        );
+        return;
+      }
       window.setTimeout(() => {
         if (event.defaultPrevented) return;
         state.items.forEach((item) => {
@@ -348,6 +434,13 @@
 
     document.addEventListener("relatorio:linha-adicionada", () => updateMonitor(form));
     updateMonitor(form);
+    window.RelatorioUploadMonitor = {
+      update: () => updateMonitor(form),
+      validateFormData: () => {
+        const state = updateMonitor(form);
+        return validarFormDataComArquivos(form, state.items);
+      },
+    };
   }
 
   document.addEventListener("DOMContentLoaded", init);

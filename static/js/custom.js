@@ -172,7 +172,11 @@ document.addEventListener("DOMContentLoaded", function () {
     form.appendChild(inputAcao);
 
     modal.hide();
-    form.submit();
+    if (typeof form.requestSubmit === "function") {
+      form.requestSubmit(btnEnviar);
+    } else {
+      btnEnviar.click();
+    }
   });
 
 });

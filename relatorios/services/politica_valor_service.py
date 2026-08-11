@@ -12,6 +12,10 @@ from relatorios.models import PoliticaValor, TipoDespesa, TipoLocalidade
 logger = logging.getLogger(__name__)
 
 TIPOS_DESPESA_SEM_POLITICA = {TipoDespesa.PASSAGEM, TipoDespesa.TRANSPORTE}
+TIPOS_DESPESA_POLITICA_POR_TECNICO = {
+    TipoDespesa.ALIMENTACAO,
+    TipoDespesa.HOSPEDAGEM,
+}
 
 
 @dataclass(frozen=True)
@@ -33,6 +37,39 @@ def _normalizar(texto):
 
 def _money(valor):
     return Decimal(str(valor or "0.00")).quantize(Decimal("0.01"))
+
+
+def _positive_int(valor, default=1):
+    try:
+        numero = int(valor or default)
+    except (TypeError, ValueError):
+        numero = default
+    return max(numero, default)
+
+
+def despesa_usa_politica_por_tecnico(tipo_despesa):
+    return str(tipo_despesa or "") in {
+        str(tipo) for tipo in TIPOS_DESPESA_POLITICA_POR_TECNICO
+    }
+
+
+def calcular_limite_politica_despesa(
+    politica,
+    *,
+    tipo_despesa,
+    quantidade_tecnicos=1,
+    diarias=0,
+):
+    if not politica:
+        return None
+
+    multiplicador = Decimal("1")
+    if despesa_usa_politica_por_tecnico(tipo_despesa):
+        multiplicador *= Decimal(_positive_int(quantidade_tecnicos))
+    if tipo_despesa == TipoDespesa.HOSPEDAGEM and _positive_int(diarias, default=0) > 0:
+        multiplicador *= Decimal(_positive_int(diarias, default=0))
+
+    return _money(politica.valor * multiplicador)
 
 
 def _buscar_chave(chave, data):
