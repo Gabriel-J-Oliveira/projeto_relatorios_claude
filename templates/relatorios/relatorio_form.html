@@ -1518,7 +1518,18 @@
         body: new URLSearchParams({ next: window.location.pathname + window.location.search }),
       });
       if (!response.ok) throw new Error("Falha ao remover comprovante.");
-      window.location.reload();
+      const item = button.closest(".comprovante-item");
+      const field = button.closest(".despesa-field-anexo");
+      item?.remove();
+      const restantes = field?.querySelectorAll(".comprovante-item").length || 0;
+      const status = field?.querySelector("[data-upload-status-line]");
+      if (status && restantes === 0) {
+        status.dataset.uploadState = "empty";
+        status.classList.remove("text-success", "text-danger", "text-info", "text-warning");
+        status.classList.add("text-muted");
+        status.textContent = "Nenhum arquivo selecionado";
+      }
+      window.RelatorioUploadMonitor?.update?.();
     } catch (error) {
       button.disabled = false;
       alert("Não foi possível remover o comprovante. Tente novamente.");
@@ -1843,11 +1854,11 @@
       }
       const ids = idsFromValue(input.value).filter(id => relatorioIds.includes(id));
       if (ids.join(",") !== input.value) input.value = ids.join(",");
-      const td = input.closest("td");
-      const count = td?.querySelector(".clientes-item-count");
-      const label = td?.querySelector(".clientes-item-label");
-      const botao = td?.querySelector(".clientes-item-btn");
-      const erro = td?.querySelector(".erro-clientes-item");
+      const wrapper = input.closest(".despesa-field-clientes, td");
+      const count = wrapper?.querySelector(".clientes-item-count");
+      const label = wrapper?.querySelector(".clientes-item-label");
+      const botao = wrapper?.querySelector(".clientes-item-btn");
+      const erro = wrapper?.querySelector(".erro-clientes-item");
       if (count) count.textContent = ids.length;
       if (label) label.textContent = naoReembolsavel ? "Empresa interna" : "Clientes";
       if (botao) {
@@ -1866,6 +1877,9 @@
   function atualizarBadgesTecnicosDespesas() {
     const relatorioIds = getTecnicosEquipeIds();
     document.querySelectorAll(".tecnicos-item-input").forEach(input => {
+      if (!input.value && relatorioIds.length === 1) {
+        input.value = relatorioIds[0];
+      }
       const ids = idsFromValue(input.value).filter(id => relatorioIds.includes(id));
       if (ids.join(",") !== input.value) input.value = ids.join(",");
       const wrapper = input.closest(".despesa-field-tecnicos");
@@ -3240,6 +3254,75 @@ async function adicionarLinhaKm() {
 }
 
   // ── Remover linha ─────────────────────────────────────────────
+  function campoTrecho(linha, nome) {
+    return linha?.querySelector(`[name$="-${nome}"]`);
+  }
+
+  function valorCampoTrecho(linha, nome) {
+    return campoTrecho(linha, nome)?.value || "";
+  }
+
+  function trechoVoltaJaExiste(linha) {
+    const data = valorCampoTrecho(linha, "data");
+    const origem = valorCampoTrecho(linha, "origem").trim();
+    const destino = valorCampoTrecho(linha, "destino").trim();
+    const km = normalizarNumero(valorCampoTrecho(linha, "km"));
+    return linhasAtivasFormulario(".linha-trecho").some(outra => {
+      if (outra === linha) return false;
+      return valorCampoTrecho(outra, "data") === data
+        && valorCampoTrecho(outra, "origem").trim() === destino
+        && valorCampoTrecho(outra, "destino").trim() === origem
+        && Math.abs(normalizarNumero(valorCampoTrecho(outra, "km")) - km) < 0.01;
+    });
+  }
+
+  async function criarTrechoIdaVolta(linha) {
+    if (!linha || trechoVoltaJaExiste(linha)) {
+      window.ErpOperationalErrors?.show("Este trecho ja possui uma volta correspondente.", [
+        "Revise os deslocamentos ja adicionados antes de duplicar novamente."
+      ]);
+      return;
+    }
+
+    const novaLinha = await adicionarLinhaKm();
+    if (!novaLinha) return;
+
+    const copiar = (origemNome, destinoNome) => {
+      const destinoCampo = campoTrecho(novaLinha, destinoNome);
+      if (destinoCampo) destinoCampo.value = valorCampoTrecho(linha, origemNome);
+    };
+
+    copiar("data", "data");
+    copiar("destino", "origem");
+    copiar("origem", "destino");
+    copiar("destino_endereco_completo", "origem_endereco_completo");
+    copiar("origem_endereco_completo", "destino_endereco_completo");
+    copiar("destino_lat", "origem_lat");
+    copiar("destino_lon", "origem_lon");
+    copiar("origem_lat", "destino_lat");
+    copiar("origem_lon", "destino_lon");
+    copiar("km", "km");
+    copiar("km_calculado_api", "km_calculado_api");
+    copiar("km_informado", "km_informado");
+    copiar("diferenca_km_percentual", "diferenca_km_percentual");
+    copiar("fonte_calculo_rota", "fonte_calculo_rota");
+    copiar("valor_km", "valor_km");
+    copiar("clientes", "clientes");
+
+    const observacao = campoTrecho(novaLinha, "observacao");
+    if (observacao && !observacao.value) observacao.value = "Volta do trecho anterior.";
+    const rotaGeojson = campoTrecho(novaLinha, "rota_geojson");
+    if (rotaGeojson) rotaGeojson.value = "{}";
+
+    atualizarBadgesClientesItens();
+    prepararLinhaMapaKm(novaLinha);
+    calcularTrechoKm(novaLinha.querySelector(".campo-km") || novaLinha);
+    validarKmGlobal(novaLinha);
+    recalcular();
+    atualizarMapaFormulario();
+    novaLinha.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
   const HOJE_ISO = new Date().toISOString().slice(0, 10);
 
   function aplicarLimiteDatas(root = document) {
@@ -3641,6 +3724,10 @@ function validarKmGlobal() {
       }
     }
     organizarBlocoMapaKm();
+    if (!document.querySelector(".cidade-atendimento-row")) {
+      adicionarLinhaCidade();
+      sincronizarPrimeiraCidadeLegada();
+    }
     document.getElementById("corpo-trechos")?.closest(".table-responsive")?.classList.add("overflow-visible");
     document.getElementById("btn-adicionar-despesa")
       ?.addEventListener("click", event => {
@@ -3709,6 +3796,12 @@ function validarKmGlobal() {
       });
     document.getElementById("corpo-trechos")
       ?.addEventListener("click", event => {
+        const btnIdaVolta = event.target.closest(".btn-ida-volta");
+        if (btnIdaVolta) {
+          event.preventDefault();
+          criarTrechoIdaVolta(btnIdaVolta.closest(".linha-trecho"));
+          return;
+        }
         const linha = event.target.closest(".linha-trecho");
         if (!linha) return;
         linhaTrechoSelecionadaMapa = linha;

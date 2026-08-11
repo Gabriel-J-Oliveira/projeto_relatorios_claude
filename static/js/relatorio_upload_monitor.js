@@ -293,7 +293,8 @@
     const largestWrap = card.querySelector("[data-upload-largest-wrap]");
     const largest = card.querySelector("[data-upload-largest]");
 
-    const persistedCount = form.querySelectorAll('[data-upload-status-line][data-upload-state="persisted"]').length;
+    const persistedItems = form.querySelectorAll("[data-upload-persisted-item]").length;
+    const persistedCount = persistedItems || form.querySelectorAll('[data-upload-status-line][data-upload-state="persisted"]').length;
     if (count) {
       const totalCount = persistedCount + items.length;
       count.textContent = `${totalCount} anexo${totalCount === 1 ? "" : "s"}`;

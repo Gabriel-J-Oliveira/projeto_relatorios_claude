@@ -621,7 +621,7 @@ CidadeAtendimentoFormSet = inlineformset_factory(
     CidadeAtendimento,
     form=CidadeAtendimentoForm,
     formset=BaseCidadeAtendimentoFormSet,
-    extra=1,
+    extra=0,
     min_num=0,
     can_delete=True,
 )

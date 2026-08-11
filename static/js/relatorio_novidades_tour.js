@@ -4,6 +4,8 @@
     hospedagem: "relatorioNovidadeHospedagemPeriodo:v1",
     tecnicos: "relatorioNovidadeMultiplosTecnicos:v1",
     cidades: "relatorioNovidadeMultiplasCidades:v1",
+    autoClienteTecnico: "relatorioNovidadeAutoClienteTecnico:v1",
+    idaVolta: "relatorioNovidadeIdaVolta:v1",
   };
 
   const fila = [];
@@ -184,6 +186,40 @@
     });
   }
 
+  function tourAutoClienteTecnico() {
+    enfileirar({
+      key: TOURS.autoClienteTecnico,
+      steps: [
+        step(
+          '[data-tour="relatorio-clientes"]',
+          "#tab-dados-btn",
+          "Cliente unico",
+          "Quando houver apenas um cliente no relatorio, novas despesas e deslocamentos usam esse cliente automaticamente."
+        ),
+        step(
+          '[data-tour="relatorio-tecnicos"]',
+          "#tab-dados-btn",
+          "Tecnico unico",
+          "Quando houver apenas um tecnico participante, novas despesas tambem recebem esse tecnico automaticamente."
+        ),
+      ],
+    });
+  }
+
+  function tourIdaVolta() {
+    enfileirar({
+      key: TOURS.idaVolta,
+      steps: [
+        step(
+          ".btn-ida-volta",
+          "#tab-km-btn",
+          "Ida e volta",
+          "Use Ida e volta para criar automaticamente o retorno de um deslocamento, invertendo origem e destino."
+        ),
+      ],
+    });
+  }
+
   function tourMultiplosAnexos() {
     enfileirar({
       key: TOURS.anexos,
@@ -278,9 +314,15 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     window.setTimeout(tourMultiplasCidades, 1200);
+    window.setTimeout(tourAutoClienteTecnico, 1800);
 
     const tabDespesas = document.getElementById("tab-despesas-btn");
     tabDespesas?.addEventListener("shown.bs.tab", aoAbrirDespesas);
+
+    const tabKm = document.getElementById("tab-km-btn");
+    tabKm?.addEventListener("shown.bs.tab", function () {
+      window.setTimeout(tourIdaVolta, 400);
+    });
 
     document.getElementById("corpo-despesas")?.addEventListener("change", function (event) {
       if (event.target.matches('[name$="-tipo"]') && event.target.value === "hospedagem") {
@@ -290,6 +332,9 @@
 
     if (document.querySelector("#tab-despesas.show.active")) {
       aoAbrirDespesas();
+    }
+    if (document.querySelector("#tab-km.show.active")) {
+      window.setTimeout(tourIdaVolta, 500);
     }
   });
 })();

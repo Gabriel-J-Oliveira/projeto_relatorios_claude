@@ -460,6 +460,8 @@ def marcar_tour_guiado_visto(request):
         "relatorioNovidadeHospedagemPeriodo:v1",
         "relatorioNovidadeMultiplosTecnicos:v1",
         "relatorioNovidadeMultiplasCidades:v1",
+        "relatorioNovidadeAutoClienteTecnico:v1",
+        "relatorioNovidadeIdaVolta:v1",
     }
     if chave not in chaves_permitidas:
         return JsonResponse({"success": False, "error": "Tour invalido."}, status=400)
@@ -1694,8 +1696,32 @@ def _clientes_item_post(request, prefix):
     return normalizar_ids_clientes(request.POST.get(f"{prefix}-clientes"))
 
 
+def _clientes_item_post_ou_unico(request, prefix, relatorio):
+    ids = _clientes_item_post(request, prefix)
+    if ids:
+        return ids
+    clientes = list(relatorio.clientes_exibicao()) if relatorio else []
+    if len(clientes) == 1:
+        return [clientes[0].pk]
+    return []
+
+
 def _tecnicos_item_post(request, prefix):
     return normalizar_ids_tecnicos(request.POST.get(f"{prefix}-tecnicos"))
+
+
+def _tecnicos_item_post_ou_unico(request, prefix, relatorio):
+    ids = _tecnicos_item_post(request, prefix)
+    if ids:
+        return ids
+    if not relatorio:
+        return []
+    tecnicos = []
+    if relatorio.tecnico_responsavel_id:
+        tecnicos.append(relatorio.tecnico_responsavel_id)
+    tecnicos.extend(relatorio.equipe.values_list("tecnico_id", flat=True))
+    tecnicos = list(dict.fromkeys(str(tecnico_id) for tecnico_id in tecnicos if tecnico_id))
+    return tecnicos if len(tecnicos) == 1 else []
 
 
 def _clientes_item_instance_value(instance):
@@ -3365,15 +3391,24 @@ def relatorio_form_view(request, pk=None):
                                             anexo,
                                             arquivo_upload,
                                         )
+                            clientes_despesa = _clientes_item_post_ou_unico(
+                                request,
+                                f.prefix,
+                                relatorio,
+                            )
                             erros_item = sync_clientes_despesa(
                                 item,
-                                _clientes_item_post(request, f.prefix),
+                                clientes_despesa,
                             )
                             if erros_item:
                                 raise WorkflowError(erros_item)
                             erros_tecnicos_item = sync_tecnicos_despesa(
                                 item,
-                                _tecnicos_item_post(request, f.prefix),
+                                _tecnicos_item_post_ou_unico(
+                                    request,
+                                    f.prefix,
+                                    relatorio,
+                                ),
                                 usuario_historico,
                             )
                             if erros_tecnicos_item:
@@ -3409,7 +3444,11 @@ def relatorio_form_view(request, pk=None):
                             )
                             trecho = f.save(commit=False)
                             trecho.relatorio = relatorio
-                            clientes_trecho = _clientes_item_post(request, f.prefix)
+                            clientes_trecho = _clientes_item_post_ou_unico(
+                                request,
+                                f.prefix,
+                                relatorio,
+                            )
                             if len(clientes_trecho) == 1:
                                 trecho.valor_km = Decimal(
                                     str(_get_valor_km_para_cliente(clientes_trecho[0]) or "0")
@@ -3816,7 +3855,10 @@ def anexo_remover_view(request, pk):
     nome = anexo.nome_original or _nome_arquivo_anexo(anexo.arquivo)
     despesa_id = anexo.despesa_id
     tamanho = anexo.tamanho_bytes
+    arquivo = anexo.arquivo
     anexo.delete()
+    if arquivo:
+        arquivo.delete(save=False)
     logger.info(
         "UPLOAD_REMOVIDO relatorio=%s despesa=%s usuario=%s anexo=%s nome=%s tamanho=%s",
         relatorio.pk,
@@ -3826,6 +3868,8 @@ def anexo_remover_view(request, pk):
         nome,
         tamanho,
     )
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({"success": True, "message": "Comprovante removido."})
     messages.success(request, "Comprovante removido.")
     return redirect(request.POST.get("next") or reverse("relatorios:relatorio_update", kwargs={"pk": relatorio.pk}))
 
@@ -3867,8 +3911,11 @@ def despesa_comprovante_remover_view(request, pk):
         raise PermissionDenied("Você não tem permissão para remover este comprovante.")
     nome = _nome_arquivo_anexo(despesa.comprovante)
     tamanho = getattr(despesa.comprovante, "size", 0) if despesa.comprovante else 0
+    arquivo = despesa.comprovante
     despesa.comprovante = None
     despesa.save(update_fields=["comprovante"])
+    if arquivo:
+        arquivo.delete(save=False)
     logger.info(
         "UPLOAD_REMOVIDO relatorio=%s despesa=%s usuario=%s anexo=legado nome=%s tamanho=%s",
         relatorio.pk,
@@ -3877,6 +3924,8 @@ def despesa_comprovante_remover_view(request, pk):
         nome,
         tamanho,
     )
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({"success": True, "message": "Comprovante removido."})
     messages.success(request, "Comprovante removido.")
     return redirect(request.POST.get("next") or reverse("relatorios:relatorio_update", kwargs={"pk": relatorio.pk}))
 
