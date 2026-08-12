@@ -110,6 +110,7 @@ class EmpresaGrupo(models.TextChoices):
     BLAZIUS_E_LORENZETTI = "blazius_e_lorenzetti", "BLAZIUS E LORENZETTI"
     CONTROLSUL = "controlsul", "CONTROLSUL"
     FISCALMAX = "fiscalmax", "FISCALMAX"
+    CASA_CHICO_DE_PNEUS = "casa_chico_de_pneus", "CASA CHICO DE PNEUS"
 
 
 class EscopoPoliticaValor(models.TextChoices):
@@ -865,6 +866,7 @@ class PoliticaValor(models.Model):
 
     @classmethod
     def vigente_por_chave(cls, chave, data, empresa_grupo=None):
+        empresas_sem_fallback_global = {EmpresaGrupo.CASA_CHICO_DE_PNEUS}
         qs_base = (
             cls.objects.filter(
                 chave=chave,
@@ -887,6 +889,8 @@ class PoliticaValor(models.Model):
             )
             if politica_empresa:
                 return politica_empresa
+            if empresa_grupo in empresas_sem_fallback_global:
+                return None
         return qs_base.filter(escopo=EscopoPoliticaValor.GLOBAL).first()
 
     @classmethod

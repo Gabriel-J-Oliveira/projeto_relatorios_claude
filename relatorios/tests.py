@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 from datetime import date
 import sys
@@ -7,12 +8,14 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from .models import (
     Adiantamento,
+    AnexoRelatorio,
     Cliente,
     EmailLog,
     EmpresaGrupo,
@@ -391,6 +394,24 @@ class PoliticaValorEscopoEmpresaTests(TestCase):
         self.assertIsNone(despesa.valor_aprovado)
         self.assertEqual(despesa.valor_final, Decimal("100.00"))
 
+    def test_casa_chico_nao_usa_fallback_global_de_politicas(self):
+        self.criar_politica("80.00")
+
+        self.assertIsNone(self.resolver_refeicao(EmpresaGrupo.CASA_CHICO_DE_PNEUS))
+
+    def test_casa_chico_pode_usar_politica_especifica_sem_global(self):
+        self.criar_politica("80.00")
+        self.criar_politica(
+            "70.00",
+            escopo=EscopoPoliticaValor.EMPRESAS,
+            empresas=[EmpresaGrupo.CASA_CHICO_DE_PNEUS],
+        )
+
+        self.assertEqual(
+            self.resolver_refeicao(EmpresaGrupo.CASA_CHICO_DE_PNEUS).valor,
+            Decimal("70.00"),
+        )
+
     def test_fallback_respeita_vigencia_da_politica_especifica(self):
         self.criar_politica("80.00")
         self.criar_politica(
@@ -547,6 +568,23 @@ class PoliticaValorEscopoEmpresaTests(TestCase):
         )
 
         self.assertEqual(valor_km_control_sul(date(2026, 8, 1)), Decimal("1.35"))
+
+    def test_casa_chico_nao_altera_valor_km_reembolso_tecnico(self):
+        self.criar_politica(
+            "1.3500",
+            chave="VALOR_KM_CONTROLSUL",
+            escopo=EscopoPoliticaValor.GLOBAL,
+        )
+        empresa = Cliente.objects.create(
+            nome="CASA CHICO DE PNEUS LTDA",
+            valor_km=Decimal("9.9900"),
+        )
+
+        calculo = calcular_km_financeiro(Decimal("10.00"), empresa)
+
+        self.assertEqual(calculo["valor_km_reembolso_tecnico"], Decimal("1.3500"))
+        self.assertEqual(calculo["valor_km_cliente"], Decimal("1.3500"))
+        self.assertEqual(calculo["valor_reembolso_tecnico"], Decimal("13.50"))
 
 
 class ManutencaoPoliticasViewsTests(TestCase):
@@ -1338,6 +1376,10 @@ class RelatorioTecnicoFlowTests(TestCase):
 
     def dados_formsets_vazios(self):
         return {
+            "cidades-TOTAL_FORMS": "0",
+            "cidades-INITIAL_FORMS": "0",
+            "cidades-MIN_NUM_FORMS": "0",
+            "cidades-MAX_NUM_FORMS": "1000",
             "despesas-TOTAL_FORMS": "0",
             "despesas-INITIAL_FORMS": "0",
             "despesas-MIN_NUM_FORMS": "0",
@@ -1347,6 +1389,35 @@ class RelatorioTecnicoFlowTests(TestCase):
             "trechos-MIN_NUM_FORMS": "0",
             "trechos-MAX_NUM_FORMS": "1000",
         }
+
+    def dados_relatorio_com_despesa(self, **extra):
+        dados = self.dados_relatorio(
+            acao="rascunho",
+            tipo_relatorio="operacional",
+            tipo_reembolso="reembolsavel",
+            clientes_relatorio=str(self.cliente.pk),
+            tecnico_reembolso=str(self.tecnico.pk),
+            tecnicos_equipe=[],
+        )
+        dados.update(self.dados_formsets_vazios())
+        dados.update(
+            {
+                "despesas-TOTAL_FORMS": "1",
+                "despesas-0-id": "",
+                "despesas-0-ordem": "0",
+                "despesas-0-data": "2026-05-02",
+                "despesas-0-tipo": "alimentacao",
+                "despesas-0-descricao": "Almoco",
+                "despesas-0-valor": "50.00",
+                "despesas-0-quem_pagou": "tecnico",
+                "despesas-0-tipo_documento_comprovante": "recibo",
+                "despesas-0-numero_documento_comprovante": "R-001",
+                "despesas-0-observacoes": "",
+                "despesas-0-clientes": str(self.cliente.pk),
+            }
+        )
+        dados.update(extra)
+        return dados
 
     def criar_relatorio(self, numero):
         return RelatorioTecnico.objects.create(
@@ -1487,6 +1558,88 @@ class RelatorioTecnicoFlowTests(TestCase):
         self.assertEqual(response.status_code, 409)
         self.assertFalse(
             RelatorioAutoSave.objects.filter(chave="autosave-bloqueado").exists()
+        )
+
+    def test_submit_assincrono_invalido_retorna_422_sem_criar_relatorio_ou_anexo(self):
+        arquivo_a = SimpleUploadedFile(
+            "nota_a.pdf",
+            b"arquivo-a",
+            content_type="application/pdf",
+        )
+        arquivo_b = SimpleUploadedFile(
+            "nota_b.pdf",
+            b"arquivo-b",
+            content_type="application/pdf",
+        )
+        dados = self.dados_relatorio_com_despesa(
+            **{
+                "despesas-0-descricao": "",
+                "upload_expected_manifest": json.dumps(
+                    [
+                        {
+                            "campo": "despesas-0-comprovante",
+                            "nome": "nota_a.pdf",
+                            "tamanho": len(b"arquivo-a"),
+                            "mime": "application/pdf",
+                        },
+                        {
+                            "campo": "despesas-0-comprovante",
+                            "nome": "nota_b.pdf",
+                            "tamanho": len(b"arquivo-b"),
+                            "mime": "application/pdf",
+                        },
+                    ]
+                ),
+                "despesas-0-comprovante": [arquivo_a, arquivo_b],
+            }
+        )
+
+        response = self.client.post(
+            reverse("relatorios:relatorio_create"),
+            dados,
+            HTTP_X_RELATORIO_ASYNC_SUBMIT="1",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 422)
+        payload = response.json()
+        self.assertFalse(payload["ok"])
+        self.assertTrue(payload["validation_error"])
+        self.assertTrue(
+            any(
+                erro.get("name") == "despesas-0-descricao"
+                for erro in payload["field_errors"]
+            )
+        )
+        self.assertFalse(RelatorioTecnico.objects.filter(motivo="Atendimento tecnico").exists())
+        self.assertFalse(AnexoRelatorio.objects.exists())
+
+    def test_submit_normal_invalido_mantem_render_html_existente(self):
+        dados = self.dados_relatorio_com_despesa(**{"despesas-0-descricao": ""})
+
+        response = self.client.post(reverse("relatorios:relatorio_create"), dados)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Corrija os erros indicados antes de salvar.")
+        self.assertFalse(RelatorioTecnico.objects.filter(motivo="Atendimento tecnico").exists())
+
+    def test_submit_assincrono_valido_preserva_redirect_de_sucesso(self):
+        dados = self.dados_relatorio_com_despesa(
+            motivo="Relatorio async valido",
+        )
+
+        response = self.client.post(
+            reverse("relatorios:relatorio_create"),
+            dados,
+            HTTP_X_RELATORIO_ASYNC_SUBMIT="1",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        relatorio = RelatorioTecnico.objects.get(motivo="Relatorio async valido")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response["Location"],
+            reverse("relatorios:relatorio_detail", kwargs={"pk": relatorio.pk}),
         )
 
     def test_trecho_calcula_valor_total_no_save(self):

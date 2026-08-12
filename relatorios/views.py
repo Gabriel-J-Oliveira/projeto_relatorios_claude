@@ -1576,6 +1576,82 @@ def _adicionar_erros_resumo(resumo, itens, *, contexto="", tab=""):
             resumo.append(_erro_resumo(item, contexto=contexto, tab=tab))
 
 
+def _relatorio_async_submit(request):
+    return request.headers.get("X-Relatorio-Async-Submit") == "1"
+
+
+def _serializar_erros_campos_form(form, *, tab=""):
+    erros = []
+    if form is None:
+        return erros
+    for campo, mensagens in form.errors.items():
+        href = _campo_href(form, campo)
+        try:
+            bound = form[campo] if campo != "__all__" else None
+        except Exception:
+            bound = None
+        label = _campo_label(form, campo)
+        for mensagem in mensagens:
+            texto = _normalizar_mensagem_campo("async", campo, mensagem)
+            erros.append(
+                {
+                    "campo": campo,
+                    "name": getattr(bound, "html_name", "") if bound else "",
+                    "label": label,
+                    "selector": href,
+                    "mensagem": texto,
+                    "tab": tab,
+                }
+            )
+    return erros
+
+
+def _serializar_erros_formset(formset, *, tab=""):
+    erros = []
+    if formset is None:
+        return erros
+    for form in formset.forms:
+        erros.extend(_serializar_erros_campos_form(form, tab=tab))
+    return erros
+
+
+def _relatorio_async_validation_response(
+    form,
+    fs_cidades,
+    fs_desp,
+    fs_km,
+    resumo_erros,
+):
+    field_errors = []
+    field_errors.extend(_serializar_erros_campos_form(form, tab="#tab-dados"))
+    field_errors.extend(_serializar_erros_formset(fs_cidades, tab="#tab-dados"))
+    field_errors.extend(_serializar_erros_formset(fs_desp, tab="#tab-despesas"))
+    field_errors.extend(_serializar_erros_formset(fs_km, tab="#tab-km"))
+    return JsonResponse(
+        {
+            "ok": False,
+            "validation_error": True,
+            "message": "Corrija os erros indicados antes de salvar.",
+            "summary": resumo_erros or [],
+            "field_errors": field_errors,
+        },
+        status=422,
+    )
+
+
+def _relatorio_async_error_response(message, *, status=500, validation_error=False):
+    return JsonResponse(
+        {
+            "ok": False,
+            "validation_error": validation_error,
+            "message": message,
+            "summary": [_erro_resumo(message, contexto="Relatório")],
+            "field_errors": [],
+        },
+        status=status,
+    )
+
+
 @login_required
 @exigir_acesso_erp
 @require_POST
@@ -3187,6 +3263,13 @@ def relatorio_form_view(request, pk=None):
             _upload_validar_capacidade_total(upload_contexto, request, instance)
         except (UPLOAD_EXCEPTIONS, WorkflowError) as exc:
             _upload_log_exception(upload_contexto, request, instance, exc)
+            if _relatorio_async_submit(request):
+                mensagem = (
+                    str(exc)
+                    if isinstance(exc, WorkflowError)
+                    else "Foi detectado um problema durante o envio dos anexos. Nenhum dado foi perdido. Verifique sua conexão e tente novamente."
+                )
+                return _relatorio_async_error_response(mensagem, status=400)
             messages.error(
                 request,
                 str(exc)
@@ -3672,6 +3755,14 @@ def relatorio_form_view(request, pk=None):
                         erros,
                         contexto="Validação do relatório",
                     )
+                    if _relatorio_async_submit(request):
+                        return _relatorio_async_validation_response(
+                            form,
+                            fs_cidades,
+                            fs_desp,
+                            fs_km,
+                            resumo_erros,
+                        )
                     return render(
                         request,
                         "relatorios/relatorio_form.html",
@@ -3714,6 +3805,11 @@ def relatorio_form_view(request, pk=None):
                             "Nenhum dado foi perdido. Verifique sua conexão e tente novamente."
                         )
                         _upload_log_exception(upload_contexto, request, instance, exc)
+                        if _relatorio_async_submit(request):
+                            return _relatorio_async_error_response(
+                                mensagem_upload,
+                                status=500,
+                            )
                         messages.error(request, mensagem_upload)
                         return render(
                             request,
@@ -3748,6 +3844,11 @@ def relatorio_form_view(request, pk=None):
                         )
                     logger.exception("Erro ao salvar relatório: %s", exc)
                     messages.error(request, "Erro interno ao salvar. Tente novamente.")
+                    if _relatorio_async_submit(request):
+                        return _relatorio_async_error_response(
+                            diagnostico_backend["mensagem"],
+                            status=500,
+                        )
                     # Não adiciona ao resumo_erros — é erro de infra, não de validação
                     return render(
                         request,
@@ -3794,6 +3895,15 @@ def relatorio_form_view(request, pk=None):
                     "Revise os campos destacados no formulário.",
                     contexto="Relatório",
                 )
+            )
+
+        if _relatorio_async_submit(request):
+            return _relatorio_async_validation_response(
+                form,
+                fs_cidades,
+                fs_desp,
+                fs_km,
+                resumo_erros,
             )
 
     # ── GET ───────────────────────────────────────────────────────────────────

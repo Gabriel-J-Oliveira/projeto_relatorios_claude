@@ -390,6 +390,170 @@
     box.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
+  function clearAsyncValidation(form) {
+    form.querySelector("[data-async-validation-summary]")?.remove();
+    form.querySelector("[data-upload-form-error]")?.remove();
+    form.querySelectorAll("[data-backend-invalid='true']").forEach((field) => {
+      field.classList.remove("is-invalid");
+      delete field.dataset.backendInvalid;
+    });
+    form.querySelectorAll("[data-backend-error='true']").forEach((feedback) => {
+      feedback.textContent = "";
+      delete feedback.dataset.backend;
+      delete feedback.dataset.backendError;
+    });
+  }
+
+  function feedbackForField(field) {
+    if (!field) return null;
+    let feedback = field.closest(".despesa-field, td, .mb-3, .col-md-3, .col-md-4, .col-md-6, .col-12")
+      ?.querySelector(".erro-inline, .invalid-feedback");
+    if (!feedback) {
+      feedback = document.createElement("div");
+      feedback.className = "invalid-feedback d-block small erro-inline";
+      field.insertAdjacentElement("afterend", feedback);
+    }
+    feedback.dataset.backend = "true";
+    feedback.dataset.backendError = "true";
+    return feedback;
+  }
+
+  function fieldByError(form, error) {
+    if (error?.selector) {
+      const id = String(error.selector).replace(/^#/, "");
+      if (id) {
+        const byId = document.getElementById(id);
+        if (byId) return byId;
+      }
+    }
+    if (error?.name && window.CSS?.escape) {
+      return form.querySelector(`[name="${CSS.escape(error.name)}"]`);
+    }
+    return null;
+  }
+
+  function renderAsyncValidation(form, payload) {
+    clearAsyncValidation(form);
+    const summary = Array.isArray(payload?.summary) ? payload.summary : [];
+    const fieldErrors = Array.isArray(payload?.field_errors) ? payload.field_errors : [];
+    const message = payload?.message || "Corrija os erros indicados antes de salvar.";
+
+    fieldErrors.forEach((error) => {
+      const field = fieldByError(form, error);
+      if (!field) return;
+      field.classList.add("is-invalid");
+      field.dataset.backendInvalid = "true";
+      const feedback = feedbackForField(field);
+      if (feedback) feedback.textContent = error.mensagem || message;
+    });
+
+    const box = document.createElement("div");
+    box.className = "alert alert-danger border-0 shadow-sm mb-4";
+    box.dataset.asyncValidationSummary = "1";
+    const count = summary.length || fieldErrors.length || 1;
+    const list = summary.length
+      ? summary
+      : [{ mensagem: message, href: fieldErrors[0]?.selector || "", tab: fieldErrors[0]?.tab || "" }];
+    box.innerHTML = (
+      `<div class="d-flex align-items-center mb-2">` +
+      `<i class="bi bi-exclamation-octagon-fill me-2"></i>` +
+      `<strong>Foram encontrados ${count} problema${count === 1 ? "" : "s"} no relatório.</strong>` +
+      `</div>` +
+      `<ul class="small mb-0 ps-3">` +
+      list.map((item) => {
+        const texto = escapeHtml(item.mensagem || message);
+        if (item.href) {
+          return `<li><a href="${escapeHtml(item.href)}" class="alert-link text-decoration-none relatorio-error-link" data-error-tab="${escapeHtml(item.tab || "")}">${texto}</a></li>`;
+        }
+        return `<li>${texto}</li>`;
+      }).join("") +
+      `</ul>`
+    );
+    const firstPane = form.querySelector(".tab-content") || form;
+    firstPane.parentNode.insertBefore(box, firstPane);
+    box.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    const firstField = fieldByError(form, fieldErrors[0] || {});
+    if (firstField) {
+      window.setTimeout(() => {
+        firstField.scrollIntoView({ behavior: "smooth", block: "center" });
+        if (typeof firstField.focus === "function") firstField.focus({ preventScroll: true });
+      }, 150);
+    }
+  }
+
+  function setSubmitting(form, submitting) {
+    form.dataset.relatorioAsyncSubmitting = submitting ? "true" : "";
+    form.dataset.submitting = submitting ? "true" : "";
+    form.querySelectorAll("button[type='submit']").forEach((button) => {
+      button.disabled = submitting;
+      if (submitting) button.setAttribute("aria-busy", "true");
+      else button.removeAttribute("aria-busy");
+    });
+  }
+
+  function buildSubmitFormData(form, submitter) {
+    if (submitter && typeof FormData === "function") {
+      try {
+        return new FormData(form, submitter);
+      } catch (error) {
+        // Browser sem suporte ao construtor com submitter.
+      }
+    }
+    const formData = new FormData(form);
+    if (submitter?.name) {
+      formData.delete(submitter.name);
+      formData.append(submitter.name, submitter.value || "");
+    }
+    return formData;
+  }
+
+  async function submitAsync(form, submitter, state) {
+    clearAsyncValidation(form);
+    setSubmitting(form, true);
+    state.items.forEach((item) => {
+      setStatus(item.input, "sending", "Enviando...", "bi-hourglass-split");
+      setButtonState(item.input, "sending");
+    });
+    try {
+      const response = await fetch(form.action || window.location.href, {
+        method: (form.method || "POST").toUpperCase(),
+        body: buildSubmitFormData(form, submitter),
+        headers: {
+          "X-Relatorio-Async-Submit": "1",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        credentials: "same-origin",
+        redirect: "follow",
+      });
+      if (response.redirected) {
+        window.location.assign(response.url);
+        return;
+      }
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch (error) {
+        payload = {};
+      }
+      if (response.status === 422 && payload?.validation_error) {
+        renderAsyncValidation(form, payload);
+        updateMonitor(form);
+        setSubmitting(form, false);
+        return;
+      }
+      const message = payload?.message || "Não foi possível concluir a operação. Tente novamente.";
+      showFormError(form, message);
+      updateMonitor(form);
+      setSubmitting(form, false);
+    } catch (error) {
+      console.error("RELATORIO_ASYNC_SUBMIT_ERROR", error);
+      showFormError(form, "Falha de comunicação com o servidor. Verifique sua conexão e tente novamente.");
+      updateMonitor(form);
+      setSubmitting(form, false);
+    }
+  }
+
   function init() {
     const form = document.getElementById("form-relatorio");
     if (!form) return;
@@ -419,9 +583,15 @@
     });
 
     form.addEventListener("submit", (event) => {
+      if (event.defaultPrevented) return;
+      if (form.dataset.relatorioAsyncSubmitting === "true") {
+        event.preventDefault();
+        return;
+      }
       const state = updateMonitor(form);
       if (state.errors.length || state.overLimit) {
         event.preventDefault();
+        setSubmitting(form, false);
         const names = state.errors.map((item) => item.name).slice(0, 4).join(", ");
         showFormError(
           form,
@@ -434,6 +604,7 @@
       const formDataState = validarFormDataComArquivos(form, state.items);
       if (!formDataState.ok) {
         event.preventDefault();
+        setSubmitting(form, false);
         console.error("UPLOAD_FORMDATA_INCONSISTENTE", formDataState);
         showFormError(
           form,
@@ -441,14 +612,9 @@
         );
         return;
       }
-      window.setTimeout(() => {
-        if (event.defaultPrevented) return;
-        state.items.forEach((item) => {
-          setStatus(item.input, "sending", "Enviando...", "bi-hourglass-split");
-          setButtonState(item.input, "sending");
-        });
-      }, 0);
-    }, true);
+      event.preventDefault();
+      submitAsync(form, event.submitter, state);
+    });
 
     document.addEventListener("relatorio:linha-adicionada", () => updateMonitor(form));
     updateMonitor(form);
