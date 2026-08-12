@@ -12,7 +12,7 @@ def marcar_politicas_existentes_como_global(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("relatorios", "0057_alter_historicorelatorio_tipo_evento_reaberto"),
+        ("relatorios", "0058_merge_20260811_0838"),
     ]
 
     operations = [
