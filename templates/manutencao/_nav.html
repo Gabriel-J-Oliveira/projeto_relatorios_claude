@@ -1,0 +1,20 @@
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item" role="presentation">
+    <a class="nav-link {% if request.resolver_match.url_name == 'manutencao' and aba_ativa != 'emails' %}active{% endif %}"
+       href="{% url 'relatorios:manutencao' %}?aba=logs">
+      <i class="bi bi-journal-text me-1"></i> Logs
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a class="nav-link {% if request.resolver_match.url_name == 'manutencao_politicas' or request.resolver_match.url_name == 'manutencao_politica_criar' or request.resolver_match.url_name == 'manutencao_politica_editar' or request.resolver_match.url_name == 'manutencao_politica_duplicar' %}active{% endif %}"
+       href="{% url 'relatorios:manutencao_politicas' %}">
+      <i class="bi bi-sliders me-1"></i> Politicas
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a class="nav-link {% if request.resolver_match.url_name == 'manutencao' and aba_ativa == 'emails' %}active{% endif %}"
+       href="{% url 'relatorios:manutencao' %}?aba=emails">
+      <i class="bi bi-envelope-exclamation me-1"></i> E-mails
+    </a>
+  </li>
+</ul>

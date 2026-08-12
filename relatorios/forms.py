@@ -15,16 +15,20 @@ from .models import (
     Cliente,
     Adiantamento,
     EmpresaGrupo,
+    EscopoPoliticaValor,
     TipoDespesa,
     TipoDocumentoComprovante,
+    TipoLocalidade,
     TipoReembolso,
     Municipio,
+    PoliticaValor,
     Setor,
     ArtigoAjuda,
     CategoriaAjuda,
     PublicoArtigoAjuda,
     FormatoArtigoAjuda,
 )
+from .services.politica_valor_service import validar_configuracao_politica_empresas
 from .validators import validar_anexo_upload
 
 
@@ -216,6 +220,143 @@ class ArtigoAjudaForm(BootstrapMixin, forms.ModelForm):
             instance.save()
             self.save_m2m()
         return instance
+
+
+class PoliticaValorManutencaoForm(BootstrapMixin, forms.Form):
+    chave = forms.CharField(label="Chave", max_length=80, required=False)
+    descricao = forms.CharField(label="Descricao", max_length=100, required=True)
+    tipo_politica = forms.ChoiceField(
+        label="Tipo da politica",
+        choices=PoliticaValor.TipoPolitica.choices,
+        required=True,
+    )
+    tipo_despesa = forms.ChoiceField(
+        label="Tipo de despesa",
+        choices=[("", "---------")] + list(TipoDespesa.choices),
+        required=False,
+    )
+    tipo_localidade = forms.ChoiceField(
+        label="Localidade",
+        choices=[("", "---------")] + list(TipoLocalidade.choices),
+        required=False,
+    )
+    cidade = forms.CharField(label="Cidade", max_length=80, required=False)
+    origem = forms.CharField(label="Origem", max_length=80, required=False)
+    destino = forms.CharField(label="Destino", max_length=80, required=False)
+    limite_valor = forms.DecimalField(
+        label="Limite de valor (R$)",
+        max_digits=10,
+        decimal_places=2,
+        required=False,
+        min_value=Decimal("0.00"),
+    )
+    valor_km = forms.DecimalField(
+        label="Valor por km (R$)",
+        max_digits=6,
+        decimal_places=4,
+        required=False,
+        min_value=Decimal("0.0000"),
+    )
+    vigencia_inicio = forms.DateField(
+        label="Vigencia inicio",
+        widget=forms.DateInput(attrs={"type": "date"}),
+        required=True,
+    )
+    vigencia_fim = forms.DateField(
+        label="Vigencia fim",
+        widget=forms.DateInput(attrs={"type": "date"}),
+        required=False,
+    )
+    ativo = forms.BooleanField(label="Ativo", required=False, initial=True)
+    escopo = forms.ChoiceField(
+        label="Escopo",
+        choices=EscopoPoliticaValor.choices,
+        widget=forms.RadioSelect,
+        required=True,
+        initial=EscopoPoliticaValor.GLOBAL,
+    )
+    empresas = forms.MultipleChoiceField(
+        label="Empresas especificas",
+        choices=EmpresaGrupo.choices,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+    )
+
+    def __init__(self, *args, instance=None, **kwargs):
+        self.instance = instance
+        initial = kwargs.pop("initial", {}) or {}
+        if instance is not None:
+            initial.update(
+                {
+                    "chave": instance.chave,
+                    "descricao": instance.descricao,
+                    "tipo_politica": instance.tipo_politica,
+                    "tipo_despesa": instance.tipo_despesa,
+                    "tipo_localidade": instance.tipo_localidade,
+                    "cidade": instance.cidade,
+                    "origem": instance.origem,
+                    "destino": instance.destino,
+                    "limite_valor": instance.limite_valor,
+                    "valor_km": instance.valor_km,
+                    "vigencia_inicio": instance.vigencia_inicio,
+                    "vigencia_fim": instance.vigencia_fim,
+                    "ativo": instance.ativo,
+                    "escopo": instance.escopo,
+                    "empresas": list(
+                        instance.empresas_grupo.values_list("empresa_grupo", flat=True)
+                    ),
+                }
+            )
+        super().__init__(*args, initial=initial, **kwargs)
+        self.fields["ativo"].widget.attrs["class"] = "form-check-input"
+        self.fields["escopo"].widget.attrs["class"] = "form-check-input"
+        self.fields["empresas"].widget.attrs["class"] = "form-check-input"
+
+    def clean(self):
+        cleaned = super().clean()
+        inicio = cleaned.get("vigencia_inicio")
+        fim = cleaned.get("vigencia_fim")
+        if inicio and fim and fim < inicio:
+            self.add_error("vigencia_fim", "A vigencia fim nao pode ser anterior ao inicio.")
+
+        limite = cleaned.get("limite_valor")
+        valor_km = cleaned.get("valor_km")
+        if limite is None and valor_km is None:
+            raise forms.ValidationError("Informe limite de valor ou valor por km.")
+        if limite is not None and valor_km is not None:
+            raise forms.ValidationError("Informe apenas um tipo de valor: limite ou valor por km.")
+
+        escopo = cleaned.get("escopo")
+        empresas = list(dict.fromkeys(cleaned.get("empresas") or []))
+        cleaned["empresas"] = empresas
+        if escopo == EscopoPoliticaValor.GLOBAL:
+            empresas = []
+            cleaned["empresas"] = []
+        if not escopo or not inicio:
+            return cleaned
+        politica = self.instance or PoliticaValor()
+        for campo in [
+            "chave",
+            "descricao",
+            "tipo_politica",
+            "tipo_despesa",
+            "tipo_localidade",
+            "cidade",
+            "origem",
+            "destino",
+            "limite_valor",
+            "valor_km",
+            "vigencia_inicio",
+            "vigencia_fim",
+            "ativo",
+            "escopo",
+        ]:
+            setattr(politica, campo, cleaned.get(campo))
+        try:
+            validar_configuracao_politica_empresas(politica, empresas)
+        except ValidationError as exc:
+            raise forms.ValidationError(exc.messages)
+        return cleaned
 
 
 class TecnicoChoiceField(forms.ModelChoiceField):

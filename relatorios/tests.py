@@ -549,6 +549,271 @@ class PoliticaValorEscopoEmpresaTests(TestCase):
         self.assertEqual(valor_km_control_sul(date(2026, 8, 1)), Decimal("1.35"))
 
 
+class ManutencaoPoliticasViewsTests(TestCase):
+    def setUp(self):
+        self.admin = get_user_model().objects.create_superuser(
+            username="admin.politicas",
+            email="admin@example.com",
+            password="senha",
+        )
+        self.comum = get_user_model().objects.create_user(
+            username="usuario.comum",
+            password="senha",
+        )
+
+    def criar_politica(
+        self,
+        chave="TESTE_REFEICAO_CAPITAL",
+        *,
+        escopo=EscopoPoliticaValor.GLOBAL,
+        empresas=(),
+        limite=Decimal("80.00"),
+        inicio=date(2026, 1, 1),
+        fim=None,
+        ativo=True,
+    ):
+        politica = PoliticaValor.objects.create(
+            chave=chave,
+            escopo=escopo,
+            tipo_politica=PoliticaValor.TipoPolitica.REFEICAO,
+            tipo_despesa=TipoDespesa.ALIMENTACAO,
+            tipo_localidade="capital",
+            descricao=chave,
+            limite_valor=limite,
+            vigencia_inicio=inicio,
+            vigencia_fim=fim,
+            ativo=ativo,
+        )
+        for empresa in empresas:
+            PoliticaValorEmpresaGrupo.objects.create(
+                politica=politica,
+                empresa_grupo=empresa,
+            )
+        return politica
+
+    def dados_post(self, **overrides):
+        dados = {
+            "chave": "TESTE_NOVA_POLITICA",
+            "descricao": "Teste nova politica",
+            "tipo_politica": PoliticaValor.TipoPolitica.REFEICAO,
+            "tipo_despesa": TipoDespesa.ALIMENTACAO,
+            "tipo_localidade": "capital",
+            "cidade": "",
+            "origem": "",
+            "destino": "",
+            "limite_valor": "80.00",
+            "valor_km": "",
+            "vigencia_inicio": "2026-01-01",
+            "vigencia_fim": "",
+            "ativo": "on",
+            "escopo": EscopoPoliticaValor.GLOBAL,
+            "empresas": [],
+        }
+        dados.update(overrides)
+        return dados
+
+    def test_acesso_nao_autorizado_recebe_403(self):
+        self.client.login(username="usuario.comum", password="senha")
+
+        response = self.client.get(reverse("relatorios:manutencao_politicas"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_listagem_exibe_politica_global_e_nao_exibe_exclusao(self):
+        self.client.login(username="admin.politicas", password="senha")
+        self.criar_politica()
+
+        response = self.client.get(reverse("relatorios:manutencao_politicas"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "TESTE_REFEICAO_CAPITAL")
+        self.assertContains(response, "GLOBAL")
+        self.assertNotContains(response, "Excluir")
+
+    def test_listagem_exibe_politica_empresarial_com_empresas(self):
+        self.client.login(username="admin.politicas", password="senha")
+        self.criar_politica(
+            chave="TESTE_EMPRESARIAL",
+            escopo=EscopoPoliticaValor.EMPRESAS,
+            empresas=[EmpresaGrupo.CONTROLSUL, EmpresaGrupo.FISCALMAX],
+        )
+
+        response = self.client.get(reverse("relatorios:manutencao_politicas"))
+
+        self.assertContains(response, "EMPRESAS")
+        self.assertContains(response, "CONTROLSUL")
+        self.assertContains(response, "FISCALMAX")
+
+    def test_filtros_funcionam_server_side(self):
+        self.client.login(username="admin.politicas", password="senha")
+        self.criar_politica(chave="TESTE_GLOBAL")
+        self.criar_politica(
+            chave="TESTE_CONTROLSUL",
+            escopo=EscopoPoliticaValor.EMPRESAS,
+            empresas=[EmpresaGrupo.CONTROLSUL],
+        )
+
+        response = self.client.get(
+            reverse("relatorios:manutencao_politicas"),
+            {"escopo": EscopoPoliticaValor.EMPRESAS, "empresa": EmpresaGrupo.CONTROLSUL},
+        )
+
+        self.assertContains(response, "TESTE_CONTROLSUL")
+        self.assertNotContains(response, "TESTE_GLOBAL")
+
+    def test_criacao_global_nao_cria_vinculos_empresariais(self):
+        self.client.login(username="admin.politicas", password="senha")
+
+        response = self.client.post(
+            reverse("relatorios:manutencao_politica_criar"),
+            self.dados_post(chave="TESTE_GLOBAL_CRIADA"),
+        )
+
+        self.assertRedirects(response, reverse("relatorios:manutencao_politicas"))
+        politica = PoliticaValor.objects.get(chave="TESTE_GLOBAL_CRIADA")
+        self.assertEqual(politica.escopo, EscopoPoliticaValor.GLOBAL)
+        self.assertFalse(politica.empresas_grupo.exists())
+
+    def test_criacao_empresas_exige_empresa(self):
+        self.client.login(username="admin.politicas", password="senha")
+
+        response = self.client.post(
+            reverse("relatorios:manutencao_politica_criar"),
+            self.dados_post(escopo=EscopoPoliticaValor.EMPRESAS, empresas=[]),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Informe ao menos uma empresa")
+        self.assertFalse(PoliticaValor.objects.filter(chave="TESTE_NOVA_POLITICA").exists())
+
+    def test_criacao_empresas_com_multiplas_empresas(self):
+        self.client.login(username="admin.politicas", password="senha")
+
+        response = self.client.post(
+            reverse("relatorios:manutencao_politica_criar"),
+            self.dados_post(
+                chave="TESTE_MULTI_EMPRESA",
+                escopo=EscopoPoliticaValor.EMPRESAS,
+                empresas=[EmpresaGrupo.CONTROLSUL, EmpresaGrupo.FISCALMAX],
+            ),
+        )
+
+        self.assertRedirects(response, reverse("relatorios:manutencao_politicas"))
+        politica = PoliticaValor.objects.get(chave="TESTE_MULTI_EMPRESA")
+        self.assertEqual(
+            set(politica.empresas_grupo.values_list("empresa_grupo", flat=True)),
+            {EmpresaGrupo.CONTROLSUL, EmpresaGrupo.FISCALMAX},
+        )
+
+    def test_conflito_empresarial_invalida_criacao_mas_global_coexiste(self):
+        self.client.login(username="admin.politicas", password="senha")
+        self.criar_politica(
+            chave="TESTE_CONFLITO",
+            escopo=EscopoPoliticaValor.EMPRESAS,
+            empresas=[EmpresaGrupo.CONTROLSUL],
+        )
+
+        response = self.client.post(
+            reverse("relatorios:manutencao_politica_criar"),
+            self.dados_post(
+                chave="TESTE_CONFLITO",
+                escopo=EscopoPoliticaValor.EMPRESAS,
+                empresas=[EmpresaGrupo.CONTROLSUL],
+            ),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "sobreposta")
+
+        response_global = self.client.post(
+            reverse("relatorios:manutencao_politica_criar"),
+            self.dados_post(chave="TESTE_CONFLITO"),
+        )
+        self.assertRedirects(response_global, reverse("relatorios:manutencao_politicas"))
+
+    def test_edicao_preserva_id_e_altera_global_para_empresas(self):
+        self.client.login(username="admin.politicas", password="senha")
+        politica = self.criar_politica(chave="TESTE_EDITA")
+        politica_id = politica.pk
+
+        response = self.client.post(
+            reverse("relatorios:manutencao_politica_editar", args=[politica.pk]),
+            self.dados_post(
+                chave="TESTE_EDITA",
+                descricao="Teste editado",
+                escopo=EscopoPoliticaValor.EMPRESAS,
+                empresas=[EmpresaGrupo.CONTROLSUL],
+            ),
+        )
+
+        self.assertRedirects(response, reverse("relatorios:manutencao_politicas"))
+        politica.refresh_from_db()
+        self.assertEqual(politica.pk, politica_id)
+        self.assertEqual(politica.descricao, "Teste editado")
+        self.assertEqual(politica.escopo, EscopoPoliticaValor.EMPRESAS)
+        self.assertEqual(politica.empresas_grupo.count(), 1)
+
+    def test_edicao_empresas_para_global_remove_vinculos(self):
+        self.client.login(username="admin.politicas", password="senha")
+        politica = self.criar_politica(
+            chave="TESTE_REMOVE_EMPRESA",
+            escopo=EscopoPoliticaValor.EMPRESAS,
+            empresas=[EmpresaGrupo.CONTROLSUL],
+        )
+
+        response = self.client.post(
+            reverse("relatorios:manutencao_politica_editar", args=[politica.pk]),
+            self.dados_post(chave="TESTE_REMOVE_EMPRESA", escopo=EscopoPoliticaValor.GLOBAL),
+        )
+
+        self.assertRedirects(response, reverse("relatorios:manutencao_politicas"))
+        politica.refresh_from_db()
+        self.assertEqual(politica.escopo, EscopoPoliticaValor.GLOBAL)
+        self.assertFalse(politica.empresas_grupo.exists())
+
+    def test_duplicacao_abre_formulario_e_salvamento_cria_novo_id(self):
+        self.client.login(username="admin.politicas", password="senha")
+        politica = self.criar_politica(chave="TESTE_DUPLICAR")
+
+        response = self.client.get(
+            reverse("relatorios:manutencao_politica_duplicar", args=[politica.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "TESTE_DUPLICAR")
+
+        response = self.client.post(
+            reverse("relatorios:manutencao_politica_criar"),
+            self.dados_post(chave="TESTE_DUPLICADA"),
+        )
+        self.assertRedirects(response, reverse("relatorios:manutencao_politicas"))
+        self.assertNotEqual(
+            PoliticaValor.objects.get(chave="TESTE_DUPLICADA").pk,
+            politica.pk,
+        )
+
+    def test_encerramento_preenche_vigencia_fim(self):
+        self.client.login(username="admin.politicas", password="senha")
+        politica = self.criar_politica(chave="TESTE_ENCERRAR", fim=None)
+
+        response = self.client.post(
+            reverse("relatorios:manutencao_politica_encerrar", args=[politica.pk])
+        )
+
+        self.assertRedirects(response, reverse("relatorios:manutencao_politicas"))
+        politica.refresh_from_db()
+        self.assertEqual(politica.vigencia_fim, timezone.localdate())
+
+    def test_posts_protegidos_por_autorizacao(self):
+        self.client.login(username="usuario.comum", password="senha")
+
+        response = self.client.post(
+            reverse("relatorios:manutencao_politica_criar"),
+            self.dados_post(chave="TESTE_NEGADO"),
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(PoliticaValor.objects.filter(chave="TESTE_NEGADO").exists())
+
+
 class DespesaTecnicoParticipanteTests(TestCase):
     def setUp(self):
         self.usuario = get_user_model().objects.create_user("tecnico-despesa")

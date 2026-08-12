@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block page_title %}{{ titulo_pagina }}{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Inicio</a>
+  </li>
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:manutencao' %}" class="text-decoration-none">Manutencao</a>
+  </li>
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:manutencao_politicas' %}" class="text-decoration-none">Politicas</a>
+  </li>
+  <li class="breadcrumb-item active">{{ titulo_pagina }}</li>
+{% endblock %}
+
+{% block content %}
+{% include "manutencao/_nav.html" %}
+
+<form method="post" class="d-grid gap-3 js-politica-form">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger">
+      {% for erro in form.non_field_errors %}
+        <div>{{ erro }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if modo == "duplicar" %}
+    <div class="alert alert-info border-0 shadow-sm">
+      Revise vigencia e empresas antes de salvar. A duplicacao so cria uma nova politica ao confirmar este formulario.
+    </div>
+  {% endif %}
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-body">
+      <h6 class="mb-0">Identificacao</h6>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label small text-muted" for="{{ form.chave.id_for_label }}">{{ form.chave.label }}</label>
+          {{ form.chave }}
+          {% for erro in form.chave.errors %}<div class="invalid-feedback d-block">{{ erro }}</div>{% endfor %}
+        </div>
+        <div class="col-md-8">
+          <label class="form-label small text-muted" for="{{ form.descricao.id_for_label }}">{{ form.descricao.label }}</label>
+          {{ form.descricao }}
+          {% for erro in form.descricao.errors %}<div class="invalid-feedback d-block">{{ erro }}</div>{% endfor %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted" for="{{ form.tipo_politica.id_for_label }}">{{ form.tipo_politica.label }}</label>
+          {{ form.tipo_politica }}
+          {% for erro in form.tipo_politica.errors %}<div class="invalid-feedback d-block">{{ erro }}</div>{% endfor %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted" for="{{ form.tipo_despesa.id_for_label }}">{{ form.tipo_despesa.label }}</label>
+          {{ form.tipo_despesa }}
+          {% for erro in form.tipo_despesa.errors %}<div class="invalid-feedback d-block">{{ erro }}</div>{% endfor %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted" for="{{ form.tipo_localidade.id_for_label }}">{{ form.tipo_localidade.label }}</label>
+          {{ form.tipo_localidade }}
+          {% for erro in form.tipo_localidade.errors %}<div class="invalid-feedback d-block">{{ erro }}</div>{% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-body">
+      <h6 class="mb-0">Aplicacao</h6>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label small text-muted" for="{{ form.cidade.id_for_label }}">{{ form.cidade.label }}</label>
+          {{ form.cidade }}
+          {% for erro in form.cidade.errors %}<div class="invalid-feedback d-block">{{ erro }}</div>{% endfor %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted" for="{{ form.origem.id_for_label }}">{{ form.origem.label }}</label>
+          {{ form.origem }}
+          {% for erro in form.origem.errors %}<div class="invalid-feedback d-block">{{ erro }}</div>{% endfor %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted" for="{{ form.destino.id_for_label }}">{{ form.destino.label }}</label>
+          {{ form.destino }}
+          {% for erro in form.destino.errors %}<div class="invalid-feedback d-block">{{ erro }}</div>{% endfor %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small text-muted" for="{{ form.limite_valor.id_for_label }}">{{ form.limite_valor.label }}</label>
+          {{ form.limite_valor }}
+          {% for erro in form.limite_valor.errors %}<div class="invalid-feedback d-block">{{ erro }}</div>{% endfor %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small text-muted" for="{{ form.valor_km.id_for_label }}">{{ form.valor_km.label }}</label>
+          {{ form.valor_km }}
+          {% for erro in form.valor_km.errors %}<div class="invalid-feedback d-block">{{ erro }}</div>{% endfor %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small text-muted" for="{{ form.vigencia_inicio.id_for_label }}">{{ form.vigencia_inicio.label }}</label>
+          {{ form.vigencia_inicio }}
+          {% for erro in form.vigencia_inicio.errors %}<div class="invalid-feedback d-block">{{ erro }}</div>{% endfor %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small text-muted" for="{{ form.vigencia_fim.id_for_label }}">{{ form.vigencia_fim.label }}</label>
+          {{ form.vigencia_fim }}
+          {% for erro in form.vigencia_fim.errors %}<div class="invalid-feedback d-block">{{ erro }}</div>{% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-body">
+      <h6 class="mb-0">Escopo</h6>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          {% for radio in form.escopo %}
+            <div class="form-check">
+              {{ radio.tag }}
+              <label class="form-check-label" for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+            </div>
+          {% endfor %}
+          {% for erro in form.escopo.errors %}<div class="invalid-feedback d-block">{{ erro }}</div>{% endfor %}
+          <div class="form-text">Global funciona como fallback geral. Empresas especificas exigem ao menos uma empresa.</div>
+        </div>
+        <div class="col-md-5 js-politica-empresas">
+          <label class="form-label small text-muted">{{ form.empresas.label }}</label>
+          {% for checkbox in form.empresas %}
+            <div class="form-check">
+              {{ checkbox.tag }}
+              <label class="form-check-label" for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
+            </div>
+          {% endfor %}
+          {% for erro in form.empresas.errors %}<div class="invalid-feedback d-block">{{ erro }}</div>{% endfor %}
+        </div>
+        <div class="col-md-3">
+          <div class="form-check mt-4">
+            {{ form.ativo }}
+            <label class="form-check-label" for="{{ form.ativo.id_for_label }}">{{ form.ativo.label }}</label>
+          </div>
+          {% for erro in form.ativo.errors %}<div class="invalid-feedback d-block">{{ erro }}</div>{% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-end gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'relatorios:manutencao_politicas' %}">Cancelar</a>
+    <button class="btn btn-primary" type="submit">
+      <i class="bi bi-check2 me-1"></i>Salvar politica
+    </button>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    const form = document.querySelector(".js-politica-form");
+    if (!form) return;
+    const empresasBox = form.querySelector(".js-politica-empresas");
+    const radios = Array.from(form.querySelectorAll("input[name='escopo']"));
+    function refreshEscopo() {
+      const selected = radios.find((radio) => radio.checked);
+      const showEmpresas = selected && selected.value === "empresas";
+      empresasBox.classList.toggle("d-none", !showEmpresas);
+    }
+    radios.forEach((radio) => radio.addEventListener("change", refreshEscopo));
+    refreshEscopo();
+  })();
+</script>
+{% endblock %}

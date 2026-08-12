@@ -11,6 +11,7 @@ from django.contrib import messages
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.paginator import Paginator
 from django.core.exceptions import PermissionDenied, RequestDataTooBig, SuspiciousOperation, ValidationError
 from django.db import transaction
 from django.db.utils import OperationalError, ProgrammingError
@@ -113,6 +114,14 @@ from .services.manutencao_service import (
     reenviar_email_log,
     resumo_emails,
 )
+from .services.politica_manutencao_service import (
+    dados_iniciais_duplicacao,
+    encerrar_politica,
+    filtrar_politicas,
+    opcoes_filtro_politicas,
+    preparar_linhas_politicas,
+    salvar_politica_manutencao,
+)
 from .services.rateio_service import (
     RateioError,
     garantir_rateio_despesa,
@@ -156,6 +165,7 @@ from .forms import (
     CidadeAtendimentoFormSet,
     ItemDespesaForm,
     ItemDespesaFormSet,
+    PoliticaValorManutencaoForm,
     RelatorioFiltroForm,
     RelatorioTecnicoForm,
     TecnicoForm,
@@ -578,6 +588,131 @@ def manutencao_view(request):
             "log_niveis": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         },
     )
+
+
+@login_required
+def manutencao_politicas_view(request):
+    _exigir_manutencao(request)
+    qs = filtrar_politicas(request.GET)
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    linhas = preparar_linhas_politicas(page_obj.object_list)
+    filtros_paginacao = request.GET.copy()
+    filtros_paginacao.pop("page", None)
+    logger.info(
+        "manutencao_politicas_listagem usuario=%s total=%s",
+        request.user.pk,
+        paginator.count,
+    )
+    return render(
+        request,
+        "manutencao/politicas_list.html",
+        {
+            "titulo_pagina": "Politicas",
+            "linhas_politicas": linhas,
+            "page_obj": page_obj,
+            "total_politicas": paginator.count,
+            "querystring_paginacao": filtros_paginacao.urlencode(),
+            **opcoes_filtro_politicas(),
+        },
+    )
+
+
+@login_required
+def manutencao_politica_criar_view(request):
+    _exigir_manutencao(request)
+    form = PoliticaValorManutencaoForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        politica = salvar_politica_manutencao(form)
+        messages.success(request, f"Politica #{politica.pk} criada com sucesso.")
+        logger.info(
+            "manutencao_politica_criada usuario=%s politica=%s escopo=%s",
+            request.user.pk,
+            politica.pk,
+            politica.escopo,
+        )
+        return redirect("relatorios:manutencao_politicas")
+    return render(
+        request,
+        "manutencao/politica_form.html",
+        {
+            "titulo_pagina": "Nova politica",
+            "form": form,
+            "modo": "criar",
+            "politica": None,
+        },
+    )
+
+
+@login_required
+def manutencao_politica_editar_view(request, pk):
+    _exigir_manutencao(request)
+    politica = get_object_or_404(
+        PoliticaValor.objects.prefetch_related("empresas_grupo"),
+        pk=pk,
+    )
+    form = PoliticaValorManutencaoForm(request.POST or None, instance=politica)
+    if request.method == "POST" and form.is_valid():
+        politica_salva = salvar_politica_manutencao(form)
+        messages.success(request, f"Politica #{politica_salva.pk} atualizada com sucesso.")
+        logger.info(
+            "manutencao_politica_editada usuario=%s politica=%s escopo=%s",
+            request.user.pk,
+            politica_salva.pk,
+            politica_salva.escopo,
+        )
+        return redirect("relatorios:manutencao_politicas")
+    return render(
+        request,
+        "manutencao/politica_form.html",
+        {
+            "titulo_pagina": f"Editar politica #{politica.pk}",
+            "form": form,
+            "modo": "editar",
+            "politica": politica,
+        },
+    )
+
+
+@login_required
+def manutencao_politica_duplicar_view(request, pk):
+    _exigir_manutencao(request)
+    politica = get_object_or_404(
+        PoliticaValor.objects.prefetch_related("empresas_grupo"),
+        pk=pk,
+    )
+    form = PoliticaValorManutencaoForm(initial=dados_iniciais_duplicacao(politica))
+    logger.info(
+        "manutencao_politica_duplicacao_aberta usuario=%s politica_origem=%s",
+        request.user.pk,
+        politica.pk,
+    )
+    return render(
+        request,
+        "manutencao/politica_form.html",
+        {
+            "titulo_pagina": f"Duplicar politica #{politica.pk}",
+            "form": form,
+            "modo": "duplicar",
+            "politica": politica,
+        },
+    )
+
+
+@require_POST
+@login_required
+def manutencao_politica_encerrar_view(request, pk):
+    _exigir_manutencao(request)
+    politica = get_object_or_404(PoliticaValor, pk=pk)
+    encerrar_politica(politica)
+    messages.success(request, f"Politica #{politica.pk} encerrada com sucesso.")
+    logger.info(
+        "manutencao_politica_encerrada usuario=%s politica=%s vigencia_fim=%s",
+        request.user.pk,
+        politica.pk,
+        politica.vigencia_fim,
+    )
+    return redirect("relatorios:manutencao_politicas")
 
 
 @require_POST

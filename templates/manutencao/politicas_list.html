@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block page_title %}Politicas{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Inicio</a>
+  </li>
+  <li class="breadcrumb-item">
+    <a href="{% url 'relatorios:manutencao' %}" class="text-decoration-none">Manutencao</a>
+  </li>
+  <li class="breadcrumb-item active">Politicas</li>
+{% endblock %}
+
+{% block page_actions %}
+  <a class="btn btn-primary btn-sm" href="{% url 'relatorios:manutencao_politica_criar' %}">
+    <i class="bi bi-plus-lg me-1"></i>Nova politica
+  </a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .politicas-table {
+    min-width: 1120px;
+  }
+  .politica-route {
+    max-width: 220px;
+    white-space: normal;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="alert alert-warning border-0 shadow-sm d-flex align-items-start gap-2">
+  <i class="bi bi-shield-lock-fill mt-1"></i>
+  <div>
+    <strong>Area restrita.</strong>
+    Use esta area apenas para manutencao controlada das politicas internas.
+  </div>
+</div>
+
+{% include "manutencao/_nav.html" %}
+
+<section class="d-grid gap-3">
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-lg-3 col-md-6">
+          <label class="form-label small text-muted">Buscar</label>
+          <input type="text" name="q" class="form-control form-control-sm" value="{{ request.GET.q }}" placeholder="chave, descricao, cidade...">
+        </div>
+        <div class="col-lg-2 col-md-3">
+          <label class="form-label small text-muted">Tipo</label>
+          <select name="tipo_politica" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            {% for valor, label in tipo_politica_choices %}
+              <option value="{{ valor }}" {% if request.GET.tipo_politica == valor %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-lg-2 col-md-3">
+          <label class="form-label small text-muted">Despesa</label>
+          <select name="tipo_despesa" class="form-select form-select-sm">
+            <option value="">Todas</option>
+            {% for valor, label in tipo_despesa_choices %}
+              <option value="{{ valor }}" {% if request.GET.tipo_despesa == valor %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-lg-1 col-md-3">
+          <label class="form-label small text-muted">Escopo</label>
+          <select name="escopo" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            {% for valor, label in escopo_choices %}
+              <option value="{{ valor }}" {% if request.GET.escopo == valor %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-lg-2 col-md-3">
+          <label class="form-label small text-muted">Empresa</label>
+          <select name="empresa" class="form-select form-select-sm">
+            <option value="">Todas</option>
+            {% for valor, label in empresa_choices %}
+              <option value="{{ valor }}" {% if request.GET.empresa == valor %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-lg-1 col-md-3">
+          <label class="form-label small text-muted">Localidade</label>
+          <select name="localidade" class="form-select form-select-sm">
+            <option value="">Todas</option>
+            {% for valor, label in localidade_choices %}
+              <option value="{{ valor }}" {% if request.GET.localidade == valor %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-lg-1 col-md-3">
+          <label class="form-label small text-muted">Status</label>
+          <select name="status" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            {% for valor, label in status_choices %}
+              <option value="{{ valor }}" {% if request.GET.status == valor %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12 d-flex justify-content-end gap-2">
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'relatorios:manutencao_politicas' %}">
+            <i class="bi bi-x-lg me-1"></i>Limpar
+          </a>
+          <button class="btn btn-sm btn-primary" type="submit">
+            <i class="bi bi-search me-1"></i>Filtrar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-body d-flex flex-wrap align-items-center justify-content-between gap-2">
+      <div>
+        <h6 class="mb-0">Politicas cadastradas</h6>
+        <small class="text-muted">{{ total_politicas }} registro(s) encontrado(s).</small>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0 politicas-table">
+          <thead>
+            <tr>
+              <th>Politica / chave</th>
+              <th>Tipo</th>
+              <th>Escopo</th>
+              <th>Empresas</th>
+              <th>Localidade / rota</th>
+              <th>Valor</th>
+              <th>Vigencia</th>
+              <th>Status</th>
+              <th class="text-end">Acoes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for linha in linhas_politicas %}
+            <tr class="{% if linha.configuracao_invalida %}table-warning{% endif %}">
+              <td>
+                <div class="fw-semibold">{{ linha.politica.descricao }}</div>
+                <div class="small text-muted">#{{ linha.politica.pk }} {% if linha.politica.chave %}{{ linha.politica.chave }}{% else %}-{% endif %}</div>
+              </td>
+              <td>
+                <div>{{ linha.politica.get_tipo_politica_display }}</div>
+                <div class="small text-muted">{{ linha.politica.get_tipo_despesa_display|default:"-" }}</div>
+              </td>
+              <td>
+                {% if linha.politica.escopo == "global" %}
+                  <span class="badge text-bg-primary">GLOBAL</span>
+                {% else %}
+                  <span class="badge text-bg-warning">EMPRESAS</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if linha.empresas %}
+                  {% for empresa in linha.empresas %}
+                    <span class="badge text-bg-secondary">{{ empresa }}</span>
+                  {% endfor %}
+                {% elif linha.politica.escopo == "global" %}
+                  <span class="text-muted small">Fallback geral</span>
+                {% else %}
+                  <span class="text-danger small">Sem empresa vinculada</span>
+                {% endif %}
+              </td>
+              <td class="politica-route small">{{ linha.localidade_label }}</td>
+              <td class="fw-semibold text-nowrap">{{ linha.valor_label }}</td>
+              <td class="small text-nowrap">
+                {{ linha.politica.vigencia_inicio|date:"d/m/Y" }}
+                {% if linha.politica.vigencia_fim %}
+                  ate {{ linha.politica.vigencia_fim|date:"d/m/Y" }}
+                {% else %}
+                  em aberto
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge {{ linha.status.badge }}">{{ linha.status.label }}</span>
+              </td>
+              <td class="text-end text-nowrap">
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'relatorios:manutencao_politica_editar' linha.politica.pk %}">
+                  <i class="bi bi-pencil-square me-1"></i>Editar
+                </a>
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'relatorios:manutencao_politica_duplicar' linha.politica.pk %}">
+                  <i class="bi bi-files me-1"></i>Duplicar
+                </a>
+                <form method="post"
+                      action="{% url 'relatorios:manutencao_politica_encerrar' linha.politica.pk %}"
+                      class="d-inline"
+                      onsubmit="return confirm('Encerrar esta politica preenchendo a vigencia fim com a data de hoje?');">
+                  {% csrf_token %}
+                  <button class="btn btn-sm btn-outline-warning" type="submit">
+                    <i class="bi bi-calendar-x me-1"></i>Encerrar
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="9" class="text-center text-muted py-4">Nenhuma politica encontrada para os filtros atuais.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% if page_obj.has_other_pages %}
+    <div class="card-footer bg-body d-flex justify-content-between align-items-center">
+      <span class="small text-muted">Pagina {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+      <div class="btn-group btn-group-sm">
+        {% if page_obj.has_previous %}
+          <a class="btn btn-outline-secondary" href="?{% if querystring_paginacao %}{{ querystring_paginacao }}&{% endif %}page={{ page_obj.previous_page_number }}">Anterior</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+          <a class="btn btn-outline-secondary" href="?{% if querystring_paginacao %}{{ querystring_paginacao }}&{% endif %}page={{ page_obj.next_page_number }}">Proxima</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
