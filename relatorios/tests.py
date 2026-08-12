@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -16,11 +16,13 @@ from .models import (
     Cliente,
     EmailLog,
     EmpresaGrupo,
+    EscopoPoliticaValor,
     HistoricoRelatorio,
     ItemDespesa,
     DespesaTecnico,
     PerfilUsuario,
     PoliticaValor,
+    PoliticaValorEmpresaGrupo,
     RelatorioAutoSave,
     RelatorioCliente,
     RelatorioTecnico,
@@ -65,6 +67,11 @@ from .services.financeiro_validator import validar_integridade_financeira_relato
 from .services.km_financeiro_service import calcular_km_financeiro
 from .services.periodo_despesa_service import calcular_diarias_periodo
 from .services.politica_aprovacao_service import aplicar_politica_valor_aprovado_inicial
+from .services.politica_valor_service import (
+    resolver_politica_despesa,
+    validar_configuracao_politica_empresas,
+    valor_km_control_sul,
+)
 from .services.workflow_service import aprovar_relatorio
 from .services.snapshot_service import criar_snapshot_financeiro
 from .services.tecnicos_despesa_service import (
@@ -243,6 +250,303 @@ class HospedagemPeriodoTests(TestCase):
         self.assertEqual(despesa.valor_politica_diaria, Decimal("250.00"))
         self.assertEqual(despesa.valor_politica, Decimal("1750.00"))
         self.assertFalse(despesa.acima_politica)
+
+
+class PoliticaValorEscopoEmpresaTests(TestCase):
+    def setUp(self):
+        self.usuario = get_user_model().objects.create_user("politica-empresa")
+        self.tecnico = Tecnico.objects.create(nome="Tecnico Politica", usuario=self.usuario)
+        self.cliente = Cliente.objects.create(nome="Cliente Politica")
+        self.relatorio = RelatorioTecnico.objects.create(
+            numero=900150,
+            cliente=self.cliente,
+            tecnico_responsavel=self.tecnico,
+            cidade_atendimento="Curitiba",
+            uf_atendimento="PR",
+            tipo_localidade="capital",
+            data_inicio=date(2026, 8, 1),
+            data_fim=date(2026, 8, 2),
+            motivo="Atendimento",
+        )
+
+    def criar_politica(
+        self,
+        valor,
+        *,
+        chave="REFEICAO_CAPITAL",
+        escopo=EscopoPoliticaValor.GLOBAL,
+        empresas=(),
+        inicio=date(2026, 1, 1),
+        fim=None,
+        ativo=True,
+    ):
+        politica = PoliticaValor.objects.create(
+            chave=chave,
+            escopo=escopo,
+            tipo_politica=PoliticaValor.TipoPolitica.REFEICAO
+            if chave.startswith("REFEICAO")
+            else PoliticaValor.TipoPolitica.VALOR_KM,
+            tipo_despesa=TipoDespesa.ALIMENTACAO if chave.startswith("REFEICAO") else "",
+            tipo_localidade="capital" if chave.startswith("REFEICAO") else "",
+            descricao=chave,
+            limite_valor=Decimal(valor) if chave.startswith("REFEICAO") else None,
+            valor_km=Decimal(valor) if chave == "VALOR_KM_CONTROLSUL" else None,
+            vigencia_inicio=inicio,
+            vigencia_fim=fim,
+            ativo=ativo,
+        )
+        for empresa in empresas:
+            PoliticaValorEmpresaGrupo.objects.create(
+                politica=politica,
+                empresa_grupo=empresa,
+            )
+        return politica
+
+    def resolver_refeicao(self, empresa_grupo=None, data_ref=date(2026, 8, 1)):
+        return resolver_politica_despesa(
+            tipo_despesa=TipoDespesa.ALIMENTACAO,
+            data=data_ref,
+            tipo_localidade="capital",
+            valor_informado=Decimal("100.00"),
+            empresa_grupo=empresa_grupo,
+        )
+
+    def test_politica_global_continua_resolvendo_com_e_sem_empresa(self):
+        self.criar_politica("80.00")
+
+        self.assertEqual(self.resolver_refeicao().valor, Decimal("80.00"))
+        self.assertEqual(
+            self.resolver_refeicao(EmpresaGrupo.CONTROLSUL).valor,
+            Decimal("80.00"),
+        )
+        self.assertEqual(
+            self.resolver_refeicao(EmpresaGrupo.FISCALMAX).valor,
+            Decimal("80.00"),
+        )
+
+    def test_politica_especifica_tem_precedencia_e_global_faz_fallback(self):
+        self.criar_politica("80.00")
+        self.criar_politica(
+            "90.00",
+            escopo=EscopoPoliticaValor.EMPRESAS,
+            empresas=[EmpresaGrupo.CONTROLSUL],
+        )
+
+        self.assertEqual(
+            self.resolver_refeicao(EmpresaGrupo.CONTROLSUL).valor,
+            Decimal("90.00"),
+        )
+        self.assertEqual(
+            self.resolver_refeicao(EmpresaGrupo.FISCALMAX).valor,
+            Decimal("80.00"),
+        )
+        self.assertEqual(self.resolver_refeicao().valor, Decimal("80.00"))
+
+    def test_politica_especifica_pode_valer_para_varias_empresas(self):
+        self.criar_politica("80.00")
+        self.criar_politica(
+            "95.00",
+            escopo=EscopoPoliticaValor.EMPRESAS,
+            empresas=[EmpresaGrupo.CONTROLSUL, EmpresaGrupo.FISCALMAX],
+        )
+
+        self.assertEqual(
+            self.resolver_refeicao(EmpresaGrupo.CONTROLSUL).valor,
+            Decimal("95.00"),
+        )
+        self.assertEqual(
+            self.resolver_refeicao(EmpresaGrupo.FISCALMAX).valor,
+            Decimal("95.00"),
+        )
+        self.assertEqual(
+            self.resolver_refeicao(EmpresaGrupo.BLAZIUS_E_LORENZETTI).valor,
+            Decimal("80.00"),
+        )
+
+    def test_politica_especifica_sem_global_nao_vira_zero_para_outras_empresas(self):
+        self.criar_politica(
+            "90.00",
+            escopo=EscopoPoliticaValor.EMPRESAS,
+            empresas=[EmpresaGrupo.CONTROLSUL],
+        )
+
+        self.assertEqual(
+            self.resolver_refeicao(EmpresaGrupo.CONTROLSUL).valor,
+            Decimal("90.00"),
+        )
+        self.assertIsNone(self.resolver_refeicao(EmpresaGrupo.FISCALMAX))
+        self.assertIsNone(self.resolver_refeicao())
+
+        despesa = ItemDespesa.objects.create(
+            relatorio=self.relatorio,
+            data=date(2026, 8, 1),
+            tipo=TipoDespesa.ALIMENTACAO,
+            descricao="Almoco",
+            valor=Decimal("100.00"),
+        )
+        aplicar_politica_valor_aprovado_inicial(despesa)
+        despesa.refresh_from_db()
+
+        self.assertIsNone(despesa.valor_politica)
+        self.assertIsNone(despesa.valor_aprovado)
+        self.assertEqual(despesa.valor_final, Decimal("100.00"))
+
+    def test_fallback_respeita_vigencia_da_politica_especifica(self):
+        self.criar_politica("80.00")
+        self.criar_politica(
+            "90.00",
+            escopo=EscopoPoliticaValor.EMPRESAS,
+            empresas=[EmpresaGrupo.CONTROLSUL],
+            inicio=date(2026, 9, 1),
+        )
+        self.criar_politica(
+            "85.00",
+            escopo=EscopoPoliticaValor.EMPRESAS,
+            empresas=[EmpresaGrupo.FISCALMAX],
+            inicio=date(2026, 1, 1),
+            fim=date(2026, 7, 31),
+        )
+
+        self.assertEqual(
+            self.resolver_refeicao(EmpresaGrupo.CONTROLSUL).valor,
+            Decimal("80.00"),
+        )
+        self.assertEqual(
+            self.resolver_refeicao(EmpresaGrupo.FISCALMAX).valor,
+            Decimal("80.00"),
+        )
+        self.assertEqual(
+            self.resolver_refeicao(EmpresaGrupo.CONTROLSUL, date(2026, 9, 15)).valor,
+            Decimal("90.00"),
+        )
+
+    def test_global_futura_ou_encerrada_nao_resolve_sem_empresa(self):
+        self.criar_politica("80.00", inicio=date(2026, 9, 1))
+        self.criar_politica(
+            "75.00",
+            inicio=date(2026, 1, 1),
+            fim=date(2026, 7, 31),
+        )
+
+        self.assertIsNone(self.resolver_refeicao())
+
+    def test_validacao_rejeita_especifica_sobreposta_para_mesma_empresa(self):
+        self.criar_politica(
+            "90.00",
+            escopo=EscopoPoliticaValor.EMPRESAS,
+            empresas=[EmpresaGrupo.CONTROLSUL],
+        )
+        nova = PoliticaValor(
+            chave="REFEICAO_CAPITAL",
+            escopo=EscopoPoliticaValor.EMPRESAS,
+            tipo_politica=PoliticaValor.TipoPolitica.REFEICAO,
+            tipo_despesa=TipoDespesa.ALIMENTACAO,
+            tipo_localidade="capital",
+            descricao="Refeicao Capital nova",
+            limite_valor=Decimal("95.00"),
+            vigencia_inicio=date(2026, 6, 1),
+            ativo=True,
+        )
+
+        with self.assertRaises(ValidationError):
+            validar_configuracao_politica_empresas(
+                nova,
+                [EmpresaGrupo.CONTROLSUL],
+            )
+
+    def test_validacao_permite_global_com_especifica_e_empresas_distintas(self):
+        self.criar_politica("80.00")
+        self.criar_politica(
+            "90.00",
+            escopo=EscopoPoliticaValor.EMPRESAS,
+            empresas=[EmpresaGrupo.CONTROLSUL],
+        )
+        fiscalmax = PoliticaValor(
+            chave="REFEICAO_CAPITAL",
+            escopo=EscopoPoliticaValor.EMPRESAS,
+            tipo_politica=PoliticaValor.TipoPolitica.REFEICAO,
+            tipo_despesa=TipoDespesa.ALIMENTACAO,
+            tipo_localidade="capital",
+            descricao="Refeicao FiscalMax",
+            limite_valor=Decimal("92.00"),
+            vigencia_inicio=date(2026, 1, 1),
+            ativo=True,
+        )
+
+        validar_configuracao_politica_empresas(
+            fiscalmax,
+            [EmpresaGrupo.FISCALMAX],
+        )
+
+    def test_item_despesa_usa_empresa_grupo_do_relatorio(self):
+        self.criar_politica("80.00")
+        self.criar_politica(
+            "90.00",
+            escopo=EscopoPoliticaValor.EMPRESAS,
+            empresas=[EmpresaGrupo.CONTROLSUL],
+        )
+        self.relatorio.empresa_grupo = EmpresaGrupo.CONTROLSUL
+        self.relatorio.save(update_fields=["empresa_grupo"])
+        despesa = ItemDespesa.objects.create(
+            relatorio=self.relatorio,
+            data=date(2026, 8, 1),
+            tipo=TipoDespesa.ALIMENTACAO,
+            descricao="Almoco",
+            valor=Decimal("100.00"),
+        )
+
+        aplicar_politica_valor_aprovado_inicial(despesa)
+        despesa.refresh_from_db()
+
+        self.assertEqual(despesa.valor_politica, Decimal("90.00"))
+        self.assertEqual(despesa.valor_aprovado, Decimal("90.00"))
+
+    def test_empresa_nao_altera_multiplicador_por_tecnicos(self):
+        self.criar_politica(
+            "90.00",
+            escopo=EscopoPoliticaValor.EMPRESAS,
+            empresas=[EmpresaGrupo.CONTROLSUL],
+        )
+        self.relatorio.empresa_grupo = EmpresaGrupo.CONTROLSUL
+        self.relatorio.save(update_fields=["empresa_grupo"])
+        tecnico_extra = Tecnico.objects.create(nome="Tecnico Extra Politica")
+        RelatorioTecnicoEquipe.objects.create(
+            relatorio=self.relatorio,
+            tecnico=tecnico_extra,
+        )
+        despesa = ItemDespesa.objects.create(
+            relatorio=self.relatorio,
+            data=date(2026, 8, 1),
+            tipo=TipoDespesa.ALIMENTACAO,
+            descricao="Almoco equipe",
+            valor=Decimal("200.00"),
+        )
+        sync_tecnicos_despesa(
+            despesa,
+            [self.tecnico.pk, tecnico_extra.pk],
+            self.usuario,
+        )
+
+        aplicar_politica_valor_aprovado_inicial(despesa)
+        despesa.refresh_from_db()
+
+        self.assertEqual(despesa.valor_politica, Decimal("180.00"))
+        self.assertEqual(despesa.valor_aprovado, Decimal("180.00"))
+
+    def test_valor_km_control_sul_continua_global_para_chamada_antiga(self):
+        self.criar_politica(
+            "1.3500",
+            chave="VALOR_KM_CONTROLSUL",
+            escopo=EscopoPoliticaValor.GLOBAL,
+        )
+        self.criar_politica(
+            "2.0000",
+            chave="VALOR_KM_CONTROLSUL",
+            escopo=EscopoPoliticaValor.EMPRESAS,
+            empresas=[EmpresaGrupo.CONTROLSUL],
+        )
+
+        self.assertEqual(valor_km_control_sul(date(2026, 8, 1)), Decimal("1.35"))
 
 
 class DespesaTecnicoParticipanteTests(TestCase):

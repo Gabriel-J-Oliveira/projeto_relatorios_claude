@@ -9,6 +9,7 @@ from .models import (
     Cliente,
     Municipio,
     PoliticaValor,
+    PoliticaValorEmpresaGrupo,
     RelatorioTecnico,
     RelatorioSnapshotFinanceiro,
     RelatorioTecnicoEquipe,
@@ -170,9 +171,16 @@ class MunicipioAdmin(admin.ModelAdmin):
 # ─────────────────────────────────────────────
 
 
+class PoliticaValorEmpresaGrupoInline(admin.TabularInline):
+    model = PoliticaValorEmpresaGrupo
+    extra = 0
+
+
 @admin.register(PoliticaValor)
 class PoliticaValorAdmin(admin.ModelAdmin):
+    inlines = [PoliticaValorEmpresaGrupoInline]
     list_display = [
+        "escopo",
         "chave",
         "descricao",
         "tipo_politica",
@@ -185,7 +193,7 @@ class PoliticaValorAdmin(admin.ModelAdmin):
         "vigencia_fim",
         "ativo",
     ]
-    list_filter = ["ativo", "tipo_politica", "tipo_despesa", "tipo_localidade", "cidade"]
+    list_filter = ["ativo", "escopo", "tipo_politica", "tipo_despesa", "tipo_localidade", "cidade"]
     search_fields = ["chave", "descricao", "cidade", "origem", "destino"]
     list_editable = ["ativo"]
 

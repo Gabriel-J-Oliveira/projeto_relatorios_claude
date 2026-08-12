@@ -2,11 +2,20 @@ import logging
 import re
 import unicodedata
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError
+from django.db.models import Q
 from django.utils import timezone
 
-from relatorios.models import PoliticaValor, TipoDespesa, TipoLocalidade
+from relatorios.models import (
+    EmpresaGrupo,
+    EscopoPoliticaValor,
+    PoliticaValor,
+    TipoDespesa,
+    TipoLocalidade,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -60,6 +69,63 @@ def despesa_usa_politica_por_tecnico(tipo_despesa):
     }
 
 
+def _fim_ou_infinito(valor):
+    return valor or date.max
+
+
+def politicas_empresariais_conflitantes(politica, empresas=None):
+    empresas = [empresa for empresa in (empresas or []) if empresa]
+    if not politica or politica.escopo != EscopoPoliticaValor.EMPRESAS or not empresas:
+        return PoliticaValor.objects.none()
+
+    inicio = politica.vigencia_inicio
+    fim = _fim_ou_infinito(politica.vigencia_fim)
+    qs = (
+        PoliticaValor.objects.filter(
+            chave=politica.chave,
+            escopo=EscopoPoliticaValor.EMPRESAS,
+            ativo=True,
+            empresas_grupo__empresa_grupo__in=empresas,
+            vigencia_inicio__lte=fim,
+        )
+        .filter(Q(vigencia_fim__isnull=True) | Q(vigencia_fim__gte=inicio))
+        .distinct()
+    )
+    if politica.pk:
+        qs = qs.exclude(pk=politica.pk)
+    return qs
+
+
+def validar_configuracao_politica_empresas(politica, empresas=None):
+    empresas_validas = {valor for valor, _label in EmpresaGrupo.choices}
+    empresas = [empresa for empresa in (empresas or []) if empresa]
+    empresas_invalidas = sorted(set(empresas) - empresas_validas)
+    if empresas_invalidas:
+        raise ValidationError(
+            f"Empresa(s) inválida(s) para política: {', '.join(empresas_invalidas)}."
+        )
+
+    if politica.escopo == EscopoPoliticaValor.GLOBAL:
+        if empresas:
+            raise ValidationError("Políticas globais não devem possuir empresas específicas.")
+        return
+
+    if politica.escopo != EscopoPoliticaValor.EMPRESAS:
+        raise ValidationError("Escopo de política inválido.")
+    if not empresas:
+        raise ValidationError("Informe ao menos uma empresa para política empresarial.")
+
+    conflitos = politicas_empresariais_conflitantes(politica, empresas)
+    if conflitos.exists():
+        conflitantes = ", ".join(
+            f"#{item.pk} {item.chave}" for item in conflitos[:5]
+        )
+        raise ValidationError(
+            "Já existe política empresarial ativa com a mesma chave, empresa e vigência "
+            f"sobreposta: {conflitantes}."
+        )
+
+
 def calcular_limite_politica_despesa(
     politica,
     *,
@@ -83,10 +149,19 @@ def calcular_limite_politica_despesa(
     return _money(valor_base * multiplicador)
 
 
-def _buscar_chave(chave, data):
-    politica = PoliticaValor.vigente_por_chave(chave, data or timezone.localdate())
+def _buscar_chave(chave, data, empresa_grupo=None):
+    politica = PoliticaValor.vigente_por_chave(
+        chave,
+        data or timezone.localdate(),
+        empresa_grupo=empresa_grupo,
+    )
     if not politica:
-        logger.info("politica_nao_encontrada chave=%s data=%s", chave, data)
+        logger.info(
+            "politica_nao_encontrada chave=%s data=%s empresa_grupo=%s",
+            chave,
+            data,
+            empresa_grupo or "",
+        )
     return politica
 
 
@@ -169,6 +244,7 @@ def resolver_politica_despesa(
     municipio=None,
     descricao="",
     valor_informado=None,
+    empresa_grupo=None,
 ):
     if tipo_despesa in TIPOS_DESPESA_SEM_POLITICA:
         return None
@@ -193,7 +269,10 @@ def resolver_politica_despesa(
 
     if not chave:
         return None
-    return _politica_payload(_buscar_chave(chave, data), valor_informado)
+    return _politica_payload(
+        _buscar_chave(chave, data, empresa_grupo=empresa_grupo),
+        valor_informado,
+    )
 
 
 def valor_km_control_sul(data=None):

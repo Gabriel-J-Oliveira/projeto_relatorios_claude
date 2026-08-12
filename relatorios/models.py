@@ -112,6 +112,11 @@ class EmpresaGrupo(models.TextChoices):
     FISCALMAX = "fiscalmax", "FISCALMAX"
 
 
+class EscopoPoliticaValor(models.TextChoices):
+    GLOBAL = "global", "Global"
+    EMPRESAS = "empresas", "Empresas específicas"
+
+
 class StatusFinanceiroItem(models.TextChoices):
     APROVADO = "aprovado", "Aprovado"
     REJEITADO = "rejeitado", "Rejeitado"
@@ -775,6 +780,13 @@ class PoliticaValor(models.Model):
         KM_DIARIO = "km_diario", "KM diário / Uber / Táxi"
         VALOR_KM = "valor_km", "Valor KM"
 
+    escopo = models.CharField(
+        "Escopo",
+        max_length=12,
+        choices=EscopoPoliticaValor.choices,
+        default=EscopoPoliticaValor.GLOBAL,
+        db_index=True,
+    )
     chave = models.CharField("Chave da política", max_length=80, blank=True, db_index=True)
     tipo_politica = models.CharField(
         "Tipo da política",
@@ -825,6 +837,21 @@ class PoliticaValor(models.Model):
         chave = f"{self.chave} - " if self.chave else ""
         return f"{chave}{self.descricao} — {self.limite_valor or self.valor_km}"
 
+    def clean(self):
+        super().clean()
+        if self.vigencia_fim and self.vigencia_fim < self.vigencia_inicio:
+            raise ValidationError(
+                {"vigencia_fim": "A vigência fim não pode ser anterior à vigência início."}
+            )
+        if (
+            self.escopo == EscopoPoliticaValor.GLOBAL
+            and self.pk
+            and self.empresas_grupo.exists()
+        ):
+            raise ValidationError(
+                {"escopo": "Políticas globais não devem possuir empresas específicas."}
+            )
+
     @classmethod
     def limite_para(cls, tipo_despesa, data, tipo_localidade=""):
         from relatorios.services.politica_valor_service import resolver_politica_despesa
@@ -837,8 +864,8 @@ class PoliticaValor(models.Model):
         return politica.valor if politica else None
 
     @classmethod
-    def vigente_por_chave(cls, chave, data):
-        p = (
+    def vigente_por_chave(cls, chave, data, empresa_grupo=None):
+        qs_base = (
             cls.objects.filter(
                 chave=chave,
                 ativo=True,
@@ -847,25 +874,77 @@ class PoliticaValor(models.Model):
             .filter(
                 models.Q(vigencia_fim__isnull=True) | models.Q(vigencia_fim__gte=data)
             )
-            .order_by("-vigencia_inicio")
-            .first()
+            .order_by("-vigencia_inicio", "-pk")
         )
-        return p
+        if empresa_grupo:
+            politica_empresa = (
+                qs_base.filter(
+                    escopo=EscopoPoliticaValor.EMPRESAS,
+                    empresas_grupo__empresa_grupo=empresa_grupo,
+                )
+                .distinct()
+                .first()
+            )
+            if politica_empresa:
+                return politica_empresa
+        return qs_base.filter(escopo=EscopoPoliticaValor.GLOBAL).first()
 
     @classmethod
     def valor_km_vigente(cls, data):
         p = (
             cls.objects.filter(
                 valor_km__isnull=False,
+                escopo=EscopoPoliticaValor.GLOBAL,
                 ativo=True,
                 vigencia_inicio__lte=data,
             )
             .filter(
                 models.Q(vigencia_fim__isnull=True) | models.Q(vigencia_fim__gte=data)
             )
+            .order_by("-vigencia_inicio", "-pk")
             .first()
         )
         return p.valor_km if p else Decimal("0.00")
+
+
+class PoliticaValorEmpresaGrupo(models.Model):
+    politica = models.ForeignKey(
+        PoliticaValor,
+        on_delete=models.CASCADE,
+        related_name="empresas_grupo",
+        verbose_name="Política",
+    )
+    empresa_grupo = models.CharField(
+        "Empresa do grupo",
+        max_length=30,
+        choices=EmpresaGrupo.choices,
+    )
+
+    class Meta:
+        verbose_name = "Empresa específica da política"
+        verbose_name_plural = "Empresas específicas da política"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["politica", "empresa_grupo"],
+                name="uniq_politica_valor_empresa_grupo",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.politica} / {self.get_empresa_grupo_display()}"
+
+    def clean(self):
+        super().clean()
+        if not self.politica:
+            return
+        from relatorios.services.politica_valor_service import (
+            validar_configuracao_politica_empresas,
+        )
+
+        validar_configuracao_politica_empresas(
+            self.politica,
+            [self.empresa_grupo],
+        )
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -2155,6 +2234,7 @@ class ItemDespesa(models.Model):
             municipio=getattr(relatorio, "municipio_atendimento", None),
             descricao=self.descricao,
             valor_informado=self.valor,
+            empresa_grupo=getattr(relatorio, "empresa_grupo", ""),
         )
 
     @property

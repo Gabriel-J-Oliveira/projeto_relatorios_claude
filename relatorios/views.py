@@ -2492,13 +2492,15 @@ def politica_despesa_json(request):
         municipio=municipio,
         descricao=(request.GET.get("descricao") or "").strip(),
         valor_informado=request.GET.get("valor") or "0",
+        empresa_grupo=(request.GET.get("empresa_grupo") or "").strip(),
     )
     if politica is None:
         logger.warning(
-            "politica_despesa_nao_encontrada tipo=%s data=%s localidade=%s usuario=%s",
+            "politica_despesa_nao_encontrada tipo=%s data=%s localidade=%s empresa_grupo=%s usuario=%s",
             tipo,
             data_txt,
             tipo_localidade,
+            (request.GET.get("empresa_grupo") or "").strip(),
             getattr(request.user, "pk", None),
         )
         return JsonResponse(

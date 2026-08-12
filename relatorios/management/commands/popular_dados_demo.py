@@ -12,6 +12,7 @@ from relatorios.models import (
     DespesaCliente,
     DespesaRateio,
     ItemDespesa,
+    EscopoPoliticaValor,
     Municipio,
     PapelTecnico,
     PoliticaValor,
@@ -196,6 +197,7 @@ class Command(BaseCommand):
                 chave=chave,
                 defaults={
                     "tipo_politica": tipo_politica,
+                    "escopo": EscopoPoliticaValor.GLOBAL,
                     "tipo_despesa": tipo_despesa,
                     "tipo_localidade": localidade,
                     "cidade": cidade,
@@ -209,6 +211,7 @@ class Command(BaseCommand):
             chave="DEMO_VALOR_KM_CONTROLSUL",
             defaults={
                 "tipo_politica": PoliticaValor.TipoPolitica.VALOR_KM,
+                "escopo": EscopoPoliticaValor.GLOBAL,
                 "descricao": "Valor KM ControlSul",
                 "valor_km": Decimal("1.3500"),
                 "vigencia_inicio": hoje - timedelta(days=365),
