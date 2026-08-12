@@ -1589,8 +1589,8 @@ class RelatorioAutoSave(models.Model):
         verbose_name_plural = "AutoSaves de relatorios"
         unique_together = [("usuario", "chave")]
         indexes = [
-            models.Index(fields=["usuario", "chave"]),
-            models.Index(fields=["relatorio", "atualizado_em"]),
+            models.Index(fields=["usuario", "chave"], name="relatorios__usuario_02e670_idx"),
+            models.Index(fields=["relatorio", "atualizado_em"], name="relatorios__relator_9ad763_idx"),
         ]
 
     def __str__(self):
@@ -1951,8 +1951,8 @@ class CidadeAtendimento(models.Model):
         verbose_name_plural = "Cidades de atendimento"
         ordering = ["ordem", "pk"]
         indexes = [
-            models.Index(fields=["relatorio", "ordem"]),
-            models.Index(fields=["cidade", "uf"]),
+            models.Index(fields=["relatorio", "ordem"], name="relatorios__relator_4caa1d_idx"),
+            models.Index(fields=["cidade", "uf"], name="relatorios__cidade_25b8d7_idx"),
         ]
 
     def __str__(self):
