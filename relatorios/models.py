@@ -118,6 +118,17 @@ class EscopoPoliticaValor(models.TextChoices):
     EMPRESAS = "empresas", "Empresas específicas"
 
 
+class EstadoPermissaoUsuario(models.TextChoices):
+    PERMITIR = "permitir", "Permitir"
+    NEGAR = "negar", "Negar"
+
+
+class EstadoHistoricoPermissao(models.TextChoices):
+    HERDAR = "herdar", "Herdar"
+    PERMITIR = "permitir", "Permitir"
+    NEGAR = "negar", "Negar"
+
+
 class StatusFinanceiroItem(models.TextChoices):
     APROVADO = "aprovado", "Aprovado"
     REJEITADO = "rejeitado", "Rejeitado"
@@ -2971,4 +2982,98 @@ class Adiantamento(models.Model):
 
     def __str__(self):
         return f"{self.get_tipo_display()} — {self.tecnico} — R$ {self.valor}"
+
+
+class PermissaoUsuarioOverride(models.Model):
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="permissoes_overrides",
+        verbose_name="Usuário",
+    )
+    codigo = models.CharField("Código da permissão", max_length=100)
+    estado = models.CharField(
+        "Estado",
+        max_length=10,
+        choices=EstadoPermissaoUsuario.choices,
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    atualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="permissoes_overrides_atualizadas",
+        verbose_name="Atualizado por",
+    )
+
+    class Meta:
+        verbose_name = "Override de permissão do usuário"
+        verbose_name_plural = "Overrides de permissões dos usuários"
+        ordering = ["usuario__username", "codigo"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["usuario", "codigo"],
+                name="uniq_permissao_usuario_codigo",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["codigo"], name="relatorios__perm_codigo_idx"),
+            models.Index(fields=["usuario", "estado"], name="relatorios__perm_user_estado_idx"),
+        ]
+
+    def clean(self):
+        super().clean()
+        from relatorios.services.permissoes_service import obter_permissao
+
+        if not obter_permissao(self.codigo):
+            raise ValidationError({"codigo": "Código de permissão não cadastrado no registry."})
+
+    def __str__(self):
+        return f"{self.usuario} - {self.codigo}: {self.get_estado_display()}"
+
+
+class HistoricoPermissaoUsuario(models.Model):
+    usuario_afetado = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="historico_permissoes",
+        verbose_name="Usuário afetado",
+    )
+    codigo = models.CharField("Código da permissão", max_length=100)
+    estado_anterior = models.CharField(
+        "Estado anterior",
+        max_length=10,
+        choices=EstadoHistoricoPermissao.choices,
+    )
+    estado_novo = models.CharField(
+        "Estado novo",
+        max_length=10,
+        choices=EstadoHistoricoPermissao.choices,
+    )
+    alterado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="historico_permissoes_realizadas",
+        verbose_name="Alterado por",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Histórico de permissão do usuário"
+        verbose_name_plural = "Histórico de permissões dos usuários"
+        ordering = ["-criado_em"]
+        indexes = [
+            models.Index(fields=["usuario_afetado", "codigo"], name="relatorios__hist_perm_user_idx"),
+            models.Index(fields=["codigo", "criado_em"], name="relatorios__hist_perm_cod_idx"),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.usuario_afetado} - {self.codigo}: "
+            f"{self.get_estado_anterior_display()} -> {self.get_estado_novo_display()}"
+        )
 

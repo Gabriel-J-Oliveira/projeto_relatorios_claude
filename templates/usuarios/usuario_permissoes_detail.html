@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block page_title %}Permissoes do usuario{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Inicio</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'relatorios:usuarios_central_list' %}" class="text-decoration-none">Usuarios</a></li>
+  <li class="breadcrumb-item active">{{ usuario_alvo.username }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="alert alert-info border-0 shadow-sm d-flex align-items-start gap-2">
+  <i class="bi bi-info-circle-fill mt-1"></i>
+  <div>
+    <strong>Central em preparacao.</strong>
+    As permissoes abaixo serao usadas pelo motor central somente apos a ativacao da feature flag.
+    Motor atual: <strong>{{ motor_atual }}</strong>. Permissoes adicionais nao ignoram workflow.
+  </div>
+</div>
+
+{% if full_access_alvo %}
+  <div class="alert alert-danger border-0 shadow-sm d-flex align-items-start gap-2">
+    <i class="bi bi-shield-lock-fill mt-1"></i>
+    <div>
+      <strong>FULL ACCESS PROTEGIDO.</strong>
+      Esta conta recebe acesso por configuracao do sistema. Os controles ficam somente leitura e nao geram overrides.
+    </div>
+  </div>
+{% endif %}
+
+<section class="d-grid gap-3">
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+      <div class="d-flex flex-wrap justify-content-between gap-3">
+        <div>
+          <h5 class="mb-1">{{ usuario_alvo.get_full_name|default:usuario_alvo.username }}</h5>
+          <div class="text-muted">{{ usuario_alvo.username }}</div>
+          <div class="small text-muted">{{ usuario_alvo.email|default:"Sem e-mail cadastrado" }}</div>
+        </div>
+        <div class="text-md-end">
+          {% if usuario_alvo.is_active %}
+            <span class="badge text-bg-success">Ativo</span>
+          {% else %}
+            <span class="badge text-bg-secondary">Inativo</span>
+          {% endif %}
+          {% if full_access_alvo %}
+            <span class="badge text-bg-danger">Full Access protegido</span>
+          {% endif %}
+          <div class="small text-muted mt-2">Origem: {{ origem_usuario }}</div>
+        </div>
+      </div>
+      <hr>
+      <div class="d-flex flex-wrap gap-2">
+        {% for grupo in grupos_usuario %}
+          <span class="badge text-bg-secondary">{{ grupo }}</span>
+        {% empty %}
+          <span class="text-muted small">Sem grupos associados.</span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-body">
+      <h6 class="mb-0">Acesso base</h6>
+    </div>
+    <div class="card-body">
+      <div class="row g-2">
+        <div class="col-md-6"><i class="bi bi-check-circle text-success me-1"></i>Criar relatorios</div>
+        <div class="col-md-6"><i class="bi bi-check-circle text-success me-1"></i>Visualizar proprios relatorios</div>
+        <div class="col-md-6"><i class="bi bi-check-circle text-success me-1"></i>Editar proprios relatorios conforme workflow</div>
+        <div class="col-md-6"><i class="bi bi-check-circle text-success me-1"></i>Enviar proprios relatorios conforme workflow</div>
+      </div>
+      <div class="small text-muted mt-2">Relatorio proprio e aquele criado pelo usuario.</div>
+    </div>
+  </div>
+
+  <div id="permissoes" class="card border-0 shadow-sm">
+    <div class="card-header bg-body d-flex justify-content-between align-items-center">
+      <div>
+        <h6 class="mb-0">Permissoes adicionais</h6>
+        <small class="text-muted">HERDAR usa o padrao do motor central. PERMITIR/NEGAR cria override individual.</small>
+      </div>
+    </div>
+    <div class="card-body d-grid gap-4">
+      {% for grupo in permissoes_grupos %}
+        <section>
+          <h6 class="text-uppercase text-muted small fw-semibold mb-2">{{ grupo.label }}</h6>
+          <div class="d-grid gap-2">
+            {% for linha in grupo.itens %}
+              <div class="border rounded-2 p-3">
+                <div class="d-flex flex-wrap justify-content-between gap-3">
+                  <div class="flex-grow-1">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                      <strong>{{ linha.permissao.nome }}</strong>
+                      {% if linha.permissao.sensibilidade == "critica" %}
+                        <span class="badge text-bg-danger">CRITICA</span>
+                      {% elif linha.permissao.sensibilidade == "sensivel" %}
+                        <span class="badge text-bg-warning">SENSIVEL</span>
+                      {% endif %}
+                      {% if linha.efetivo_permitido %}
+                        <span class="badge text-bg-primary">ON</span>
+                      {% else %}
+                        <span class="badge text-bg-secondary">OFF</span>
+                      {% endif %}
+                    </div>
+                    <div class="small text-muted mt-1">{{ linha.permissao.descricao }}</div>
+                    <div class="small mt-2">
+                      <span class="me-3">Efetivo:
+                        {% if linha.efetivo_permitido %}
+                          <strong class="text-primary">Permitido</strong>
+                        {% else %}
+                          <strong class="text-muted">Negado</strong>
+                        {% endif %}
+                      </span>
+                      <span>Origem: <strong>{{ linha.origem }}</strong></span>
+                    </div>
+                    {% if linha.dependencias_pendentes %}
+                      <div class="small text-warning mt-2">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Dependencias pendentes:
+                        {% for dep in linha.dependencias_pendentes %}
+                          <code>{{ dep }}</code>{% if not forloop.last %}, {% endif %}
+                        {% endfor %}
+                      </div>
+                    {% endif %}
+                  </div>
+                  <form method="post"
+                        action="{% url 'relatorios:usuario_permissao_override' usuario_alvo.pk %}"
+                        class="d-flex flex-wrap align-items-start gap-1"
+                        {% if linha.permissao.sensibilidade == "critica" %}onsubmit="return confirm('Confirmar alteracao desta permissao critica?');"{% endif %}>
+                    {% csrf_token %}
+                    <input type="hidden" name="codigo" value="{{ linha.permissao.codigo }}">
+                    <button class="btn btn-sm {% if linha.override == estado_herdar %}btn-secondary{% else %}btn-outline-secondary{% endif %}"
+                            name="estado"
+                            value="{{ estado_herdar }}"
+                            type="submit"
+                            {% if linha.readonly %}disabled{% endif %}>
+                      Herdar
+                    </button>
+                    <button class="btn btn-sm {% if linha.override == estado_permitir %}btn-primary{% else %}btn-outline-primary{% endif %}"
+                            name="estado"
+                            value="{{ estado_permitir }}"
+                            type="submit"
+                            {% if linha.readonly %}disabled{% endif %}>
+                      Permitir
+                    </button>
+                    <button class="btn btn-sm {% if linha.override == estado_negar %}btn-danger{% else %}btn-outline-danger{% endif %}"
+                            name="estado"
+                            value="{{ estado_negar }}"
+                            type="submit"
+                            {% if linha.readonly %}disabled{% endif %}>
+                      Negar
+                    </button>
+                  </form>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-body">
+      <h6 class="mb-0">Auditoria</h6>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Data/hora</th>
+              <th>Responsavel</th>
+              <th>Permissao</th>
+              <th>Antes</th>
+              <th>Depois</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for linha in historico_permissoes %}
+              <tr>
+                <td class="text-nowrap">{{ linha.historico.criado_em|date:"d/m/Y H:i" }}</td>
+                <td>{{ linha.historico.alterado_por.get_full_name|default:linha.historico.alterado_por.username|default:"Sistema" }}</td>
+                <td>
+                  <div>{{ linha.nome }}</div>
+                  <div class="small text-muted">{{ linha.codigo }}</div>
+                </td>
+                <td>{{ linha.historico.get_estado_anterior_display }}</td>
+                <td>{{ linha.historico.get_estado_novo_display }}</td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="5" class="text-center text-muted py-4">Nenhuma alteracao registrada para este usuario.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

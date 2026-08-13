@@ -389,6 +389,12 @@ def queryset_relatorios_visiveis(user, queryset):
 
 
 def permissoes_usuario(user):
+    try:
+        from relatorios.services.permissoes_service import usuario_pode_acessar_central_permissoes
+    except Exception:
+        usuario_pode_acessar_central = False
+    else:
+        usuario_pode_acessar_central = usuario_pode_acessar_central_permissoes(user)
     administrativo = usuario_eh_administrativo(user)
     tecnico = usuario_eh_tecnico(user)
     admin_erp = usuario_eh_admin_erp(user)
@@ -411,6 +417,7 @@ def permissoes_usuario(user):
         "visualiza_adiantamentos": administrativo or acesso_total,
         "aprova_relatorios": administrativo or acesso_total,
         "manutencao": usuario_pode_acessar_manutencao(user),
+        "usuarios_gerenciar": usuario_pode_acessar_central,
     }
 
 

@@ -2022,7 +2022,6 @@
 
   function aplicarSelecaoClientes() {
     const ids = Array.from(document.querySelectorAll(".cliente-opcao.btn-success"))
-      .filter(btn => !btn.closest("tr")?.classList.contains("d-none"))
       .map(btn => btn.dataset.clienteId);
     const tipo = clienteSelectorTarget?.dataset.clientSelector;
     const input = tipo === "relatorio"
@@ -2036,7 +2035,6 @@
 
   function aplicarSelecaoTecnicos() {
     const ids = Array.from(document.querySelectorAll(".tecnico-opcao.btn-success"))
-      .filter(btn => !btn.closest("tr")?.classList.contains("d-none"))
       .map(btn => btn.dataset.tecnicoId);
     const tipo = tecnicoSelectorTarget?.dataset.tecnicoSelector || "relatorio";
     if (tipo === "item") {

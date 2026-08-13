@@ -123,6 +123,17 @@
     </li>
     {% endif %}
 
+    {% if permissoes_erp.usuarios_gerenciar %}
+    <li class="nav-item">
+      <a href="{% url 'relatorios:usuarios_central_list' %}"
+         class="nav-link d-flex align-items-center gap-2
+                {% if 'usuario' in request.resolver_match.url_name %}active{% endif %}">
+        <i class="bi bi-people fs-5"></i>
+        <span>Usuarios</span>
+      </a>
+    </li>
+    {% endif %}
+
   </ul>
 
 </nav>

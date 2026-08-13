@@ -7,9 +7,12 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import SimpleTestCase, TestCase, override_settings
+from django.http import HttpResponse
+from django.test import Client as DjangoClient
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -20,9 +23,13 @@ from .models import (
     EmailLog,
     EmpresaGrupo,
     EscopoPoliticaValor,
+    EstadoHistoricoPermissao,
+    EstadoPermissaoUsuario,
     HistoricoRelatorio,
+    HistoricoPermissaoUsuario,
     ItemDespesa,
     DespesaTecnico,
+    PermissaoUsuarioOverride,
     PerfilUsuario,
     PoliticaValor,
     PoliticaValorEmpresaGrupo,
@@ -57,12 +64,30 @@ from .services.identidade.ldap_utils import (
 )
 from .services.autorizacao_service import (
     GRUPO_ADMIN_ERP,
+    GRUPO_DOMAIN_ADMINS,
+    GRUPO_FINANCEIRO,
+    GRUPO_TECNICO,
     usuario_eh_administrativo,
     usuario_eh_admin_extra,
     usuario_pode_editar_relatorio,
     usuario_pode_enviar_relatorio,
+    usuario_pode_acessar_manutencao,
+    usuario_pode_atuar_como_financeiro,
+    usuario_pode_reabrir_relatorio,
     usuario_tem_acesso_total,
 )
+from .services.permissoes_service import (
+    CodigoPermissao,
+    definir_override_permissao,
+    estado_efetivo_override,
+    listar_permissoes,
+    obter_permissao,
+    usuario_tem_permissao,
+    usuario_tem_permissao_central,
+    usuario_tem_full_access_erp,
+    usuario_pode_acessar_central_permissoes,
+)
+from .context_processors import permissoes_erp
 from .services.resumo_cliente_service import resumo_financeiro_por_cliente
 from .services.clientes_valor_km_service import clientes_relatorio_sem_valor_km
 from .services.clientes_relatorio_service import resolver_cliente_empresa_grupo
@@ -75,6 +100,7 @@ from .services.politica_valor_service import (
     validar_configuracao_politica_empresas,
     valor_km_control_sul,
 )
+from .services.relatorio_performance_service import RelatorioPerformanceTracker
 from .services.workflow_service import aprovar_relatorio
 from .services.snapshot_service import criar_snapshot_financeiro
 from .services.tecnicos_despesa_service import (
@@ -114,6 +140,59 @@ class _UsuarioFake:
 
     def get_username(self):
         return self.username
+
+
+class RelatorioPerformanceTrackerTests(SimpleTestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def _request_post(self):
+        return self.factory.post(
+            "/relatorios/novo/",
+            data={
+                "despesas-TOTAL_FORMS": "2",
+                "trechos-TOTAL_FORMS": "1",
+                "tecnico_responsavel": "10",
+                "tecnicos_equipe": ["11", "12"],
+                "despesas-0-comprovante": SimpleUploadedFile(
+                    "comprovante.pdf",
+                    b"abc",
+                    content_type="application/pdf",
+                ),
+            },
+        )
+
+    @override_settings(RELATORIO_PERF_ENABLED=False)
+    def test_relatorio_perf_desligado_nao_emite_log(self):
+        request = self._request_post()
+        with patch("relatorios.services.relatorio_performance_service.logger.info") as info:
+            tracker = RelatorioPerformanceTracker(request)
+            with tracker.phase("validation"):
+                pass
+            tracker.finish(outcome="success", http_status=302)
+
+        info.assert_not_called()
+
+    @override_settings(RELATORIO_PERF_ENABLED=True, RELATORIO_PERF_SLOW_SECONDS=999)
+    def test_relatorio_perf_ligado_registra_resumo_e_server_timing(self):
+        request = self._request_post()
+        with patch("relatorios.services.relatorio_performance_service.logger.info") as info:
+            tracker = RelatorioPerformanceTracker(request)
+            with tracker.phase("validation"):
+                pass
+            tracker.finish(outcome="validation_error", http_status=422)
+            response = tracker.apply_server_timing(HttpResponse())
+
+        mensagem = info.call_args.args[0]
+        self.assertIn("[RELATORIO_PERF]", mensagem)
+        self.assertIn("outcome=validation_error", mensagem)
+        self.assertIn("http_status=422", mensagem)
+        self.assertIn("files=1", mensagem)
+        self.assertIn("upload_bytes=3", mensagem)
+        self.assertIn("expenses=2", mensagem)
+        self.assertIn("km=1", mensagem)
+        self.assertIn("participants=3", mensagem)
+        self.assertIn("validation;dur=", response["Server-Timing"])
 
 
 class ExtraAdminUsersTests(SimpleTestCase):
@@ -201,6 +280,591 @@ class ExtraAdminUsersTests(SimpleTestCase):
 
         self.assertTrue(usuario_pode_editar_relatorio(usuario, relatorio))
         self.assertFalse(usuario_pode_enviar_relatorio(usuario, relatorio))
+
+
+class PermissoesServiceTests(SimpleTestCase):
+    def _relatorio(self, status, criado_por_id=999, tecnico_email=""):
+        return SimpleNamespace(
+            pk=88,
+            numero=None,
+            status=status,
+            criado_por_id=criado_por_id,
+            criado_por=None,
+            tecnico_responsavel=SimpleNamespace(
+                pk=77,
+                nome="Tecnico",
+                email=tecnico_email,
+            ) if tecnico_email else None,
+            tecnico_reembolso=None,
+        )
+
+    def test_catalogo_nao_tem_codigos_duplicados(self):
+        codigos = [permissao.codigo for permissao in listar_permissoes()]
+
+        self.assertEqual(len(codigos), len(set(codigos)))
+        self.assertIsNotNone(obter_permissao(CodigoPermissao.MANUTENCAO_ACESSAR))
+
+    def test_codigo_inexistente_falha_fechado(self):
+        usuario = _UsuarioFake("usuario.comum")
+
+        self.assertFalse(usuario_tem_permissao(usuario, "codigo.inexistente"))
+
+    def test_permissao_global_reproduz_regra_legada_permitida(self):
+        usuario = _UsuarioFake("admin.erp", grupos=[GRUPO_ADMIN_ERP])
+
+        self.assertEqual(
+            usuario_pode_acessar_manutencao(usuario),
+            usuario_tem_permissao(usuario, CodigoPermissao.MANUTENCAO_ACESSAR),
+        )
+
+    def test_permissao_global_reproduz_regra_legada_negada(self):
+        usuario = _UsuarioFake("usuario.comum")
+
+        self.assertEqual(
+            usuario_pode_acessar_manutencao(usuario),
+            usuario_tem_permissao(usuario, CodigoPermissao.MANUTENCAO_ACESSAR),
+        )
+
+    def test_superuser_preserva_acesso_herdado(self):
+        usuario = _UsuarioFake("root")
+        usuario.is_superuser = True
+
+        self.assertTrue(usuario_tem_permissao(usuario, CodigoPermissao.ERP_ACESSAR))
+        self.assertTrue(usuario_tem_permissao(usuario, CodigoPermissao.FINANCEIRO_ATUAR))
+        self.assertTrue(usuario_tem_permissao(usuario, CodigoPermissao.MANUTENCAO_ACESSAR))
+
+    def test_grupo_financeiro_preserva_regra_financeira(self):
+        usuario = _UsuarioFake("financeiro", grupos=[GRUPO_FINANCEIRO])
+
+        self.assertEqual(
+            usuario_pode_atuar_como_financeiro(usuario),
+            usuario_tem_permissao(usuario, CodigoPermissao.RELATORIOS_APROVAR),
+        )
+        self.assertEqual(
+            usuario_pode_atuar_como_financeiro(usuario),
+            usuario_tem_permissao(usuario, CodigoPermissao.FINANCEIRO_ALTERAR_RATEIOS),
+        )
+
+    def test_permissao_por_objeto_exige_objeto(self):
+        usuario = _UsuarioFake("tecnico.dono")
+
+        self.assertFalse(usuario_tem_permissao(usuario, CodigoPermissao.RELATORIOS_EDITAR))
+
+    def test_permissao_por_objeto_reproduz_edicao_por_status(self):
+        usuario = _UsuarioFake("tecnico.dono")
+        relatorio = self._relatorio(StatusRelatorio.RASCUNHO, criado_por_id=usuario.pk)
+
+        self.assertEqual(
+            usuario_pode_editar_relatorio(usuario, relatorio),
+            usuario_tem_permissao(usuario, CodigoPermissao.RELATORIOS_EDITAR, objeto=relatorio),
+        )
+
+    def test_permissao_por_status_bloqueia_status_finalizado(self):
+        usuario = _UsuarioFake("admin.erp", grupos=[GRUPO_ADMIN_ERP])
+        relatorio = self._relatorio(StatusRelatorio.APROVADO)
+
+        self.assertEqual(
+            usuario_pode_editar_relatorio(usuario, relatorio),
+            usuario_tem_permissao(usuario, CodigoPermissao.RELATORIOS_EDITAR, objeto=relatorio),
+        )
+
+    def test_permissao_enviar_reproduz_regra_legada(self):
+        usuario = _UsuarioFake("responsavel")
+        usuario.email = "tecnico@empresa.test"
+        relatorio = self._relatorio(
+            StatusRelatorio.RASCUNHO,
+            criado_por_id=999,
+            tecnico_email="tecnico@empresa.test",
+        )
+
+        self.assertEqual(
+            usuario_pode_enviar_relatorio(usuario, relatorio),
+            usuario_tem_permissao(usuario, CodigoPermissao.RELATORIOS_ENVIAR, objeto=relatorio),
+        )
+
+    @override_settings(EXTRA_ADMIN_USERS=[])
+    def test_reabrir_reproduz_regra_hardcoded_atual(self):
+        usuario_autorizado = _UsuarioFake("control.local\\gabriel.oliveira")
+        usuario_negado = _UsuarioFake("admin.erp", grupos=[GRUPO_ADMIN_ERP])
+
+        self.assertEqual(
+            usuario_pode_reabrir_relatorio(usuario_autorizado),
+            usuario_tem_permissao(usuario_autorizado, CodigoPermissao.RELATORIOS_REABRIR),
+        )
+        self.assertEqual(
+            usuario_pode_reabrir_relatorio(usuario_negado),
+            usuario_tem_permissao(usuario_negado, CodigoPermissao.RELATORIOS_REABRIR),
+        )
+
+
+@override_settings(
+    PERMISSOES_CENTRAL_ENABLED=True,
+    ERP_FULL_ACCESS_USERS=["CONTROL\\gabriel.oliveira"],
+    EXTRA_ADMIN_USERS=[],
+)
+class PermissoesCentralMotorTests(TestCase):
+    def setUp(self):
+        self.User = get_user_model()
+        self.dono = self.User.objects.create_user(username="dono")
+        self.outro = self.User.objects.create_user(username="outro")
+
+    def _relatorio(self, status, criado_por):
+        return SimpleNamespace(
+            pk=99,
+            status=status,
+            criado_por_id=criado_por.pk,
+        )
+
+    def _permitir(self, usuario, codigo):
+        definir_override_permissao(
+            usuario,
+            codigo,
+            EstadoPermissaoUsuario.PERMITIR,
+            alterado_por=self.dono,
+        )
+
+    def _negar(self, usuario, codigo):
+        definir_override_permissao(
+            usuario,
+            codigo,
+            EstadoPermissaoUsuario.NEGAR,
+            alterado_por=self.dono,
+        )
+
+    def test_full_access_exclusivo_por_configuracao(self):
+        usuario = self.User.objects.create_user(username="CONTROL\\gabriel.oliveira")
+        relatorio = self._relatorio(StatusRelatorio.CONFERENCIA, self.outro)
+
+        self.assertTrue(usuario_tem_full_access_erp(usuario))
+        self.assertTrue(
+            usuario_tem_permissao_central(
+                usuario, CodigoPermissao.RELATORIOS_APROVAR, objeto=relatorio
+            )
+        )
+        self.assertTrue(usuario_tem_permissao_central(usuario, CodigoPermissao.MANUTENCAO_ACESSAR))
+
+    def test_domain_admin_nao_recebe_full_access_no_motor_central(self):
+        grupo = Group.objects.create(name=GRUPO_DOMAIN_ADMINS)
+        usuario = self.User.objects.create_user(username="domain.admin")
+        usuario.groups.add(grupo)
+
+        self.assertFalse(usuario_tem_full_access_erp(usuario))
+        self.assertFalse(usuario_tem_permissao_central(usuario, CodigoPermissao.MANUTENCAO_ACESSAR))
+
+    def test_superuser_nao_recebe_full_access_de_negocio(self):
+        usuario = self.User.objects.create_superuser(
+            username="superuser.erp",
+            email="superuser@example.com",
+            password="x",
+        )
+
+        self.assertFalse(usuario_tem_full_access_erp(usuario))
+        self.assertFalse(usuario_tem_permissao_central(usuario, CodigoPermissao.FINANCEIRO_ACESSAR))
+
+    @override_settings(EXTRA_ADMIN_USERS=["extra.admin"])
+    def test_extra_admin_users_nao_recebe_full_access_central(self):
+        usuario = self.User.objects.create_user(username="extra.admin")
+
+        self.assertFalse(usuario_tem_full_access_erp(usuario))
+        self.assertFalse(usuario_tem_permissao_central(usuario, CodigoPermissao.MANUTENCAO_ACESSAR))
+
+    def test_usuario_normal_visualiza_relatorio_proprio(self):
+        relatorio = self._relatorio(StatusRelatorio.APROVADO, self.dono)
+
+        self.assertTrue(
+            usuario_tem_permissao_central(
+                self.dono, CodigoPermissao.RELATORIOS_VISUALIZAR, objeto=relatorio
+            )
+        )
+
+    def test_usuario_normal_nao_visualiza_relatorio_alheio_aprovado(self):
+        relatorio = self._relatorio(StatusRelatorio.APROVADO, self.outro)
+
+        self.assertFalse(
+            usuario_tem_permissao_central(
+                self.dono, CodigoPermissao.RELATORIOS_VISUALIZAR, objeto=relatorio
+            )
+        )
+
+    def test_visualizacao_universal_permite_ver_relatorio_alheio(self):
+        relatorio = self._relatorio(StatusRelatorio.APROVADO, self.outro)
+        self._permitir(self.dono, CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS)
+
+        self.assertTrue(
+            usuario_tem_permissao_central(
+                self.dono, CodigoPermissao.RELATORIOS_VISUALIZAR, objeto=relatorio
+            )
+        )
+
+    def test_visualizacao_universal_sozinha_nao_edita_alheio(self):
+        relatorio = self._relatorio(StatusRelatorio.RASCUNHO, self.outro)
+        self._permitir(self.dono, CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS)
+
+        self.assertFalse(
+            usuario_tem_permissao_central(
+                self.dono, CodigoPermissao.RELATORIOS_EDITAR, objeto=relatorio
+            )
+        )
+
+    def test_editar_alheios_exige_visualizacao_universal(self):
+        relatorio = self._relatorio(StatusRelatorio.RASCUNHO, self.outro)
+        self._permitir(self.dono, CodigoPermissao.RELATORIOS_EDITAR_ALHEIOS)
+
+        self.assertFalse(
+            usuario_tem_permissao_central(
+                self.dono, CodigoPermissao.RELATORIOS_EDITAR, objeto=relatorio
+            )
+        )
+
+    def test_editar_alheios_respeita_workflow(self):
+        relatorio_aprovado = self._relatorio(StatusRelatorio.APROVADO, self.outro)
+        relatorio_conferencia = self._relatorio(StatusRelatorio.CONFERENCIA, self.outro)
+        self._permitir(self.dono, CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS)
+        self._permitir(self.dono, CodigoPermissao.RELATORIOS_EDITAR_ALHEIOS)
+
+        self.assertFalse(
+            usuario_tem_permissao_central(
+                self.dono, CodigoPermissao.RELATORIOS_EDITAR, objeto=relatorio_aprovado
+            )
+        )
+        self.assertTrue(
+            usuario_tem_permissao_central(
+                self.dono, CodigoPermissao.RELATORIOS_EDITAR, objeto=relatorio_conferencia
+            )
+        )
+
+    def test_aprovar_respeita_status_conferencia(self):
+        relatorio_rascunho = self._relatorio(StatusRelatorio.RASCUNHO, self.outro)
+        relatorio_conferencia = self._relatorio(StatusRelatorio.CONFERENCIA, self.outro)
+        self._permitir(self.dono, CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS)
+        self._permitir(self.dono, CodigoPermissao.FINANCEIRO_ACESSAR)
+        self._permitir(self.dono, CodigoPermissao.RELATORIOS_APROVAR)
+
+        self.assertFalse(
+            usuario_tem_permissao_central(
+                self.dono, CodigoPermissao.RELATORIOS_APROVAR, objeto=relatorio_rascunho
+            )
+        )
+        self.assertTrue(
+            usuario_tem_permissao_central(
+                self.dono, CodigoPermissao.RELATORIOS_APROVAR, objeto=relatorio_conferencia
+            )
+        )
+
+    def test_aprovar_relatorio_alheio_exige_visualizacao_universal(self):
+        relatorio = self._relatorio(StatusRelatorio.CONFERENCIA, self.outro)
+        self._permitir(self.dono, CodigoPermissao.FINANCEIRO_ACESSAR)
+        self._permitir(self.dono, CodigoPermissao.RELATORIOS_APROVAR)
+
+        self.assertFalse(
+            usuario_tem_permissao_central(
+                self.dono, CodigoPermissao.RELATORIOS_APROVAR, objeto=relatorio
+            )
+        )
+
+    def test_override_negar_vence_default_comum(self):
+        grupo = Group.objects.create(name=GRUPO_TECNICO)
+        self.dono.groups.add(grupo)
+        self.assertTrue(usuario_tem_permissao_central(self.dono, CodigoPermissao.ERP_ACESSAR))
+
+        self._negar(self.dono, CodigoPermissao.ERP_ACESSAR)
+
+        self.assertFalse(usuario_tem_permissao_central(self.dono, CodigoPermissao.ERP_ACESSAR))
+
+    def test_override_permitir_nao_ignora_workflow(self):
+        relatorio = self._relatorio(StatusRelatorio.RASCUNHO, self.outro)
+        self._permitir(self.dono, CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS)
+        self._permitir(self.dono, CodigoPermissao.FINANCEIRO_ACESSAR)
+        self._permitir(self.dono, CodigoPermissao.RELATORIOS_APROVAR)
+
+        self.assertFalse(
+            usuario_tem_permissao_central(
+                self.dono, CodigoPermissao.RELATORIOS_APROVAR, objeto=relatorio
+            )
+        )
+
+    def test_codigo_desconhecido_falha_fechado(self):
+        self.assertFalse(usuario_tem_permissao_central(self.dono, "codigo.desconhecido"))
+
+    def test_objeto_obrigatorio_ausente_falha_fechado(self):
+        self.assertFalse(
+            usuario_tem_permissao_central(self.dono, CodigoPermissao.RELATORIOS_EDITAR)
+        )
+
+    def test_grupo_socios_nao_recebe_full_access_por_grupo(self):
+        grupo = Group.objects.create(name="Socios")
+        usuario = self.User.objects.create_user(username="socio.erp")
+        usuario.groups.add(grupo)
+
+        self.assertFalse(usuario_tem_full_access_erp(usuario))
+        self.assertFalse(usuario_tem_permissao_central(usuario, CodigoPermissao.MANUTENCAO_ACESSAR))
+
+
+class PermissoesOverrideHistoricoTests(TestCase):
+    def setUp(self):
+        self.User = get_user_model()
+        self.usuario = self.User.objects.create_user(username="usuario.permissao")
+        self.responsavel = self.User.objects.create_user(username="responsavel.permissao")
+
+    def test_historico_registra_permitir_negar_e_herdar(self):
+        definir_override_permissao(
+            self.usuario,
+            CodigoPermissao.RELATORIOS_APROVAR,
+            EstadoPermissaoUsuario.PERMITIR,
+            alterado_por=self.responsavel,
+        )
+        definir_override_permissao(
+            self.usuario,
+            CodigoPermissao.RELATORIOS_APROVAR,
+            EstadoPermissaoUsuario.NEGAR,
+            alterado_por=self.responsavel,
+        )
+        definir_override_permissao(
+            self.usuario,
+            CodigoPermissao.RELATORIOS_APROVAR,
+            EstadoHistoricoPermissao.HERDAR,
+            alterado_por=self.responsavel,
+        )
+
+        self.assertEqual(
+            estado_efetivo_override(self.usuario, CodigoPermissao.RELATORIOS_APROVAR),
+            EstadoHistoricoPermissao.HERDAR,
+        )
+        self.assertFalse(
+            PermissaoUsuarioOverride.objects.filter(
+                usuario=self.usuario,
+                codigo=CodigoPermissao.RELATORIOS_APROVAR,
+            ).exists()
+        )
+        historico = list(
+            HistoricoPermissaoUsuario.objects.filter(
+                usuario_afetado=self.usuario,
+                codigo=CodigoPermissao.RELATORIOS_APROVAR,
+            ).order_by("id")
+        )
+        self.assertEqual(len(historico), 3)
+        self.assertEqual(historico[0].estado_anterior, EstadoHistoricoPermissao.HERDAR)
+        self.assertEqual(historico[0].estado_novo, EstadoPermissaoUsuario.PERMITIR)
+        self.assertEqual(historico[1].estado_anterior, EstadoPermissaoUsuario.PERMITIR)
+        self.assertEqual(historico[1].estado_novo, EstadoPermissaoUsuario.NEGAR)
+        self.assertEqual(historico[2].estado_anterior, EstadoPermissaoUsuario.NEGAR)
+        self.assertEqual(historico[2].estado_novo, EstadoHistoricoPermissao.HERDAR)
+        self.assertTrue(all(item.alterado_por_id == self.responsavel.pk for item in historico))
+
+    def test_override_e_historico_sao_atomicos(self):
+        with patch(
+            "relatorios.models.HistoricoPermissaoUsuario.objects.create",
+            side_effect=RuntimeError("falha auditoria"),
+        ):
+            with self.assertRaises(RuntimeError):
+                definir_override_permissao(
+                    self.usuario,
+                    CodigoPermissao.RELATORIOS_APROVAR,
+                    EstadoPermissaoUsuario.PERMITIR,
+                    alterado_por=self.responsavel,
+                )
+
+        self.assertFalse(
+            PermissaoUsuarioOverride.objects.filter(
+                usuario=self.usuario,
+                codigo=CodigoPermissao.RELATORIOS_APROVAR,
+            ).exists()
+        )
+
+
+@override_settings(
+    PERMISSOES_CENTRAL_ENABLED=False,
+    ERP_FULL_ACCESS_USERS=["CONTROL\\gabriel.oliveira"],
+    EXTRA_ADMIN_USERS=[],
+)
+class CentralUsuariosPermissoesViewsTests(TestCase):
+    def setUp(self):
+        self.User = get_user_model()
+        self.full = self.User.objects.create_user(username="CONTROL\\gabriel.oliveira")
+        self.alvo = self.User.objects.create_user(
+            username="maria.silva",
+            first_name="Maria",
+            last_name="Silva",
+            email="maria@example.com",
+        )
+        self.comum = self.User.objects.create_user(username="usuario.comum")
+
+    def test_full_access_abre_central(self):
+        self.client.force_login(self.full)
+
+        response = self.client.get(reverse("relatorios:usuarios_central_list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Central em preparacao")
+        self.assertContains(response, "maria.silva")
+
+    def test_usuario_comum_nao_abre_central(self):
+        self.client.force_login(self.comum)
+
+        response = self.client.get(reverse("relatorios:usuarios_central_list"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_domain_admin_nao_abre_apenas_por_grupo(self):
+        grupo = Group.objects.create(name=GRUPO_DOMAIN_ADMINS)
+        self.comum.groups.add(grupo)
+        self.client.force_login(self.comum)
+
+        response = self.client.get(reverse("relatorios:usuarios_central_list"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_superuser_nao_abre_apenas_por_superuser(self):
+        superuser = self.User.objects.create_superuser(
+            username="superuser.local",
+            email="super@example.com",
+            password="x",
+        )
+        self.client.force_login(superuser)
+
+        response = self.client.get(reverse("relatorios:usuarios_central_list"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_listagem_nao_expoe_senha(self):
+        self.client.force_login(self.full)
+
+        response = self.client.get(reverse("relatorios:usuarios_central_list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, self.alvo.password)
+        self.assertNotContains(response, "password")
+
+    def test_cria_permitir_negar_e_herdar_com_historico(self):
+        self.client.force_login(self.full)
+        url = reverse("relatorios:usuario_permissao_override", args=[self.alvo.pk])
+
+        response = self.client.post(
+            url,
+            {
+                "codigo": CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+                "estado": EstadoPermissaoUsuario.PERMITIR,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            PermissaoUsuarioOverride.objects.filter(
+                usuario=self.alvo,
+                codigo=CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+                estado=EstadoPermissaoUsuario.PERMITIR,
+            ).exists()
+        )
+
+        self.client.post(
+            url,
+            {
+                "codigo": CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+                "estado": EstadoPermissaoUsuario.NEGAR,
+            },
+        )
+        self.assertEqual(
+            PermissaoUsuarioOverride.objects.get(
+                usuario=self.alvo,
+                codigo=CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+            ).estado,
+            EstadoPermissaoUsuario.NEGAR,
+        )
+
+        self.client.post(
+            url,
+            {
+                "codigo": CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+                "estado": EstadoHistoricoPermissao.HERDAR,
+            },
+        )
+        self.assertFalse(
+            PermissaoUsuarioOverride.objects.filter(
+                usuario=self.alvo,
+                codigo=CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+            ).exists()
+        )
+        self.assertEqual(
+            HistoricoPermissaoUsuario.objects.filter(
+                usuario_afetado=self.alvo,
+                codigo=CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+            ).count(),
+            3,
+        )
+
+    def test_codigo_invalido_falha_sem_override(self):
+        self.client.force_login(self.full)
+
+        response = self.client.post(
+            reverse("relatorios:usuario_permissao_override", args=[self.alvo.pk]),
+            {"codigo": "codigo.invalido", "estado": EstadoPermissaoUsuario.PERMITIR},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(PermissaoUsuarioOverride.objects.filter(usuario=self.alvo).exists())
+
+    def test_usuario_alvo_full_nao_recebe_override(self):
+        self.client.force_login(self.full)
+
+        response = self.client.post(
+            reverse("relatorios:usuario_permissao_override", args=[self.full.pk]),
+            {
+                "codigo": CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+                "estado": EstadoPermissaoUsuario.NEGAR,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(PermissaoUsuarioOverride.objects.filter(usuario=self.full).exists())
+
+    def test_editar_alheios_sem_visualizacao_universal_e_rejeitado(self):
+        self.client.force_login(self.full)
+
+        response = self.client.post(
+            reverse("relatorios:usuario_permissao_override", args=[self.alvo.pk]),
+            {
+                "codigo": CodigoPermissao.RELATORIOS_EDITAR_ALHEIOS,
+                "estado": EstadoPermissaoUsuario.PERMITIR,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(PermissaoUsuarioOverride.objects.filter(usuario=self.alvo).exists())
+
+    def test_csrf_nao_enfraquecido_no_post(self):
+        client = DjangoClient(enforce_csrf_checks=True)
+        client.force_login(self.full)
+
+        response = client.post(
+            reverse("relatorios:usuario_permissao_override", args=[self.alvo.pk]),
+            {
+                "codigo": CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+                "estado": EstadoPermissaoUsuario.PERMITIR,
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(PermissaoUsuarioOverride.objects.filter(usuario=self.alvo).exists())
+
+    def test_sidebar_contexto_legado_flag_off_expoe_usuarios_somente_para_full(self):
+        request_full = RequestFactory().get("/")
+        request_full.user = self.full
+        request_comum = RequestFactory().get("/")
+        request_comum.user = self.comum
+
+        self.assertTrue(permissoes_erp(request_full)["permissoes_erp"]["usuarios_gerenciar"])
+        self.assertFalse(permissoes_erp(request_comum)["permissoes_erp"]["usuarios_gerenciar"])
+        self.assertFalse(getattr(settings, "PERMISSOES_CENTRAL_ENABLED", True))
+
+    @override_settings(PERMISSOES_CENTRAL_ENABLED=True)
+    def test_flag_on_permite_central_por_permissoes_gerenciar(self):
+        definir_override_permissao(
+            self.alvo,
+            CodigoPermissao.PERMISSOES_GERENCIAR,
+            EstadoPermissaoUsuario.PERMITIR,
+            alterado_por=self.full,
+        )
+
+        self.assertTrue(usuario_pode_acessar_central_permissoes(self.alvo))
 
 
 class HospedagemPeriodoTests(TestCase):

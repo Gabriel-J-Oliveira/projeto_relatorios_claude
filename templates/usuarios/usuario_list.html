@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block page_title %}Usuarios{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'relatorios:dashboard' %}" class="text-decoration-none">Inicio</a></li>
+  <li class="breadcrumb-item active">Usuarios</li>
+{% endblock %}
+
+{% block content %}
+<div class="alert alert-info border-0 shadow-sm d-flex align-items-start gap-2">
+  <i class="bi bi-info-circle-fill mt-1"></i>
+  <div>
+    <strong>Central em preparacao.</strong>
+    As permissoes configuradas aqui serao utilizadas pelo novo motor apos sua ativacao.
+    Motor atual: <strong>{{ motor_atual }}</strong>. Motor preparado: <strong>Central</strong>.
+  </div>
+</div>
+
+<section class="d-grid gap-3">
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-lg-5 col-md-6">
+          <label class="form-label small text-muted">Buscar</label>
+          <input type="text" name="q" class="form-control form-control-sm" value="{{ request.GET.q }}" placeholder="nome, username ou e-mail">
+        </div>
+        <div class="col-lg-2 col-md-3">
+          <label class="form-label small text-muted">Status</label>
+          <select name="ativo" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            <option value="1" {% if request.GET.ativo == "1" %}selected{% endif %}>Ativos</option>
+            <option value="0" {% if request.GET.ativo == "0" %}selected{% endif %}>Inativos</option>
+          </select>
+        </div>
+        <div class="col-lg-3 col-md-3">
+          <label class="form-label small text-muted">Grupo</label>
+          <select name="grupo" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            {% for grupo in grupos_opcoes %}
+              <option value="{{ grupo }}" {% if request.GET.grupo == grupo %}selected{% endif %}>{{ grupo }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-lg-2 col-md-3">
+          <label class="form-label small text-muted">Overrides</label>
+          <select name="overrides" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            <option value="1" {% if request.GET.overrides == "1" %}selected{% endif %}>Com overrides</option>
+          </select>
+        </div>
+        <div class="col-12 d-flex justify-content-end gap-2">
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'relatorios:usuarios_central_list' %}">
+            <i class="bi bi-x-lg me-1"></i>Limpar
+          </a>
+          <button class="btn btn-sm btn-primary" type="submit">
+            <i class="bi bi-search me-1"></i>Filtrar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-body d-flex justify-content-between align-items-center">
+      <div>
+        <h6 class="mb-0">Usuarios cadastrados</h6>
+        <small class="text-muted">{{ total_usuarios }} registro(s) encontrado(s).</small>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Login</th>
+              <th>Status</th>
+              <th>Grupos</th>
+              <th>Overrides</th>
+              <th>Full Access</th>
+              <th class="text-end">Acoes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for linha in linhas_usuarios %}
+              <tr>
+                <td>
+                  <div class="fw-semibold">{{ linha.nome }}</div>
+                  <div class="small text-muted">{{ linha.usuario.email|default:"Sem e-mail" }}</div>
+                </td>
+                <td class="text-nowrap">{{ linha.usuario.username }}</td>
+                <td>
+                  {% if linha.usuario.is_active %}
+                    <span class="badge text-bg-success">Ativo</span>
+                  {% else %}
+                    <span class="badge text-bg-secondary">Inativo</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% for grupo in linha.grupos %}
+                    <span class="badge text-bg-secondary">{{ grupo }}</span>
+                  {% empty %}
+                    <span class="text-muted small">Sem grupos</span>
+                  {% endfor %}
+                </td>
+                <td>
+                  {% if linha.overrides_count %}
+                    <span class="badge text-bg-primary">{{ linha.overrides_count }}</span>
+                  {% else %}
+                    <span class="text-muted small">Nenhum</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if linha.full_access %}
+                    <span class="badge text-bg-danger">Protegido</span>
+                  {% else %}
+                    <span class="text-muted small">Nao</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  <a class="btn btn-sm btn-outline-primary" href="{% url 'relatorios:usuario_permissoes_detail' linha.usuario.pk %}">
+                    <i class="bi bi-sliders me-1"></i>Permissoes
+                  </a>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="7" class="text-center text-muted py-4">Nenhum usuario encontrado para os filtros atuais.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% if page_obj.has_other_pages %}
+      <div class="card-footer bg-body d-flex justify-content-between align-items-center">
+        <span class="small text-muted">Pagina {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+        <div class="btn-group btn-group-sm">
+          {% if page_obj.has_previous %}
+            <a class="btn btn-outline-secondary" href="?{% if querystring_paginacao %}{{ querystring_paginacao }}&{% endif %}page={{ page_obj.previous_page_number }}">Anterior</a>
+          {% endif %}
+          {% if page_obj.has_next %}
+            <a class="btn btn-outline-secondary" href="?{% if querystring_paginacao %}{{ querystring_paginacao }}&{% endif %}page={{ page_obj.next_page_number }}">Proxima</a>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

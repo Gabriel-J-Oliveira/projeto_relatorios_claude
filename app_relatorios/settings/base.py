@@ -123,6 +123,12 @@ RELATORIO_ANEXOS_MAX_TOTAL_MB = config(
     default=1024,
     cast=int,
 )
+RELATORIO_PERF_ENABLED = config("RELATORIO_PERF_ENABLED", default=False, cast=bool)
+RELATORIO_PERF_SLOW_SECONDS = config(
+    "RELATORIO_PERF_SLOW_SECONDS",
+    default=3.0,
+    cast=float,
+)
 HELP_IMAGES_ROOT = Path(
     config("HELP_IMAGES_ROOT", default="/home/app_relatorios_files/help_images")
 )
@@ -256,6 +262,12 @@ EXTRA_ADMIN_USERS = config(
     "EXTRA_ADMIN_USERS",
     default="",
     cast=lambda v: [item.strip().lower() for item in str(v).split(",") if item.strip()],
+)
+PERMISSOES_CENTRAL_ENABLED = config("PERMISSOES_CENTRAL_ENABLED", default=False, cast=bool)
+ERP_FULL_ACCESS_USERS = config(
+    "ERP_FULL_ACCESS_USERS",
+    default="CONTROL\\gabriel.oliveira",
+    cast=lambda v: [item.strip() for item in str(v).split(",") if item.strip()],
 )
 AD_SYNC_ENABLED = config("AD_SYNC_ENABLED", default=True, cast=bool)
 AD_USERS_BASE_DN = config("AD_USERS_BASE_DN", default="")

@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from django.contrib import messages
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
 from django.core.exceptions import PermissionDenied, RequestDataTooBig, SuspiciousOperation, ValidationError
@@ -122,6 +123,24 @@ from .services.politica_manutencao_service import (
     preparar_linhas_politicas,
     salvar_politica_manutencao,
 )
+from .services.permissoes_service import (
+    CodigoPermissao,
+    permissoes_central_ativa,
+    usuario_pode_acessar_central_permissoes,
+    usuario_tem_full_access_erp,
+)
+from .services.usuarios_permissoes_service import (
+    PermissaoCentralError,
+    grupos_usuario,
+    historico_permissoes_usuario,
+    motor_atual_label,
+    opcoes_grupos_usuarios,
+    permissoes_agrupadas_usuario,
+    queryset_usuarios_central,
+    resumo_usuarios_linha,
+    salvar_override_central,
+    usuario_origem_label,
+)
 from .services.rateio_service import (
     RateioError,
     garantir_rateio_despesa,
@@ -149,6 +168,7 @@ from .services.pdf_interno_service import montar_contexto_pdf_interno
 from .services.maps_service import MapsServiceError, buscar_endereco, calcular_rota
 from .services.dashboard_service import get_dashboard_context, get_dashboard_data
 from .services.politica_aprovacao_service import aplicar_politica_valor_aprovado_inicial
+from .services.relatorio_performance_service import RelatorioPerformanceTracker
 from .services.help_center_service import (
     contexto_central_ajuda,
     materializar_artigo_arquivo,
@@ -555,6 +575,116 @@ def _exigir_manutencao(request):
             request.path,
         )
         raise PermissionDenied("Você não tem permissão para acessar a manutenção do sistema.")
+
+
+def _exigir_central_permissoes(request):
+    if not usuario_pode_acessar_central_permissoes(request.user):
+        logger.warning(
+            "central_permissoes_acesso_negado usuario=%s path=%s",
+            getattr(request.user, "pk", None),
+            request.path,
+        )
+        raise PermissionDenied("Voce nao tem permissao para acessar a Central de Usuarios.")
+
+
+@login_required
+def usuarios_central_list_view(request):
+    _exigir_central_permissoes(request)
+    qs = queryset_usuarios_central(request.GET)
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    linhas = [resumo_usuarios_linha(usuario) for usuario in page_obj.object_list]
+    filtros_paginacao = request.GET.copy()
+    filtros_paginacao.pop("page", None)
+    logger.info(
+        "central_usuarios_listagem usuario=%s total=%s",
+        request.user.pk,
+        paginator.count,
+    )
+    return render(
+        request,
+        "usuarios/usuario_list.html",
+        {
+            "titulo_pagina": "Usuarios",
+            "linhas_usuarios": linhas,
+            "page_obj": page_obj,
+            "total_usuarios": paginator.count,
+            "querystring_paginacao": filtros_paginacao.urlencode(),
+            "grupos_opcoes": opcoes_grupos_usuarios(),
+            "motor_atual": motor_atual_label(),
+            "central_ativa": permissoes_central_ativa(),
+        },
+    )
+
+
+@login_required
+def usuario_permissoes_detail_view(request, pk):
+    _exigir_central_permissoes(request)
+    User = get_user_model()
+    usuario_alvo = get_object_or_404(
+        User.objects.prefetch_related("groups", "permissoes_overrides"),
+        pk=pk,
+    )
+    logger.info(
+        "central_usuario_detalhe usuario=%s alvo=%s",
+        request.user.pk,
+        usuario_alvo.pk,
+    )
+    return render(
+        request,
+        "usuarios/usuario_permissoes_detail.html",
+        {
+            "titulo_pagina": "Permissoes do usuario",
+            "usuario_alvo": usuario_alvo,
+            "grupos_usuario": grupos_usuario(usuario_alvo),
+            "origem_usuario": usuario_origem_label(usuario_alvo),
+            "permissoes_grupos": permissoes_agrupadas_usuario(usuario_alvo),
+            "historico_permissoes": historico_permissoes_usuario(usuario_alvo),
+            "full_access_alvo": usuario_tem_full_access_erp(usuario_alvo),
+            "motor_atual": motor_atual_label(),
+            "central_ativa": permissoes_central_ativa(),
+            "estado_herdar": "herdar",
+            "estado_permitir": "permitir",
+            "estado_negar": "negar",
+        },
+    )
+
+
+@require_POST
+@login_required
+def usuario_permissao_override_view(request, pk):
+    _exigir_central_permissoes(request)
+    User = get_user_model()
+    usuario_alvo = get_object_or_404(User, pk=pk)
+    codigo = (request.POST.get("codigo") or "").strip()
+    estado = (request.POST.get("estado") or "").strip()
+    try:
+        salvar_override_central(
+            administrador=request.user,
+            usuario_alvo=usuario_alvo,
+            codigo=codigo,
+            estado=estado,
+        )
+    except PermissaoCentralError as exc:
+        messages.error(request, str(exc))
+        logger.warning(
+            "central_permissao_override_negado usuario=%s alvo=%s codigo=%s estado=%s erro=%s",
+            request.user.pk,
+            usuario_alvo.pk,
+            codigo,
+            estado,
+            exc,
+        )
+    else:
+        messages.success(request, "Permissao atualizada com sucesso.")
+        logger.info(
+            "central_permissao_override_salvo usuario=%s alvo=%s codigo=%s estado=%s",
+            request.user.pk,
+            usuario_alvo.pk,
+            codigo,
+            estado,
+        )
+    return redirect(f"{reverse('relatorios:usuario_permissoes_detail', args=[usuario_alvo.pk])}#permissoes")
 
 
 @login_required
@@ -3255,12 +3385,14 @@ def relatorio_form_view(request, pk=None):
             _upload_tamanho_existente_relatorio(instance) or 0
         ),
     }
+    perf = RelatorioPerformanceTracker(request, instance)
 
     if request.method == "POST":
         try:
-            upload_contexto = _upload_contexto_inicial(request, instance)
-            _upload_validar_manifesto_esperado(upload_contexto, request, instance)
-            _upload_validar_capacidade_total(upload_contexto, request, instance)
+            with perf.phase("upload_precheck"):
+                upload_contexto = _upload_contexto_inicial(request, instance)
+                _upload_validar_manifesto_esperado(upload_contexto, request, instance)
+                _upload_validar_capacidade_total(upload_contexto, request, instance)
         except (UPLOAD_EXCEPTIONS, WorkflowError) as exc:
             _upload_log_exception(upload_contexto, request, instance, exc)
             if _relatorio_async_submit(request):
@@ -3269,7 +3401,9 @@ def relatorio_form_view(request, pk=None):
                     if isinstance(exc, WorkflowError)
                     else "Foi detectado um problema durante o envio dos anexos. Nenhum dado foi perdido. Verifique sua conexão e tente novamente."
                 )
-                return _relatorio_async_error_response(mensagem, status=400)
+                response = _relatorio_async_error_response(mensagem, status=400)
+                perf.finish(outcome="workflow_error", http_status=response.status_code, relatorio=instance)
+                return perf.apply_server_timing(response)
             messages.error(
                 request,
                 str(exc)
@@ -3281,7 +3415,9 @@ def relatorio_form_view(request, pk=None):
                 if instance
                 else reverse("relatorios:relatorio_create")
             )
-            return redirect(destino)
+            response = redirect(destino)
+            perf.finish(outcome="workflow_error", http_status=response.status_code, relatorio=instance)
+            return perf.apply_server_timing(response)
 
     # ── Determinar valor_km_padrao (variável auxiliar) ────────────────────────
     # No POST: lê o cliente enviado no form para recalcular o padrão correto.
@@ -3330,38 +3466,40 @@ def relatorio_form_view(request, pk=None):
 
     # ── POST ──────────────────────────────────────────────────────────────────
     if request.method == "POST":
-        form = RelatorioTecnicoForm(
-            request.POST,
-            request.FILES,
-            instance=instance,
-        )
+        with perf.phase("prepare_forms"):
+            form = RelatorioTecnicoForm(
+                request.POST,
+                request.FILES,
+                instance=instance,
+            )
 
-        fs_desp = ItemDespesaFormSet(
-            request.POST,
-            request.FILES,
-            instance=instance,
-            prefix="despesas",
-        )
+            fs_desp = ItemDespesaFormSet(
+                request.POST,
+                request.FILES,
+                instance=instance,
+                prefix="despesas",
+            )
 
-        fs_cidades = CidadeAtendimentoFormSet(
-            request.POST,
-            instance=instance,
-            prefix="cidades",
-        )
+            fs_cidades = CidadeAtendimentoFormSet(
+                request.POST,
+                instance=instance,
+                prefix="cidades",
+            )
 
-        fs_km = TrechoKmFormSet(
-            request.POST,
-            request.FILES,
-            instance=instance,
-            prefix="trechos",
-            form_kwargs={"valor_km_padrao": valor_km_padrao},
-        )
-        _popular_clientes_formsets_para_template(request, fs_desp, fs_km)
+            fs_km = TrechoKmFormSet(
+                request.POST,
+                request.FILES,
+                instance=instance,
+                prefix="trechos",
+                form_kwargs={"valor_km_padrao": valor_km_padrao},
+            )
+            _popular_clientes_formsets_para_template(request, fs_desp, fs_km)
 
-        form_ok = form.is_valid()
-        cidades_ok = fs_cidades.is_valid()
-        desp_ok = fs_desp.is_valid()
-        km_ok = fs_km.is_valid()
+        with perf.phase("validation"):
+            form_ok = form.is_valid()
+            cidades_ok = fs_cidades.is_valid()
+            desp_ok = fs_desp.is_valid()
+            km_ok = fs_km.is_valid()
 
         logger.debug(
             "Validação: form=%s | fs_desp=%s | fs_km=%s",
@@ -3400,17 +3538,18 @@ def relatorio_form_view(request, pk=None):
                 )
 
         if form_ok and cidades_ok and desp_ok and km_ok:
-            erros_clientes = _validar_clientes_formsets(
-                request,
-                fs_desp,
-                fs_km,
-                cliente_ids_relatorio,
-            )
-            erros_tecnicos_despesa = _validar_tecnicos_despesas_formset(
-                request,
-                fs_desp,
-                tecnicos_post_ids,
-            )
+            with perf.phase("validation"):
+                erros_clientes = _validar_clientes_formsets(
+                    request,
+                    fs_desp,
+                    fs_km,
+                    cliente_ids_relatorio,
+                )
+                erros_tecnicos_despesa = _validar_tecnicos_despesas_formset(
+                    request,
+                    fs_desp,
+                    tecnicos_post_ids,
+                )
             if erros_clientes:
                 _adicionar_erros_resumo(
                     resumo_erros,
@@ -3468,7 +3607,7 @@ def relatorio_form_view(request, pk=None):
             # foi capturado pela flag `erros_extras`.
             if not erros_extras and not form.errors:
                 try:
-                    with transaction.atomic():
+                    with perf.phase("persistence"), transaction.atomic():
                         relatorio_novo = instance is None
                         if not relatorio_novo:
                             relatorio_atual = RelatorioTecnico.objects.select_for_update().get(
@@ -3499,7 +3638,8 @@ def relatorio_form_view(request, pk=None):
                             getattr(relatorio, "tecnico_responsavel_id", None),
                             getattr(relatorio, "tecnico_reembolso_id", None),
                         )
-                        relatorio.save()
+                        with perf.phase("save_report"):
+                            relatorio.save()
                         logger.info(
                             "RELATORIO_SAVE_DEBUG etapa=apos_save acao=%s novo=%s user_id=%s "
                             "username=%s relatorio_id=%s status=%s criado_por_id=%s "
@@ -3514,30 +3654,35 @@ def relatorio_form_view(request, pk=None):
                             getattr(relatorio, "tecnico_responsavel_id", None),
                             getattr(relatorio, "tecnico_reembolso_id", None),
                         )
-                        form.save_m2m()
-                        _salvar_cidades_atendimento_formset(fs_cidades, relatorio)
-                        sync_clientes_relatorio(
-                            relatorio,
-                            cliente_ids_relatorio,
-                            motivos_clientes,
-                        )
+                        with perf.phase("save_report"):
+                            form.save_m2m()
+                            _salvar_cidades_atendimento_formset(fs_cidades, relatorio)
+                        with perf.phase("participants"):
+                            sync_clientes_relatorio(
+                                relatorio,
+                                cliente_ids_relatorio,
+                                motivos_clientes,
+                            )
 
                         tecnicos_apoio = form.cleaned_data.get("tecnicos_equipe", [])
-                        _sync_equipe(relatorio, tecnicos_apoio)
+                        with perf.phase("participants"):
+                            _sync_equipe(relatorio, tecnicos_apoio)
                         usuario_historico = (
                             request.user if request.user.is_authenticated else None
                         )
-                        remover_tecnicos_despesas_fora_relatorio(
-                            relatorio,
-                            usuario_historico,
-                        )
+                        with perf.phase("participants"):
+                            remover_tecnicos_despesas_fora_relatorio(
+                                relatorio,
+                                usuario_historico,
+                            )
                         _registrar_auditoria_km_excedente(
                             relatorio,
                             usuario_historico,
                             km_excedente_anterior,
                         )
 
-                        _upload_log_salvando(upload_contexto, request, relatorio)
+                        with perf.phase("attachments"):
+                            _upload_log_salvando(upload_contexto, request, relatorio)
 
                         fs_desp.instance = relatorio
                         for f in fs_desp.forms:
@@ -3571,82 +3716,92 @@ def relatorio_form_view(request, pk=None):
                                 item.comprovante = comprovante_anterior or None
                             elif comprovante_upload:
                                 item.comprovante = comprovante_upload
-                            item.save()
+                            with perf.phase("expenses"):
+                                item.save()
                             if comprovantes_upload and salvar_upload_como_anexo:
                                 for arquivo_upload in comprovantes_upload:
-                                    anexo = _criar_anexo_comprovante_adicional(
-                                        relatorio,
-                                        usuario_historico,
-                                        item,
-                                        arquivo_upload,
-                                    )
-                                    if anexo:
-                                        _upload_registrar_persistido(
-                                            upload_contexto,
-                                            anexo,
+                                    with perf.phase("attachments"):
+                                        anexo = _criar_anexo_comprovante_adicional(
+                                            relatorio,
+                                            usuario_historico,
+                                            item,
                                             arquivo_upload,
                                         )
+                                    if anexo:
+                                        with perf.phase("attachments"):
+                                            _upload_registrar_persistido(
+                                                upload_contexto,
+                                                anexo,
+                                                arquivo_upload,
+                                            )
                             else:
-                                _upload_registrar_persistido(
-                                    upload_contexto,
-                                    item,
-                                    comprovante_upload,
-                                )
-                                _registrar_metadados_comprovante(
-                                    relatorio,
-                                    usuario_historico,
-                                    item,
-                                    comprovante_upload,
-                                )
-                                for arquivo_upload in comprovantes_upload[1:]:
-                                    anexo = _criar_anexo_comprovante_adicional(
+                                with perf.phase("attachments"):
+                                    _upload_registrar_persistido(
+                                        upload_contexto,
+                                        item,
+                                        comprovante_upload,
+                                    )
+                                    _registrar_metadados_comprovante(
                                         relatorio,
                                         usuario_historico,
                                         item,
-                                        arquivo_upload,
+                                        comprovante_upload,
                                     )
-                                    if anexo:
-                                        _upload_registrar_persistido(
-                                            upload_contexto,
-                                            anexo,
+                                for arquivo_upload in comprovantes_upload[1:]:
+                                    with perf.phase("attachments"):
+                                        anexo = _criar_anexo_comprovante_adicional(
+                                            relatorio,
+                                            usuario_historico,
+                                            item,
                                             arquivo_upload,
                                         )
+                                    if anexo:
+                                        with perf.phase("attachments"):
+                                            _upload_registrar_persistido(
+                                                upload_contexto,
+                                                anexo,
+                                                arquivo_upload,
+                                            )
                             clientes_despesa = _clientes_item_post_ou_unico(
                                 request,
                                 f.prefix,
                                 relatorio,
                             )
-                            erros_item = sync_clientes_despesa(
-                                item,
-                                clientes_despesa,
-                            )
+                            with perf.phase("participants"):
+                                erros_item = sync_clientes_despesa(
+                                    item,
+                                    clientes_despesa,
+                                )
                             if erros_item:
                                 raise WorkflowError(erros_item)
-                            erros_tecnicos_item = sync_tecnicos_despesa(
-                                item,
-                                _tecnicos_item_post_ou_unico(
-                                    request,
-                                    f.prefix,
-                                    relatorio,
-                                ),
-                                usuario_historico,
-                            )
+                            with perf.phase("participants"):
+                                erros_tecnicos_item = sync_tecnicos_despesa(
+                                    item,
+                                    _tecnicos_item_post_ou_unico(
+                                        request,
+                                        f.prefix,
+                                        relatorio,
+                                    ),
+                                    usuario_historico,
+                                )
                             if erros_tecnicos_item:
                                 raise WorkflowError(erros_tecnicos_item)
                             if relatorio.status in {
                                 StatusRelatorio.RASCUNHO,
                                 StatusRelatorio.AJUSTE,
                             }:
-                                politica_alterou_aprovado = (
-                                    aplicar_politica_valor_aprovado_inicial(
-                                        item,
-                                        preservar_manual=(
-                                            relatorio.status != StatusRelatorio.RASCUNHO
-                                        ),
+                                with perf.phase("policy"):
+                                    politica_alterou_aprovado = (
+                                        aplicar_politica_valor_aprovado_inicial(
+                                            item,
+                                            preservar_manual=(
+                                                relatorio.status != StatusRelatorio.RASCUNHO
+                                            ),
+                                        )
                                     )
-                                )
                                 if politica_alterou_aprovado:
-                                    garantir_rateio_despesa(item)
+                                    with perf.phase("rateios"):
+                                        garantir_rateio_despesa(item)
                         for f in fs_desp.deleted_forms:
                             if f.instance.pk:
                                 f.instance.delete()
@@ -3675,57 +3830,65 @@ def relatorio_form_view(request, pk=None):
                                 )
                             elif len(clientes_trecho) > 1:
                                 trecho.valor_km = Decimal("0.00")
-                            trecho.save()
-                            _upload_registrar_persistido(
-                                upload_contexto,
-                                trecho,
-                                request.FILES.get(f"{f.prefix}-comprovante"),
-                            )
-                            _registrar_auditoria_geografica_trecho(
-                                relatorio,
-                                usuario_historico,
-                                trecho,
-                                trecho_anterior,
-                            )
-                            erros_trecho = sync_clientes_trecho(
-                                trecho,
-                                clientes_trecho,
-                            )
+                            with perf.phase("km"):
+                                trecho.save()
+                            with perf.phase("attachments"):
+                                _upload_registrar_persistido(
+                                    upload_contexto,
+                                    trecho,
+                                    request.FILES.get(f"{f.prefix}-comprovante"),
+                                )
+                            with perf.phase("km"):
+                                _registrar_auditoria_geografica_trecho(
+                                    relatorio,
+                                    usuario_historico,
+                                    trecho,
+                                    trecho_anterior,
+                                )
+                            with perf.phase("participants"):
+                                erros_trecho = sync_clientes_trecho(
+                                    trecho,
+                                    clientes_trecho,
+                                )
                             if erros_trecho:
                                 raise WorkflowError(erros_trecho)
                         for f in fs_km.deleted_forms:
                             if f.instance.pk:
                                 f.instance.delete()
 
-                        erros_integridade = validar_integridade_financeira_relatorio(
-                            relatorio
-                        )
+                        with perf.phase("integrity"):
+                            erros_integridade = validar_integridade_financeira_relatorio(
+                                relatorio
+                            )
                         if erros_integridade:
                             raise WorkflowError(erros_integridade)
 
-                        _upload_finalizar_ou_falhar(
-                            upload_contexto,
-                            request,
-                            relatorio,
-                        )
+                        with perf.phase("attachments"):
+                            _upload_finalizar_ou_falhar(
+                                upload_contexto,
+                                request,
+                                relatorio,
+                            )
 
                         if relatorio_novo:
-                            registrar_evento(
-                                relatorio,
-                                usuario_historico,
-                                TipoEventoHistorico.CRIADO,
-                                f"Rascunho {relatorio.identificador} criado.",
-                            )
+                            with perf.phase("history"):
+                                registrar_evento(
+                                    relatorio,
+                                    usuario_historico,
+                                    TipoEventoHistorico.CRIADO,
+                                    f"Rascunho {relatorio.identificador} criado.",
+                                )
                         if acao != "rascunho":
                             _log_envio_relatorio_pre_autorizacao(
                                 request,
                                 relatorio,
                                 "relatorio_form_view",
                             )
-                            relatorio = enviar_para_conferencia(
-                                relatorio.pk,
-                                usuario_historico,
-                            )
+                            with perf.phase("workflow"):
+                                relatorio = enviar_para_conferencia(
+                                    relatorio.pk,
+                                    usuario_historico,
+                                )
 
                         _limpar_autosaves_relatorio(
                             request.user,
@@ -3745,7 +3908,9 @@ def relatorio_form_view(request, pk=None):
                         request,
                         f"Relatório {relatorio.identificador} salvo com sucesso.",
                     )
-                    return redirect("relatorios:relatorio_detail", pk=relatorio.pk)
+                    response = redirect("relatorios:relatorio_detail", pk=relatorio.pk)
+                    perf.finish(outcome="success", http_status=response.status_code, relatorio=relatorio)
+                    return perf.apply_server_timing(response)
 
                 except WorkflowError as exc:
                     erros = _lista_erros_operacionais(exc)
@@ -3756,13 +3921,16 @@ def relatorio_form_view(request, pk=None):
                         contexto="Validação do relatório",
                     )
                     if _relatorio_async_submit(request):
-                        return _relatorio_async_validation_response(
+                        response = _relatorio_async_validation_response(
                             form,
                             fs_cidades,
                             fs_desp,
                             fs_km,
                             resumo_erros,
                         )
+                        perf.finish(outcome="workflow_error", http_status=response.status_code, relatorio=instance)
+                        return perf.apply_server_timing(response)
+                    perf.finish(outcome="workflow_error", http_status=200, relatorio=instance)
                     return render(
                         request,
                         "relatorios/relatorio_form.html",
@@ -3806,11 +3974,14 @@ def relatorio_form_view(request, pk=None):
                         )
                         _upload_log_exception(upload_contexto, request, instance, exc)
                         if _relatorio_async_submit(request):
-                            return _relatorio_async_error_response(
+                            response = _relatorio_async_error_response(
                                 mensagem_upload,
                                 status=500,
                             )
+                            perf.finish(outcome="unexpected_error", http_status=response.status_code, relatorio=instance)
+                            return perf.apply_server_timing(response)
                         messages.error(request, mensagem_upload)
+                        perf.finish(outcome="unexpected_error", http_status=200, relatorio=instance)
                         return render(
                             request,
                             "relatorios/relatorio_form.html",
@@ -3845,11 +4016,14 @@ def relatorio_form_view(request, pk=None):
                     logger.exception("Erro ao salvar relatório: %s", exc)
                     messages.error(request, "Erro interno ao salvar. Tente novamente.")
                     if _relatorio_async_submit(request):
-                        return _relatorio_async_error_response(
+                        response = _relatorio_async_error_response(
                             diagnostico_backend["mensagem"],
                             status=500,
                         )
+                        perf.finish(outcome="unexpected_error", http_status=response.status_code, relatorio=instance)
+                        return perf.apply_server_timing(response)
                     # Não adiciona ao resumo_erros — é erro de infra, não de validação
+                    perf.finish(outcome="unexpected_error", http_status=200, relatorio=instance)
                     return render(
                         request,
                         "relatorios/relatorio_form.html",
@@ -3898,13 +4072,15 @@ def relatorio_form_view(request, pk=None):
             )
 
         if _relatorio_async_submit(request):
-            return _relatorio_async_validation_response(
+            response = _relatorio_async_validation_response(
                 form,
                 fs_cidades,
                 fs_desp,
                 fs_km,
                 resumo_erros,
             )
+            perf.finish(outcome="validation_error", http_status=response.status_code, relatorio=instance)
+            return perf.apply_server_timing(response)
 
     # ── GET ───────────────────────────────────────────────────────────────────
     else:
@@ -3926,6 +4102,9 @@ def relatorio_form_view(request, pk=None):
             form_kwargs={"valor_km_padrao": valor_km_padrao},
         )
         _popular_clientes_formsets_para_template(request, fs_desp, fs_km)
+
+    if request.method == "POST":
+        perf.finish(outcome="validation_error", http_status=200, relatorio=instance)
 
     # ── Renderização (GET e POST com erro chegam aqui) ─────────────────────────
     return render(

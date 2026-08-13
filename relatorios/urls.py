@@ -24,6 +24,13 @@ urlpatterns = [
     path("manutencao/emails/<int:pk>/reenviar/", views.manutencao_email_reenviar_view, name="manutencao_email_reenviar"),
     path("manutencao/emails/reenviar-lote/", views.manutencao_emails_reenviar_lote_view, name="manutencao_emails_reenviar_lote"),
     path("manutencao/email-teste/", views.manutencao_email_teste_view, name="manutencao_email_teste"),
+    path("usuarios/", views.usuarios_central_list_view, name="usuarios_central_list"),
+    path("usuarios/<int:pk>/", views.usuario_permissoes_detail_view, name="usuario_permissoes_detail"),
+    path(
+        "usuarios/<int:pk>/permissoes/",
+        views.usuario_permissao_override_view,
+        name="usuario_permissao_override",
+    ),
     path("tours/marcar-visto/", views.marcar_tour_guiado_visto, name="marcar_tour_guiado_visto"),
     path("dashboard/", views.DashboardView.as_view(), name="dashboard"),
     path("dashboard/dados/", views.dashboard_dados_json, name="dashboard_dados"),
