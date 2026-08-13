@@ -148,7 +148,7 @@ class Migration(migrations.Migration):
             model_name="permissaousuariooverride",
             index=models.Index(
                 fields=["usuario", "estado"],
-                name="relatorios__perm_user_estado_idx",
+                name="relatorios__perm_usr_est_idx",
             ),
         ),
         migrations.AddConstraint(

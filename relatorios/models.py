@@ -1077,7 +1077,7 @@ class RelatorioTecnico(models.Model):
         default=TipoReembolso.REEMBOLSAVEL,
     )
     empresa_grupo = models.CharField(
-        "Empresa responsável pelo custo",
+        "Empresa do grupo",
         max_length=30,
         choices=EmpresaGrupo.choices,
         blank=True,
@@ -3020,7 +3020,7 @@ class PermissaoUsuarioOverride(models.Model):
         ]
         indexes = [
             models.Index(fields=["codigo"], name="relatorios__perm_codigo_idx"),
-            models.Index(fields=["usuario", "estado"], name="relatorios__perm_user_estado_idx"),
+            models.Index(fields=["usuario", "estado"], name="relatorios__perm_usr_est_idx"),
         ]
 
     def clean(self):
