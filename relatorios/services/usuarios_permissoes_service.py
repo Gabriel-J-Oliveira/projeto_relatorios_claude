@@ -105,6 +105,7 @@ class EstadoPermissaoApresentacao:
     readonly: bool
     dependencias: tuple[str, ...]
     dependencias_pendentes: tuple[str, ...]
+    dependencias_pendentes_nomes: tuple[str, ...]
 
 
 def queryset_usuarios_central(params):
@@ -186,10 +187,15 @@ def permissoes_usuario_para_ui(usuario):
             continue
         dependencias = DEPENDENCIAS_PERMISSOES.get(codigo, ())
         dependencias_pendentes = []
+        dependencias_pendentes_nomes = []
         for dependencia in dependencias:
             permitido, _origem = _estado_efetivo_basico(usuario, dependencia, overrides)
             if not permitido:
                 dependencias_pendentes.append(dependencia)
+                permissao_dependencia = obter_permissao(dependencia)
+                dependencias_pendentes_nomes.append(
+                    permissao_dependencia.nome if permissao_dependencia else dependencia
+                )
         permitido, origem = _estado_efetivo_basico(usuario, codigo, overrides)
         linhas.append(
             EstadoPermissaoApresentacao(
@@ -200,6 +206,7 @@ def permissoes_usuario_para_ui(usuario):
                 readonly=usuario_tem_full_access_erp(usuario),
                 dependencias=dependencias,
                 dependencias_pendentes=tuple(dependencias_pendentes),
+                dependencias_pendentes_nomes=tuple(dependencias_pendentes_nomes),
             )
         )
     return linhas
