@@ -1,0 +1,35 @@
+[1mdiff --git a/relatorios/migrations/0061_permissoes_usuario_override_historico.py b/relatorios/migrations/0061_permissoes_usuario_override_historico.py[m
+[1mindex 40210c6..7d59f82 100644[m
+[1m--- a/relatorios/migrations/0061_permissoes_usuario_override_historico.py[m
+[1m+++ b/relatorios/migrations/0061_permissoes_usuario_override_historico.py[m
+[36m@@ -148,7 +148,7 @@[m [mclass Migration(migrations.Migration):[m
+             model_name="permissaousuariooverride",[m
+             index=models.Index([m
+                 fields=["usuario", "estado"],[m
+[31m-                name="relatorios__perm_user_estado_idx",[m
+[32m+[m[32m                name="relatorios__perm_usr_est_idx",[m
+             ),[m
+         ),[m
+         migrations.AddConstraint([m
+[1mdiff --git a/relatorios/models.py b/relatorios/models.py[m
+[1mindex f2bdf84..ba0b475 100644[m
+[1m--- a/relatorios/models.py[m
+[1m+++ b/relatorios/models.py[m
+[36m@@ -1077,7 +1077,7 @@[m [mclass RelatorioTecnico(models.Model):[m
+         default=TipoReembolso.REEMBOLSAVEL,[m
+     )[m
+     empresa_grupo = models.CharField([m
+[31m-        "Empresa responsável pelo custo",[m
+[32m+[m[32m        "Empresa do grupo",[m
+         max_length=30,[m
+         choices=EmpresaGrupo.choices,[m
+         blank=True,[m
+[36m@@ -3020,7 +3020,7 @@[m [mclass PermissaoUsuarioOverride(models.Model):[m
+         ][m
+         indexes = [[m
+             models.Index(fields=["codigo"], name="relatorios__perm_codigo_idx"),[m
+[31m-            models.Index(fields=["usuario", "estado"], name="relatorios__perm_user_estado_idx"),[m
+[32m+[m[32m            models.Index(fields=["usuario", "estado"], name="relatorios__perm_usr_est_idx"),[m
+         ][m
+ [m
+     def clean(self):[m
