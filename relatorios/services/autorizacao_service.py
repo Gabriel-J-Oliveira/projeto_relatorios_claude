@@ -135,8 +135,21 @@ def usuario_eh_administrativo(user):
     )
 
 
-def usuario_pode_acessar_manutencao(user):
+def usuario_pode_acessar_manutencao_legado(user):
     return usuario_tem_acesso_total(user) or usuario_eh_admin_erp(user)
+
+
+def usuario_pode_acessar_manutencao(user):
+    from relatorios.services.permissoes_service import (
+        CodigoPermissao,
+        avaliar_permissao_cutover,
+    )
+
+    return avaliar_permissao_cutover(
+        user,
+        CodigoPermissao.MANUTENCAO_ACESSAR,
+        lambda: usuario_pode_acessar_manutencao_legado(user),
+    )
 
 
 def usuario_pode_acessar_erp(user):
@@ -159,6 +172,19 @@ def usuario_pode_reabrir_relatorio(user):
 
 def usuario_pode_gerenciar_cadastros(user):
     return _usuario_tem_algum_grupo(user, [GRUPO_GESTOR, GRUPO_ADMIN_ERP])
+
+
+def usuario_pode_gerenciar_clientes(user):
+    from relatorios.services.permissoes_service import (
+        CodigoPermissao,
+        avaliar_permissao_cutover,
+    )
+
+    return avaliar_permissao_cutover(
+        user,
+        CodigoPermissao.CADASTROS_CLIENTES_GERENCIAR,
+        lambda: usuario_eh_administrativo(user),
+    )
 
 
 def usuario_pode_editar_relatorio_em_conferencia(user):
@@ -390,17 +416,37 @@ def queryset_relatorios_visiveis(user, queryset):
 
 def permissoes_usuario(user):
     try:
-        from relatorios.services.permissoes_service import usuario_pode_acessar_central_permissoes
+        from relatorios.services.permissoes_service import (
+            CodigoPermissao,
+            permissoes_central_ativa,
+            usuario_pode_acessar_central_permissoes,
+            usuario_tem_permissao,
+        )
     except Exception:
         usuario_pode_acessar_central = False
+        central_ativa = False
+        visualiza_clientes = usuario_eh_administrativo(user)
     else:
         usuario_pode_acessar_central = usuario_pode_acessar_central_permissoes(user)
+        central_ativa = permissoes_central_ativa()
+        visualiza_clientes = usuario_tem_permissao(
+            user,
+            CodigoPermissao.CADASTROS_CLIENTES_GERENCIAR,
+        )
     administrativo = usuario_eh_administrativo(user)
     tecnico = usuario_eh_tecnico(user)
     admin_erp = usuario_eh_admin_erp(user)
     superadmin = usuario_eh_superadmin(user)
     domain_admin = usuario_eh_domain_admin(user)
     acesso_total = usuario_tem_acesso_total(user)
+    visualiza_cadastros_legado = administrativo or acesso_total
+    visualiza_tecnicos = visualiza_cadastros_legado
+    visualiza_adiantamentos = visualiza_cadastros_legado
+    visualiza_cadastros = (
+        visualiza_cadastros_legado
+        if not central_ativa
+        else bool(visualiza_clientes or visualiza_tecnicos)
+    )
     return {
         "acessa_erp": usuario_pode_acessar_erp(user),
         "administrativo": administrativo or acesso_total,
@@ -413,8 +459,10 @@ def permissoes_usuario(user):
         "dashboard_global": administrativo or acesso_total,
         "dashboard_individual": not (administrativo or acesso_total),
         "visualiza_dados_globais": administrativo or acesso_total,
-        "visualiza_cadastros": administrativo or acesso_total,
-        "visualiza_adiantamentos": administrativo or acesso_total,
+        "visualiza_cadastros": visualiza_cadastros,
+        "visualiza_clientes": visualiza_clientes if central_ativa else visualiza_cadastros_legado,
+        "visualiza_tecnicos": visualiza_tecnicos,
+        "visualiza_adiantamentos": visualiza_adiantamentos,
         "aprova_relatorios": administrativo or acesso_total,
         "manutencao": usuario_pode_acessar_manutencao(user),
         "usuarios_gerenciar": usuario_pode_acessar_central,

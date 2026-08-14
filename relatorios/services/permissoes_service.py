@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import logging
 from typing import Callable
 
 from django.conf import settings
@@ -13,7 +14,7 @@ from relatorios.services.autorizacao_service import (
     _normalizar_login_usuario,
     usuario_eh_administrativo,
     usuario_pode_acessar_erp,
-    usuario_pode_acessar_manutencao,
+    usuario_pode_acessar_manutencao_legado,
     usuario_pode_atuar_como_financeiro,
     usuario_pode_editar_relatorio,
     usuario_pode_enviar_relatorio,
@@ -21,9 +22,12 @@ from relatorios.services.autorizacao_service import (
     usuario_pode_visualizar_relatorio,
 )
 from relatorios.services.clientes_valor_km_service import (
-    usuario_pode_configurar_valor_km,
+    usuario_pode_configurar_valor_km_legado,
 )
-from relatorios.services.help_center_service import usuario_pode_editar_ajuda
+from relatorios.services.help_center_service import usuario_pode_editar_ajuda_legado
+
+
+logger = logging.getLogger(__name__)
 
 
 class CategoriaPermissao:
@@ -126,7 +130,7 @@ def _financeiro_legado(usuario, objeto=None):
 
 
 def _manutencao_legado(usuario, objeto=None):
-    return bool(usuario_pode_acessar_manutencao(usuario))
+    return bool(usuario_pode_acessar_manutencao_legado(usuario))
 
 
 def _catalogo():
@@ -409,7 +413,7 @@ def _catalogo():
             "Permite preencher ou alterar valor de KM em clientes.",
             CategoriaPermissao.CADASTROS,
             EscopoPermissao.GLOBAL,
-            _global(usuario_pode_configurar_valor_km),
+            _global(usuario_pode_configurar_valor_km_legado),
             regra_legada="usuario_pode_configurar_valor_km",
             sensibilidade=SensibilidadePermissao.CRITICA,
         ),
@@ -469,7 +473,7 @@ def _catalogo():
             "Permite criar, editar, excluir e enviar imagens da central de ajuda.",
             CategoriaPermissao.AJUDA,
             EscopoPermissao.GLOBAL,
-            _global(usuario_pode_editar_ajuda),
+            _global(usuario_pode_editar_ajuda_legado),
             regra_legada="usuario_pode_editar_ajuda",
         ),
     }
@@ -755,6 +759,35 @@ def comparar_permissao_legado_central(usuario, codigo, objeto=None):
         "legado": usuario_tem_permissao_legada(usuario, codigo, objeto=objeto),
         "central": usuario_tem_permissao_central(usuario, codigo, objeto=objeto),
     }
+
+
+def avaliar_permissao_cutover(usuario, codigo, legado, objeto=None):
+    legado_result = bool(legado() if callable(legado) else legado)
+    central_ativa = permissoes_central_ativa()
+    try:
+        central_result = usuario_tem_permissao_central(usuario, codigo, objeto=objeto)
+    except Exception as exc:
+        if central_ativa:
+            raise
+        logger.warning(
+            "[PERMISSOES_SHADOW] code=%s user_id=%s legacy=%s central_error=%s",
+            codigo,
+            getattr(usuario, "pk", None),
+            int(legado_result),
+            exc.__class__.__name__,
+        )
+        return legado_result
+    if not central_ativa:
+        if legado_result != central_result:
+            logger.info(
+                "[PERMISSOES_SHADOW] code=%s user_id=%s legacy=%s central=%s",
+                codigo,
+                getattr(usuario, "pk", None),
+                int(legado_result),
+                int(central_result),
+            )
+        return legado_result
+    return central_result
 
 
 def _estado_historico_de_override(override):

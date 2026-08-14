@@ -73,11 +73,13 @@ from .services.autorizacao_service import (
     usuario_pode_enviar_relatorio,
     usuario_pode_acessar_manutencao,
     usuario_pode_atuar_como_financeiro,
+    usuario_pode_gerenciar_clientes,
     usuario_pode_reabrir_relatorio,
     usuario_tem_acesso_total,
 )
 from .services.permissoes_service import (
     CodigoPermissao,
+    avaliar_permissao_cutover,
     definir_override_permissao,
     estado_efetivo_override,
     listar_permissoes,
@@ -89,7 +91,11 @@ from .services.permissoes_service import (
 )
 from .context_processors import permissoes_erp
 from .services.resumo_cliente_service import resumo_financeiro_por_cliente
-from .services.clientes_valor_km_service import clientes_relatorio_sem_valor_km
+from .services.clientes_valor_km_service import (
+    clientes_relatorio_sem_valor_km,
+    usuario_pode_configurar_valor_km,
+)
+from .services.help_center_service import usuario_pode_editar_ajuda
 from .services.clientes_relatorio_service import resolver_cliente_empresa_grupo
 from .services.financeiro_validator import validar_integridade_financeira_relatorio
 from .services.km_financeiro_service import calcular_km_financeiro
@@ -396,6 +402,193 @@ class PermissoesServiceTests(SimpleTestCase):
             usuario_pode_reabrir_relatorio(usuario_negado),
             usuario_tem_permissao(usuario_negado, CodigoPermissao.RELATORIOS_REABRIR),
         )
+
+
+@override_settings(PERMISSOES_CENTRAL_ENABLED=False, ERP_FULL_ACCESS_USERS=[], EXTRA_ADMIN_USERS=[])
+class PermissoesCutoverPrimeiroLoteFlagOffTests(TestCase):
+    def setUp(self):
+        self.User = get_user_model()
+        self.admin = self.User.objects.create_user(username="admin.erp")
+        self.comum = self.User.objects.create_user(username="usuario.comum")
+        self.staff = self.User.objects.create_user(username="staff.user", is_staff=True)
+        grupo_admin = Group.objects.create(name=GRUPO_ADMIN_ERP)
+        self.admin.groups.add(grupo_admin)
+
+    def test_flag_off_manutencao_preserva_regra_legada_e_ignora_override(self):
+        definir_override_permissao(
+            self.admin,
+            CodigoPermissao.MANUTENCAO_ACESSAR,
+            EstadoPermissaoUsuario.NEGAR,
+            alterado_por=self.admin,
+        )
+
+        self.assertTrue(usuario_pode_acessar_manutencao(self.admin))
+        self.assertFalse(usuario_pode_acessar_manutencao(self.comum))
+
+    def test_flag_off_clientes_preserva_regra_legada_e_ignora_override(self):
+        definir_override_permissao(
+            self.admin,
+            CodigoPermissao.CADASTROS_CLIENTES_GERENCIAR,
+            EstadoPermissaoUsuario.NEGAR,
+            alterado_por=self.admin,
+        )
+
+        self.assertTrue(usuario_pode_gerenciar_clientes(self.admin))
+        self.assertFalse(usuario_pode_gerenciar_clientes(self.comum))
+
+    def test_flag_off_valor_km_preserva_regra_legada_e_ignora_override(self):
+        definir_override_permissao(
+            self.admin,
+            CodigoPermissao.CLIENTES_CONFIGURAR_VALOR_KM,
+            EstadoPermissaoUsuario.NEGAR,
+            alterado_por=self.admin,
+        )
+
+        self.assertTrue(usuario_pode_configurar_valor_km(self.admin))
+        self.assertFalse(usuario_pode_configurar_valor_km(self.comum))
+
+    def test_flag_off_ajuda_preserva_regra_legada_incluindo_staff(self):
+        definir_override_permissao(
+            self.staff,
+            CodigoPermissao.AJUDA_EDITAR,
+            EstadoPermissaoUsuario.NEGAR,
+            alterado_por=self.admin,
+        )
+
+        self.assertTrue(usuario_pode_editar_ajuda(self.staff))
+        self.assertFalse(usuario_pode_editar_ajuda(self.comum))
+
+    def test_shadow_log_divergencia_sem_alterar_resultado_legado(self):
+        with self.assertLogs("relatorios.services.permissoes_service", level="INFO") as logs:
+            resultado = avaliar_permissao_cutover(
+                self.admin,
+                CodigoPermissao.MANUTENCAO_ACESSAR,
+                True,
+            )
+
+        self.assertTrue(resultado)
+        self.assertTrue(any("[PERMISSOES_SHADOW]" in mensagem for mensagem in logs.output))
+        self.assertTrue(any("legacy=1 central=0" in mensagem for mensagem in logs.output))
+
+    def test_shadow_log_central_permitido_nao_altera_negativa_legada(self):
+        definir_override_permissao(
+            self.comum,
+            CodigoPermissao.CADASTROS_CLIENTES_GERENCIAR,
+            EstadoPermissaoUsuario.PERMITIR,
+            alterado_por=self.admin,
+        )
+
+        with self.assertLogs("relatorios.services.permissoes_service", level="INFO") as logs:
+            resultado = avaliar_permissao_cutover(
+                self.comum,
+                CodigoPermissao.CADASTROS_CLIENTES_GERENCIAR,
+                False,
+            )
+
+        self.assertFalse(resultado)
+        self.assertTrue(any("legacy=0 central=1" in mensagem for mensagem in logs.output))
+
+    def test_shadow_nao_loga_quando_resultados_iguais(self):
+        with patch("relatorios.services.permissoes_service.logger.info") as info:
+            resultado = avaliar_permissao_cutover(
+                self.comum,
+                CodigoPermissao.MANUTENCAO_ACESSAR,
+                False,
+            )
+
+        self.assertFalse(resultado)
+        info.assert_not_called()
+
+
+@override_settings(PERMISSOES_CENTRAL_ENABLED=True, ERP_FULL_ACCESS_USERS=["CONTROL\\gabriel.oliveira"], EXTRA_ADMIN_USERS=[])
+class PermissoesCutoverPrimeiroLoteFlagOnTests(TestCase):
+    def setUp(self):
+        self.User = get_user_model()
+        self.operador = self.User.objects.create_user(username="operador")
+        self.comum = self.User.objects.create_user(username="usuario.comum")
+        self.superuser = self.User.objects.create_superuser(
+            username="superuser.negocio",
+            email="super@example.com",
+            password="x",
+        )
+        self.staff = self.User.objects.create_user(username="staff.user", is_staff=True)
+        self.full = self.User.objects.create_user(username="CONTROL\\gabriel.oliveira")
+        self.domain = self.User.objects.create_user(username="domain.admin")
+        self.admin_erp = self.User.objects.create_user(username="admin.erp")
+        grupo_domain = Group.objects.create(name=GRUPO_DOMAIN_ADMINS)
+        grupo_tecnico = Group.objects.create(name=GRUPO_TECNICO)
+        grupo_admin = Group.objects.create(name=GRUPO_ADMIN_ERP)
+        self.domain.groups.add(grupo_domain)
+        self.operador.groups.add(grupo_tecnico)
+        self.admin_erp.groups.add(grupo_admin)
+
+    def _permitir(self, usuario, codigo):
+        definir_override_permissao(
+            usuario,
+            codigo,
+            EstadoPermissaoUsuario.PERMITIR,
+            alterado_por=self.full,
+        )
+
+    def _negar(self, usuario, codigo):
+        definir_override_permissao(
+            usuario,
+            codigo,
+            EstadoPermissaoUsuario.NEGAR,
+            alterado_por=self.full,
+        )
+
+    def test_flag_on_permitir_herdar_negar_e_full_protegido(self):
+        self.assertFalse(usuario_pode_acessar_manutencao(self.comum))
+        self._permitir(self.comum, CodigoPermissao.MANUTENCAO_ACESSAR)
+        self.assertTrue(usuario_pode_acessar_manutencao(self.comum))
+        self._negar(self.comum, CodigoPermissao.MANUTENCAO_ACESSAR)
+        self.assertFalse(usuario_pode_acessar_manutencao(self.comum))
+        self.assertTrue(usuario_pode_acessar_manutencao(self.full))
+
+    def test_flag_on_superuser_staff_domain_admin_nao_concedem_negocio_central(self):
+        self.assertFalse(usuario_pode_acessar_manutencao(self.superuser))
+        self.assertFalse(usuario_pode_editar_ajuda(self.staff))
+        self.assertFalse(usuario_pode_gerenciar_clientes(self.domain))
+
+    def test_clientes_e_valor_km_sao_permissoes_separadas(self):
+        self._permitir(self.comum, CodigoPermissao.CADASTROS_CLIENTES_GERENCIAR)
+        self.assertTrue(usuario_pode_gerenciar_clientes(self.comum))
+        self.assertFalse(usuario_pode_configurar_valor_km(self.comum))
+
+        self._negar(self.comum, CodigoPermissao.CADASTROS_CLIENTES_GERENCIAR)
+        self._permitir(self.comum, CodigoPermissao.CLIENTES_CONFIGURAR_VALOR_KM)
+        self.assertFalse(usuario_pode_gerenciar_clientes(self.comum))
+        self.assertTrue(usuario_pode_configurar_valor_km(self.comum))
+
+    def test_backend_cliente_list_exige_permissao_central(self):
+        cliente_url = reverse("relatorios:cliente_list")
+        self.client.force_login(self.operador)
+        resposta_negada = self.client.get(cliente_url)
+        self.assertEqual(resposta_negada.status_code, 302)
+
+        self._permitir(self.operador, CodigoPermissao.CADASTROS_CLIENTES_GERENCIAR)
+        resposta_permitida = self.client.get(cliente_url)
+        self.assertEqual(resposta_permitida.status_code, 200)
+
+    def test_sidebar_flag_on_usa_permissoes_do_lote(self):
+        request = RequestFactory().get("/")
+        request.user = self.comum
+        contexto = permissoes_erp(request)["permissoes_erp"]
+        self.assertFalse(contexto["visualiza_clientes"])
+        self.assertFalse(contexto["manutencao"])
+
+        self._permitir(self.comum, CodigoPermissao.CADASTROS_CLIENTES_GERENCIAR)
+        self._permitir(self.comum, CodigoPermissao.MANUTENCAO_ACESSAR)
+        contexto = permissoes_erp(request)["permissoes_erp"]
+        self.assertTrue(contexto["visualiza_clientes"])
+        self.assertTrue(contexto["manutencao"])
+
+        request.user = self.admin_erp
+        contexto = permissoes_erp(request)["permissoes_erp"]
+        self.assertFalse(contexto["visualiza_clientes"])
+        self.assertTrue(contexto["visualiza_tecnicos"])
+        self.assertTrue(contexto["visualiza_adiantamentos"])
 
 
 @override_settings(

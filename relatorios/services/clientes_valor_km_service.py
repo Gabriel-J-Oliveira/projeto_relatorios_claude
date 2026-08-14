@@ -21,11 +21,24 @@ from relatorios.services.km_financeiro_service import (
 logger = logging.getLogger("relatorios.clientes.valor_km")
 
 
-def usuario_pode_configurar_valor_km(user):
+def usuario_pode_configurar_valor_km_legado(user):
     return (
         usuario_tem_acesso_total(user)
         or usuario_eh_financeiro(user)
         or usuario_eh_admin_erp(user)
+    )
+
+
+def usuario_pode_configurar_valor_km(user):
+    from relatorios.services.permissoes_service import (
+        CodigoPermissao,
+        avaliar_permissao_cutover,
+    )
+
+    return avaliar_permissao_cutover(
+        user,
+        CodigoPermissao.CLIENTES_CONFIGURAR_VALOR_KM,
+        lambda: usuario_pode_configurar_valor_km_legado(user),
     )
 
 

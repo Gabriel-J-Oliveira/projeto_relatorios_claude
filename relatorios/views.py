@@ -92,6 +92,7 @@ from .services.autorizacao_service import (
     usuario_pode_atuar_como_financeiro,
     usuario_pode_editar_relatorio,
     usuario_pode_enviar_relatorio,
+    usuario_pode_gerenciar_clientes,
     usuario_pode_reabrir_relatorio,
     usuario_pode_visualizar_relatorio,
     usuario_eh_superadmin,
@@ -703,6 +704,7 @@ def usuario_permissao_override_view(request, pk):
 @login_required
 def usuario_permissoes_replicar_view(request, pk):
     _exigir_central_permissoes(request)
+    inicio_replicacao = time.perf_counter()
     User = get_user_model()
     usuario_fonte = get_object_or_404(
         User.objects.prefetch_related("groups", "permissoes_overrides"),
@@ -732,20 +734,27 @@ def usuario_permissoes_replicar_view(request, pk):
                 f"Permissoes replicadas para {preview.total_destinos} usuario(s). {total} alteracao(oes) aplicada(s).",
             )
             logger.info(
-                "central_permissoes_replicadas usuario=%s fonte=%s destinos=%s alteracoes=%s modo=%s",
+                "[PERMISSOES_AUDIT] action=replicate actor_id=%s source_user_id=%s targets_count=%s "
+                "changes_count=%s critical_changes_count=%s mode=%s result=success duration_ms=%s",
                 request.user.pk,
                 usuario_fonte.pk,
                 preview.total_destinos,
                 total,
+                preview.criticas,
                 modo,
+                int((time.perf_counter() - inicio_replicacao) * 1000),
             )
             return redirect(f"{reverse('relatorios:usuario_permissoes_detail', args=[usuario_fonte.pk])}#permissoes")
     except PermissaoCentralError as exc:
         messages.error(request, str(exc))
         logger.warning(
-            "central_permissoes_replicacao_negada usuario=%s fonte=%s erro=%s",
+            "[PERMISSOES_AUDIT] action=replicate actor_id=%s source_user_id=%s targets_count=%s "
+            "changes_count=0 critical_changes_count=0 mode=%s result=failure duration_ms=%s error=%s",
             request.user.pk,
             usuario_fonte.pk,
+            len(destino_ids),
+            modo,
+            int((time.perf_counter() - inicio_replicacao) * 1000),
             exc,
         )
         preview = None
@@ -3069,6 +3078,14 @@ class AdministrativoMixin(AcessoErpMixin):
     def dispatch(self, request, *args, **kwargs):
         if not usuario_eh_administrativo(request.user):
             messages.error(request, "Você não tem permissão para acessar esta área.")
+            return redirect("relatorios:dashboard")
+        return super().dispatch(request, *args, **kwargs)
+
+
+class ClienteGerenciarMixin(AcessoErpMixin):
+    def dispatch(self, request, *args, **kwargs):
+        if not usuario_pode_gerenciar_clientes(request.user):
+            messages.error(request, "VocÃª nÃ£o tem permissÃ£o para gerenciar clientes.")
             return redirect("relatorios:dashboard")
         return super().dispatch(request, *args, **kwargs)
 
@@ -5594,7 +5611,7 @@ def tecnico_delete_view(request, pk):
 # ─────────────────────────────────────────────
 
 
-class ClienteListView(AdministrativoMixin, ListView):
+class ClienteListView(ClienteGerenciarMixin, ListView):
     model = Cliente
     template_name = "clientes/cliente_list.html"
     context_object_name = "clientes"
@@ -5639,8 +5656,10 @@ class ClienteListView(AdministrativoMixin, ListView):
 
 
 @login_required
-@exigir_administrativo
 def cliente_form_view(request, pk=None):
+    if not usuario_pode_gerenciar_clientes(request.user):
+        messages.error(request, "VocÃª nÃ£o tem permissÃ£o para gerenciar clientes.")
+        return redirect("relatorios:dashboard")
     instance = get_object_or_404(Cliente, pk=pk) if pk else None
     form = ClienteForm(request.POST or None, instance=instance)
     if form.is_valid():
@@ -5661,8 +5680,10 @@ def cliente_form_view(request, pk=None):
 
 
 @login_required
-@exigir_administrativo
 def cliente_delete_view(request, pk):
+    if not usuario_pode_gerenciar_clientes(request.user):
+        messages.error(request, "VocÃª nÃ£o tem permissÃ£o para gerenciar clientes.")
+        return redirect("relatorios:dashboard")
     cliente = get_object_or_404(Cliente, pk=pk)
     if request.method == "POST":
         cliente.delete()

@@ -67,11 +67,24 @@ class HelpArticle:
     related_slugs: tuple[str, ...] = ()
 
 
-def usuario_pode_editar_ajuda(user):
+def usuario_pode_editar_ajuda_legado(user):
     return bool(
         usuario_tem_acesso_total(user)
         or usuario_eh_admin_erp(user)
         or getattr(user, "is_staff", False)
+    )
+
+
+def usuario_pode_editar_ajuda(user):
+    from relatorios.services.permissoes_service import (
+        CodigoPermissao,
+        avaliar_permissao_cutover,
+    )
+
+    return avaliar_permissao_cutover(
+        user,
+        CodigoPermissao.AJUDA_EDITAR,
+        lambda: usuario_pode_editar_ajuda_legado(user),
     )
 
 
