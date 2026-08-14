@@ -183,9 +183,29 @@
     max-width: 100%;
   }
 
+  #modalReplicarPermissoes .modal-content {
+    max-height: calc(100vh - 3.5rem);
+  }
+
+  #form-replicar-permissoes {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  #modalReplicarPermissoes .modal-body {
+    min-height: 0;
+  }
+
   @media (min-width: 992px) {
+    #modalReplicarPermissoes .modal-body {
+      overflow: hidden;
+    }
+
     .permission-replication-grid {
-      min-height: min(590px, calc(100vh - 220px));
+      min-height: 0;
+      height: min(590px, calc(100vh - 220px));
     }
 
     .permission-replication-column {
@@ -195,7 +215,14 @@
 
     .permission-replication-list {
       flex: 1 1 auto;
+      min-height: 0;
       max-height: none;
+      overflow-y: auto;
+    }
+
+    .permission-replication-side {
+      min-height: 0;
+      overflow-y: auto;
     }
   }
 
@@ -540,7 +567,7 @@
                 </div>
               </div>
 
-              <div class="col-lg-7">
+              <div class="permission-replication-side col-lg-7">
                 <div class="mb-3">
                   <label class="form-label small fw-semibold text-muted">Modo de replicacao</label>
                   <div class="d-grid gap-2">
