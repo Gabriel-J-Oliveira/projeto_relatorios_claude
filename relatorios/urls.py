@@ -31,6 +31,11 @@ urlpatterns = [
         views.usuario_permissao_override_view,
         name="usuario_permissao_override",
     ),
+    path(
+        "usuarios/<int:pk>/permissoes/replicar/",
+        views.usuario_permissoes_replicar_view,
+        name="usuario_permissoes_replicar",
+    ),
     path("tours/marcar-visto/", views.marcar_tour_guiado_visto, name="marcar_tour_guiado_visto"),
     path("dashboard/", views.DashboardView.as_view(), name="dashboard"),
     path("dashboard/dados/", views.dashboard_dados_json, name="dashboard_dados"),

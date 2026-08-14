@@ -131,15 +131,19 @@ from .services.permissoes_service import (
 )
 from .services.usuarios_permissoes_service import (
     PermissaoCentralError,
+    aplicar_replicacao_permissoes,
     grupos_usuario,
     historico_permissoes_usuario,
     motor_atual_label,
     opcoes_grupos_usuarios,
+    permissoes_replicacao_agrupadas,
     permissoes_agrupadas_usuario,
+    preparar_preview_replicacao_permissoes,
     queryset_usuarios_central,
     resumo_usuarios_linha,
     salvar_override_central,
     usuario_origem_label,
+    usuarios_disponiveis_replicacao,
 )
 from .services.rateio_service import (
     RateioError,
@@ -617,6 +621,27 @@ def usuarios_central_list_view(request):
     )
 
 
+def _contexto_usuario_permissoes(usuario_alvo, *, replicacao_preview=None, replicacao_form=None):
+    return {
+        "titulo_pagina": "Permissoes do usuario",
+        "usuario_alvo": usuario_alvo,
+        "grupos_usuario": grupos_usuario(usuario_alvo),
+        "origem_usuario": usuario_origem_label(usuario_alvo),
+        "permissoes_grupos": permissoes_agrupadas_usuario(usuario_alvo),
+        "historico_permissoes": historico_permissoes_usuario(usuario_alvo),
+        "full_access_alvo": usuario_tem_full_access_erp(usuario_alvo),
+        "motor_atual": motor_atual_label(),
+        "central_ativa": permissoes_central_ativa(),
+        "estado_herdar": "herdar",
+        "estado_permitir": "permitir",
+        "estado_negar": "negar",
+        "usuarios_replicacao": usuarios_disponiveis_replicacao(usuario_alvo),
+        "permissoes_replicacao_grupos": permissoes_replicacao_agrupadas(),
+        "replicacao_preview": replicacao_preview,
+        "replicacao_form": replicacao_form or {},
+    }
+
+
 @login_required
 def usuario_permissoes_detail_view(request, pk):
     _exigir_central_permissoes(request)
@@ -633,20 +658,7 @@ def usuario_permissoes_detail_view(request, pk):
     return render(
         request,
         "usuarios/usuario_permissoes_detail.html",
-        {
-            "titulo_pagina": "Permissoes do usuario",
-            "usuario_alvo": usuario_alvo,
-            "grupos_usuario": grupos_usuario(usuario_alvo),
-            "origem_usuario": usuario_origem_label(usuario_alvo),
-            "permissoes_grupos": permissoes_agrupadas_usuario(usuario_alvo),
-            "historico_permissoes": historico_permissoes_usuario(usuario_alvo),
-            "full_access_alvo": usuario_tem_full_access_erp(usuario_alvo),
-            "motor_atual": motor_atual_label(),
-            "central_ativa": permissoes_central_ativa(),
-            "estado_herdar": "herdar",
-            "estado_permitir": "permitir",
-            "estado_negar": "negar",
-        },
+        _contexto_usuario_permissoes(usuario_alvo),
     )
 
 
@@ -685,6 +697,67 @@ def usuario_permissao_override_view(request, pk):
             estado,
         )
     return redirect(f"{reverse('relatorios:usuario_permissoes_detail', args=[usuario_alvo.pk])}#permissoes")
+
+
+@require_POST
+@login_required
+def usuario_permissoes_replicar_view(request, pk):
+    _exigir_central_permissoes(request)
+    User = get_user_model()
+    usuario_fonte = get_object_or_404(
+        User.objects.prefetch_related("groups", "permissoes_overrides"),
+        pk=pk,
+    )
+    destino_ids = request.POST.getlist("destinos")
+    codigos = request.POST.getlist("codigos")
+    modo = request.POST.get("modo") or "overrides"
+    acao = request.POST.get("replicacao_acao") or "preview"
+    form_state = {
+        "destinos": destino_ids,
+        "codigos": codigos,
+        "modo": modo,
+    }
+    try:
+        preview = preparar_preview_replicacao_permissoes(
+            administrador=request.user,
+            usuario_fonte=usuario_fonte,
+            destino_ids=destino_ids,
+            codigos=codigos,
+            modo=modo,
+        )
+        if acao == "aplicar":
+            total = aplicar_replicacao_permissoes(preview=preview, administrador=request.user)
+            messages.success(
+                request,
+                f"Permissoes replicadas para {preview.total_destinos} usuario(s). {total} alteracao(oes) aplicada(s).",
+            )
+            logger.info(
+                "central_permissoes_replicadas usuario=%s fonte=%s destinos=%s alteracoes=%s modo=%s",
+                request.user.pk,
+                usuario_fonte.pk,
+                preview.total_destinos,
+                total,
+                modo,
+            )
+            return redirect(f"{reverse('relatorios:usuario_permissoes_detail', args=[usuario_fonte.pk])}#permissoes")
+    except PermissaoCentralError as exc:
+        messages.error(request, str(exc))
+        logger.warning(
+            "central_permissoes_replicacao_negada usuario=%s fonte=%s erro=%s",
+            request.user.pk,
+            usuario_fonte.pk,
+            exc,
+        )
+        preview = None
+    return render(
+        request,
+        "usuarios/usuario_permissoes_detail.html",
+        _contexto_usuario_permissoes(
+            usuario_fonte,
+            replicacao_preview=preview,
+            replicacao_form=form_state,
+        ),
+    )
 
 
 @login_required

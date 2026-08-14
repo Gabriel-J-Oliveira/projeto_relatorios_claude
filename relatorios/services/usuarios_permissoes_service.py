@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.db.models import Count, Q
 
 from relatorios.models import (
@@ -106,6 +107,47 @@ class EstadoPermissaoApresentacao:
     dependencias: tuple[str, ...]
     dependencias_pendentes: tuple[str, ...]
     dependencias_pendentes_nomes: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class UsuarioReplicacaoLinha:
+    usuario: object
+    nome: str
+    grupos: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ReplicacaoAlteracaoPreview:
+    usuario: object
+    codigo: str
+    nome: str
+    estado_anterior: str
+    estado_novo: str
+    sensibilidade: str
+
+
+@dataclass(frozen=True)
+class ReplicacaoDestinoPreview:
+    usuario: object
+    alteracoes: tuple[ReplicacaoAlteracaoPreview, ...]
+    iguais: int
+    erros: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ReplicacaoPermissoesPreview:
+    fonte: object
+    modo: str
+    destinos: tuple[ReplicacaoDestinoPreview, ...]
+    codigos: tuple[str, ...]
+    total_destinos: int
+    total_alteracoes: int
+    total_iguais: int
+    criados: int
+    alterados: int
+    removidos: int
+    criticas: int
+    erros: tuple[str, ...]
 
 
 def queryset_usuarios_central(params):
@@ -222,6 +264,37 @@ def permissoes_agrupadas_usuario(usuario):
     return grupos
 
 
+def usuarios_disponiveis_replicacao(usuario_fonte):
+    User = get_user_model()
+    usuarios = (
+        User.objects.exclude(pk=usuario_fonte.pk)
+        .prefetch_related("groups")
+        .order_by("first_name", "username")
+    )
+    linhas = []
+    for usuario in usuarios:
+        if usuario_tem_full_access_erp(usuario):
+            continue
+        linhas.append(
+            UsuarioReplicacaoLinha(
+                usuario=usuario,
+                nome=usuario.get_full_name() or usuario.username,
+                grupos=tuple(grupos_usuario(usuario)),
+            )
+        )
+    return linhas
+
+
+def permissoes_replicacao_agrupadas():
+    grupos = []
+    permissoes = [permissao for permissao in listar_permissoes() if permissao.codigo in CODIGOS_CENTRAL_USUARIOS_V1]
+    for categoria, label in CATEGORIAS_UI:
+        itens = [permissao for permissao in permissoes if permissao.categoria == categoria]
+        if itens:
+            grupos.append({"codigo": categoria, "label": label, "itens": itens})
+    return grupos
+
+
 def resumo_usuarios_linha(usuario):
     grupos = grupos_usuario(usuario)
     return {
@@ -289,3 +362,202 @@ def salvar_override_central(*, administrador, usuario_alvo, codigo, estado):
         estado=estado,
     )
     definir_override_permissao(usuario_alvo, codigo, estado, alterado_por=administrador)
+
+
+def _normalizar_ids_destino(ids):
+    normalizados = []
+    for valor in ids:
+        try:
+            normalizados.append(int(valor))
+        except (TypeError, ValueError):
+            continue
+    return tuple(dict.fromkeys(normalizados))
+
+
+def _normalizar_codigos_replicacao(codigos):
+    permitidos = set(CODIGOS_CENTRAL_USUARIOS_V1)
+    normalizados = []
+    for codigo in codigos:
+        codigo = (codigo or "").strip()
+        if codigo in permitidos and codigo not in normalizados:
+            normalizados.append(codigo)
+    return tuple(normalizados)
+
+
+def _estado_label(estado):
+    if estado == EstadoPermissaoUsuario.PERMITIR:
+        return "PERMITIR"
+    if estado == EstadoPermissaoUsuario.NEGAR:
+        return "NEGAR"
+    return "HERDAR"
+
+
+def _estado_tecnico(overrides, codigo):
+    return overrides.get(codigo, EstadoHistoricoPermissao.HERDAR)
+
+
+def _carregar_usuarios_destino(ids):
+    User = get_user_model()
+    usuarios = (
+        User.objects.filter(pk__in=ids)
+        .prefetch_related("groups", "permissoes_overrides")
+        .order_by("first_name", "username")
+    )
+    por_id = {usuario.pk: usuario for usuario in usuarios}
+    return [por_id[pk] for pk in ids if pk in por_id]
+
+
+def _validar_dependencias_estado_final(usuario, overrides_finais, codigos):
+    erros = []
+    for codigo in codigos:
+        if overrides_finais.get(codigo) != EstadoPermissaoUsuario.PERMITIR:
+            continue
+        pendentes = []
+        for dependencia in DEPENDENCIAS_PERMISSOES.get(codigo, ()):
+            permitido, _origem = _estado_efetivo_basico(usuario, dependencia, overrides_finais)
+            if not permitido:
+                permissao_dependencia = obter_permissao(dependencia)
+                pendentes.append(permissao_dependencia.nome if permissao_dependencia else dependencia)
+        if pendentes:
+            permissao = obter_permissao(codigo)
+            erros.append(f"{permissao.nome if permissao else codigo} requer " + ", ".join(pendentes) + ".")
+    return erros
+
+
+def preparar_preview_replicacao_permissoes(
+    *,
+    administrador,
+    usuario_fonte,
+    destino_ids,
+    codigos,
+    modo,
+):
+    if not usuario_pode_acessar_central_permissoes(administrador):
+        raise PermissaoCentralError("Usuario sem permissao para gerenciar permissoes.")
+    if usuario_tem_full_access_erp(usuario_fonte):
+        raise PermissaoCentralError("Full Access protegido nao pode ser fonte de replicacao.")
+    if modo not in {"overrides", "exato"}:
+        raise PermissaoCentralError("Modo de replicacao invalido.")
+
+    destino_ids = _normalizar_ids_destino(destino_ids)
+    codigos = _normalizar_codigos_replicacao(codigos or CODIGOS_CENTRAL_USUARIOS_V1)
+    if not destino_ids:
+        raise PermissaoCentralError("Selecione ao menos um usuario de destino.")
+    if not codigos:
+        raise PermissaoCentralError("Selecione ao menos uma permissao.")
+
+    usuario_fonte = (
+        get_user_model()
+        .objects.prefetch_related("permissoes_overrides")
+        .get(pk=usuario_fonte.pk)
+    )
+    source_overrides = _overrides_map(usuario_fonte)
+    destinos = _carregar_usuarios_destino(destino_ids)
+    if not destinos:
+        raise PermissaoCentralError("Nenhum usuario de destino valido foi selecionado.")
+
+    previews = []
+    total_alteracoes = 0
+    total_iguais = 0
+    criados = 0
+    alterados = 0
+    removidos = 0
+    criticas = 0
+    erros_gerais = []
+
+    for destino in destinos:
+        erros = []
+        if destino.pk == usuario_fonte.pk:
+            erros.append("O usuario fonte nao pode ser destino.")
+        if usuario_tem_full_access_erp(destino):
+            erros.append("Full Access protegido nao pode receber overrides.")
+
+        destino_overrides = _overrides_map(destino)
+        overrides_finais = dict(destino_overrides)
+        alteracoes = []
+        iguais = 0
+
+        for codigo in codigos:
+            estado_fonte = _estado_tecnico(source_overrides, codigo)
+            if modo == "overrides" and estado_fonte == EstadoHistoricoPermissao.HERDAR:
+                continue
+            estado_atual = _estado_tecnico(destino_overrides, codigo)
+            estado_novo = estado_fonte
+            if estado_novo == EstadoHistoricoPermissao.HERDAR:
+                overrides_finais.pop(codigo, None)
+            else:
+                overrides_finais[codigo] = estado_novo
+
+            if estado_atual == estado_novo:
+                iguais += 1
+                continue
+
+            permissao = obter_permissao(codigo)
+            alteracoes.append(
+                ReplicacaoAlteracaoPreview(
+                    usuario=destino,
+                    codigo=codigo,
+                    nome=permissao.nome if permissao else codigo,
+                    estado_anterior=_estado_label(estado_atual),
+                    estado_novo=_estado_label(estado_novo),
+                    sensibilidade=getattr(permissao, "sensibilidade", ""),
+                )
+            )
+            if estado_atual == EstadoHistoricoPermissao.HERDAR and estado_novo != EstadoHistoricoPermissao.HERDAR:
+                criados += 1
+            elif estado_atual != EstadoHistoricoPermissao.HERDAR and estado_novo == EstadoHistoricoPermissao.HERDAR:
+                removidos += 1
+            else:
+                alterados += 1
+            if getattr(permissao, "sensibilidade", "") == SensibilidadePermissao.CRITICA:
+                criticas += 1
+
+        erros.extend(_validar_dependencias_estado_final(destino, overrides_finais, codigos))
+        total_alteracoes += len(alteracoes)
+        total_iguais += iguais
+        previews.append(
+            ReplicacaoDestinoPreview(
+                usuario=destino,
+                alteracoes=tuple(alteracoes),
+                iguais=iguais,
+                erros=tuple(erros),
+            )
+        )
+        erros_gerais.extend([f"{destino.username}: {erro}" for erro in erros])
+
+    return ReplicacaoPermissoesPreview(
+        fonte=usuario_fonte,
+        modo=modo,
+        destinos=tuple(previews),
+        codigos=codigos,
+        total_destinos=len(destinos),
+        total_alteracoes=total_alteracoes,
+        total_iguais=total_iguais,
+        criados=criados,
+        alterados=alterados,
+        removidos=removidos,
+        criticas=criticas,
+        erros=tuple(erros_gerais),
+    )
+
+
+def aplicar_replicacao_permissoes(*, preview, administrador):
+    if preview.erros:
+        raise PermissaoCentralError("Corrija os conflitos do preview antes de aplicar.")
+    aplicadas = 0
+    ordem_catalogo = {codigo: indice for indice, codigo in enumerate(CODIGOS_CENTRAL_USUARIOS_V1)}
+    with transaction.atomic():
+        for destino_preview in preview.destinos:
+            alteracoes = sorted(
+                destino_preview.alteracoes,
+                key=lambda item: ordem_catalogo.get(item.codigo, len(ordem_catalogo)),
+            )
+            for alteracao in alteracoes:
+                salvar_override_central(
+                    administrador=administrador,
+                    usuario_alvo=destino_preview.usuario,
+                    codigo=alteracao.codigo,
+                    estado=alteracao.estado_novo.lower(),
+                )
+                aplicadas += 1
+    return aplicadas

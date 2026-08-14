@@ -8,6 +8,96 @@
   <li class="breadcrumb-item active">{{ usuario_alvo.username }}</li>
 {% endblock %}
 
+{% block extra_js %}
+<script>
+(() => {
+  const modal = document.getElementById("modalReplicarPermissoes");
+  if (!modal) return;
+
+  const normalizar = (valor) => String(valor || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+  const rows = Array.from(modal.querySelectorAll("[data-replication-user-row]"));
+  const userChecks = Array.from(modal.querySelectorAll("[data-replication-user-checkbox]"));
+  const permissionChecks = Array.from(modal.querySelectorAll("[data-replication-permission-checkbox]"));
+  const search = modal.querySelector("[data-replication-search]");
+  const count = modal.querySelector("[data-replication-selected-count]");
+  const chips = modal.querySelector("[data-replication-selected-chips]");
+
+  function updateSelectedUi() {
+    const selected = userChecks.filter(check => check.checked);
+    if (count) {
+      count.textContent = `${selected.length} selecionado${selected.length === 1 ? "" : "s"}`;
+    }
+    if (chips) {
+      chips.replaceChildren();
+      selected.slice(0, 12).forEach(check => {
+        const chip = document.createElement("span");
+        chip.className = "permission-replication-chip badge rounded-pill text-bg-primary d-inline-flex align-items-center gap-1";
+        chip.textContent = check.dataset.userLabel || check.dataset.userUsername || check.value;
+        chips.appendChild(chip);
+      });
+      if (selected.length > 12) {
+        const extra = document.createElement("span");
+        extra.className = "badge rounded-pill text-bg-secondary";
+        extra.textContent = `+${selected.length - 12}`;
+        chips.appendChild(extra);
+      }
+    }
+  }
+
+  function updateFilter() {
+    const termo = normalizar(search?.value);
+    rows.forEach(row => {
+      const texto = normalizar(row.dataset.replicationSearchText);
+      row.classList.toggle("d-none", Boolean(termo && !texto.includes(termo)));
+    });
+  }
+
+  userChecks.forEach(check => check.addEventListener("change", updateSelectedUi));
+  search?.addEventListener("input", updateFilter);
+
+  modal.querySelector("[data-replication-clear-search]")?.addEventListener("click", () => {
+    if (search) search.value = "";
+    updateFilter();
+  });
+
+  modal.querySelector("[data-replication-select-visible]")?.addEventListener("click", () => {
+    rows.forEach(row => {
+      if (!row.classList.contains("d-none")) {
+        const check = row.querySelector("[data-replication-user-checkbox]");
+        if (check) check.checked = true;
+      }
+    });
+    updateSelectedUi();
+  });
+
+  modal.querySelector("[data-replication-clear-selected]")?.addEventListener("click", () => {
+    userChecks.forEach(check => { check.checked = false; });
+    updateSelectedUi();
+  });
+
+  modal.querySelector("[data-replication-select-permissions]")?.addEventListener("click", () => {
+    permissionChecks.forEach(check => { check.checked = true; });
+  });
+
+  modal.querySelector("[data-replication-clear-permissions]")?.addEventListener("click", () => {
+    permissionChecks.forEach(check => { check.checked = false; });
+  });
+
+  updateFilter();
+  updateSelectedUi();
+
+  {% if replicacao_preview %}
+    bootstrap.Modal.getOrCreateInstance(modal).show();
+  {% endif %}
+})();
+</script>
+{% endblock %}
+
 {% block extra_css %}
 <style>
   .permissions-page-shell {
@@ -68,6 +158,24 @@
   .permission-group-title {
     margin-bottom: .35rem;
     letter-spacing: .02em;
+  }
+
+  .permission-replication-list {
+    max-height: 300px;
+    overflow: auto;
+  }
+
+  .permission-replication-option {
+    transition: background-color .15s ease, border-color .15s ease;
+  }
+
+  .permission-replication-option:has(.form-check-input:checked) {
+    border-color: var(--bs-primary) !important;
+    background: rgba(var(--bs-primary-rgb), .08);
+  }
+
+  .permission-replication-chip {
+    max-width: 100%;
   }
 
   .permission-default-action {
@@ -170,6 +278,14 @@
         <h6 class="mb-0">Permissoes adicionais</h6>
         <small class="text-muted">O switch mostra o estado efetivo. Overrides individuais podem ser removidos com Usar padrao.</small>
       </div>
+      <button type="button"
+              class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
+              data-bs-toggle="modal"
+              data-bs-target="#modalReplicarPermissoes"
+              {% if full_access_alvo %}disabled aria-disabled="true"{% endif %}>
+        <i class="bi bi-files"></i>
+        Replicar permissoes
+      </button>
     </div>
     <div class="card-body">
       {% for grupo in permissoes_grupos %}
@@ -314,5 +430,212 @@
     </div>
   </div>
 </section>
+
+<div class="modal fade" id="modalReplicarPermissoes" tabindex="-1" aria-labelledby="modalReplicarPermissoesLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="modalReplicarPermissoesLabel">Replicar permissoes</h5>
+          <div class="small text-muted">
+            Fonte: <strong>{{ usuario_alvo.get_full_name|default:usuario_alvo.username }}</strong>
+            <span class="mx-1">&middot;</span>
+            Copia estados tecnicos HERDAR, PERMITIR e NEGAR.
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+
+      {% if full_access_alvo %}
+        <div class="modal-body">
+          <div class="alert alert-warning mb-0">
+            Full Access protegido nao pode ser usado como fonte de replicacao.
+          </div>
+        </div>
+      {% else %}
+        <form method="post"
+              action="{% url 'relatorios:usuario_permissoes_replicar' usuario_alvo.pk %}"
+              id="form-replicar-permissoes">
+          {% csrf_token %}
+          <div class="modal-body">
+            <div class="row g-4">
+              <div class="col-lg-5">
+                <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                  <label for="replicar-usuarios-busca" class="form-label small fw-semibold text-muted mb-0">
+                    Usuarios destino
+                  </label>
+                  <span class="badge text-bg-primary" data-replication-selected-count>0 selecionados</span>
+                </div>
+                <div class="input-group input-group-sm mb-2">
+                  <span class="input-group-text"><i class="bi bi-search"></i></span>
+                  <input type="search"
+                         class="form-control"
+                         id="replicar-usuarios-busca"
+                         placeholder="Pesquisar por nome ou username"
+                         data-replication-search>
+                  <button class="btn btn-outline-secondary" type="button" data-replication-clear-search>Limpar</button>
+                </div>
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                  <button type="button" class="btn btn-sm btn-outline-primary" data-replication-select-visible>
+                    Selecionar visiveis
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-replication-clear-selected>
+                    Limpar selecao
+                  </button>
+                </div>
+                <div class="d-flex flex-wrap gap-1 mb-2" data-replication-selected-chips></div>
+                <div class="permission-replication-list border rounded-2 p-2">
+                  {% for linha_usuario in usuarios_replicacao %}
+                    <label class="permission-replication-option d-flex align-items-start gap-2 border rounded-2 p-2 mb-2"
+                           data-replication-user-row
+                           data-replication-search-text="{{ linha_usuario.nome }} {{ linha_usuario.usuario.username }} {% for grupo in linha_usuario.grupos %}{{ grupo }} {% endfor %}">
+                      <input class="form-check-input mt-1"
+                             type="checkbox"
+                             name="destinos"
+                             value="{{ linha_usuario.usuario.pk }}"
+                             data-replication-user-checkbox
+                             data-user-label="{{ linha_usuario.nome }}"
+                             data-user-username="{{ linha_usuario.usuario.username }}"
+                             {% if linha_usuario.usuario.pk|stringformat:"s" in replicacao_form.destinos %}checked{% endif %}>
+                      <span class="min-w-0">
+                        <span class="fw-semibold d-block text-truncate">{{ linha_usuario.nome }}</span>
+                        <span class="small text-muted d-block text-truncate">{{ linha_usuario.usuario.username }}</span>
+                        {% if linha_usuario.grupos %}
+                          <span class="small text-muted d-block text-truncate">
+                            {% for grupo in linha_usuario.grupos %}{{ grupo }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                          </span>
+                        {% endif %}
+                      </span>
+                    </label>
+                  {% empty %}
+                    <div class="text-muted small p-3 text-center">Nenhum usuario disponivel para replicacao.</div>
+                  {% endfor %}
+                </div>
+              </div>
+
+              <div class="col-lg-7">
+                <div class="mb-3">
+                  <label class="form-label small fw-semibold text-muted">Modo de replicacao</label>
+                  <div class="d-grid gap-2">
+                    <label class="border rounded-2 p-2">
+                      <input class="form-check-input me-2"
+                             type="radio"
+                             name="modo"
+                             value="overrides"
+                             {% if replicacao_form.modo != "exato" %}checked{% endif %}>
+                      <span class="fw-semibold">Somente overrides explicitos</span>
+                      <span class="small text-muted d-block ms-4">HERDAR na fonte nao altera o destino. Opcao mais segura.</span>
+                    </label>
+                    <label class="border rounded-2 p-2">
+                      <input class="form-check-input me-2"
+                             type="radio"
+                             name="modo"
+                             value="exato"
+                             {% if replicacao_form.modo == "exato" %}checked{% endif %}>
+                      <span class="fw-semibold">Replicar configuracao exatamente</span>
+                      <span class="small text-muted d-block ms-4">HERDAR na fonte remove override do destino.</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                    <label class="form-label small fw-semibold text-muted mb-0">Permissoes a copiar</label>
+                    <div class="btn-group btn-group-sm">
+                      <button type="button" class="btn btn-outline-primary" data-replication-select-permissions>Selecionar todas</button>
+                      <button type="button" class="btn btn-outline-secondary" data-replication-clear-permissions>Limpar</button>
+                    </div>
+                  </div>
+                  <div class="border rounded-2 p-2">
+                    {% for grupo in permissoes_replicacao_grupos %}
+                      <div class="mb-2">
+                        <div class="text-uppercase text-muted small fw-semibold mb-1">{{ grupo.label }}</div>
+                        <div class="row g-1">
+                          {% for permissao in grupo.itens %}
+                            <label class="col-md-6 small d-flex align-items-start gap-2">
+                              <input class="form-check-input mt-1"
+                                     type="checkbox"
+                                     name="codigos"
+                                     value="{{ permissao.codigo }}"
+                                     data-replication-permission-checkbox
+                                     {% if not replicacao_form.codigos or permissao.codigo in replicacao_form.codigos %}checked{% endif %}>
+                              <span>
+                                <span class="fw-semibold">{{ permissao.nome }}</span>
+                                {% if permissao.sensibilidade == "critica" %}
+                                  <span class="badge text-bg-danger-subtle text-danger-emphasis border border-danger-subtle ms-1">CRITICA</span>
+                                {% endif %}
+                              </span>
+                            </label>
+                          {% endfor %}
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+
+                {% if replicacao_preview %}
+                  <div class="border rounded-2 p-3 bg-body-tertiary">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                      <h6 class="mb-0">Preview da replicacao</h6>
+                      {% if replicacao_preview.erros %}
+                        <span class="badge text-bg-warning">Revisao necessaria</span>
+                      {% else %}
+                        <span class="badge text-bg-success">Pronto para aplicar</span>
+                      {% endif %}
+                    </div>
+                    <div class="row g-2 small mb-3">
+                      <div class="col-6 col-md-4"><span class="text-muted">Destinos:</span> <strong>{{ replicacao_preview.total_destinos }}</strong></div>
+                      <div class="col-6 col-md-4"><span class="text-muted">Alteracoes:</span> <strong>{{ replicacao_preview.total_alteracoes }}</strong></div>
+                      <div class="col-6 col-md-4"><span class="text-muted">Ja iguais:</span> <strong>{{ replicacao_preview.total_iguais }}</strong></div>
+                      <div class="col-6 col-md-4"><span class="text-muted">Criados:</span> <strong>{{ replicacao_preview.criados }}</strong></div>
+                      <div class="col-6 col-md-4"><span class="text-muted">Alterados:</span> <strong>{{ replicacao_preview.alterados }}</strong></div>
+                      <div class="col-6 col-md-4"><span class="text-muted">Removidos:</span> <strong>{{ replicacao_preview.removidos }}</strong></div>
+                      <div class="col-12"><span class="text-muted">Permissoes criticas:</span> <strong>{{ replicacao_preview.criticas }}</strong></div>
+                    </div>
+                    {% if replicacao_preview.erros %}
+                      <div class="alert alert-warning py-2 small">
+                        {% for erro in replicacao_preview.erros %}
+                          <div><i class="bi bi-exclamation-triangle me-1"></i>{{ erro }}</div>
+                        {% endfor %}
+                      </div>
+                    {% endif %}
+                    <div class="small" style="max-height: 220px; overflow:auto;">
+                      {% for destino in replicacao_preview.destinos %}
+                        <div class="border-top py-2">
+                          <div class="fw-semibold">{{ destino.usuario.get_full_name|default:destino.usuario.username }}</div>
+                          <div class="text-muted">{{ destino.alteracoes|length }} alteracao(oes), {{ destino.iguais }} ja iguais</div>
+                          {% for alteracao in destino.alteracoes %}
+                            <div class="d-flex flex-wrap gap-2 align-items-center mt-1">
+                              <span>{{ alteracao.nome }}</span>
+                              {% if alteracao.sensibilidade == "critica" %}
+                                <span class="badge text-bg-danger-subtle text-danger-emphasis border border-danger-subtle">CRITICA</span>
+                              {% endif %}
+                              <span class="text-muted">{{ alteracao.estado_anterior }} -> {{ alteracao.estado_novo }}</span>
+                            </div>
+                          {% endfor %}
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-outline-primary" name="replicacao_acao" value="preview">
+              Revisar alteracoes
+            </button>
+            {% if replicacao_preview and not replicacao_preview.erros %}
+              <button type="submit" class="btn btn-primary" name="replicacao_acao" value="aplicar">
+                Confirmar e aplicar
+              </button>
+            {% endif %}
+          </div>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
 </div>
 {% endblock %}

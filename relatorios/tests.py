@@ -101,6 +101,7 @@ from .services.politica_valor_service import (
     valor_km_control_sul,
 )
 from .services.relatorio_performance_service import RelatorioPerformanceTracker
+from .services.usuarios_permissoes_service import preparar_preview_replicacao_permissoes
 from .services.workflow_service import aprovar_relatorio
 from .services.snapshot_service import criar_snapshot_financeiro
 from .services.tecnicos_despesa_service import (
@@ -865,6 +866,288 @@ class CentralUsuariosPermissoesViewsTests(TestCase):
         )
 
         self.assertTrue(usuario_pode_acessar_central_permissoes(self.alvo))
+
+    def test_replicacao_preview_nao_grava(self):
+        destino = self.User.objects.create_user(username="destino.preview")
+        definir_override_permissao(
+            self.alvo,
+            CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+            EstadoPermissaoUsuario.PERMITIR,
+            alterado_por=self.full,
+        )
+        self.client.force_login(self.full)
+
+        response = self.client.post(
+            reverse("relatorios:usuario_permissoes_replicar", args=[self.alvo.pk]),
+            {
+                "replicacao_acao": "preview",
+                "modo": "overrides",
+                "destinos": [str(destino.pk)],
+                "codigos": [CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(PermissaoUsuarioOverride.objects.filter(usuario=destino).exists())
+        self.assertEqual(HistoricoPermissaoUsuario.objects.filter(usuario_afetado=destino).count(), 0)
+        self.assertContains(response, "Preview da replicacao")
+
+    def test_usuario_comum_nao_replica_permissoes(self):
+        destino = self.User.objects.create_user(username="destino.negado")
+        self.client.force_login(self.comum)
+
+        response = self.client.post(
+            reverse("relatorios:usuario_permissoes_replicar", args=[self.alvo.pk]),
+            {
+                "replicacao_acao": "aplicar",
+                "modo": "overrides",
+                "destinos": [str(destino.pk)],
+                "codigos": [CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS],
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(PermissaoUsuarioOverride.objects.filter(usuario=destino).exists())
+
+    def test_replicacao_csrf_nao_enfraquecido(self):
+        destino = self.User.objects.create_user(username="destino.csrf")
+        client = DjangoClient(enforce_csrf_checks=True)
+        client.force_login(self.full)
+
+        response = client.post(
+            reverse("relatorios:usuario_permissoes_replicar", args=[self.alvo.pk]),
+            {
+                "replicacao_acao": "aplicar",
+                "modo": "overrides",
+                "destinos": [str(destino.pk)],
+                "codigos": [CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS],
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(PermissaoUsuarioOverride.objects.filter(usuario=destino).exists())
+
+    def test_replicacao_somente_overrides_nao_altera_herdar_da_fonte(self):
+        destino = self.User.objects.create_user(username="destino.overrides")
+        definir_override_permissao(
+            destino,
+            CodigoPermissao.FINANCEIRO_ACESSAR,
+            EstadoPermissaoUsuario.NEGAR,
+            alterado_por=self.full,
+        )
+        definir_override_permissao(
+            self.alvo,
+            CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+            EstadoPermissaoUsuario.PERMITIR,
+            alterado_por=self.full,
+        )
+        self.client.force_login(self.full)
+
+        response = self.client.post(
+            reverse("relatorios:usuario_permissoes_replicar", args=[self.alvo.pk]),
+            {
+                "replicacao_acao": "aplicar",
+                "modo": "overrides",
+                "destinos": [str(destino.pk)],
+                "codigos": [
+                    CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+                    CodigoPermissao.FINANCEIRO_ACESSAR,
+                ],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            PermissaoUsuarioOverride.objects.get(
+                usuario=destino,
+                codigo=CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+            ).estado,
+            EstadoPermissaoUsuario.PERMITIR,
+        )
+        self.assertEqual(
+            PermissaoUsuarioOverride.objects.get(
+                usuario=destino,
+                codigo=CodigoPermissao.FINANCEIRO_ACESSAR,
+            ).estado,
+            EstadoPermissaoUsuario.NEGAR,
+        )
+
+    def test_replicacao_exata_remove_override_quando_fonte_herda(self):
+        destino = self.User.objects.create_user(username="destino.exato")
+        definir_override_permissao(
+            destino,
+            CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+            EstadoPermissaoUsuario.PERMITIR,
+            alterado_por=self.full,
+        )
+        self.client.force_login(self.full)
+
+        response = self.client.post(
+            reverse("relatorios:usuario_permissoes_replicar", args=[self.alvo.pk]),
+            {
+                "replicacao_acao": "aplicar",
+                "modo": "exato",
+                "destinos": [str(destino.pk)],
+                "codigos": [CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            PermissaoUsuarioOverride.objects.filter(
+                usuario=destino,
+                codigo=CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+            ).exists()
+        )
+        self.assertEqual(
+            HistoricoPermissaoUsuario.objects.filter(
+                usuario_afetado=destino,
+                codigo=CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+                estado_novo=EstadoHistoricoPermissao.HERDAR,
+            ).count(),
+            1,
+        )
+
+    def test_replicacao_nao_aceita_full_como_fonte_ou_destino(self):
+        destino = self.User.objects.create_user(username="destino.full")
+        self.client.force_login(self.full)
+
+        response_fonte = self.client.post(
+            reverse("relatorios:usuario_permissoes_replicar", args=[self.full.pk]),
+            {
+                "replicacao_acao": "aplicar",
+                "modo": "overrides",
+                "destinos": [str(destino.pk)],
+                "codigos": [CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS],
+            },
+        )
+        response_destino = self.client.post(
+            reverse("relatorios:usuario_permissoes_replicar", args=[self.alvo.pk]),
+            {
+                "replicacao_acao": "aplicar",
+                "modo": "overrides",
+                "destinos": [str(self.full.pk)],
+                "codigos": [CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS],
+            },
+        )
+
+        self.assertEqual(response_fonte.status_code, 200)
+        self.assertEqual(response_destino.status_code, 200)
+        self.assertFalse(PermissaoUsuarioOverride.objects.filter(usuario=destino).exists())
+        self.assertFalse(PermissaoUsuarioOverride.objects.filter(usuario=self.full).exists())
+
+    def test_replicacao_nao_aceita_fonte_como_destino(self):
+        self.client.force_login(self.full)
+
+        response = self.client.post(
+            reverse("relatorios:usuario_permissoes_replicar", args=[self.alvo.pk]),
+            {
+                "replicacao_acao": "aplicar",
+                "modo": "overrides",
+                "destinos": [str(self.alvo.pk)],
+                "codigos": [CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(PermissaoUsuarioOverride.objects.filter(usuario=self.alvo).exists())
+
+    def test_replicacao_com_dependencia_invalida_e_rejeitada(self):
+        destino = self.User.objects.create_user(username="destino.dep")
+        PermissaoUsuarioOverride.objects.create(
+            usuario=self.alvo,
+            codigo=CodigoPermissao.RELATORIOS_APROVAR,
+            estado=EstadoPermissaoUsuario.PERMITIR,
+            atualizado_por=self.full,
+        )
+        self.client.force_login(self.full)
+
+        response = self.client.post(
+            reverse("relatorios:usuario_permissoes_replicar", args=[self.alvo.pk]),
+            {
+                "replicacao_acao": "aplicar",
+                "modo": "overrides",
+                "destinos": [str(destino.pk)],
+                "codigos": [CodigoPermissao.RELATORIOS_APROVAR],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "requer")
+        self.assertFalse(PermissaoUsuarioOverride.objects.filter(usuario=destino).exists())
+
+    def test_replicacao_atomica_nao_aplica_destino_valido_se_lote_tem_erro(self):
+        destino_valido = self.User.objects.create_user(username="destino.valido")
+        definir_override_permissao(
+            self.alvo,
+            CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+            EstadoPermissaoUsuario.PERMITIR,
+            alterado_por=self.full,
+        )
+        self.client.force_login(self.full)
+
+        response = self.client.post(
+            reverse("relatorios:usuario_permissoes_replicar", args=[self.alvo.pk]),
+            {
+                "replicacao_acao": "aplicar",
+                "modo": "overrides",
+                "destinos": [str(destino_valido.pk), str(self.full.pk)],
+                "codigos": [CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(PermissaoUsuarioOverride.objects.filter(usuario=destino_valido).exists())
+
+    def test_replicacao_itens_iguais_nao_geram_historico(self):
+        destino = self.User.objects.create_user(username="destino.igual")
+        definir_override_permissao(
+            self.alvo,
+            CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+            EstadoPermissaoUsuario.PERMITIR,
+            alterado_por=self.full,
+        )
+        definir_override_permissao(
+            destino,
+            CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+            EstadoPermissaoUsuario.PERMITIR,
+            alterado_por=self.full,
+        )
+        historico_antes = HistoricoPermissaoUsuario.objects.filter(usuario_afetado=destino).count()
+        self.client.force_login(self.full)
+
+        response = self.client.post(
+            reverse("relatorios:usuario_permissoes_replicar", args=[self.alvo.pk]),
+            {
+                "replicacao_acao": "aplicar",
+                "modo": "overrides",
+                "destinos": [str(destino.pk)],
+                "codigos": [CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(HistoricoPermissaoUsuario.objects.filter(usuario_afetado=destino).count(), historico_antes)
+
+    def test_replicacao_critica_aparece_no_preview(self):
+        destino = self.User.objects.create_user(username="destino.critica")
+        definir_override_permissao(
+            self.alvo,
+            CodigoPermissao.RELATORIOS_REABRIR,
+            EstadoPermissaoUsuario.PERMITIR,
+            alterado_por=self.full,
+        )
+
+        preview = preparar_preview_replicacao_permissoes(
+            administrador=self.full,
+            usuario_fonte=self.alvo,
+            destino_ids=[destino.pk],
+            codigos=[CodigoPermissao.RELATORIOS_REABRIR],
+            modo="overrides",
+        )
+
+        self.assertEqual(preview.criticas, 1)
+        self.assertEqual(preview.total_alteracoes, 1)
 
 
 class HospedagemPeriodoTests(TestCase):
