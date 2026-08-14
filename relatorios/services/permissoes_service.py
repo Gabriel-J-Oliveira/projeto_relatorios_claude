@@ -12,12 +12,15 @@ from relatorios.models import (
 )
 from relatorios.services.autorizacao_service import (
     _normalizar_login_usuario,
+    status_permite_edicao_relatorio_alheio_autorizado,
+    status_permite_edicao_relatorio_proprio,
+    status_permite_envio_relatorio,
     usuario_eh_administrativo,
     usuario_pode_acessar_erp,
     usuario_pode_acessar_manutencao_legado,
     usuario_pode_atuar_como_financeiro,
-    usuario_pode_editar_relatorio,
-    usuario_pode_enviar_relatorio,
+    usuario_pode_editar_relatorio_legado,
+    usuario_pode_enviar_relatorio_legado,
     usuario_pode_reabrir_relatorio,
     usuario_pode_visualizar_relatorio_legado,
 )
@@ -190,7 +193,7 @@ def _catalogo():
             "Permite editar um relatorio conforme usuario, objeto e status.",
             CategoriaPermissao.RELATORIOS,
             EscopoPermissao.OBJETO_STATUS,
-            _relatorio_legado(usuario_pode_editar_relatorio),
+            _relatorio_legado(usuario_pode_editar_relatorio_legado),
             objeto_obrigatorio=True,
             regra_legada="usuario_pode_editar_relatorio",
             sensibilidade=SensibilidadePermissao.SENSIVEL,
@@ -211,7 +214,7 @@ def _catalogo():
             "Permite enviar um relatorio para conferencia conforme usuario e status.",
             CategoriaPermissao.RELATORIOS,
             EscopoPermissao.OBJETO_STATUS,
-            _relatorio_legado(usuario_pode_enviar_relatorio),
+            _relatorio_legado(usuario_pode_enviar_relatorio_legado),
             objeto_obrigatorio=True,
             regra_legada="usuario_pode_enviar_relatorio",
         ),
@@ -231,7 +234,7 @@ def _catalogo():
             "Permite excluir rascunho quando o workflow permitir.",
             CategoriaPermissao.RELATORIOS,
             EscopoPermissao.OBJETO_STATUS,
-            _relatorio_legado(usuario_pode_editar_relatorio),
+            _relatorio_legado(usuario_pode_editar_relatorio_legado),
             objeto_obrigatorio=True,
             regra_legada="usuario_pode_editar_relatorio + status rascunho",
             sensibilidade=SensibilidadePermissao.SENSIVEL,
@@ -480,11 +483,6 @@ def _catalogo():
 
 
 PERMISSOES = _catalogo()
-RELATORIO_STATUS_EDITAVEIS_CENTRAL = {
-    StatusRelatorio.RASCUNHO,
-    StatusRelatorio.AJUSTE,
-    StatusRelatorio.CONFERENCIA,
-}
 
 
 def obter_permissao(codigo):
@@ -624,30 +622,26 @@ def _usuario_tem_permissao_central_impl(usuario, codigo, objeto=None):
         if objeto is None or _relatorio_finalizado(objeto):
             return False
         if usuario_tem_full_access_erp(usuario):
-            return _status_relatorio(objeto) in RELATORIO_STATUS_EDITAVEIS_CENTRAL
+            return status_permite_edicao_relatorio_alheio_autorizado(
+                _status_relatorio(objeto)
+            )
         if _usuario_eh_dono(usuario, objeto):
-            return _status_relatorio(objeto) in {StatusRelatorio.RASCUNHO, StatusRelatorio.AJUSTE}
+            return status_permite_edicao_relatorio_proprio(_status_relatorio(objeto))
         return (
-            _status_relatorio(objeto) in RELATORIO_STATUS_EDITAVEIS_CENTRAL
+            status_permite_edicao_relatorio_alheio_autorizado(_status_relatorio(objeto))
             and _usuario_tem_permissao_central_impl(
                 usuario, CodigoPermissao.RELATORIOS_EDITAR_ALHEIOS
             )
         )
     if codigo == CodigoPermissao.RELATORIOS_ENVIAR:
-        if objeto is None or _status_relatorio(objeto) not in {
-            StatusRelatorio.RASCUNHO,
-            StatusRelatorio.AJUSTE,
-        }:
+        if objeto is None or not status_permite_envio_relatorio(_status_relatorio(objeto)):
             return False
         if usuario_tem_full_access_erp(usuario):
             return True
         if _usuario_eh_dono(usuario, objeto):
             return True
-        return (
-            _capacidade_global_central(usuario, codigo)
-            and _usuario_tem_permissao_central_impl(
-                usuario, CodigoPermissao.RELATORIOS_EDITAR_ALHEIOS
-            )
+        return _usuario_tem_permissao_central_impl(
+            usuario, CodigoPermissao.RELATORIOS_EDITAR_ALHEIOS
         )
     if codigo == CodigoPermissao.RELATORIOS_DUPLICAR:
         if objeto is None or _status_relatorio(objeto) == StatusRelatorio.AJUSTE:

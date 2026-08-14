@@ -29,6 +29,22 @@ GRUPOS_ERP = [
 ]
 
 
+def status_permite_edicao_relatorio_proprio(status):
+    return status in {StatusRelatorio.RASCUNHO, StatusRelatorio.AJUSTE}
+
+
+def status_permite_edicao_relatorio_alheio_autorizado(status):
+    return status in {
+        StatusRelatorio.RASCUNHO,
+        StatusRelatorio.AJUSTE,
+        StatusRelatorio.CONFERENCIA,
+    }
+
+
+def status_permite_envio_relatorio(status):
+    return status in {StatusRelatorio.RASCUNHO, StatusRelatorio.AJUSTE}
+
+
 def _normalizar_login_usuario(valor):
     login = str(valor or "").strip().lower()
     if "\\" in login:
@@ -275,7 +291,7 @@ def _log_autorizacao_relatorio(acao, user, relatorio, validacoes, resultado):
         logger.warning(mensagem)
 
 
-def usuario_pode_editar_relatorio(user, relatorio):
+def usuario_pode_editar_relatorio_legado(user, relatorio):
     acesso_total = usuario_tem_acesso_total(user)
     administrativo = usuario_eh_administrativo(user)
     financeiro_ou_socio = usuario_pode_editar_relatorio_em_conferencia(user)
@@ -284,10 +300,9 @@ def usuario_pode_editar_relatorio(user, relatorio):
         StatusRelatorio.REJEITADO,
     }
     status_em_conferencia = relatorio.status == StatusRelatorio.CONFERENCIA
-    status_editavel_por_tecnico = relatorio.status in {
-        StatusRelatorio.RASCUNHO,
-        StatusRelatorio.AJUSTE,
-    }
+    status_editavel_por_tecnico = status_permite_edicao_relatorio_proprio(
+        relatorio.status
+    )
     eh_dono = usuario_eh_dono_relatorio(user, relatorio)
     eh_responsavel = usuario_eh_responsavel_relatorio(user, relatorio)
     validacoes = {
@@ -318,6 +333,20 @@ def usuario_pode_editar_relatorio(user, relatorio):
         resultado,
     )
     return resultado
+
+
+def usuario_pode_editar_relatorio(user, relatorio):
+    from relatorios.services.permissoes_service import (
+        CodigoPermissao,
+        avaliar_permissao_cutover,
+    )
+
+    return avaliar_permissao_cutover(
+        user,
+        CodigoPermissao.RELATORIOS_EDITAR,
+        lambda: usuario_pode_editar_relatorio_legado(user, relatorio),
+        objeto=relatorio,
+    )
 
 
 def usuario_eh_dono_relatorio(user, relatorio):
@@ -382,13 +411,10 @@ def usuario_pode_visualizar_relatorio(user, relatorio):
     )
 
 
-def usuario_pode_enviar_relatorio(user, relatorio):
+def usuario_pode_enviar_relatorio_legado(user, relatorio):
     acesso_total = usuario_tem_acesso_total(user)
     administrativo = usuario_eh_administrativo(user)
-    status_permitido = relatorio.status in {
-        StatusRelatorio.RASCUNHO,
-        StatusRelatorio.AJUSTE,
-    }
+    status_permitido = status_permite_envio_relatorio(relatorio.status)
     status_finalizado = relatorio.status in {
         StatusRelatorio.APROVADO,
         StatusRelatorio.REJEITADO,
@@ -418,6 +444,20 @@ def usuario_pode_enviar_relatorio(user, relatorio):
         resultado,
     )
     return resultado
+
+
+def usuario_pode_enviar_relatorio(user, relatorio):
+    from relatorios.services.permissoes_service import (
+        CodigoPermissao,
+        avaliar_permissao_cutover,
+    )
+
+    return avaliar_permissao_cutover(
+        user,
+        CodigoPermissao.RELATORIOS_ENVIAR,
+        lambda: usuario_pode_enviar_relatorio_legado(user, relatorio),
+        objeto=relatorio,
+    )
 
 
 def queryset_relatorios_visiveis_legado(user, queryset):

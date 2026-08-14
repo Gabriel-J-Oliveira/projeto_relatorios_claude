@@ -207,7 +207,7 @@
                     </button>
                   </form>
                 {% endif %}
-                {% if r.status == 'rascunho' or r.status == 'ajuste_pendente' %}
+                {% if r.pode_editar_na_listagem %}
                   <a href="{% url 'relatorios:relatorio_update' r.pk %}"
                      class="btn btn-sm btn-outline-primary" title="Editar">
                     <i class="bi bi-pencil"></i>

@@ -68,6 +68,9 @@ from .services.autorizacao_service import (
     GRUPO_FINANCEIRO,
     GRUPO_TECNICO,
     queryset_relatorios_visiveis,
+    status_permite_edicao_relatorio_alheio_autorizado,
+    status_permite_edicao_relatorio_proprio,
+    status_permite_envio_relatorio,
     usuario_eh_administrativo,
     usuario_eh_admin_extra,
     usuario_pode_editar_relatorio,
@@ -594,7 +597,13 @@ class PermissoesCutoverPrimeiroLoteFlagOnTests(TestCase):
 
 
 class _RelatorioVisibilidadeMixin:
-    def criar_relatorio_visibilidade(self, numero, criado_por, tecnico=None):
+    def criar_relatorio_visibilidade(
+        self,
+        numero,
+        criado_por,
+        tecnico=None,
+        status=StatusRelatorio.RASCUNHO,
+    ):
         tecnico = tecnico or self.tecnico
         return RelatorioTecnico.objects.create(
             numero=str(numero),
@@ -607,7 +616,31 @@ class _RelatorioVisibilidadeMixin:
             data_fim=date(2026, 5, 2),
             motivo="Atendimento tecnico",
             criado_por=criado_por,
+            status=status,
         )
+
+
+class RelatorioStatusAutorizacaoTests(SimpleTestCase):
+    def test_status_de_edicao_do_proprio_relatorio(self):
+        self.assertTrue(status_permite_edicao_relatorio_proprio(StatusRelatorio.RASCUNHO))
+        self.assertTrue(status_permite_edicao_relatorio_proprio(StatusRelatorio.AJUSTE))
+        self.assertFalse(status_permite_edicao_relatorio_proprio(StatusRelatorio.CONFERENCIA))
+        self.assertFalse(status_permite_edicao_relatorio_proprio(StatusRelatorio.APROVADO))
+        self.assertFalse(status_permite_edicao_relatorio_proprio(StatusRelatorio.REJEITADO))
+
+    def test_status_de_edicao_alheia_autorizada_preserva_conferencia(self):
+        self.assertTrue(status_permite_edicao_relatorio_alheio_autorizado(StatusRelatorio.RASCUNHO))
+        self.assertTrue(status_permite_edicao_relatorio_alheio_autorizado(StatusRelatorio.AJUSTE))
+        self.assertTrue(status_permite_edicao_relatorio_alheio_autorizado(StatusRelatorio.CONFERENCIA))
+        self.assertFalse(status_permite_edicao_relatorio_alheio_autorizado(StatusRelatorio.APROVADO))
+        self.assertFalse(status_permite_edicao_relatorio_alheio_autorizado(StatusRelatorio.REJEITADO))
+
+    def test_status_de_envio_e_reenvio(self):
+        self.assertTrue(status_permite_envio_relatorio(StatusRelatorio.RASCUNHO))
+        self.assertTrue(status_permite_envio_relatorio(StatusRelatorio.AJUSTE))
+        self.assertFalse(status_permite_envio_relatorio(StatusRelatorio.CONFERENCIA))
+        self.assertFalse(status_permite_envio_relatorio(StatusRelatorio.APROVADO))
+        self.assertFalse(status_permite_envio_relatorio(StatusRelatorio.REJEITADO))
 
 
 @override_settings(PERMISSOES_CENTRAL_ENABLED=False, ERP_FULL_ACCESS_USERS=[], EXTRA_ADMIN_USERS=[])
@@ -797,6 +830,258 @@ class PermissoesCutoverRelatoriosVisibilidadeFlagOnTests(_RelatorioVisibilidadeM
         self._permitir(self.dono, CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS)
         resposta_permitida = self.client.get(reverse("relatorios:relatorio_detail", args=[self.relatorio_outro.pk]))
         self.assertEqual(resposta_permitida.status_code, 200)
+
+
+@override_settings(PERMISSOES_CENTRAL_ENABLED=False, ERP_FULL_ACCESS_USERS=[], EXTRA_ADMIN_USERS=[])
+class PermissoesCutoverRelatoriosEdicaoEnvioFlagOffTests(_RelatorioVisibilidadeMixin, TestCase):
+    def setUp(self):
+        self.User = get_user_model()
+        self.dono = self.User.objects.create_user(username="dono")
+        self.outro = self.User.objects.create_user(username="outro")
+        self.admin = self.User.objects.create_user(username="admin.erp")
+        self.responsavel = self.User.objects.create_user(
+            username="responsavel",
+            email="responsavel@example.com",
+        )
+        grupo_admin = Group.objects.create(name=GRUPO_ADMIN_ERP)
+        grupo_tecnico = Group.objects.create(name=GRUPO_TECNICO)
+        self.admin.groups.add(grupo_admin)
+        self.dono.groups.add(grupo_tecnico)
+        self.outro.groups.add(grupo_tecnico)
+        self.responsavel.groups.add(grupo_tecnico)
+        self.cliente = Cliente.objects.create(nome="Cliente Edicao Legado", cidade="Curitiba", uf="PR")
+        self.tecnico = Tecnico.objects.create(nome="Tecnico Padrao Edicao", email="tecnico@example.com")
+        self.tecnico_responsavel = Tecnico.objects.create(
+            nome="Tecnico Responsavel Edicao",
+            email="responsavel@example.com",
+        )
+        self.relatorio_dono = self.criar_relatorio_visibilidade(99201, self.dono)
+        self.relatorio_dono_aprovado = self.criar_relatorio_visibilidade(
+            99202,
+            self.dono,
+            status=StatusRelatorio.APROVADO,
+        )
+        self.relatorio_dono_conferencia = self.criar_relatorio_visibilidade(
+            99203,
+            self.dono,
+            status=StatusRelatorio.CONFERENCIA,
+        )
+        self.relatorio_responsavel = self.criar_relatorio_visibilidade(
+            99204,
+            self.outro,
+            tecnico=self.tecnico_responsavel,
+        )
+
+    def test_flag_off_dono_preserva_edicao_e_envio_por_status_legado(self):
+        self.assertTrue(usuario_pode_editar_relatorio(self.dono, self.relatorio_dono))
+        self.assertFalse(usuario_pode_editar_relatorio(self.dono, self.relatorio_dono_aprovado))
+        self.assertTrue(usuario_pode_enviar_relatorio(self.dono, self.relatorio_dono))
+        self.assertFalse(usuario_pode_enviar_relatorio(self.dono, self.relatorio_dono_conferencia))
+
+    def test_flag_off_tecnico_responsavel_alheio_mantem_comportamento_legado(self):
+        self.assertTrue(usuario_pode_editar_relatorio(self.responsavel, self.relatorio_responsavel))
+        self.assertTrue(usuario_pode_enviar_relatorio(self.responsavel, self.relatorio_responsavel))
+
+    def test_flag_off_administrativo_mantem_comportamento_legado(self):
+        self.assertTrue(usuario_pode_editar_relatorio(self.admin, self.relatorio_responsavel))
+        self.assertTrue(usuario_pode_enviar_relatorio(self.admin, self.relatorio_responsavel))
+
+    def test_flag_off_override_central_divergente_nao_muda_resultado_e_loga_shadow(self):
+        definir_override_permissao(
+            self.responsavel,
+            CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+            EstadoPermissaoUsuario.NEGAR,
+            alterado_por=self.admin,
+        )
+        definir_override_permissao(
+            self.responsavel,
+            CodigoPermissao.RELATORIOS_EDITAR_ALHEIOS,
+            EstadoPermissaoUsuario.NEGAR,
+            alterado_por=self.admin,
+        )
+
+        with self.assertLogs("relatorios.services.permissoes_service", level="INFO") as logs:
+            pode_editar = usuario_pode_editar_relatorio(self.responsavel, self.relatorio_responsavel)
+            pode_enviar = usuario_pode_enviar_relatorio(self.responsavel, self.relatorio_responsavel)
+
+        self.assertTrue(pode_editar)
+        self.assertTrue(pode_enviar)
+        mensagens = "\n".join(logs.output)
+        self.assertIn("[PERMISSOES_SHADOW]", mensagens)
+        self.assertIn(CodigoPermissao.RELATORIOS_EDITAR, mensagens)
+        self.assertIn(CodigoPermissao.RELATORIOS_ENVIAR, mensagens)
+
+    def test_flag_off_url_direta_de_edicao_preserva_legado(self):
+        self.client.force_login(self.responsavel)
+        resposta = self.client.get(reverse("relatorios:relatorio_update", args=[self.relatorio_responsavel.pk]))
+
+        self.assertEqual(resposta.status_code, 200)
+
+    def test_flag_off_botao_editar_na_listagem_preserva_legado(self):
+        self.client.force_login(self.admin)
+        resposta = self.client.get(reverse("relatorios:relatorio_list"))
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertContains(
+            resposta,
+            reverse("relatorios:relatorio_update", args=[self.relatorio_responsavel.pk]),
+        )
+
+
+@override_settings(
+    PERMISSOES_CENTRAL_ENABLED=True,
+    ERP_FULL_ACCESS_USERS=["CONTROL\\gabriel.oliveira"],
+    EXTRA_ADMIN_USERS=[],
+)
+class PermissoesCutoverRelatoriosEdicaoEnvioFlagOnTests(_RelatorioVisibilidadeMixin, TestCase):
+    def setUp(self):
+        self.User = get_user_model()
+        self.dono = self.User.objects.create_user(username="dono")
+        self.outro = self.User.objects.create_user(username="outro")
+        self.universal = self.User.objects.create_user(username="universal")
+        self.editor = self.User.objects.create_user(username="editor")
+        self.superuser = self.User.objects.create_superuser(
+            username="superuser.sem.full",
+            email="superuser@example.com",
+            password="x",
+        )
+        self.domain = self.User.objects.create_user(username="domain.admin")
+        self.full = self.User.objects.create_user(username="CONTROL\\gabriel.oliveira")
+        self.responsavel = self.User.objects.create_user(
+            username="responsavel",
+            email="responsavel@example.com",
+        )
+        grupo_domain = Group.objects.create(name=GRUPO_DOMAIN_ADMINS)
+        grupo_tecnico = Group.objects.create(name=GRUPO_TECNICO)
+        self.domain.groups.add(grupo_domain)
+        for usuario in [self.dono, self.outro, self.universal, self.editor, self.responsavel]:
+            usuario.groups.add(grupo_tecnico)
+        self.cliente = Cliente.objects.create(nome="Cliente Edicao Central", cidade="Curitiba", uf="PR")
+        self.tecnico = Tecnico.objects.create(nome="Tecnico Padrao Central", email="tecnico.central@example.com")
+        self.tecnico_responsavel = Tecnico.objects.create(
+            nome="Tecnico Responsavel Central",
+            email="responsavel@example.com",
+        )
+        self.relatorio_dono = self.criar_relatorio_visibilidade(99301, self.dono)
+        self.relatorio_dono_aprovado = self.criar_relatorio_visibilidade(
+            99302,
+            self.dono,
+            status=StatusRelatorio.APROVADO,
+        )
+        self.relatorio_dono_conferencia = self.criar_relatorio_visibilidade(
+            99303,
+            self.dono,
+            status=StatusRelatorio.CONFERENCIA,
+        )
+        self.relatorio_outro = self.criar_relatorio_visibilidade(99304, self.outro)
+        self.relatorio_outro_aprovado = self.criar_relatorio_visibilidade(
+            99305,
+            self.outro,
+            status=StatusRelatorio.APROVADO,
+        )
+        self.relatorio_responsavel = self.criar_relatorio_visibilidade(
+            99306,
+            self.outro,
+            tecnico=self.tecnico_responsavel,
+        )
+
+    def _permitir(self, usuario, codigo):
+        definir_override_permissao(
+            usuario,
+            codigo,
+            EstadoPermissaoUsuario.PERMITIR,
+            alterado_por=self.full,
+        )
+
+    def _permitir_edicao_alheia(self, usuario):
+        self._permitir(usuario, CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS)
+        self._permitir(usuario, CodigoPermissao.RELATORIOS_EDITAR_ALHEIOS)
+
+    def test_flag_on_edicao_propria_respeita_workflow_sem_toggle(self):
+        self.assertTrue(usuario_pode_editar_relatorio(self.dono, self.relatorio_dono))
+        self.assertFalse(usuario_pode_editar_relatorio(self.dono, self.relatorio_dono_aprovado))
+
+    def test_flag_on_edicao_alheia_exige_visualizar_e_editar_alheios(self):
+        self.assertFalse(usuario_pode_editar_relatorio(self.editor, self.relatorio_outro))
+
+        self._permitir(self.universal, CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS)
+        self.assertFalse(usuario_pode_editar_relatorio(self.universal, self.relatorio_outro))
+
+        self._permitir_edicao_alheia(self.editor)
+        self.assertTrue(usuario_pode_editar_relatorio(self.editor, self.relatorio_outro))
+        self.assertFalse(usuario_pode_editar_relatorio(self.editor, self.relatorio_outro_aprovado))
+
+    def test_flag_on_tecnico_responsavel_superuser_e_domain_nao_bypassam_edicao(self):
+        self.assertFalse(usuario_pode_editar_relatorio(self.responsavel, self.relatorio_responsavel))
+        self.assertFalse(usuario_pode_editar_relatorio(self.superuser, self.relatorio_outro))
+        self.assertFalse(usuario_pode_editar_relatorio(self.domain, self.relatorio_outro))
+
+    def test_flag_on_full_protegido_edita_respeitando_workflow(self):
+        self.assertTrue(usuario_pode_editar_relatorio(self.full, self.relatorio_outro))
+        self.assertFalse(usuario_pode_editar_relatorio(self.full, self.relatorio_outro_aprovado))
+
+    def test_flag_on_envio_proprio_respeita_workflow_sem_toggle(self):
+        self.assertTrue(usuario_pode_enviar_relatorio(self.dono, self.relatorio_dono))
+        self.assertFalse(usuario_pode_enviar_relatorio(self.dono, self.relatorio_dono_conferencia))
+
+    def test_flag_on_envio_alheio_e_derivado_de_visualizar_e_editar_alheios(self):
+        self.assertFalse(usuario_pode_enviar_relatorio(self.editor, self.relatorio_outro))
+
+        self._permitir(self.universal, CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS)
+        self.assertFalse(usuario_pode_enviar_relatorio(self.universal, self.relatorio_outro))
+
+        self._permitir_edicao_alheia(self.editor)
+        self.assertTrue(usuario_pode_enviar_relatorio(self.editor, self.relatorio_outro))
+
+    def test_flag_on_tecnico_responsavel_sozinho_nao_envia_alheio(self):
+        self.assertFalse(usuario_pode_enviar_relatorio(self.responsavel, self.relatorio_responsavel))
+
+    def test_flag_on_full_protegido_envia_respeitando_workflow(self):
+        self.assertTrue(usuario_pode_enviar_relatorio(self.full, self.relatorio_outro))
+        self.assertFalse(usuario_pode_enviar_relatorio(self.full, self.relatorio_dono_conferencia))
+
+    def test_flag_on_relatorios_enviar_nao_exige_override_proprio(self):
+        self._permitir_edicao_alheia(self.editor)
+
+        self.assertFalse(
+            PermissaoUsuarioOverride.objects.filter(
+                usuario=self.editor,
+                codigo=CodigoPermissao.RELATORIOS_ENVIAR,
+            ).exists()
+        )
+        self.assertTrue(usuario_pode_enviar_relatorio(self.editor, self.relatorio_outro))
+
+    def test_flag_on_post_direto_envio_alheio_sem_editar_alheios_e_bloqueado(self):
+        self._permitir(self.universal, CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS)
+        self.client.force_login(self.universal)
+
+        resposta = self.client.post(
+            reverse(
+                "relatorios:relatorio_status",
+                args=[self.relatorio_outro.pk, StatusRelatorio.CONFERENCIA],
+            )
+        )
+
+        self.assertEqual(resposta.status_code, 302)
+        self.relatorio_outro.refresh_from_db()
+        self.assertEqual(self.relatorio_outro.status, StatusRelatorio.RASCUNHO)
+
+    def test_flag_on_botao_editar_na_listagem_acompanha_backend(self):
+        url_edicao = reverse("relatorios:relatorio_update", args=[self.relatorio_outro.pk])
+
+        self._permitir(self.universal, CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS)
+        self.client.force_login(self.universal)
+        resposta_universal = self.client.get(reverse("relatorios:relatorio_list"))
+
+        self.assertEqual(resposta_universal.status_code, 200)
+        self.assertNotContains(resposta_universal, url_edicao)
+
+        self._permitir_edicao_alheia(self.editor)
+        self.client.force_login(self.editor)
+        resposta_editor = self.client.get(reverse("relatorios:relatorio_list"))
+
+        self.assertEqual(resposta_editor.status_code, 200)
+        self.assertContains(resposta_editor, url_edicao)
 
 
 @override_settings(

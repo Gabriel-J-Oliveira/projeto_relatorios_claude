@@ -3407,6 +3407,11 @@ class RelatorioListView(AcessoErpMixin, ListView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        for relatorio in ctx.get("relatorios", []):
+            relatorio.pode_editar_na_listagem = usuario_pode_editar_relatorio(
+                self.request.user,
+                relatorio,
+            )
         params = self.request.GET.copy()
         params.pop("page", None)
         params_sem_ordem = params.copy()
