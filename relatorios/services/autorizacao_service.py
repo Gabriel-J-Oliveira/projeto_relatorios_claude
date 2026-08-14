@@ -362,10 +362,24 @@ def usuario_eh_responsavel_relatorio(user, relatorio):
     return resultado
 
 
-def usuario_pode_visualizar_relatorio(user, relatorio):
+def usuario_pode_visualizar_relatorio_legado(user, relatorio):
     if usuario_tem_acesso_total(user) or usuario_eh_administrativo(user):
         return True
     return usuario_eh_dono_relatorio(user, relatorio)
+
+
+def usuario_pode_visualizar_relatorio(user, relatorio):
+    from relatorios.services.permissoes_service import (
+        CodigoPermissao,
+        avaliar_permissao_cutover,
+    )
+
+    return avaliar_permissao_cutover(
+        user,
+        CodigoPermissao.RELATORIOS_VISUALIZAR,
+        lambda: usuario_pode_visualizar_relatorio_legado(user, relatorio),
+        objeto=relatorio,
+    )
 
 
 def usuario_pode_enviar_relatorio(user, relatorio):
@@ -406,11 +420,38 @@ def usuario_pode_enviar_relatorio(user, relatorio):
     return resultado
 
 
-def queryset_relatorios_visiveis(user, queryset):
+def queryset_relatorios_visiveis_legado(user, queryset):
     if usuario_tem_acesso_total(user) or usuario_eh_administrativo(user):
         return queryset
     if not getattr(user, "is_authenticated", False):
         return queryset.none()
+    return queryset.filter(criado_por=user)
+
+
+def queryset_relatorios_visiveis(user, queryset):
+    from relatorios.services.permissoes_service import (
+        CodigoPermissao,
+        avaliar_permissao_cutover,
+        permissoes_central_ativa,
+        usuario_tem_full_access_erp,
+        usuario_tem_permissao_central,
+    )
+
+    queryset_legado = lambda: queryset_relatorios_visiveis_legado(user, queryset)
+    if not permissoes_central_ativa():
+        avaliar_permissao_cutover(
+            user,
+            CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+            lambda: usuario_tem_acesso_total(user) or usuario_eh_administrativo(user),
+        )
+        return queryset_legado()
+    if not getattr(user, "is_authenticated", False):
+        return queryset.none()
+    if usuario_tem_full_access_erp(user) or usuario_tem_permissao_central(
+        user,
+        CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+    ):
+        return queryset
     return queryset.filter(criado_por=user)
 
 

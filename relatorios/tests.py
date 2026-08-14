@@ -67,6 +67,7 @@ from .services.autorizacao_service import (
     GRUPO_DOMAIN_ADMINS,
     GRUPO_FINANCEIRO,
     GRUPO_TECNICO,
+    queryset_relatorios_visiveis,
     usuario_eh_administrativo,
     usuario_eh_admin_extra,
     usuario_pode_editar_relatorio,
@@ -75,6 +76,7 @@ from .services.autorizacao_service import (
     usuario_pode_atuar_como_financeiro,
     usuario_pode_gerenciar_clientes,
     usuario_pode_reabrir_relatorio,
+    usuario_pode_visualizar_relatorio,
     usuario_tem_acesso_total,
 )
 from .services.permissoes_service import (
@@ -589,6 +591,212 @@ class PermissoesCutoverPrimeiroLoteFlagOnTests(TestCase):
         self.assertFalse(contexto["visualiza_clientes"])
         self.assertTrue(contexto["visualiza_tecnicos"])
         self.assertTrue(contexto["visualiza_adiantamentos"])
+
+
+class _RelatorioVisibilidadeMixin:
+    def criar_relatorio_visibilidade(self, numero, criado_por, tecnico=None):
+        tecnico = tecnico or self.tecnico
+        return RelatorioTecnico.objects.create(
+            numero=str(numero),
+            cliente=self.cliente,
+            tecnico_responsavel=tecnico,
+            cidade_atendimento="Curitiba",
+            uf_atendimento="PR",
+            tipo_localidade="interior",
+            data_inicio=date(2026, 5, 1),
+            data_fim=date(2026, 5, 2),
+            motivo="Atendimento tecnico",
+            criado_por=criado_por,
+        )
+
+
+@override_settings(PERMISSOES_CENTRAL_ENABLED=False, ERP_FULL_ACCESS_USERS=[], EXTRA_ADMIN_USERS=[])
+class PermissoesCutoverRelatoriosVisibilidadeFlagOffTests(_RelatorioVisibilidadeMixin, TestCase):
+    def setUp(self):
+        self.User = get_user_model()
+        self.dono = self.User.objects.create_user(username="dono")
+        self.outro = self.User.objects.create_user(username="outro")
+        self.admin = self.User.objects.create_user(username="admin.erp")
+        self.responsavel = self.User.objects.create_user(
+            username="responsavel",
+            email="responsavel@example.com",
+        )
+        grupo_admin = Group.objects.create(name=GRUPO_ADMIN_ERP)
+        grupo_tecnico = Group.objects.create(name=GRUPO_TECNICO)
+        self.admin.groups.add(grupo_admin)
+        self.dono.groups.add(grupo_tecnico)
+        self.outro.groups.add(grupo_tecnico)
+        self.responsavel.groups.add(grupo_tecnico)
+        self.cliente = Cliente.objects.create(nome="Cliente Visibilidade", cidade="Curitiba", uf="PR")
+        self.tecnico = Tecnico.objects.create(nome="Tecnico Padrao", email="tecnico@example.com")
+        self.tecnico_responsavel = Tecnico.objects.create(
+            nome="Tecnico Responsavel",
+            email="responsavel@example.com",
+        )
+        self.relatorio_dono = self.criar_relatorio_visibilidade(99001, self.dono)
+        self.relatorio_outro = self.criar_relatorio_visibilidade(99002, self.outro)
+        self.relatorio_responsavel = self.criar_relatorio_visibilidade(
+            99003,
+            self.outro,
+            tecnico=self.tecnico_responsavel,
+        )
+
+    def test_flag_off_preserva_dono_admin_e_comportamento_legado_do_responsavel(self):
+        self.assertTrue(usuario_pode_visualizar_relatorio(self.dono, self.relatorio_dono))
+        self.assertTrue(usuario_pode_visualizar_relatorio(self.admin, self.relatorio_outro))
+        self.assertEqual(
+            usuario_pode_visualizar_relatorio(self.responsavel, self.relatorio_responsavel),
+            False,
+        )
+
+    def test_flag_off_queryset_preserva_legado_e_override_nao_muda_produtivo(self):
+        definir_override_permissao(
+            self.dono,
+            CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+            EstadoPermissaoUsuario.PERMITIR,
+            alterado_por=self.admin,
+        )
+
+        ids = set(
+            queryset_relatorios_visiveis(
+                self.dono,
+                RelatorioTecnico.objects.all(),
+            ).values_list("pk", flat=True)
+        )
+
+        self.assertIn(self.relatorio_dono.pk, ids)
+        self.assertNotIn(self.relatorio_outro.pk, ids)
+
+    def test_flag_off_url_direta_mantem_comportamento_legado(self):
+        self.client.force_login(self.dono)
+        resposta = self.client.get(reverse("relatorios:relatorio_detail", args=[self.relatorio_outro.pk]))
+
+        self.assertEqual(resposta.status_code, 404)
+
+    def test_flag_off_shadow_loga_divergencia_de_visibilidade_sem_mudar_resultado(self):
+        definir_override_permissao(
+            self.dono,
+            CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
+            EstadoPermissaoUsuario.PERMITIR,
+            alterado_por=self.admin,
+        )
+
+        with self.assertLogs("relatorios.services.permissoes_service", level="INFO") as logs:
+            resultado = usuario_pode_visualizar_relatorio(self.dono, self.relatorio_outro)
+
+        self.assertFalse(resultado)
+        self.assertTrue(any("[PERMISSOES_SHADOW]" in mensagem for mensagem in logs.output))
+        self.assertTrue(any("object=RelatorioTecnico" in mensagem for mensagem in logs.output))
+
+
+@override_settings(PERMISSOES_CENTRAL_ENABLED=True, ERP_FULL_ACCESS_USERS=["CONTROL\\gabriel.oliveira"], EXTRA_ADMIN_USERS=[])
+class PermissoesCutoverRelatoriosVisibilidadeFlagOnTests(_RelatorioVisibilidadeMixin, TestCase):
+    def setUp(self):
+        self.User = get_user_model()
+        self.dono = self.User.objects.create_user(username="dono")
+        self.outro = self.User.objects.create_user(username="outro")
+        self.universal = self.User.objects.create_user(username="universal")
+        self.superuser = self.User.objects.create_superuser(
+            username="superuser.sem.full",
+            email="superuser@example.com",
+            password="x",
+        )
+        self.domain = self.User.objects.create_user(username="domain.admin")
+        self.full = self.User.objects.create_user(username="CONTROL\\gabriel.oliveira")
+        self.responsavel = self.User.objects.create_user(
+            username="responsavel",
+            email="responsavel@example.com",
+        )
+        grupo_domain = Group.objects.create(name=GRUPO_DOMAIN_ADMINS)
+        grupo_tecnico = Group.objects.create(name=GRUPO_TECNICO)
+        self.domain.groups.add(grupo_domain)
+        self.dono.groups.add(grupo_tecnico)
+        self.outro.groups.add(grupo_tecnico)
+        self.universal.groups.add(grupo_tecnico)
+        self.responsavel.groups.add(grupo_tecnico)
+        self.cliente = Cliente.objects.create(nome="Cliente Visibilidade Central", cidade="Curitiba", uf="PR")
+        self.tecnico = Tecnico.objects.create(nome="Tecnico Padrao Central", email="tecnico.central@example.com")
+        self.tecnico_responsavel = Tecnico.objects.create(
+            nome="Tecnico Responsavel Central",
+            email="responsavel@example.com",
+        )
+        self.relatorio_dono = self.criar_relatorio_visibilidade(99101, self.dono)
+        self.relatorio_outro = self.criar_relatorio_visibilidade(99102, self.outro)
+        self.relatorio_responsavel = self.criar_relatorio_visibilidade(
+            99103,
+            self.outro,
+            tecnico=self.tecnico_responsavel,
+        )
+
+    def _permitir(self, usuario, codigo):
+        definir_override_permissao(
+            usuario,
+            codigo,
+            EstadoPermissaoUsuario.PERMITIR,
+            alterado_por=self.full,
+        )
+
+    def _negar(self, usuario, codigo):
+        definir_override_permissao(
+            usuario,
+            codigo,
+            EstadoPermissaoUsuario.NEGAR,
+            alterado_por=self.full,
+        )
+
+    def test_flag_on_dono_visualiza_proprio_e_sem_universal_nao_visualiza_alheio(self):
+        self.assertTrue(usuario_pode_visualizar_relatorio(self.dono, self.relatorio_dono))
+        self.assertFalse(usuario_pode_visualizar_relatorio(self.dono, self.relatorio_outro))
+
+    def test_flag_on_permitir_visualizar_alheios_concede_e_negar_bloqueia(self):
+        self._permitir(self.universal, CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS)
+        self.assertTrue(usuario_pode_visualizar_relatorio(self.universal, self.relatorio_outro))
+
+        self._negar(self.universal, CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS)
+        self.assertFalse(usuario_pode_visualizar_relatorio(self.universal, self.relatorio_outro))
+
+    def test_flag_on_tecnico_responsavel_sozinho_nao_visualiza_alheio(self):
+        self.assertFalse(usuario_pode_visualizar_relatorio(self.responsavel, self.relatorio_responsavel))
+
+    def test_flag_on_full_protegido_visualiza_alheio(self):
+        self.assertTrue(usuario_pode_visualizar_relatorio(self.full, self.relatorio_outro))
+
+    def test_flag_on_superuser_e_domain_admin_sozinhos_nao_visualizam_alheio(self):
+        self.assertFalse(usuario_pode_visualizar_relatorio(self.superuser, self.relatorio_outro))
+        self.assertFalse(usuario_pode_visualizar_relatorio(self.domain, self.relatorio_outro))
+
+    def test_flag_on_queryset_sem_universal_contem_somente_criado_por(self):
+        ids = set(
+            queryset_relatorios_visiveis(
+                self.dono,
+                RelatorioTecnico.objects.all(),
+            ).values_list("pk", flat=True)
+        )
+
+        self.assertIn(self.relatorio_dono.pk, ids)
+        self.assertNotIn(self.relatorio_outro.pk, ids)
+        self.assertNotIn(self.relatorio_responsavel.pk, ids)
+
+    def test_flag_on_queryset_com_universal_inclui_alheios(self):
+        self._permitir(self.universal, CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS)
+        ids = set(
+            queryset_relatorios_visiveis(
+                self.universal,
+                RelatorioTecnico.objects.all(),
+            ).values_list("pk", flat=True)
+        )
+
+        self.assertIn(self.relatorio_dono.pk, ids)
+        self.assertIn(self.relatorio_outro.pk, ids)
+
+    def test_flag_on_listagem_e_url_direta_sao_consistentes(self):
+        self.client.force_login(self.dono)
+        resposta_negada = self.client.get(reverse("relatorios:relatorio_detail", args=[self.relatorio_outro.pk]))
+        self.assertEqual(resposta_negada.status_code, 404)
+
+        self._permitir(self.dono, CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS)
+        resposta_permitida = self.client.get(reverse("relatorios:relatorio_detail", args=[self.relatorio_outro.pk]))
+        self.assertEqual(resposta_permitida.status_code, 200)
 
 
 @override_settings(

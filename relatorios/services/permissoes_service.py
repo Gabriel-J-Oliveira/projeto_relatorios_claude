@@ -19,7 +19,7 @@ from relatorios.services.autorizacao_service import (
     usuario_pode_editar_relatorio,
     usuario_pode_enviar_relatorio,
     usuario_pode_reabrir_relatorio,
-    usuario_pode_visualizar_relatorio,
+    usuario_pode_visualizar_relatorio_legado,
 )
 from relatorios.services.clientes_valor_km_service import (
     usuario_pode_configurar_valor_km_legado,
@@ -170,7 +170,7 @@ def _catalogo():
             "Permite visualizar um relatorio conforme regra por objeto.",
             CategoriaPermissao.RELATORIOS,
             EscopoPermissao.OBJETO,
-            _relatorio_legado(usuario_pode_visualizar_relatorio),
+            _relatorio_legado(usuario_pode_visualizar_relatorio_legado),
             objeto_obrigatorio=True,
             regra_legada="usuario_pode_visualizar_relatorio",
         ),
@@ -221,7 +221,7 @@ def _catalogo():
             "Permite duplicar relatorio visivel quando a regra do objeto permitir.",
             CategoriaPermissao.RELATORIOS,
             EscopoPermissao.OBJETO_STATUS,
-            _relatorio_legado(usuario_pode_visualizar_relatorio),
+            _relatorio_legado(usuario_pode_visualizar_relatorio_legado),
             objeto_obrigatorio=True,
             regra_legada="relatorio visivel",
         ),
@@ -322,7 +322,7 @@ def _catalogo():
             "Permite gerar PDF/ZIP de cliente quando o workflow permitir.",
             CategoriaPermissao.RELATORIOS,
             EscopoPermissao.OBJETO_STATUS,
-            _relatorio_legado(usuario_pode_visualizar_relatorio),
+            _relatorio_legado(usuario_pode_visualizar_relatorio_legado),
             objeto_obrigatorio=True,
             regra_legada="relatorio visivel + aprovado",
             sensibilidade=SensibilidadePermissao.SENSIVEL,
@@ -764,15 +764,21 @@ def comparar_permissao_legado_central(usuario, codigo, objeto=None):
 def avaliar_permissao_cutover(usuario, codigo, legado, objeto=None):
     legado_result = bool(legado() if callable(legado) else legado)
     central_ativa = permissoes_central_ativa()
+    object_name = objeto.__class__.__name__ if objeto is not None else ""
+    object_id = getattr(objeto, "pk", None)
+    object_status = getattr(objeto, "status", "")
     try:
         central_result = usuario_tem_permissao_central(usuario, codigo, objeto=objeto)
     except Exception as exc:
         if central_ativa:
             raise
         logger.warning(
-            "[PERMISSOES_SHADOW] code=%s user_id=%s legacy=%s central_error=%s",
+            "[PERMISSOES_SHADOW] code=%s user_id=%s object=%s object_id=%s status=%s legacy=%s central_error=%s",
             codigo,
             getattr(usuario, "pk", None),
+            object_name,
+            object_id,
+            object_status,
             int(legado_result),
             exc.__class__.__name__,
         )
@@ -780,9 +786,12 @@ def avaliar_permissao_cutover(usuario, codigo, legado, objeto=None):
     if not central_ativa:
         if legado_result != central_result:
             logger.info(
-                "[PERMISSOES_SHADOW] code=%s user_id=%s legacy=%s central=%s",
+                "[PERMISSOES_SHADOW] code=%s user_id=%s object=%s object_id=%s status=%s legacy=%s central=%s",
                 codigo,
                 getattr(usuario, "pk", None),
+                object_name,
+                object_id,
+                object_status,
                 int(legado_result),
                 int(central_result),
             )
