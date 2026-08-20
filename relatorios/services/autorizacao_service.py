@@ -176,6 +176,23 @@ def usuario_pode_atuar_como_financeiro(user):
     return usuario_eh_administrativo(user)
 
 
+def usuario_pode_acessar_financeiro_legado(user):
+    return usuario_pode_atuar_como_financeiro(user)
+
+
+def usuario_pode_acessar_financeiro(user):
+    from relatorios.services.permissoes_service import (
+        CodigoPermissao,
+        avaliar_permissao_cutover,
+    )
+
+    return avaliar_permissao_cutover(
+        user,
+        CodigoPermissao.FINANCEIRO_ACESSAR,
+        lambda: usuario_pode_acessar_financeiro_legado(user),
+    )
+
+
 def usuario_pode_reabrir_relatorio(user):
     if not getattr(user, "is_authenticated", False):
         return False

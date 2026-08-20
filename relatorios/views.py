@@ -89,6 +89,7 @@ from .services.autorizacao_service import (
     queryset_relatorios_visiveis,
     usuario_eh_administrativo,
     usuario_pode_acessar_erp,
+    usuario_pode_acessar_financeiro,
     usuario_pode_atuar_como_financeiro,
     usuario_pode_editar_relatorio,
     usuario_pode_enviar_relatorio,
@@ -4500,6 +4501,7 @@ def relatorio_detail_view(request, pk):
         .get(pk=relatorio.pk)
     )
     distribuicao_clientes = resumo_financeiro_por_cliente(relatorio)
+    pode_acessar_financeiro = usuario_pode_acessar_financeiro(request.user)
     clientes_sem_valor_km_relatorio = (
         clientes_relatorio_sem_valor_km(relatorio)
         if usuario_pode_atuar_como_financeiro(request.user)
@@ -4513,9 +4515,10 @@ def relatorio_detail_view(request, pk):
             "relatorio": relatorio,
             "avisos_financeiro": (
                 _avisos_financeiro(relatorio)
-                if usuario_pode_atuar_como_financeiro(request.user)
+                if pode_acessar_financeiro
                 else []
             ),
+            "pode_acessar_financeiro": pode_acessar_financeiro,
             "pode_editar_relatorio": _relatorio_editavel_por_usuario(
                 relatorio, request.user
             ),

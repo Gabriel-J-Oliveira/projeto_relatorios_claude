@@ -3,6 +3,7 @@ from django.urls import reverse
 from relatorios.models import RelatorioTecnico, StatusRelatorio
 from relatorios.services.autorizacao_service import (
     queryset_relatorios_visiveis,
+    usuario_pode_acessar_financeiro,
     usuario_pode_atuar_como_financeiro,
 )
 from relatorios.services.clientes_valor_km_service import (
@@ -37,7 +38,7 @@ def obter_notificacoes_usuario(usuario):
 
     notificacoes = []
 
-    if usuario_pode_atuar_como_financeiro(usuario):
+    if usuario_pode_acessar_financeiro(usuario):
         qtd_conferencia = RelatorioTecnico.objects.filter(
             status=StatusRelatorio.CONFERENCIA
         ).count()
@@ -54,6 +55,7 @@ def obter_notificacoes_usuario(usuario):
                 )
             )
 
+    if usuario_pode_atuar_como_financeiro(usuario):
         qtd_clientes_sem_km = (
             clientes_pendentes_valor_km(usuario, apenas_api_novos=True).count()
             if usuario_pode_configurar_valor_km(usuario)
@@ -71,6 +73,9 @@ def obter_notificacoes_usuario(usuario):
                     "danger",
                 )
             )
+        return notificacoes
+
+    if usuario_pode_acessar_financeiro(usuario):
         return notificacoes
 
     qs_usuario = queryset_relatorios_visiveis(usuario, RelatorioTecnico.objects.all())

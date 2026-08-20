@@ -66,6 +66,7 @@ from .services.autorizacao_service import (
     GRUPO_ADMIN_ERP,
     GRUPO_DOMAIN_ADMINS,
     GRUPO_FINANCEIRO,
+    GRUPO_GESTOR,
     GRUPO_TECNICO,
     queryset_relatorios_visiveis,
     status_permite_edicao_relatorio_alheio_autorizado,
@@ -73,6 +74,7 @@ from .services.autorizacao_service import (
     status_permite_envio_relatorio,
     usuario_eh_administrativo,
     usuario_eh_admin_extra,
+    usuario_pode_acessar_financeiro,
     usuario_pode_editar_relatorio,
     usuario_pode_enviar_relatorio,
     usuario_pode_acessar_manutencao,
@@ -113,6 +115,7 @@ from .services.politica_valor_service import (
 )
 from .services.relatorio_performance_service import RelatorioPerformanceTracker
 from .services.usuarios_permissoes_service import preparar_preview_replicacao_permissoes
+from .services.notificacoes_service import obter_notificacoes_usuario
 from .services.workflow_service import aprovar_relatorio
 from .services.snapshot_service import criar_snapshot_financeiro
 from .services.tecnicos_despesa_service import (
@@ -620,6 +623,18 @@ class _RelatorioVisibilidadeMixin:
         )
 
 
+def _marcar_cadastro_usuario_completo(usuario, first_name="Usuario", last_name=None):
+    usuario.first_name = first_name
+    usuario.last_name = last_name or usuario.username.replace(".", " ").title()
+    username_email = usuario.username.replace("\\", ".")
+    usuario.email = usuario.email or f"{username_email}@example.com"
+    usuario.save(update_fields=["first_name", "last_name", "email"])
+    PerfilUsuario.objects.update_or_create(
+        usuario=usuario,
+        defaults={"cadastro_confirmado_em": timezone.now()},
+    )
+
+
 class RelatorioStatusAutorizacaoTests(SimpleTestCase):
     def test_status_de_edicao_do_proprio_relatorio(self):
         self.assertTrue(status_permite_edicao_relatorio_proprio(StatusRelatorio.RASCUNHO))
@@ -1082,6 +1097,216 @@ class PermissoesCutoverRelatoriosEdicaoEnvioFlagOnTests(_RelatorioVisibilidadeMi
 
         self.assertEqual(resposta_editor.status_code, 200)
         self.assertContains(resposta_editor, url_edicao)
+
+
+@override_settings(PERMISSOES_CENTRAL_ENABLED=False, ERP_FULL_ACCESS_USERS=[], EXTRA_ADMIN_USERS=[])
+class PermissoesCutoverFinanceiroAcessoFlagOffTests(TestCase):
+    def setUp(self):
+        self.User = get_user_model()
+        self.financeiro = self.User.objects.create_user(username="financeiro.legado")
+        self.operador = self.User.objects.create_user(username="operador")
+        _marcar_cadastro_usuario_completo(self.financeiro)
+        _marcar_cadastro_usuario_completo(self.operador)
+        grupo_financeiro = Group.objects.create(name=GRUPO_FINANCEIRO)
+        self.financeiro.groups.add(grupo_financeiro)
+
+    def test_flag_off_preserva_acesso_operacional_legado(self):
+        self.assertTrue(usuario_pode_atuar_como_financeiro(self.financeiro))
+        self.assertTrue(usuario_pode_acessar_financeiro(self.financeiro))
+        self.assertFalse(usuario_pode_acessar_financeiro(self.operador))
+
+    def test_flag_off_override_divergente_nao_muda_decisao_e_loga_shadow(self):
+        definir_override_permissao(
+            self.financeiro,
+            CodigoPermissao.FINANCEIRO_ACESSAR,
+            EstadoPermissaoUsuario.NEGAR,
+            alterado_por=self.operador,
+        )
+
+        with self.assertLogs("relatorios.services.permissoes_service", level="INFO") as logs:
+            resultado = usuario_pode_acessar_financeiro(self.financeiro)
+
+        self.assertTrue(resultado)
+        mensagens = "\n".join(logs.output)
+        self.assertIn("[PERMISSOES_SHADOW]", mensagens)
+        self.assertIn(CodigoPermissao.FINANCEIRO_ACESSAR, mensagens)
+
+
+@override_settings(
+    PERMISSOES_CENTRAL_ENABLED=True,
+    ERP_FULL_ACCESS_USERS=["CONTROL\\gabriel.oliveira"],
+    EXTRA_ADMIN_USERS=[],
+)
+class PermissoesCutoverFinanceiroAcessoFlagOnTests(_RelatorioVisibilidadeMixin, TestCase):
+    def setUp(self):
+        self.User = get_user_model()
+        self.operador = self.User.objects.create_user(username="operador")
+        self.financeiro_grupo = self.User.objects.create_user(username="financeiro.grupo")
+        self.gestor = self.User.objects.create_user(username="gestor")
+        self.admin_erp = self.User.objects.create_user(username="admin.erp")
+        self.domain = self.User.objects.create_user(username="domain.admin")
+        self.superuser = self.User.objects.create_superuser(
+            username="superuser.sem.full",
+            email="superuser@example.com",
+            password="x",
+        )
+        self.staff = self.User.objects.create_user(username="staff")
+        self.staff.is_staff = True
+        self.staff.save(update_fields=["is_staff"])
+        self.full = self.User.objects.create_user(username="CONTROL\\gabriel.oliveira")
+        self.dono = self.User.objects.create_user(username="dono")
+        self.outro = self.User.objects.create_user(username="outro")
+        for usuario in [
+            self.operador,
+            self.financeiro_grupo,
+            self.gestor,
+            self.admin_erp,
+            self.domain,
+            self.superuser,
+            self.staff,
+            self.full,
+            self.dono,
+            self.outro,
+        ]:
+            _marcar_cadastro_usuario_completo(usuario)
+
+        grupo_tecnico = Group.objects.create(name=GRUPO_TECNICO)
+        grupo_financeiro = Group.objects.create(name=GRUPO_FINANCEIRO)
+        grupo_gestor = Group.objects.create(name=GRUPO_GESTOR)
+        grupo_admin = Group.objects.create(name=GRUPO_ADMIN_ERP)
+        grupo_domain = Group.objects.create(name=GRUPO_DOMAIN_ADMINS)
+
+        self.financeiro_grupo.groups.add(grupo_financeiro)
+        self.gestor.groups.add(grupo_gestor)
+        self.admin_erp.groups.add(grupo_admin)
+        self.domain.groups.add(grupo_domain)
+        for usuario in [self.operador, self.dono, self.outro]:
+            usuario.groups.add(grupo_tecnico)
+
+        self.cliente = Cliente.objects.create(
+            nome="Cliente Financeiro 4A",
+            cidade="Curitiba",
+            uf="PR",
+        )
+        self.tecnico = Tecnico.objects.create(
+            nome="Tecnico Financeiro 4A",
+            email="tecnico.financeiro.4a@example.com",
+        )
+        self.relatorio_conferencia = self.criar_relatorio_visibilidade(
+            99401,
+            self.outro,
+            status=StatusRelatorio.CONFERENCIA,
+        )
+        ItemDespesa.objects.create(
+            relatorio=self.relatorio_conferencia,
+            data=date(2026, 5, 1),
+            tipo=TipoDespesa.ALIMENTACAO,
+            descricao="Almoco",
+            valor=Decimal("45.00"),
+        )
+
+    def _permitir(self, usuario, codigo):
+        definir_override_permissao(
+            usuario,
+            codigo,
+            EstadoPermissaoUsuario.PERMITIR,
+            alterado_por=self.full,
+        )
+
+    def _negar(self, usuario, codigo):
+        definir_override_permissao(
+            usuario,
+            codigo,
+            EstadoPermissaoUsuario.NEGAR,
+            alterado_por=self.full,
+        )
+
+    def test_flag_on_financeiro_acessar_permitir_negar_default_e_full(self):
+        self.assertFalse(usuario_pode_acessar_financeiro(self.operador))
+
+        self._permitir(self.operador, CodigoPermissao.FINANCEIRO_ACESSAR)
+        self.assertTrue(usuario_pode_acessar_financeiro(self.operador))
+
+        self._negar(self.operador, CodigoPermissao.FINANCEIRO_ACESSAR)
+        self.assertFalse(usuario_pode_acessar_financeiro(self.operador))
+
+        self.assertTrue(usuario_pode_acessar_financeiro(self.full))
+
+    def test_flag_on_grupos_e_flags_legados_nao_concedem_acesso_financeiro_central(self):
+        self.assertFalse(usuario_pode_acessar_financeiro(self.financeiro_grupo))
+        self.assertFalse(usuario_pode_acessar_financeiro(self.gestor))
+        self.assertFalse(usuario_pode_acessar_financeiro(self.admin_erp))
+        self.assertFalse(usuario_pode_acessar_financeiro(self.domain))
+        self.assertFalse(usuario_pode_acessar_financeiro(self.superuser))
+        self.assertFalse(usuario_pode_acessar_financeiro(self.staff))
+
+    def test_flag_on_dono_ou_tecnico_nao_ganha_acesso_financeiro(self):
+        self.assertFalse(usuario_pode_acessar_financeiro(self.dono))
+        self.assertFalse(usuario_pode_acessar_financeiro(self.outro))
+
+    def test_financeiro_acessar_nao_concede_visibilidade_de_relatorio_alheio(self):
+        self._permitir(self.operador, CodigoPermissao.FINANCEIRO_ACESSAR)
+
+        self.client.force_login(self.operador)
+        resposta = self.client.get(
+            reverse("relatorios:relatorio_detail", args=[self.relatorio_conferencia.pk])
+        )
+
+        self.assertEqual(resposta.status_code, 404)
+
+    def test_avisos_financeiros_usam_acesso_operacional_sem_liberar_escrita(self):
+        self._permitir(self.operador, CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS)
+        self._permitir(self.operador, CodigoPermissao.FINANCEIRO_ACESSAR)
+
+        self.client.force_login(self.operador)
+        resposta = self.client.get(
+            reverse("relatorios:relatorio_detail", args=[self.relatorio_conferencia.pk])
+        )
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertContains(resposta, "card-atencao-financeiro")
+        self.assertContains(resposta, "Resumo Financeiro")
+        self.assertNotContains(resposta, 'data-tour="detail-aprovar-relatorio"')
+        self.assertNotContains(resposta, "Corrigir valor de KM")
+
+    def test_notificacao_conferencia_usa_financeiro_acessar_e_nao_grupo_legado(self):
+        self._permitir(self.operador, CodigoPermissao.FINANCEIRO_ACESSAR)
+
+        notificacoes_operador = obter_notificacoes_usuario(self.operador)
+        notificacoes_grupo = obter_notificacoes_usuario(self.financeiro_grupo)
+
+        self.assertTrue(
+            any(item["tipo"] == "relatorios_conferencia" for item in notificacoes_operador)
+        )
+        self.assertFalse(
+            any(item["tipo"] == "relatorios_conferencia" for item in notificacoes_grupo)
+        )
+
+    def test_post_financeiro_e_pdf_interno_permanecem_com_autorizacao_antiga(self):
+        self._permitir(self.operador, CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS)
+        self._permitir(self.operador, CodigoPermissao.FINANCEIRO_ACESSAR)
+        self._permitir(self.operador, CodigoPermissao.RELATORIOS_APROVAR)
+        self._permitir(self.operador, CodigoPermissao.RELATORIOS_PDF_INTERNO)
+        self.client.force_login(self.operador)
+
+        resposta_status = self.client.post(
+            reverse(
+                "relatorios:relatorio_status",
+                args=[self.relatorio_conferencia.pk, StatusRelatorio.APROVADO],
+            )
+        )
+        self.relatorio_conferencia.refresh_from_db()
+
+        self.assertEqual(resposta_status.status_code, 302)
+        self.assertEqual(self.relatorio_conferencia.status, StatusRelatorio.CONFERENCIA)
+
+        self.relatorio_conferencia.status = StatusRelatorio.APROVADO
+        self.relatorio_conferencia.save(update_fields=["status"])
+        resposta_pdf = self.client.get(
+            reverse("relatorios:relatorio_pdf_interno", args=[self.relatorio_conferencia.pk])
+        )
+
+        self.assertEqual(resposta_pdf.status_code, 302)
 
 
 @override_settings(
