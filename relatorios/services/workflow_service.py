@@ -405,13 +405,14 @@ def enviar_para_conferencia(relatorio_id, usuario=None):
     return relatorio
 
 
-def solicitar_ajuste(relatorio_id, usuario=None, justificativa=""):
+def solicitar_ajuste(relatorio_id, usuario=None, justificativa="", validar_permissao=True):
     justificativa = (justificativa or "").strip()
     if not justificativa:
         raise WorkflowError("Informe a justificativa para esta ação.")
     with transaction.atomic():
         relatorio = _obter_relatorio_bloqueado(relatorio_id)
-        _validar_permissao_financeira(usuario)
+        if validar_permissao:
+            _validar_permissao_financeira(usuario)
         validar_transicao(relatorio, StatusRelatorio.AJUSTE)
         status_anterior = relatorio.status
         relatorio.motivo_rejeicao = justificativa
@@ -443,10 +444,11 @@ def solicitar_ajuste(relatorio_id, usuario=None, justificativa=""):
     return relatorio
 
 
-def aprovar_relatorio(relatorio_id, usuario=None, post_data=None):
+def aprovar_relatorio(relatorio_id, usuario=None, post_data=None, validar_permissao=True):
     with transaction.atomic():
         relatorio = _obter_relatorio_bloqueado(relatorio_id)
-        _validar_permissao_financeira(usuario)
+        if validar_permissao:
+            _validar_permissao_financeira(usuario)
         validar_transicao(relatorio, StatusRelatorio.APROVADO)
         status_anterior = relatorio.status
         _aplicar_politicas_iniciais_relatorio(relatorio)
@@ -489,13 +491,14 @@ def aprovar_relatorio(relatorio_id, usuario=None, post_data=None):
     return relatorio
 
 
-def rejeitar_relatorio(relatorio_id, usuario=None, justificativa=""):
+def rejeitar_relatorio(relatorio_id, usuario=None, justificativa="", validar_permissao=True):
     justificativa = (justificativa or "").strip()
     if not justificativa:
         raise WorkflowError("Informe a justificativa para esta ação.")
     with transaction.atomic():
         relatorio = _obter_relatorio_bloqueado(relatorio_id)
-        _validar_permissao_financeira(usuario)
+        if validar_permissao:
+            _validar_permissao_financeira(usuario)
         validar_transicao(relatorio, StatusRelatorio.REJEITADO)
         try:
             garantir_rateios_relatorio(relatorio)

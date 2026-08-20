@@ -37,7 +37,6 @@ def status_permite_edicao_relatorio_alheio_autorizado(status):
     return status in {
         StatusRelatorio.RASCUNHO,
         StatusRelatorio.AJUSTE,
-        StatusRelatorio.CONFERENCIA,
     }
 
 
@@ -193,6 +192,71 @@ def usuario_pode_acessar_financeiro(user):
     )
 
 
+def _status_permite_workflow_financeiro(relatorio):
+    return getattr(relatorio, "status", None) == StatusRelatorio.CONFERENCIA
+
+
+def _usuario_pode_acao_financeira_workflow_legado(user, relatorio):
+    return bool(
+        _status_permite_workflow_financeiro(relatorio)
+        and usuario_pode_atuar_como_financeiro(user)
+    )
+
+
+def usuario_pode_aprovar_relatorio_legado(user, relatorio):
+    return _usuario_pode_acao_financeira_workflow_legado(user, relatorio)
+
+
+def usuario_pode_rejeitar_relatorio_legado(user, relatorio):
+    return _usuario_pode_acao_financeira_workflow_legado(user, relatorio)
+
+
+def usuario_pode_devolver_relatorio_ajuste_legado(user, relatorio):
+    return _usuario_pode_acao_financeira_workflow_legado(user, relatorio)
+
+
+def usuario_pode_aprovar_relatorio(user, relatorio):
+    from relatorios.services.permissoes_service import (
+        CodigoPermissao,
+        avaliar_permissao_cutover,
+    )
+
+    return avaliar_permissao_cutover(
+        user,
+        CodigoPermissao.RELATORIOS_APROVAR,
+        lambda: usuario_pode_aprovar_relatorio_legado(user, relatorio),
+        objeto=relatorio,
+    )
+
+
+def usuario_pode_rejeitar_relatorio(user, relatorio):
+    from relatorios.services.permissoes_service import (
+        CodigoPermissao,
+        avaliar_permissao_cutover,
+    )
+
+    return avaliar_permissao_cutover(
+        user,
+        CodigoPermissao.RELATORIOS_REJEITAR,
+        lambda: usuario_pode_rejeitar_relatorio_legado(user, relatorio),
+        objeto=relatorio,
+    )
+
+
+def usuario_pode_devolver_relatorio_ajuste(user, relatorio):
+    from relatorios.services.permissoes_service import (
+        CodigoPermissao,
+        avaliar_permissao_cutover,
+    )
+
+    return avaliar_permissao_cutover(
+        user,
+        CodigoPermissao.RELATORIOS_DEVOLVER_AJUSTE,
+        lambda: usuario_pode_devolver_relatorio_ajuste_legado(user, relatorio),
+        objeto=relatorio,
+    )
+
+
 def usuario_pode_reabrir_relatorio(user):
     if not getattr(user, "is_authenticated", False):
         return False
@@ -311,7 +375,6 @@ def _log_autorizacao_relatorio(acao, user, relatorio, validacoes, resultado):
 def usuario_pode_editar_relatorio_legado(user, relatorio):
     acesso_total = usuario_tem_acesso_total(user)
     administrativo = usuario_eh_administrativo(user)
-    financeiro_ou_socio = usuario_pode_editar_relatorio_em_conferencia(user)
     status_finalizado = relatorio.status in {
         StatusRelatorio.APROVADO,
         StatusRelatorio.REJEITADO,
@@ -325,7 +388,6 @@ def usuario_pode_editar_relatorio_legado(user, relatorio):
     validacoes = {
         "usuario_tem_acesso_total": acesso_total,
         "usuario_eh_administrativo": administrativo,
-        "usuario_financeiro_ou_socio": financeiro_ou_socio,
         "status_nao_finalizado": not status_finalizado,
         "status_em_conferencia": status_em_conferencia,
         "status_editavel_por_tecnico": status_editavel_por_tecnico,
@@ -336,7 +398,7 @@ def usuario_pode_editar_relatorio_legado(user, relatorio):
         _log_autorizacao_relatorio("editar_relatorio", user, relatorio, validacoes, False)
         return False
     if status_em_conferencia:
-        resultado = financeiro_ou_socio
+        resultado = False
     else:
         resultado = bool(
             status_editavel_por_tecnico

@@ -90,10 +90,13 @@ from .services.autorizacao_service import (
     usuario_eh_administrativo,
     usuario_pode_acessar_erp,
     usuario_pode_acessar_financeiro,
+    usuario_pode_aprovar_relatorio,
+    usuario_pode_devolver_relatorio_ajuste,
     usuario_pode_atuar_como_financeiro,
     usuario_pode_editar_relatorio,
     usuario_pode_enviar_relatorio,
     usuario_pode_gerenciar_clientes,
+    usuario_pode_rejeitar_relatorio,
     usuario_pode_reabrir_relatorio,
     usuario_pode_visualizar_relatorio,
     usuario_eh_superadmin,
@@ -3057,16 +3060,11 @@ def _relatorio_filtro_form(user, data=None):
 class AcessoErpMixin(LoginRequiredMixin):
     def dispatch(self, request, *args, **kwargs):
 
-        print("DEBUG USER:", request.user)
-        print("DEBUG AUTH:", request.user.is_authenticated)
 
         # deixa o LoginRequiredMixin agir primeiro
         if not request.user.is_authenticated:
             return self.handle_no_permission()
 
-        print("DEBUG GROUPS:", list(request.user.groups.values_list("name", flat=True)))
-        print("DEBUG SUPERUSER:", request.user.is_superuser)
-        print("DEBUG ERP:", usuario_pode_acessar_erp(request.user))
 
         if not usuario_pode_acessar_erp(request.user):
             messages.error(request, "Seu usuário não possui perfil de acesso ao ERP.")
@@ -3467,7 +3465,7 @@ def relatorio_form_view(request, pk=None):
         elif instance.status == StatusRelatorio.CONFERENCIA:
             messages.error(
                 request,
-                "Relatório em conferência só pode ser editado pelo Financeiro ou pelos sócios.",
+                "Este relatório está em conferência e não pode ser editado.",
             )
         else:
             messages.error(request, "Relatório aprovado ou rejeitado não pode ser editado.")
@@ -4502,6 +4500,9 @@ def relatorio_detail_view(request, pk):
     )
     distribuicao_clientes = resumo_financeiro_por_cliente(relatorio)
     pode_acessar_financeiro = usuario_pode_acessar_financeiro(request.user)
+    pode_aprovar_relatorio = usuario_pode_aprovar_relatorio(request.user, relatorio)
+    pode_rejeitar_relatorio = usuario_pode_rejeitar_relatorio(request.user, relatorio)
+    pode_devolver_ajuste = usuario_pode_devolver_relatorio_ajuste(request.user, relatorio)
     clientes_sem_valor_km_relatorio = (
         clientes_relatorio_sem_valor_km(relatorio)
         if usuario_pode_atuar_como_financeiro(request.user)
@@ -4519,6 +4520,9 @@ def relatorio_detail_view(request, pk):
                 else []
             ),
             "pode_acessar_financeiro": pode_acessar_financeiro,
+            "pode_aprovar_relatorio": pode_aprovar_relatorio,
+            "pode_rejeitar_relatorio": pode_rejeitar_relatorio,
+            "pode_devolver_ajuste": pode_devolver_ajuste,
             "pode_editar_relatorio": _relatorio_editavel_por_usuario(
                 relatorio, request.user
             ),
@@ -5434,33 +5438,63 @@ def relatorio_status_view(request, pk, status):
                 messages.error(request, "Você não tem permissão para enviar este relatório.")
                 return redirect("relatorios:relatorio_detail", pk=pk)
             relatorio = enviar_para_conferencia(pk, usuario_historico)
-        elif status in {
-            StatusRelatorio.AJUSTE,
-            StatusRelatorio.REJEITADO,
-            StatusRelatorio.APROVADO,
-        } and not usuario_pode_atuar_como_financeiro(request.user):
-            _registrar_bloqueio_seguranca(
-                request,
-                "Acao financeira de workflow bloqueada",
-                relatorio_id=pk,
-                status=status,
-            )
-            messages.error(request, "Você não tem permissão para executar esta ação financeira.")
-            return redirect("relatorios:relatorio_detail", pk=pk)
         elif status == StatusRelatorio.AJUSTE:
+            if not usuario_pode_devolver_relatorio_ajuste(request.user, relatorio_atual):
+                _registrar_bloqueio_seguranca(
+                    request,
+                    "Solicitacao de ajuste bloqueada",
+                    relatorio_id=pk,
+                    status=status,
+                )
+                messages.error(request, "VocÃª nÃ£o tem permissÃ£o para devolver este relatÃ³rio para ajuste.")
+                return redirect("relatorios:relatorio_detail", pk=pk)
             relatorio = solicitar_ajuste(
                 pk,
                 usuario_historico,
                 request.POST.get("motivo_rejeicao", ""),
+                validar_permissao=False,
             )
         elif status == StatusRelatorio.REJEITADO:
+            if not usuario_pode_rejeitar_relatorio(request.user, relatorio_atual):
+                _registrar_bloqueio_seguranca(
+                    request,
+                    "Rejeicao de relatorio bloqueada",
+                    relatorio_id=pk,
+                    status=status,
+                )
+                messages.error(request, "VocÃª nÃ£o tem permissÃ£o para rejeitar este relatÃ³rio.")
+                return redirect("relatorios:relatorio_detail", pk=pk)
             relatorio = rejeitar_relatorio(
                 pk,
                 usuario_historico,
                 request.POST.get("motivo_rejeicao", ""),
+                validar_permissao=False,
             )
         elif status == StatusRelatorio.APROVADO:
-            relatorio = aprovar_relatorio(pk, usuario_historico, request.POST)
+            if not usuario_pode_aprovar_relatorio(request.user, relatorio_atual):
+                _registrar_bloqueio_seguranca(
+                    request,
+                    "Aprovacao de relatorio bloqueada",
+                    relatorio_id=pk,
+                    status=status,
+                )
+                messages.error(request, "VocÃª nÃ£o tem permissÃ£o para aprovar este relatÃ³rio.")
+                return redirect("relatorios:relatorio_detail", pk=pk)
+            if usuario_pode_atuar_como_financeiro(request.user):
+                post_financeiro = request.POST
+            else:
+                post_financeiro = {
+                    f"despesa_{despesa.pk}_valor_aprovado": (
+                        "" if despesa.valor_aprovado is None else str(despesa.valor_aprovado)
+                    )
+                    for despesa in relatorio_atual.despesas.all()
+                }
+            relatorio = aprovar_relatorio(
+                pk,
+                usuario_historico,
+                post_financeiro,
+                validar_permissao=False,
+            )
         else:
             messages.error(request, "Status inválido.")
             return redirect("relatorios:relatorio_detail", pk=pk)

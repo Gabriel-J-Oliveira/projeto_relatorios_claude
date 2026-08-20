@@ -39,7 +39,8 @@
       <i class="bi bi-send me-1"></i>Enviar p/ Aprovação
     </button>
   </form>
-  {% elif relatorio.status == 'conferencia_pendente' and pode_atuar_financeiro %}
+  {% elif relatorio.status == 'conferencia_pendente' %}
+  {% if pode_aprovar_relatorio %}
   <button type="submit"
           form="form-valores-aprovados-financeiro"
           formmethod="post"
@@ -48,6 +49,8 @@
           data-tour="detail-aprovar-relatorio">
     <i class="bi bi-check-lg me-1"></i>Aprovar
   </button>
+  {% endif %}
+  {% if pode_devolver_ajuste %}
   <button type="button"
           class="btn btn-warning btn-sm text-dark"
           data-bs-toggle="modal"
@@ -55,13 +58,16 @@
           data-tour="detail-solicitar-ajuste">
     <i class="bi bi-arrow-counterclockwise me-1"></i>Solicitar ajuste
   </button>
+  {% endif %}
+  {% if pode_rejeitar_relatorio %}
   <button type="button"
           class="btn btn-danger btn-sm"
           data-bs-toggle="modal"
           data-bs-target="#modalRejeitarRelatorio"
           data-tour="detail-rejeitar-relatorio">
-    <i class="bi bi-x-lg me-1"></i>Rejeitar relatório
+    <i class="bi bi-x-lg me-1"></i>Rejeitar relatorio
   </button>
+  {% endif %}
   {% endif %}
 </div>
 {% endblock %}
@@ -1437,7 +1443,7 @@
   {% endfor %}
 {% endif %}
 
-{% if pode_atuar_financeiro and relatorio.status == 'conferencia_pendente' %}
+{% if relatorio.status == 'conferencia_pendente' and pode_devolver_ajuste %}
 <div class="modal fade" id="modalSolicitarAjuste" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow">
@@ -1468,7 +1474,9 @@
     </div>
   </div>
 </div>
+{% endif %}
 
+{% if relatorio.status == 'conferencia_pendente' and pode_rejeitar_relatorio %}
 <div class="modal fade" id="modalRejeitarRelatorio" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow">
