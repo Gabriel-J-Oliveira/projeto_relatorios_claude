@@ -59,8 +59,14 @@ class SensibilidadePermissao:
     CRITICA = "critica"
 
 
+class NaturezaPermissao:
+    LEITURA = "leitura"
+    MUTACAO = "mutacao"
+
+
 class CodigoPermissao:
     ERP_ACESSAR = "erp.acessar"
+    ERP_SOMENTE_LEITURA_GLOBAL = "erp.somente_leitura_global"
     DASHBOARD_GLOBAL = "dashboard.global"
 
     RELATORIOS_CRIAR = "relatorios.criar"
@@ -116,6 +122,7 @@ class PermissaoTecnica:
     objeto_obrigatorio: bool = False
     regra_legada: str = ""
     sensibilidade: str = SensibilidadePermissao.NORMAL
+    natureza: str = NaturezaPermissao.MUTACAO
 
 
 def _global(funcao):
@@ -150,6 +157,18 @@ def _catalogo():
             _global(usuario_pode_acessar_erp),
             regra_legada="usuario_pode_acessar_erp",
             sensibilidade=SensibilidadePermissao.CRITICA,
+            natureza=NaturezaPermissao.LEITURA,
+        ),
+        CodigoPermissao.ERP_SOMENTE_LEITURA_GLOBAL: PermissaoTecnica(
+            CodigoPermissao.ERP_SOMENTE_LEITURA_GLOBAL,
+            "Perfil global somente leitura",
+            "Permite acesso global de consulta, bloqueando operacoes que alterem dados ou estado do sistema.",
+            CategoriaPermissao.SISTEMA,
+            EscopoPermissao.GLOBAL,
+            lambda usuario, objeto=None: False,
+            regra_legada="sem regra legada; restricao central",
+            sensibilidade=SensibilidadePermissao.CRITICA,
+            natureza=NaturezaPermissao.LEITURA,
         ),
         CodigoPermissao.DASHBOARD_GLOBAL: PermissaoTecnica(
             CodigoPermissao.DASHBOARD_GLOBAL,
@@ -160,6 +179,7 @@ def _catalogo():
             _global(usuario_eh_administrativo),
             regra_legada="usuario_eh_administrativo",
             sensibilidade=SensibilidadePermissao.SENSIVEL,
+            natureza=NaturezaPermissao.LEITURA,
         ),
         CodigoPermissao.RELATORIOS_CRIAR: PermissaoTecnica(
             CodigoPermissao.RELATORIOS_CRIAR,
@@ -179,6 +199,7 @@ def _catalogo():
             _relatorio_legado(usuario_pode_visualizar_relatorio_legado),
             objeto_obrigatorio=True,
             regra_legada="usuario_pode_visualizar_relatorio",
+            natureza=NaturezaPermissao.LEITURA,
         ),
         CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS: PermissaoTecnica(
             CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
@@ -189,6 +210,7 @@ def _catalogo():
             _global(usuario_eh_administrativo),
             regra_legada="usuario_eh_administrativo",
             sensibilidade=SensibilidadePermissao.SENSIVEL,
+            natureza=NaturezaPermissao.LEITURA,
         ),
         CodigoPermissao.RELATORIOS_EDITAR: PermissaoTecnica(
             CodigoPermissao.RELATORIOS_EDITAR,
@@ -251,6 +273,7 @@ def _catalogo():
             _financeiro_legado,
             regra_legada="usuario_pode_atuar_como_financeiro",
             sensibilidade=SensibilidadePermissao.SENSIVEL,
+            natureza=NaturezaPermissao.LEITURA,
         ),
         CodigoPermissao.FINANCEIRO_ATUAR: PermissaoTecnica(
             CodigoPermissao.FINANCEIRO_ATUAR,
@@ -335,6 +358,7 @@ def _catalogo():
             objeto_obrigatorio=True,
             regra_legada="relatorio visivel + aprovado",
             sensibilidade=SensibilidadePermissao.SENSIVEL,
+            natureza=NaturezaPermissao.LEITURA,
         ),
         CodigoPermissao.RELATORIOS_PDF_INTERNO: PermissaoTecnica(
             CodigoPermissao.RELATORIOS_PDF_INTERNO,
@@ -345,6 +369,7 @@ def _catalogo():
             _financeiro_legado,
             regra_legada="usuario_pode_atuar_como_financeiro",
             sensibilidade=SensibilidadePermissao.SENSIVEL,
+            natureza=NaturezaPermissao.LEITURA,
         ),
         CodigoPermissao.FINANCEIRO_ALTERAR_VALORES: PermissaoTecnica(
             CodigoPermissao.FINANCEIRO_ALTERAR_VALORES,
@@ -557,6 +582,33 @@ def _override_nega(usuario, codigo):
     return _estado_override(usuario, codigo) == EstadoPermissaoUsuario.NEGAR
 
 
+def permissao_eh_leitura(codigo):
+    permissao = obter_permissao(codigo)
+    return bool(permissao and permissao.natureza == NaturezaPermissao.LEITURA)
+
+
+def permissao_eh_mutacao(codigo):
+    permissao = obter_permissao(codigo)
+    if permissao is None:
+        return True
+    return permissao.natureza != NaturezaPermissao.LEITURA
+
+
+def usuario_tem_perfil_somente_leitura_global(usuario):
+    if not getattr(usuario, "is_authenticated", False):
+        return False
+    if usuario_tem_full_access_erp(usuario):
+        return False
+    return _override_permite(usuario, CodigoPermissao.ERP_SOMENTE_LEITURA_GLOBAL)
+
+
+def _somente_leitura_bloqueia_codigo(usuario, codigo):
+    return bool(
+        usuario_tem_perfil_somente_leitura_global(usuario)
+        and permissao_eh_mutacao(codigo)
+    )
+
+
 def _usuario_eh_dono(usuario, relatorio):
     return bool(
         getattr(usuario, "is_authenticated", False)
@@ -587,9 +639,15 @@ def _capacidade_global_central(usuario, codigo):
         return False
     if usuario_tem_full_access_erp(usuario):
         return True
+    if codigo == CodigoPermissao.ERP_SOMENTE_LEITURA_GLOBAL:
+        return _override_permite(usuario, codigo)
+    if _somente_leitura_bloqueia_codigo(usuario, codigo):
+        return False
     if _override_nega(usuario, codigo):
         return False
     if _override_permite(usuario, codigo):
+        return True
+    if usuario_tem_perfil_somente_leitura_global(usuario) and permissao_eh_leitura(codigo):
         return True
     if codigo == CodigoPermissao.ERP_ACESSAR:
         return usuario_pode_acessar_erp(usuario)
@@ -613,6 +671,8 @@ def _usuario_tem_permissao_central_impl(usuario, codigo, objeto=None):
     if permissao is None:
         return False
     if not getattr(usuario, "is_authenticated", False):
+        return False
+    if _somente_leitura_bloqueia_codigo(usuario, codigo):
         return False
 
     if codigo == CodigoPermissao.RELATORIOS_VISUALIZAR:

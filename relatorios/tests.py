@@ -92,13 +92,17 @@ from .services.autorizacao_service import (
 )
 from .services.permissoes_service import (
     CodigoPermissao,
+    NaturezaPermissao,
+    PermissaoTecnica,
     avaliar_permissao_cutover,
     definir_override_permissao,
     estado_efetivo_override,
     listar_permissoes,
     obter_permissao,
+    permissao_eh_mutacao,
     usuario_tem_permissao,
     usuario_tem_permissao_central,
+    usuario_tem_perfil_somente_leitura_global,
     usuario_tem_full_access_erp,
     usuario_pode_acessar_central_permissoes,
 )
@@ -392,11 +396,11 @@ class PermissoesServiceTests(SimpleTestCase):
 
         self.assertEqual(
             usuario_pode_atuar_como_financeiro(usuario),
-            usuario_tem_permissao(usuario, CodigoPermissao.RELATORIOS_APROVAR),
+            usuario_tem_permissao(usuario, CodigoPermissao.FINANCEIRO_ATUAR),
         )
         self.assertEqual(
             usuario_pode_atuar_como_financeiro(usuario),
-            usuario_tem_permissao(usuario, CodigoPermissao.FINANCEIRO_ALTERAR_RATEIOS),
+            usuario_tem_permissao(usuario, CodigoPermissao.FINANCEIRO_ACESSAR),
         )
 
     def test_permissao_por_objeto_exige_objeto(self):
@@ -568,6 +572,16 @@ class PermissoesCutoverPrimeiroLoteFlagOnTests(TestCase):
         self.domain.groups.add(grupo_domain)
         self.operador.groups.add(grupo_tecnico)
         self.admin_erp.groups.add(grupo_admin)
+        for usuario in [
+            self.operador,
+            self.comum,
+            self.superuser,
+            self.staff,
+            self.full,
+            self.domain,
+            self.admin_erp,
+        ]:
+            _marcar_cadastro_usuario_completo(usuario)
 
     def _permitir(self, usuario, codigo):
         definir_override_permissao(
@@ -714,6 +728,8 @@ class PermissoesCutoverRelatoriosVisibilidadeFlagOffTests(_RelatorioVisibilidade
         self.dono.groups.add(grupo_tecnico)
         self.outro.groups.add(grupo_tecnico)
         self.responsavel.groups.add(grupo_tecnico)
+        for usuario in [self.dono, self.outro, self.admin, self.responsavel]:
+            _marcar_cadastro_usuario_completo(usuario)
         self.cliente = Cliente.objects.create(nome="Cliente Visibilidade", cidade="Curitiba", uf="PR")
         self.tecnico = Tecnico.objects.create(nome="Tecnico Padrao", email="tecnico@example.com")
         self.tecnico_responsavel = Tecnico.objects.create(
@@ -801,6 +817,16 @@ class PermissoesCutoverRelatoriosVisibilidadeFlagOnTests(_RelatorioVisibilidadeM
         self.outro.groups.add(grupo_tecnico)
         self.universal.groups.add(grupo_tecnico)
         self.responsavel.groups.add(grupo_tecnico)
+        for usuario in [
+            self.dono,
+            self.outro,
+            self.universal,
+            self.superuser,
+            self.domain,
+            self.full,
+            self.responsavel,
+        ]:
+            _marcar_cadastro_usuario_completo(usuario)
         self.cliente = Cliente.objects.create(nome="Cliente Visibilidade Central", cidade="Curitiba", uf="PR")
         self.tecnico = Tecnico.objects.create(nome="Tecnico Padrao Central", email="tecnico.central@example.com")
         self.tecnico_responsavel = Tecnico.objects.create(
@@ -1775,17 +1801,23 @@ class PermissoesCentralMotorTests(TestCase):
         )
 
     def test_editar_alheios_respeita_workflow(self):
+        relatorio_rascunho = self._relatorio(StatusRelatorio.RASCUNHO, self.outro)
         relatorio_aprovado = self._relatorio(StatusRelatorio.APROVADO, self.outro)
         relatorio_conferencia = self._relatorio(StatusRelatorio.CONFERENCIA, self.outro)
         self._permitir(self.dono, CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS)
         self._permitir(self.dono, CodigoPermissao.RELATORIOS_EDITAR_ALHEIOS)
 
+        self.assertTrue(
+            usuario_tem_permissao_central(
+                self.dono, CodigoPermissao.RELATORIOS_EDITAR, objeto=relatorio_rascunho
+            )
+        )
         self.assertFalse(
             usuario_tem_permissao_central(
                 self.dono, CodigoPermissao.RELATORIOS_EDITAR, objeto=relatorio_aprovado
             )
         )
-        self.assertTrue(
+        self.assertFalse(
             usuario_tem_permissao_central(
                 self.dono, CodigoPermissao.RELATORIOS_EDITAR, objeto=relatorio_conferencia
             )
@@ -1856,6 +1888,354 @@ class PermissoesCentralMotorTests(TestCase):
 
         self.assertFalse(usuario_tem_full_access_erp(usuario))
         self.assertFalse(usuario_tem_permissao_central(usuario, CodigoPermissao.MANUTENCAO_ACESSAR))
+
+
+@override_settings(
+    PERMISSOES_CENTRAL_ENABLED=True,
+    ERP_FULL_ACCESS_USERS=["CONTROL\\gabriel.oliveira"],
+    EXTRA_ADMIN_USERS=["ro.extra"],
+)
+class PermissoesSomenteLeituraGlobalTests(_RelatorioVisibilidadeMixin, TestCase):
+    def setUp(self):
+        self.User = get_user_model()
+        self.operador = self.User.objects.create_user(username="operador.ro")
+        self.dono = self.User.objects.create_user(username="dono.ro")
+        self.outro = self.User.objects.create_user(username="outro.ro")
+        self.full = self.User.objects.create_user(username="CONTROL\\gabriel.oliveira")
+        self.extra_admin = self.User.objects.create_user(username="ro.extra")
+        self.financeiro = self.User.objects.create_user(username="financeiro.ro")
+        self.admin_erp = self.User.objects.create_user(username="admin.erp.ro")
+        self.domain = self.User.objects.create_user(username="domain.ro")
+        self.superuser = self.User.objects.create_superuser(
+            username="superuser.ro",
+            email="superuser.ro@example.com",
+            password="x",
+        )
+        self.staff = self.User.objects.create_user(username="staff.ro")
+        self.staff.is_staff = True
+        self.staff.save(update_fields=["is_staff"])
+
+        grupo_tecnico = Group.objects.create(name=GRUPO_TECNICO)
+        grupo_financeiro = Group.objects.create(name=GRUPO_FINANCEIRO)
+        grupo_admin = Group.objects.create(name=GRUPO_ADMIN_ERP)
+        grupo_domain = Group.objects.create(name=GRUPO_DOMAIN_ADMINS)
+
+        for usuario in [
+            self.operador,
+            self.dono,
+            self.outro,
+            self.full,
+            self.extra_admin,
+            self.financeiro,
+            self.admin_erp,
+            self.domain,
+            self.superuser,
+            self.staff,
+        ]:
+            _marcar_cadastro_usuario_completo(usuario)
+            usuario.groups.add(grupo_tecnico)
+        self.financeiro.groups.add(grupo_financeiro)
+        self.admin_erp.groups.add(grupo_admin)
+        self.domain.groups.add(grupo_domain)
+
+        self.cliente = Cliente.objects.create(nome="Cliente RO", cidade="Curitiba", uf="PR")
+        self.tecnico = Tecnico.objects.create(nome="Tecnico RO", email="tecnico.ro@example.com")
+        self.relatorio_proprio = self.criar_relatorio_visibilidade(
+            99601,
+            self.operador,
+            status=StatusRelatorio.RASCUNHO,
+        )
+        self.relatorio_alheio = self.criar_relatorio_visibilidade(
+            99602,
+            self.outro,
+            status=StatusRelatorio.RASCUNHO,
+        )
+        self.relatorio_conferencia = self.criar_relatorio_visibilidade(
+            99603,
+            self.outro,
+            status=StatusRelatorio.CONFERENCIA,
+        )
+        self.relatorio_aprovado = self.criar_relatorio_visibilidade(
+            99604,
+            self.outro,
+            status=StatusRelatorio.APROVADO,
+        )
+        self.despesa = ItemDespesa.objects.create(
+            relatorio=self.relatorio_conferencia,
+            data=date(2026, 5, 1),
+            tipo=TipoDespesa.ALIMENTACAO,
+            descricao="Despesa RO",
+            valor=Decimal("50.00"),
+            valor_aprovado=Decimal("50.00"),
+            quem_pagou=QuemPagou.EMPRESA,
+        )
+        self.anexo = AnexoRelatorio.objects.create(
+            relatorio=self.relatorio_proprio,
+            arquivo=SimpleUploadedFile("ro.txt", b"ro"),
+            nome_original="ro.txt",
+            tipo_mime="text/plain",
+            tamanho_bytes=2,
+            enviado_por=self.operador,
+        )
+        self.adiantamento = Adiantamento.objects.create(
+            tecnico=self.tecnico,
+            tipo=TipoAdiantamento.ADIANTAMENTO,
+            valor=Decimal("10.00"),
+            data=date(2026, 5, 1),
+            descricao="Adiantamento RO",
+        )
+
+        self._permitir(self.operador, CodigoPermissao.ERP_SOMENTE_LEITURA_GLOBAL)
+
+    def _permitir(self, usuario, codigo):
+        definir_override_permissao(
+            usuario,
+            codigo,
+            EstadoPermissaoUsuario.PERMITIR,
+            alterado_por=self.full,
+        )
+
+    def test_ro_central_concede_capacidades_de_leitura_com_regras_de_objeto_e_status(self):
+        self.assertTrue(usuario_tem_perfil_somente_leitura_global(self.operador))
+        self.assertTrue(usuario_tem_permissao_central(self.operador, CodigoPermissao.ERP_ACESSAR))
+        self.assertTrue(usuario_tem_permissao_central(self.operador, CodigoPermissao.DASHBOARD_GLOBAL))
+        self.assertTrue(
+            usuario_tem_permissao_central(
+                self.operador,
+                CodigoPermissao.RELATORIOS_VISUALIZAR,
+                objeto=self.relatorio_proprio,
+            )
+        )
+        self.assertTrue(
+            usuario_tem_permissao_central(
+                self.operador,
+                CodigoPermissao.RELATORIOS_VISUALIZAR,
+                objeto=self.relatorio_alheio,
+            )
+        )
+        self.assertTrue(
+            usuario_tem_permissao_central(self.operador, CodigoPermissao.FINANCEIRO_ACESSAR)
+        )
+        self.assertTrue(
+            usuario_tem_permissao_central(
+                self.operador,
+                CodigoPermissao.RELATORIOS_PDF_CLIENTE,
+                objeto=self.relatorio_aprovado,
+            )
+        )
+        self.assertTrue(
+            usuario_tem_permissao_central(
+                self.operador,
+                CodigoPermissao.RELATORIOS_PDF_INTERNO,
+                objeto=self.relatorio_aprovado,
+            )
+        )
+        self.assertFalse(
+            usuario_tem_permissao_central(
+                self.operador,
+                CodigoPermissao.RELATORIOS_PDF_CLIENTE,
+                objeto=self.relatorio_proprio,
+            )
+        )
+
+    def test_ro_central_bloqueia_capacidades_mutaveis_mesmo_com_permitir_explicito(self):
+        codigos_mutaveis = [
+            CodigoPermissao.RELATORIOS_CRIAR,
+            CodigoPermissao.RELATORIOS_EDITAR,
+            CodigoPermissao.RELATORIOS_EDITAR_ALHEIOS,
+            CodigoPermissao.RELATORIOS_ENVIAR,
+            CodigoPermissao.RELATORIOS_DUPLICAR,
+            CodigoPermissao.RELATORIOS_EXCLUIR_RASCUNHO,
+            CodigoPermissao.RELATORIOS_APROVAR,
+            CodigoPermissao.RELATORIOS_REJEITAR,
+            CodigoPermissao.RELATORIOS_DEVOLVER_AJUSTE,
+            CodigoPermissao.RELATORIOS_MUDAR_STATUS_FINANCEIRO,
+            CodigoPermissao.RELATORIOS_ALTERAR_STATUS_ADMIN,
+            CodigoPermissao.RELATORIOS_REABRIR,
+            CodigoPermissao.FINANCEIRO_ALTERAR_VALORES,
+            CodigoPermissao.FINANCEIRO_ALTERAR_ITENS,
+            CodigoPermissao.FINANCEIRO_ALTERAR_RATEIOS,
+            CodigoPermissao.CADASTROS_CLIENTES_GERENCIAR,
+            CodigoPermissao.CADASTROS_TECNICOS_GERENCIAR,
+            CodigoPermissao.CADASTROS_ADIANTAMENTOS_GERENCIAR,
+            CodigoPermissao.CADASTROS_GERENCIAR,
+            CodigoPermissao.CLIENTES_CONFIGURAR_VALOR_KM,
+            CodigoPermissao.MANUTENCAO_POLITICAS,
+            CodigoPermissao.MANUTENCAO_EMAILS,
+            CodigoPermissao.USUARIOS_GERENCIAR,
+            CodigoPermissao.PERMISSOES_GERENCIAR,
+            CodigoPermissao.AJUDA_EDITAR,
+        ]
+        for codigo in codigos_mutaveis:
+            self._permitir(self.operador, codigo)
+
+        objeto_por_codigo = {
+            CodigoPermissao.RELATORIOS_EDITAR: self.relatorio_proprio,
+            CodigoPermissao.RELATORIOS_ENVIAR: self.relatorio_proprio,
+            CodigoPermissao.RELATORIOS_DUPLICAR: self.relatorio_proprio,
+            CodigoPermissao.RELATORIOS_EXCLUIR_RASCUNHO: self.relatorio_proprio,
+            CodigoPermissao.RELATORIOS_APROVAR: self.relatorio_conferencia,
+            CodigoPermissao.RELATORIOS_REJEITAR: self.relatorio_conferencia,
+            CodigoPermissao.RELATORIOS_DEVOLVER_AJUSTE: self.relatorio_conferencia,
+            CodigoPermissao.RELATORIOS_MUDAR_STATUS_FINANCEIRO: self.relatorio_conferencia,
+            CodigoPermissao.RELATORIOS_ALTERAR_STATUS_ADMIN: self.relatorio_conferencia,
+            CodigoPermissao.RELATORIOS_REABRIR: self.relatorio_aprovado,
+            CodigoPermissao.FINANCEIRO_ALTERAR_VALORES: self.relatorio_conferencia,
+            CodigoPermissao.FINANCEIRO_ALTERAR_ITENS: self.relatorio_conferencia,
+            CodigoPermissao.FINANCEIRO_ALTERAR_RATEIOS: self.relatorio_conferencia,
+        }
+        for codigo in codigos_mutaveis:
+            with self.subTest(codigo=codigo):
+                self.assertFalse(
+                    usuario_tem_permissao_central(
+                        self.operador,
+                        codigo,
+                        objeto=objeto_por_codigo.get(codigo),
+                    )
+                )
+
+    def test_ro_nao_e_furado_por_grupos_flags_ou_relacao_com_o_relatorio(self):
+        for usuario in [
+            self.extra_admin,
+            self.financeiro,
+            self.admin_erp,
+            self.domain,
+            self.superuser,
+            self.staff,
+            self.dono,
+        ]:
+            self._permitir(usuario, CodigoPermissao.ERP_SOMENTE_LEITURA_GLOBAL)
+
+        self.assertFalse(usuario_tem_permissao_central(self.extra_admin, CodigoPermissao.RELATORIOS_CRIAR))
+        self.assertFalse(
+            usuario_tem_permissao_central(
+                self.financeiro,
+                CodigoPermissao.RELATORIOS_APROVAR,
+                objeto=self.relatorio_conferencia,
+            )
+        )
+        self.assertFalse(usuario_tem_permissao_central(self.admin_erp, CodigoPermissao.CADASTROS_CLIENTES_GERENCIAR))
+        self.assertFalse(usuario_tem_permissao_central(self.domain, CodigoPermissao.MANUTENCAO_ACESSAR))
+        self.assertFalse(usuario_tem_permissao_central(self.superuser, CodigoPermissao.PERMISSOES_GERENCIAR))
+        self.assertFalse(usuario_tem_permissao_central(self.staff, CodigoPermissao.AJUDA_EDITAR))
+        self.assertFalse(
+            usuario_tem_permissao_central(
+                self.dono,
+                CodigoPermissao.RELATORIOS_EDITAR,
+                objeto=self.relatorio_proprio,
+            )
+        )
+
+    def test_full_protegido_prevalece_mesmo_com_override_ro(self):
+        self._permitir(self.full, CodigoPermissao.ERP_SOMENTE_LEITURA_GLOBAL)
+
+        self.assertTrue(usuario_tem_full_access_erp(self.full))
+        self.assertFalse(usuario_tem_perfil_somente_leitura_global(self.full))
+        self.assertTrue(
+            usuario_tem_permissao_central(
+                self.full,
+                CodigoPermissao.RELATORIOS_APROVAR,
+                objeto=self.relatorio_conferencia,
+            )
+        )
+
+    def test_permissao_tecnica_sem_natureza_explicita_e_mutacao_por_default(self):
+        permissao = PermissaoTecnica(
+            "teste.capacidade_nova",
+            "Capacidade nova",
+            "Sem natureza explicita.",
+            "teste",
+            "global",
+            lambda usuario, objeto=None: True,
+        )
+
+        self.assertEqual(permissao.natureza, NaturezaPermissao.MUTACAO)
+        self.assertTrue(permissao_eh_mutacao("teste.codigo_inexistente"))
+
+    def test_backstop_bloqueia_metodos_inseguros_e_endpoints_legados_com_flag_on(self):
+        self.client.force_login(self.operador)
+        rotas_post = [
+            reverse("relatorios:relatorio_create"),
+            reverse("relatorios:relatorio_update", args=[self.relatorio_proprio.pk]),
+            reverse("relatorios:relatorio_status", args=[self.relatorio_conferencia.pk, StatusRelatorio.APROVADO]),
+            reverse("relatorios:relatorio_duplicate", args=[self.relatorio_proprio.pk]),
+            reverse("relatorios:relatorio_excluir_rascunho", args=[self.relatorio_proprio.pk]),
+            reverse("relatorios:anexo_remover", args=[self.anexo.pk]),
+            reverse("relatorios:despesa_comprovante_remover", args=[self.despesa.pk]),
+            reverse("relatorios:relatorio_valores_financeiros", args=[self.relatorio_conferencia.pk]),
+            reverse("relatorios:relatorio_item_financeiro", args=[self.relatorio_conferencia.pk, "despesa", self.despesa.pk, "rejeitar"]),
+            reverse("relatorios:relatorio_rateio_financeiro", args=[self.relatorio_conferencia.pk, "despesa", self.despesa.pk]),
+            reverse("relatorios:relatorio_reabrir", args=[self.relatorio_aprovado.pk]),
+            reverse("relatorios:cliente_create"),
+            reverse("relatorios:cliente_valor_km_salvar", args=[self.cliente.pk]),
+            reverse("relatorios:tecnico_create"),
+            reverse("relatorios:adiantamento_update", args=[self.adiantamento.pk]),
+            reverse("relatorios:ajuda_artigo_criar", args=["base"]),
+            reverse("relatorios:manutencao_email_teste"),
+            reverse("relatorios:usuario_permissao_override", args=[self.outro.pk]),
+        ]
+
+        for url in rotas_post:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.post(url, {}).status_code, 403)
+
+        dashboard_url = reverse("relatorios:dashboard")
+        self.assertEqual(self.client.put(dashboard_url, {}).status_code, 403)
+        self.assertEqual(self.client.patch(dashboard_url, {}).status_code, 403)
+        self.assertEqual(self.client.delete(dashboard_url, {}).status_code, 403)
+
+    def test_backstop_preserva_allowlist_pessoal(self):
+        self.client.force_login(self.operador)
+
+        completar = self.client.post(
+            reverse("relatorios:completar_cadastro"),
+            {
+                "first_name": "Operador",
+                "last_name": "RO",
+                "email": "operador.ro@example.com",
+            },
+        )
+        self.assertNotEqual(completar.status_code, 403)
+
+        tour = self.client.post(
+            reverse("relatorios:marcar_tour_guiado_visto"),
+            data=json.dumps({"tour": "dashboardTourVisto:v1"}),
+            content_type="application/json",
+        )
+        self.assertEqual(tour.status_code, 200)
+
+        suporte_payload = {
+            "tipo": "problema",
+            "assunto": "Ajuda",
+            "descricao": "Descricao suficiente para reportar suporte.",
+            "pagina_atual": "/relatorios/",
+        }
+        with patch("relatorios.views.enviar_report_suporte"):
+            suporte = self.client.post(
+                reverse("relatorios:suporte_reportar"),
+                data=json.dumps(suporte_payload),
+                content_type="application/json",
+            )
+        self.assertEqual(suporte.status_code, 200)
+
+    @override_settings(PERMISSOES_CENTRAL_ENABLED=False)
+    def test_flag_off_nao_bloqueia_ro_e_shadow_calcula_resultado_central(self):
+        with self.assertLogs("relatorios.services.permissoes_service", level="INFO") as logs:
+            resultado = avaliar_permissao_cutover(
+                self.operador,
+                CodigoPermissao.RELATORIOS_CRIAR,
+                lambda: True,
+            )
+
+        self.assertTrue(resultado)
+        self.assertIn("[PERMISSOES_SHADOW]", "\n".join(logs.output))
+        self.assertFalse(
+            usuario_tem_permissao_central(self.operador, CodigoPermissao.RELATORIOS_CRIAR)
+        )
+
+        self.client.force_login(self.operador)
+        resposta = self.client.post(reverse("relatorios:relatorio_autosave"), {})
+        self.assertNotEqual(resposta.status_code, 403)
 
 
 class PermissoesOverrideHistoricoTests(TestCase):

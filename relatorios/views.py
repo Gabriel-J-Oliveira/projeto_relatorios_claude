@@ -133,6 +133,8 @@ from .services.permissoes_service import (
     permissoes_central_ativa,
     usuario_pode_acessar_central_permissoes,
     usuario_tem_full_access_erp,
+    usuario_tem_perfil_somente_leitura_global,
+    usuario_tem_permissao,
 )
 from .services.usuarios_permissoes_service import (
     PermissaoCentralError,
@@ -3292,6 +3294,13 @@ def _relatorios_legados_visiveis(user):
     return qs.filter(tecnico_nome_normalizado=nome_usuario)
 
 
+def _usuario_somente_leitura_global_ativo(user):
+    return bool(
+        permissoes_central_ativa()
+        and usuario_tem_perfil_somente_leitura_global(user)
+    )
+
+
 class RelatorioLegadoListView(AcessoErpMixin, ListView):
     model = RelatorioLegado
     template_name = "relatorios/legados_list.html"
@@ -3406,6 +3415,9 @@ class RelatorioListView(AcessoErpMixin, ListView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        usuario_somente_leitura_global = _usuario_somente_leitura_global_ativo(
+            self.request.user
+        )
         for relatorio in ctx.get("relatorios", []):
             relatorio.pode_editar_na_listagem = usuario_pode_editar_relatorio(
                 self.request.user,
@@ -3431,6 +3443,7 @@ class RelatorioListView(AcessoErpMixin, ListView):
         ctx["direcao_atual"] = direcao_atual
         ctx["numero_sort_url"] = "?" + params_numero.urlencode()
         ctx["pagination_query"] = params.urlencode()
+        ctx["usuario_somente_leitura_global"] = usuario_somente_leitura_global
         return ctx
 
 
@@ -4503,9 +4516,13 @@ def relatorio_detail_view(request, pk):
     pode_aprovar_relatorio = usuario_pode_aprovar_relatorio(request.user, relatorio)
     pode_rejeitar_relatorio = usuario_pode_rejeitar_relatorio(request.user, relatorio)
     pode_devolver_ajuste = usuario_pode_devolver_relatorio_ajuste(request.user, relatorio)
+    usuario_somente_leitura_global = _usuario_somente_leitura_global_ativo(request.user)
     clientes_sem_valor_km_relatorio = (
         clientes_relatorio_sem_valor_km(relatorio)
-        if usuario_pode_atuar_como_financeiro(request.user)
+        if (
+            usuario_pode_atuar_como_financeiro(request.user)
+            and not usuario_somente_leitura_global
+        )
         else []
     )
 
@@ -4520,22 +4537,33 @@ def relatorio_detail_view(request, pk):
                 else []
             ),
             "pode_acessar_financeiro": pode_acessar_financeiro,
-            "pode_aprovar_relatorio": pode_aprovar_relatorio,
-            "pode_rejeitar_relatorio": pode_rejeitar_relatorio,
-            "pode_devolver_ajuste": pode_devolver_ajuste,
+            "pode_aprovar_relatorio": pode_aprovar_relatorio and not usuario_somente_leitura_global,
+            "pode_rejeitar_relatorio": pode_rejeitar_relatorio and not usuario_somente_leitura_global,
+            "pode_devolver_ajuste": pode_devolver_ajuste and not usuario_somente_leitura_global,
             "pode_editar_relatorio": _relatorio_editavel_por_usuario(
                 relatorio, request.user
+            )
+            and not usuario_somente_leitura_global,
+            "pode_atuar_financeiro": (
+                usuario_pode_atuar_como_financeiro(request.user)
+                and not usuario_somente_leitura_global
             ),
-            "pode_atuar_financeiro": usuario_pode_atuar_como_financeiro(request.user),
             "pode_alterar_itens_financeiros": (
-                usuario_eh_superadmin(request.user)
-                or (
-                    usuario_pode_atuar_como_financeiro(request.user)
-                    and relatorio.status not in {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
+                not usuario_somente_leitura_global
+                and (
+                    usuario_eh_superadmin(request.user)
+                    or (
+                        usuario_pode_atuar_como_financeiro(request.user)
+                        and relatorio.status not in {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
+                    )
                 )
             ),
-            "superadmin_django": usuario_eh_superadmin(request.user),
-            "pode_enviar_relatorio": usuario_pode_enviar_relatorio(request.user, relatorio),
+            "superadmin_django": usuario_eh_superadmin(request.user) and not usuario_somente_leitura_global,
+            "pode_enviar_relatorio": (
+                usuario_pode_enviar_relatorio(request.user, relatorio)
+                and not usuario_somente_leitura_global
+            ),
+            "usuario_somente_leitura_global": usuario_somente_leitura_global,
             "inconsistencias_rateio": inconsistencias_rateio,
             "clientes_sem_valor_km_relatorio": clientes_sem_valor_km_relatorio,
             "distribuicao_clientes": distribuicao_clientes,
@@ -4590,8 +4618,15 @@ def relatorio_consulta_view(request, pk):
             "distribuicao_clientes": consulta["distribuicao_clientes"],
             "anexos_visualizacao": _anexos_visualizacao_relatorio(relatorio),
             "mapa_trechos_json": consulta.get("mapa_trechos", []),
-            "pode_gerar_pdf_interno": usuario_pode_atuar_como_financeiro(request.user),
-            "pode_reabrir_relatorio": usuario_pode_reabrir_relatorio(request.user),
+            "pode_gerar_pdf_interno": usuario_tem_permissao(
+                request.user,
+                CodigoPermissao.RELATORIOS_PDF_INTERNO,
+                objeto=relatorio,
+            ),
+            "pode_reabrir_relatorio": (
+                usuario_pode_reabrir_relatorio(request.user)
+                and not _usuario_somente_leitura_global_ativo(request.user)
+            ),
             "titulo_pagina": f"Consulta {consulta['relatorio'].identificador}",
         },
     )
@@ -4785,7 +4820,6 @@ def relatorio_clientes_pdf_view(request, pk):
 
 @require_GET
 @login_required
-@exigir_financeiro
 def relatorio_pdf_interno_view(request, pk):
     relatorio = get_object_or_404(
         RelatorioTecnico.objects.select_related(
@@ -4804,6 +4838,17 @@ def relatorio_pdf_interno_view(request, pk):
         ),
         pk=pk,
     )
+    if not usuario_tem_permissao(
+        request.user,
+        CodigoPermissao.RELATORIOS_PDF_INTERNO,
+        objeto=relatorio,
+    ):
+        logger.warning(
+            "RELATORIO_PDF_INTERNO_NEGADO usuario=%s relatorio=%s",
+            getattr(request.user, "pk", None),
+            pk,
+        )
+        raise PermissionDenied("Você não tem permissão para gerar o PDF interno.")
     if relatorio.status not in {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}:
         messages.error(
             request,

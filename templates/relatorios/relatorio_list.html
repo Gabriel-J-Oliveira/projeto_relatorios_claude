@@ -198,7 +198,7 @@
                    class="btn btn-sm btn-outline-secondary" title="Ver">
                   <i class="bi bi-eye"></i>
                 </a>
-                {% if r.status != 'ajuste_pendente' %}
+                {% if r.status != 'ajuste_pendente' and not usuario_somente_leitura_global %}
                   <form method="post" action="{% url 'relatorios:relatorio_duplicate' r.pk %}" class="d-inline">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-outline-secondary btn-sm" title="Duplicar">
@@ -213,7 +213,7 @@
                     <i class="bi bi-pencil"></i>
                   </a>
                 {% endif %}
-                {% if r.status == 'rascunho' %}
+                {% if r.status == 'rascunho' and not usuario_somente_leitura_global %}
                   {% if r.criado_por_id == request.user.id or request.user.is_superuser or permissoes_erp.administrativo %}
                     <form method="post"
                           action="{% url 'relatorios:relatorio_excluir_rascunho' r.pk %}"

@@ -38,6 +38,7 @@ def permissoes_erp(request):
 
     return {
         "permissoes_erp": permissoes,
+        "usuario_somente_leitura_global": permissoes.get("somente_leitura_global", False),
         "tours_guiados_vistos": tours_guiados_vistos,
         "tours_guiados_vistos_json": json.dumps(tours_guiados_vistos),
         "clientes_sem_valor_km": clientes_sem_valor_km,

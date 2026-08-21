@@ -580,15 +580,20 @@ def permissoes_usuario(user):
             CodigoPermissao,
             permissoes_central_ativa,
             usuario_pode_acessar_central_permissoes,
+            usuario_tem_perfil_somente_leitura_global,
             usuario_tem_permissao,
         )
     except Exception:
         usuario_pode_acessar_central = False
         central_ativa = False
         visualiza_clientes = usuario_eh_administrativo(user)
+        somente_leitura_global = False
     else:
         usuario_pode_acessar_central = usuario_pode_acessar_central_permissoes(user)
         central_ativa = permissoes_central_ativa()
+        somente_leitura_global = (
+            central_ativa and usuario_tem_perfil_somente_leitura_global(user)
+        )
         visualiza_clientes = usuario_tem_permissao(
             user,
             CodigoPermissao.CADASTROS_CLIENTES_GERENCIAR,
@@ -626,6 +631,7 @@ def permissoes_usuario(user):
         "aprova_relatorios": administrativo or acesso_total,
         "manutencao": usuario_pode_acessar_manutencao(user),
         "usuarios_gerenciar": usuario_pode_acessar_central,
+        "somente_leitura_global": somente_leitura_global,
     }
 
 

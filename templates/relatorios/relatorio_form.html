@@ -13,7 +13,7 @@
   <li class="breadcrumb-item active">{{ titulo_pagina }}</li>
 {% endblock %}
 {% block page_actions %}
-{% if instance and instance.status == 'rascunho' %}
+{% if instance and instance.status == 'rascunho' and not usuario_somente_leitura_global %}
   {% if instance.criado_por_id == request.user.id or request.user.is_superuser or permissoes_erp.administrativo %}
   <form method="post"
         action="{% url 'relatorios:relatorio_excluir_rascunho' instance.pk %}"

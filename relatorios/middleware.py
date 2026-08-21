@@ -101,6 +101,77 @@ class CadastroObrigatorioMiddleware:
         return bool(nomes & self.ROTAS_LIBERADAS)
 
 
+class SomenteLeituraGlobalMiddleware:
+    """
+    Backstop central fail-closed para usuarios com perfil global somente leitura.
+
+    Com a Central desligada, nao altera o comportamento produtivo. Com a Central
+    ligada, bloqueia metodos inseguros por padrao e mutacoes GET conhecidas.
+    """
+
+    METODOS_MUTAVEIS = {"POST", "PUT", "PATCH", "DELETE"}
+    ROTAS_MUTAVEIS_LIBERADAS = {
+        "login",
+        "logout",
+        "relatorios:completar_cadastro",
+        "relatorios:marcar_tour_guiado_visto",
+        "relatorios:suporte_reportar",
+    }
+    ROTAS_GET_MUTAVEIS = {
+        "relatorios:relatorio_reabrir",
+    }
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        return self.get_response(request)
+
+    def process_view(self, request, view_func, view_args, view_kwargs):
+        user = getattr(request, "user", None)
+        if not getattr(user, "is_authenticated", False):
+            return None
+
+        from relatorios.services.permissoes_service import (
+            permissoes_central_ativa,
+            usuario_tem_perfil_somente_leitura_global,
+        )
+
+        if not permissoes_central_ativa():
+            return None
+        if not usuario_tem_perfil_somente_leitura_global(user):
+            return None
+
+        nomes_rota = self._nomes_rota(request)
+        metodo = request.method.upper()
+        bloqueia_metodo_mutavel = (
+            metodo in self.METODOS_MUTAVEIS
+            and not nomes_rota.intersection(self.ROTAS_MUTAVEIS_LIBERADAS)
+        )
+        bloqueia_get_mutavel = (
+            metodo == "GET"
+            and bool(nomes_rota.intersection(self.ROTAS_GET_MUTAVEIS))
+        )
+        if bloqueia_metodo_mutavel or bloqueia_get_mutavel:
+            logger.warning(
+                "somente_leitura_global_bloqueio usuario=%s metodo=%s path=%s view=%s",
+                getattr(user, "pk", None),
+                metodo,
+                request.path,
+                getattr(getattr(request, "resolver_match", None), "view_name", ""),
+            )
+            raise PermissionDenied(
+                "Seu perfil permite apenas consulta e bloqueia alteracoes no ERP."
+            )
+        return None
+
+    def _nomes_rota(self, request):
+        match = getattr(request, "resolver_match", None)
+        if not match:
+            return set()
+        return {nome for nome in {match.view_name, match.url_name} if nome}
+
+
 class IdentidadeCorporativaMiddleware:
     """
     Protecao operacional de sessao.

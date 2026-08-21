@@ -57,6 +57,7 @@ MIDDLEWARE = [
     "relatorios.middleware.IdentidadeCorporativaMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "relatorios.middleware.CadastroObrigatorioMiddleware",
+    "relatorios.middleware.SomenteLeituraGlobalMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 

@@ -24,6 +24,7 @@ from relatorios.services.permissoes_service import (
 
 
 CODIGOS_CENTRAL_USUARIOS_V1 = (
+    CodigoPermissao.ERP_SOMENTE_LEITURA_GLOBAL,
     CodigoPermissao.RELATORIOS_VISUALIZAR_ALHEIOS,
     CodigoPermissao.RELATORIOS_EDITAR_ALHEIOS,
     CodigoPermissao.FINANCEIRO_ACESSAR,
@@ -44,6 +45,7 @@ CODIGOS_CENTRAL_USUARIOS_V1 = (
 )
 
 CATEGORIAS_UI = (
+    (CategoriaPermissao.SISTEMA, "Sistema"),
     (CategoriaPermissao.RELATORIOS, "Relatorios"),
     (CategoriaPermissao.FINANCEIRO, "Financeiro"),
     (CategoriaPermissao.ADMINISTRACAO, "Administracao"),
