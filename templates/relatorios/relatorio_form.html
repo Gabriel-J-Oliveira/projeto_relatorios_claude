@@ -3898,6 +3898,10 @@ function validarKmGlobal() {
         button.removeAttribute("aria-busy");
       });
       let invalido = false;
+      const errosSubmit = [];
+      const adicionarErroSubmit = mensagem => {
+        if (mensagem && !errosSubmit.includes(mensagem)) errosSubmit.push(mensagem);
+      };
       const tipoReembolso = document.querySelector('[name="tipo_reembolso"]')?.value || "reembolsavel";
       const clientesRelatorio = getClientesRelatorioIds();
       const erroRelatorio = document.querySelector(".erro-clientes-relatorio");
@@ -3909,34 +3913,46 @@ function validarKmGlobal() {
       if (erroTecnicos) erroTecnicos.textContent = "";
       if (!validarDatasFuturasFrontend(form)) {
         invalido = true;
+        adicionarErroSubmit("Revise as datas informadas.");
       }
       if (!validarDocumentosComprovanteFrontend(form)) {
         invalido = true;
+        adicionarErroSubmit("Revise os dados dos comprovantes preenchidos.");
       }
       const cidadeAtendimentoTexto = document.getElementById("id_cidade_atendimento")?.value?.trim();
       if (acaoSubmit !== "rascunho" && !document.getElementById("id_municipio_atendimento")?.value && !cidadeAtendimentoTexto) {
         invalido = true;
         document.getElementById("id_cidade_atendimento")?.classList.add("is-invalid");
+        adicionarErroSubmit("Selecione a cidade oficial do atendimento.");
       }
       if (tipoReembolso === "reembolsavel" && !clientesRelatorio.length) {
         invalido = true;
         if (erroRelatorio) erroRelatorio.textContent = "Selecione ao menos um cliente.";
+        adicionarErroSubmit("Selecione ao menos um cliente do relatório.");
       }
       if (acaoSubmit !== "rascunho") {
+        let motivosInvalidos = false;
         document.querySelectorAll(".motivo-cliente-textarea").forEach(campo => {
           const erro = campo.closest(".motivo-cliente-card")?.querySelector(".motivo-cliente-erro");
           const vazio = !String(campo.value || "").trim();
           campo.classList.toggle("is-invalid", vazio);
           erro?.classList.toggle("d-none", !vazio);
-          if (vazio) invalido = true;
+          if (vazio) {
+            motivosInvalidos = true;
+            invalido = true;
+          }
         });
-        if (invalido && erroMotivos && clientesRelatorio.length) {
-          erroMotivos.textContent = "Informe o motivo da viagem para todos os clientes do relatório.";
+        if (motivosInvalidos) {
+          if (erroMotivos && clientesRelatorio.length) {
+            erroMotivos.textContent = "Informe o motivo da viagem para todos os clientes do relatório.";
+          }
+          adicionarErroSubmit("Informe o motivo da viagem para todos os clientes do relatório.");
         }
       }
       if (!tecnicosRelatorio.length) {
         invalido = true;
         if (erroTecnicos) erroTecnicos.textContent = "Selecione ao menos um técnico.";
+        adicionarErroSubmit("Selecione ao menos um técnico.");
       }
       if (acaoSubmit !== "rascunho") {
         const tecnicoReembolso = getTecnicoReembolsoId();
@@ -3944,13 +3960,16 @@ function validarKmGlobal() {
         if (tipoReembolso === "reembolsavel" && !tecnicoReembolso) {
           invalido = true;
           if (erroTecnicos) erroTecnicos.textContent = "Selecione o técnico que receberá o reembolso.";
+          adicionarErroSubmit("Selecione o técnico que receberá o reembolso.");
         }
         if (tipoReembolso === "nao_reembolsavel" && !empresaGrupo) {
           invalido = true;
           const empresaFeedback = document.getElementById("empresa-grupo-feedback");
           if (empresaFeedback) empresaFeedback.textContent = "Selecione a empresa responsável pelo custo.";
+          adicionarErroSubmit("Selecione a empresa responsável pelo custo.");
         }
       }
+      let itensSemCliente = false;
       document.querySelectorAll(".linha-despesa, .linha-trecho").forEach(linha => {
         if (linhaEstaRemovida(linha) || !linhaTemConteudoSeguro(linha)) return;
         const input = linha.querySelector(".clientes-item-input");
@@ -3958,9 +3977,13 @@ function validarKmGlobal() {
         if (erro) erro.textContent = "";
         if (tipoReembolso === "reembolsavel" && !idsFromValue(input?.value).length) {
           invalido = true;
+          itensSemCliente = true;
           if (erro) erro.textContent = "Selecione o cliente.";
         }
       });
+      if (itensSemCliente) {
+        adicionarErroSubmit("Selecione os clientes dos itens preenchidos.");
+      }
       if (invalido) {
         event.preventDefault();
         if (form) form.dataset.submitting = "";
@@ -3968,9 +3991,10 @@ function validarKmGlobal() {
           clientes: clientesRelatorio,
           tecnicos: tecnicosRelatorio,
         }, "warning");
-        window.ErpOperationalErrors?.show("Não foi possível salvar o relatório.", [
-          "Selecione os clientes, técnicos, cidade oficial e clientes dos itens preenchidos."
-        ]);
+        window.ErpOperationalErrors?.show(
+          "Não foi possível salvar o relatório.",
+          errosSubmit.length ? errosSubmit : ["Revise os campos destacados no formulário."]
+        );
       } else {
         normalizarCamposDecimaisParaSubmit();
       }

@@ -216,6 +216,39 @@ class RelatorioPerformanceTrackerTests(SimpleTestCase):
         self.assertIn("validation;dur=", response["Server-Timing"])
 
 
+class RelatorioFormMotivosClienteFrontendTests(SimpleTestCase):
+    def _template_source(self):
+        path = settings.BASE_DIR / "templates" / "relatorios" / "relatorio_form.html"
+        return path.read_text(encoding="utf-8")
+
+    def test_validacao_motivos_usa_flag_especifica(self):
+        source = self._template_source()
+
+        self.assertIn("let motivosInvalidos = false;", source)
+        self.assertIn("if (motivosInvalidos) {", source)
+        self.assertNotIn("if (invalido && erroMotivos && clientesRelatorio.length)", source)
+
+    def test_motivo_vazio_bloqueia_envio_sem_depender_de_outros_erros(self):
+        source = self._template_source()
+
+        self.assertIn("motivosInvalidos = true;", source)
+        self.assertIn("invalido = true;", source)
+        self.assertIn(
+            'adicionarErroSubmit("Informe o motivo da viagem para todos os clientes do relatório.");',
+            source,
+        )
+
+    def test_rascunho_nao_valida_motivos_por_cliente(self):
+        source = self._template_source()
+        trecho = source[
+            source.index('if (acaoSubmit !== "rascunho") {')
+            : source.index('if (!tecnicosRelatorio.length)')
+        ]
+
+        self.assertIn("let motivosInvalidos = false;", trecho)
+        self.assertIn(".motivo-cliente-textarea", trecho)
+
+
 class ExtraAdminUsersTests(SimpleTestCase):
     @override_settings(EXTRA_ADMIN_USERS=["joao.martins"])
     def test_usuario_extra_admin_tem_acesso_administrativo(self):
