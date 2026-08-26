@@ -347,6 +347,30 @@ function linhaTemConteudo(linha) {
   });
 }
 
+function campoDataHospedagem(campo) {
+  const nome = campo?.name || "";
+  return (
+    campo?.classList?.contains("campo-hospedagem-entrada") ||
+    campo?.classList?.contains("campo-hospedagem-saida") ||
+    nome.endsWith("-data_inicio_hospedagem") ||
+    nome.endsWith("-data_fim_hospedagem")
+  );
+}
+
+function linhaDespesaEhHospedagem(linha) {
+  const tipo = linha
+    ?.querySelector('select[name$="-tipo"], input[name$="-tipo"]')
+    ?.value;
+  return tipo === "hospedagem";
+}
+
+function limparDatasHospedagemInativas(linha) {
+  if (!linha || linhaDespesaEhHospedagem(linha)) return;
+  linha
+    .querySelectorAll(".campo-hospedagem-entrada, .campo-hospedagem-saida")
+    .forEach(campo => UI.clearError(campo));
+}
+
 
 /* ============================================================
    4. VALIDADORES INDIVIDUAIS
@@ -586,8 +610,15 @@ const FieldRules = [
 
   {
     // Data fora do período (despesas e trechos)
-    test: c => c.type === "date" && !!c.value,
+    test: c => c.type === "date" && (!!c.value || campoDataHospedagem(c)),
     run(campo) {
+      if (campoDataHospedagem(campo)) {
+        const linha = campo.closest(".linha-despesa");
+        if (!linhaDespesaEhHospedagem(linha)) {
+          UI.clearError(campo);
+          return;
+        }
+      }
       const r = Validators.dataFora(campo);
       r.ok ? UI.clearError(campo) : UI.setError(campo, r.msg);
     },
@@ -607,6 +638,7 @@ const FieldRules = [
     run(campo) {
       const r = Validators.tipoObrigatorio(campo);
       r.ok ? UI.clearError(campo) : UI.setError(campo, r.msg);
+      limparDatasHospedagemInativas(campo.closest(".linha-despesa"));
     },
   },
 

@@ -253,6 +253,61 @@ class RelatorioFormMotivosClienteFrontendTests(SimpleTestCase):
         self.assertIn(".motivo-cliente-textarea", trecho)
 
 
+class RelatorioFormHospedagemFrontendTests(SimpleTestCase):
+    def _custom_js_source(self):
+        path = settings.BASE_DIR / "static" / "js" / "custom.js"
+        return path.read_text(encoding="utf-8")
+
+    def test_datas_hospedagem_sao_identificadas_por_nome_ou_classe(self):
+        source = self._custom_js_source()
+
+        self.assertIn("function campoDataHospedagem(campo)", source)
+        self.assertIn('campo?.classList?.contains("campo-hospedagem-entrada")', source)
+        self.assertIn('campo?.classList?.contains("campo-hospedagem-saida")', source)
+        self.assertIn('nome.endsWith("-data_inicio_hospedagem")', source)
+        self.assertIn('nome.endsWith("-data_fim_hospedagem")', source)
+
+    def test_datas_hospedagem_inativas_limpam_erro_sem_validar_periodo(self):
+        source = self._custom_js_source()
+
+        self.assertIn("function limparDatasHospedagemInativas(linha)", source)
+        self.assertIn("if (!linha || linhaDespesaEhHospedagem(linha)) return;", source)
+        self.assertIn('".campo-hospedagem-entrada, .campo-hospedagem-saida"', source)
+        self.assertIn("UI.clearError(campo)", source)
+        self.assertIn("if (!linhaDespesaEhHospedagem(linha))", source)
+        self.assertIn("UI.clearError(campo);", source)
+        self.assertIn("return;", source)
+
+    def test_datas_hospedagem_ativas_continuam_validando_periodo(self):
+        source = self._custom_js_source()
+
+        trecho_regra_data = source[
+            source.index("// Data fora do período (despesas e trechos)")
+            : source.index("// Tipo obrigatório (select de despesas)")
+        ]
+        self.assertIn('test: c => c.type === "date" && (!!c.value || campoDataHospedagem(c))', trecho_regra_data)
+        self.assertIn("const r = Validators.dataFora(campo);", trecho_regra_data)
+        self.assertIn("r.ok ? UI.clearError(campo) : UI.setError(campo, r.msg);", trecho_regra_data)
+
+    def test_mudanca_para_tipo_nao_hospedagem_limpa_erros_residuais(self):
+        source = self._custom_js_source()
+
+        trecho_tipo = source[
+            source.index("// Tipo obrigatório (select de despesas)")
+            : source.index("// Valor obrigatório (após touched)")
+        ]
+        self.assertIn('test: c => c.tagName === "SELECT" && c.name?.includes("-tipo")', trecho_tipo)
+        self.assertIn('limparDatasHospedagemInativas(campo.closest(".linha-despesa"));', trecho_tipo)
+
+    def test_demais_datas_e_alerta_de_erros_reais_permanecem(self):
+        source = self._custom_js_source()
+
+        self.assertIn("Validators.dataFora(campo)", source)
+        self.assertIn('alert("Existem erros no formulário.");', source)
+        self.assertIn('const temErro = linhasAtivas(".linha-despesa, .linha-trecho")', source)
+        self.assertIn('.some(linha => linha.querySelector(".is-invalid"));', source)
+
+
 class ExtraAdminUsersTests(SimpleTestCase):
     @override_settings(EXTRA_ADMIN_USERS=["joao.martins"])
     def test_usuario_extra_admin_tem_acesso_administrativo(self):
