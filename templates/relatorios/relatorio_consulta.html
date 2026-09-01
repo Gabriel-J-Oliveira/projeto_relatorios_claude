@@ -31,7 +31,7 @@
     <i class="bi bi-file-earmark-pdf me-1"></i>Gerar PDF
   </a>
   {% endif %}
-  {% if pode_reabrir_relatorio and consulta.relatorio.status == 'aprovado' %}
+  {% if pode_reabrir_relatorio and consulta.relatorio.status == 'aprovado' or pode_reabrir_relatorio and consulta.relatorio.status == 'rejeitado' %}
   <button type="button"
           class="btn btn-outline-warning btn-sm"
           data-bs-toggle="modal"
@@ -44,7 +44,7 @@
 
 {% block content %}
 
-{% if pode_reabrir_relatorio and consulta.relatorio.status == 'aprovado' %}
+{% if pode_reabrir_relatorio and consulta.relatorio.status == 'aprovado' or pode_reabrir_relatorio and consulta.relatorio.status == 'rejeitado' %}
 <div class="modal fade" id="modalReabrirRelatorio" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -56,7 +56,7 @@
       </div>
       <div class="modal-body">
         <p class="mb-0">
-          Esta ação retornará o relatório para “Conferência pendente” e recalculará políticas financeiras e rateios dos dados vivos. O histórico da aprovação anterior será preservado.
+          Esta ação retornará o relatório para Conferência pendente e recalculará políticas financeiras e rateios dos dados vivos. O histórico da finalização anterior será preservado.
         </p>
       </div>
       <div class="modal-footer">

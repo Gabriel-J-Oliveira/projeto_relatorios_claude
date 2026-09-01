@@ -17,6 +17,13 @@ class ReabrirRelatorioError(Exception):
     pass
 
 
+STATUS_REABRIVEIS = {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
+
+
+def _status_label(status):
+    return dict(StatusRelatorio.choices).get(status, status)
+
+
 def _recalcular_politicas_e_rateios(relatorio):
     despesas_recalculadas = []
     for despesa in relatorio.despesas.select_for_update().prefetch_related(
@@ -41,13 +48,13 @@ def _recalcular_politicas_e_rateios(relatorio):
 
 
 @transaction.atomic
-def reabrir_relatorio_aprovado(relatorio_id, usuario):
+def reabrir_relatorio_finalizado(relatorio_id, usuario):
     relatorio = RelatorioTecnico.objects.select_for_update().get(pk=relatorio_id)
     status_anterior = relatorio.status
 
-    if status_anterior != StatusRelatorio.APROVADO:
+    if status_anterior not in STATUS_REABRIVEIS:
         raise ReabrirRelatorioError(
-            "Somente relatórios aprovados podem ser reabertos."
+            "Somente relatórios aprovados ou rejeitados podem ser reabertos."
         )
 
     relatorio.status = StatusRelatorio.CONFERENCIA
@@ -59,8 +66,9 @@ def reabrir_relatorio_aprovado(relatorio_id, usuario):
         usuario,
         TipoEventoHistorico.REABERTO,
         (
-            "Relatório reaberto administrativamente por Gabriel Oliveira. "
-            'Status alterado de "Aprovado" para "Conferência pendente".'
+            "Relatório reaberto administrativamente. "
+            f'Status alterado de "{_status_label(status_anterior)}" '
+            f'para "{_status_label(StatusRelatorio.CONFERENCIA)}".'
         ),
         {
             "status_anterior": status_anterior,
@@ -82,3 +90,7 @@ def reabrir_relatorio_aprovado(relatorio_id, usuario):
         len(despesas_recalculadas),
     )
     return relatorio
+
+
+def reabrir_relatorio_aprovado(relatorio_id, usuario):
+    return reabrir_relatorio_finalizado(relatorio_id, usuario)

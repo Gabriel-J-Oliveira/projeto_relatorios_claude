@@ -3990,9 +3990,14 @@ class RelatorioTecnicoFlowTests(TestCase):
             username="financeiro",
             password="senha-teste",
         )
-        self.grupo_financeiro = Group.objects.get(name="Financeiro")
-        self.grupo_tecnico = Group.objects.get(name="Tecnico")
+        self.grupo_financeiro, _ = Group.objects.get_or_create(name="Financeiro")
+        self.grupo_tecnico, _ = Group.objects.get_or_create(name="Tecnico")
         self.usuario_financeiro.groups.add(self.grupo_financeiro)
+        _marcar_cadastro_usuario_completo(
+            self.usuario_financeiro,
+            first_name="Usuario",
+            last_name="Financeiro",
+        )
         self.client.force_login(self.usuario_financeiro)
 
     def dados_relatorio(self, **extra):
@@ -4066,8 +4071,8 @@ class RelatorioTecnicoFlowTests(TestCase):
             cidade_atendimento="Curitiba",
             uf_atendimento="PR",
             tipo_localidade="interior",
-            data_inicio="2026-05-01",
-            data_fim="2026-05-03",
+            data_inicio=date(2026, 5, 1),
+            data_fim=date(2026, 5, 3),
             motivo="Atendimento tecnico",
             centro_custo="Manutencao",
             valor_adiantamento=Decimal("100.00"),
@@ -4860,6 +4865,7 @@ class RelatorioTecnicoFlowTests(TestCase):
             username=r"control.local\gabriel.oliveira",
             password="senha-teste",
         )
+        _marcar_cadastro_usuario_completo(usuario_autorizado)
         usuario_autorizado.groups.add(self.grupo_financeiro)
         PoliticaValor.objects.create(
             chave="REFEICAO_INTERIOR",
@@ -4931,13 +4937,14 @@ class RelatorioTecnicoFlowTests(TestCase):
         rateio = despesa.rateios.get(cliente=self.cliente)
         self.assertEqual(rateio.valor_original, Decimal("90.20"))
         self.assertEqual(rateio.valor_final, Decimal("80.00"))
-        self.assertTrue(
-            HistoricoRelatorio.objects.filter(
-                relatorio=relatorio,
-                usuario=usuario_autorizado,
-                tipo_evento=TipoEventoHistorico.REABERTO,
-            ).exists()
+        historico = HistoricoRelatorio.objects.get(
+            relatorio=relatorio,
+            usuario=usuario_autorizado,
+            tipo_evento=TipoEventoHistorico.REABERTO,
         )
+        self.assertEqual(historico.dados_json["status_anterior"], StatusRelatorio.APROVADO)
+        self.assertEqual(historico.dados_json["status_novo"], StatusRelatorio.CONFERENCIA)
+        self.assertIn('Status alterado de "Aprovado"', historico.descricao)
 
         aprovar_relatorio(relatorio.pk, self.usuario_financeiro, post_data={})
         relatorio.refresh_from_db()
@@ -4947,6 +4954,109 @@ class RelatorioTecnicoFlowTests(TestCase):
         self.assertNotEqual(snapshot.checksum, checksum)
         self.assertEqual(snapshot.total_aprovado, Decimal("80.00"))
         self.assertEqual(snapshot.payload["despesas"][0]["valor_final"], "80.00")
+
+    def test_usuario_autorizado_reabre_relatorio_rejeitado_preservando_snapshot_e_motivo(self):
+        usuario_autorizado = get_user_model().objects.create_user(
+            username=r"control.local\gabriel.oliveira",
+            password="senha-teste",
+        )
+        _marcar_cadastro_usuario_completo(usuario_autorizado)
+        usuario_autorizado.groups.add(self.grupo_financeiro)
+        PoliticaValor.objects.create(
+            chave="REFEICAO_INTERIOR",
+            tipo_politica=PoliticaValor.TipoPolitica.REFEICAO,
+            tipo_despesa=TipoDespesa.ALIMENTACAO,
+            tipo_localidade="interior",
+            descricao="Refeicao Interior Rejeitado",
+            limite_valor=Decimal("75.00"),
+            vigencia_inicio=date(2026, 1, 1),
+            ativo=True,
+        )
+        relatorio = self.criar_relatorio("RT-2026-REABRIR-REJEITADO")
+        relatorio.status = StatusRelatorio.REJEITADO
+        relatorio.motivo_rejeicao = "Relatório incompatível com o atendimento."
+        relatorio.tecnico_reembolso = self.tecnico
+        relatorio.save(update_fields=["status", "motivo_rejeicao", "tecnico_reembolso"])
+        despesa = ItemDespesa.objects.create(
+            relatorio=relatorio,
+            ordem=0,
+            data="2026-05-02",
+            tipo="alimentacao",
+            descricao="Almoco rejeitado",
+            valor=Decimal("90.20"),
+            valor_aprovado=Decimal("90.20"),
+            quem_pagou="tecnico",
+        )
+        snapshot = criar_snapshot_financeiro(relatorio, self.usuario_financeiro)
+        snapshot_pk = snapshot.pk
+        checksum = snapshot.checksum
+        numero = relatorio.numero
+        motivo_rejeicao = relatorio.motivo_rejeicao
+
+        self.client.force_login(usuario_autorizado)
+        response = self.client.post(
+            reverse("relatorios:relatorio_reabrir", kwargs={"pk": relatorio.pk})
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("relatorios:relatorio_detail", kwargs={"pk": relatorio.pk}),
+        )
+        relatorio.refresh_from_db()
+        despesa.refresh_from_db()
+        snapshot.refresh_from_db()
+        self.assertEqual(relatorio.status, StatusRelatorio.CONFERENCIA)
+        self.assertEqual(relatorio.numero, numero)
+        self.assertEqual(relatorio.motivo_rejeicao, motivo_rejeicao)
+        self.assertEqual(snapshot.pk, snapshot_pk)
+        self.assertEqual(snapshot.checksum, checksum)
+        self.assertEqual(despesa.valor_politica, Decimal("75.00"))
+        self.assertEqual(despesa.valor_aprovado, Decimal("75.00"))
+        historico = HistoricoRelatorio.objects.get(
+            relatorio=relatorio,
+            usuario=usuario_autorizado,
+            tipo_evento=TipoEventoHistorico.REABERTO,
+        )
+        self.assertEqual(historico.dados_json["status_anterior"], StatusRelatorio.REJEITADO)
+        self.assertEqual(historico.dados_json["status_novo"], StatusRelatorio.CONFERENCIA)
+        self.assertIn('Status alterado de "Rejeitado"', historico.descricao)
+
+    def test_reabrir_bloqueia_status_nao_finalizados(self):
+        usuario_autorizado = get_user_model().objects.create_user(
+            username=r"control.local\gabriel.oliveira",
+            password="senha-teste",
+        )
+        _marcar_cadastro_usuario_completo(usuario_autorizado)
+        usuario_autorizado.groups.add(self.grupo_financeiro)
+        self.client.force_login(usuario_autorizado)
+
+        for status in [
+            StatusRelatorio.RASCUNHO,
+            StatusRelatorio.AJUSTE,
+            StatusRelatorio.CONFERENCIA,
+        ]:
+            with self.subTest(status=status):
+                relatorio = self.criar_relatorio(f"RT-2026-REABRIR-{status}")
+                relatorio.status = status
+                relatorio.save(update_fields=["status"])
+
+                response = self.client.post(
+                    reverse("relatorios:relatorio_reabrir", kwargs={"pk": relatorio.pk})
+                )
+
+                self.assertRedirects(
+                    response,
+                    reverse("relatorios:relatorio_consulta", kwargs={"pk": relatorio.pk}),
+                    fetch_redirect_response=False,
+                )
+                relatorio.refresh_from_db()
+                self.assertEqual(relatorio.status, status)
+                self.assertFalse(
+                    HistoricoRelatorio.objects.filter(
+                        relatorio=relatorio,
+                        tipo_evento=TipoEventoHistorico.REABERTO,
+                    ).exists()
+                )
 
     def test_usuario_nao_autorizado_nao_reabre_relatorio_aprovado(self):
         relatorio = self.criar_relatorio("RT-2026-REABRIR-NEGADO")
@@ -4983,11 +5093,32 @@ class RelatorioTecnicoFlowTests(TestCase):
             ).exists()
         )
 
-    def test_botao_reabrir_aparece_apenas_para_usuario_autorizado(self):
+    def test_endpoint_reabrir_continua_somente_post(self):
         usuario_autorizado = get_user_model().objects.create_user(
             username=r"control.local\gabriel.oliveira",
             password="senha-teste",
         )
+        _marcar_cadastro_usuario_completo(usuario_autorizado)
+        usuario_autorizado.groups.add(self.grupo_financeiro)
+        relatorio = self.criar_relatorio("RT-2026-REABRIR-GET")
+        relatorio.status = StatusRelatorio.APROVADO
+        relatorio.save(update_fields=["status"])
+
+        self.client.force_login(usuario_autorizado)
+        response = self.client.get(
+            reverse("relatorios:relatorio_reabrir", kwargs={"pk": relatorio.pk})
+        )
+
+        self.assertEqual(response.status_code, 405)
+        relatorio.refresh_from_db()
+        self.assertEqual(relatorio.status, StatusRelatorio.APROVADO)
+
+    def test_botao_reabrir_aparece_para_aprovado_e_rejeitado_quando_autorizado(self):
+        usuario_autorizado = get_user_model().objects.create_user(
+            username=r"control.local\gabriel.oliveira",
+            password="senha-teste",
+        )
+        _marcar_cadastro_usuario_completo(usuario_autorizado)
         usuario_autorizado.groups.add(self.grupo_financeiro)
         relatorio = self.criar_relatorio("RT-2026-REABRIR-BOTAO")
         relatorio.status = StatusRelatorio.APROVADO
@@ -5013,6 +5144,37 @@ class RelatorioTecnicoFlowTests(TestCase):
         self.client.force_login(usuario_autorizado)
         response = self.client.get(url)
         self.assertContains(response, "Reabrir relatório")
+
+        relatorio.status = StatusRelatorio.REJEITADO
+        relatorio.motivo_rejeicao = "Rejeição definitiva."
+        relatorio.save(update_fields=["status", "motivo_rejeicao"])
+        response = self.client.get(url)
+        self.assertContains(response, "Reabrir relatório")
+
+    def test_botao_reabrir_nao_aparece_para_status_nao_finalizados(self):
+        usuario_autorizado = get_user_model().objects.create_user(
+            username=r"control.local\gabriel.oliveira",
+            password="senha-teste",
+        )
+        _marcar_cadastro_usuario_completo(usuario_autorizado)
+        usuario_autorizado.groups.add(self.grupo_financeiro)
+        self.client.force_login(usuario_autorizado)
+
+        for status in [
+            StatusRelatorio.RASCUNHO,
+            StatusRelatorio.AJUSTE,
+            StatusRelatorio.CONFERENCIA,
+        ]:
+            with self.subTest(status=status):
+                relatorio = self.criar_relatorio(f"RT-2026-REABRIR-BOTAO-{status}")
+                relatorio.status = status
+                relatorio.save(update_fields=["status"])
+
+                response = self.client.get(
+                    reverse("relatorios:relatorio_detail", kwargs={"pk": relatorio.pk})
+                )
+
+                self.assertNotContains(response, "Reabrir relatório")
 
     def test_usuario_comum_sem_grupo_financeiro_nao_aprova_relatorio(self):
         usuario_comum = get_user_model().objects.create_user(
