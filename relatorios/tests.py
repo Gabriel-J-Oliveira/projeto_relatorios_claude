@@ -258,6 +258,10 @@ class RelatorioFormHospedagemFrontendTests(SimpleTestCase):
         path = settings.BASE_DIR / "static" / "js" / "custom.js"
         return path.read_text(encoding="utf-8")
 
+    def _template_source(self):
+        path = settings.BASE_DIR / "templates" / "relatorios" / "relatorio_form.html"
+        return path.read_text(encoding="utf-8")
+
     def test_datas_hospedagem_sao_identificadas_por_nome_ou_classe(self):
         source = self._custom_js_source()
 
@@ -306,6 +310,50 @@ class RelatorioFormHospedagemFrontendTests(SimpleTestCase):
         self.assertIn('alert("Existem erros no formulário.");', source)
         self.assertIn('const temErro = linhasAtivas(".linha-despesa, .linha-trecho")', source)
         self.assertIn('.some(linha => linha.querySelector(".is-invalid"));', source)
+
+    def test_validador_inline_identifica_datas_de_hospedagem(self):
+        source = self._template_source()
+
+        self.assertIn("function campoDataHospedagemFrontend(input)", source)
+        self.assertIn('input?.classList?.contains("campo-hospedagem-entrada")', source)
+        self.assertIn('input?.classList?.contains("campo-hospedagem-saida")', source)
+        self.assertIn('nome.endsWith("-data_inicio_hospedagem")', source)
+        self.assertIn('nome.endsWith("-data_fim_hospedagem")', source)
+
+    def test_validador_inline_usa_tipo_da_despesa_para_hospedagem(self):
+        source = self._template_source()
+
+        self.assertIn("function linhaDespesaEhHospedagemFrontend(linha)", source)
+        self.assertIn('select[name$="-tipo"], input[name$="-tipo"]', source)
+        self.assertIn('return tipo === "hospedagem";', source)
+        self.assertIn('input.closest(".linha-despesa")', source)
+
+    def test_validador_inline_limpa_hospedagem_inativa_sem_bloquear_submit(self):
+        source = self._template_source()
+        trecho = source[
+            source.index("function validarDatasFuturasFrontend(root = document)")
+            : source.index("function validarDocumentosComprovanteFrontend(root = document)")
+        ]
+
+        self.assertIn("if (dataHospedagemInativa(input)) {", trecho)
+        self.assertIn("limparValidacaoCampo(input);", trecho)
+        self.assertIn("return;", trecho)
+        self.assertLess(
+            trecho.index("if (dataHospedagemInativa(input)) {"),
+            trecho.index("if (input.value && input.value > HOJE_ISO)"),
+        )
+
+    def test_validador_inline_mantem_bloqueio_de_datas_futuras_reais(self):
+        source = self._template_source()
+        trecho = source[
+            source.index("function validarDatasFuturasFrontend(root = document)")
+            : source.index("function validarDocumentosComprovanteFrontend(root = document)")
+        ]
+
+        self.assertIn('root.querySelectorAll(\'input[type="date"]\').forEach(input => {', trecho)
+        self.assertIn("if (input.value && input.value > HOJE_ISO) {", trecho)
+        self.assertIn("invalido = true;", trecho)
+        self.assertIn('marcarCampoInvalido(input, "Data não pode ser futura.");', trecho)
 
 
 class ExtraAdminUsersTests(SimpleTestCase):

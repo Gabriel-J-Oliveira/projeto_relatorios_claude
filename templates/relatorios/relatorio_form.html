@@ -3357,9 +3357,37 @@ async function adicionarLinhaKm() {
     if (feedback && feedback.dataset.backend !== "true") feedback.textContent = "";
   }
 
+  function campoDataHospedagemFrontend(input) {
+    if (typeof campoDataHospedagem === "function") return campoDataHospedagem(input);
+    const nome = input?.name || "";
+    return (
+      input?.classList?.contains("campo-hospedagem-entrada") ||
+      input?.classList?.contains("campo-hospedagem-saida") ||
+      nome.endsWith("-data_inicio_hospedagem") ||
+      nome.endsWith("-data_fim_hospedagem")
+    );
+  }
+
+  function linhaDespesaEhHospedagemFrontend(linha) {
+    if (typeof linhaDespesaEhHospedagem === "function") return linhaDespesaEhHospedagem(linha);
+    const tipo = linha
+      ?.querySelector('select[name$="-tipo"], input[name$="-tipo"]')
+      ?.value;
+    return tipo === "hospedagem";
+  }
+
+  function dataHospedagemInativa(input) {
+    if (!campoDataHospedagemFrontend(input)) return false;
+    return !linhaDespesaEhHospedagemFrontend(input.closest(".linha-despesa"));
+  }
+
   function validarDatasFuturasFrontend(root = document) {
     let invalido = false;
     root.querySelectorAll('input[type="date"]').forEach(input => {
+      if (dataHospedagemInativa(input)) {
+        limparValidacaoCampo(input);
+        return;
+      }
       limparValidacaoCampo(input);
       if (input.value && input.value > HOJE_ISO) {
         invalido = true;
