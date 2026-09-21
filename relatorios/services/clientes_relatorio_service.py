@@ -6,6 +6,7 @@ from relatorios.models import (
     DespesaCliente,
     DespesaRateio,
     EmpresaGrupo,
+    EmpresaGrupoCliente,
     RelatorioCliente,
     StatusRelatorio,
     TrechoKMCliente,
@@ -54,6 +55,14 @@ def normalizar_ids_clientes(valor):
 
 
 def resolver_cliente_empresa_grupo(empresa_grupo):
+    associacao = (
+        EmpresaGrupoCliente.objects.select_related("cliente")
+        .filter(empresa_grupo=empresa_grupo)
+        .first()
+    )
+    if associacao:
+        return associacao.cliente if associacao.cliente.ativo else None
+
     termos = EMPRESAS_GRUPO_TERMOS.get(empresa_grupo)
     if not termos:
         return None
@@ -88,6 +97,18 @@ def resolver_cliente_empresa_grupo(empresa_grupo):
     if len(candidatos) == 1:
         return candidatos[0]
     return None
+
+
+def mapa_clientes_empresa_grupo():
+    return {
+        associacao.empresa_grupo: {
+            "id": associacao.cliente_id,
+            "nome": associacao.cliente.nome_exibicao,
+        }
+        for associacao in EmpresaGrupoCliente.objects.select_related("cliente").filter(
+            cliente__ativo=True
+        )
+    }
 
 
 def obter_clientes_relatorio(relatorio):

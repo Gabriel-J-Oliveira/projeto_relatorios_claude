@@ -737,6 +737,31 @@ class Cliente(models.Model):
         return self.cidade or self.uf or "-"
 
 
+class EmpresaGrupoCliente(models.Model):
+    empresa_grupo = models.CharField(
+        "Empresa do grupo",
+        max_length=30,
+        choices=EmpresaGrupo.choices,
+        unique=True,
+    )
+    cliente = models.OneToOneField(
+        Cliente,
+        verbose_name="Cliente canonico",
+        on_delete=models.PROTECT,
+        related_name="empresa_grupo_canonica",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Cliente canonico da empresa do grupo"
+        verbose_name_plural = "Clientes canonicos das empresas do grupo"
+        ordering = ["empresa_grupo"]
+
+    def __str__(self):
+        return f"{self.get_empresa_grupo_display()} -> {self.cliente}"
+
+
 class Municipio(models.Model):
     codigo_ibge = models.CharField("Código IBGE", max_length=7, unique=True)
     nome = models.CharField("Município", max_length=120)

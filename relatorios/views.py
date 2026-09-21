@@ -58,6 +58,7 @@ from .models import (
 from .services.historico_service import registrar_evento
 from .services.email_service import EmailNotificacaoError, enviar_report_suporte
 from .services.clientes_relatorio_service import (
+    mapa_clientes_empresa_grupo,
     normalizar_ids_clientes,
     obter_clientes_relatorio,
     obter_motivos_clientes_relatorio,
@@ -4048,6 +4049,7 @@ def relatorio_form_view(request, pk=None):
                             "fs_km": fs_km,
                             "instance": instance,
                             "clientes_importacao": _clientes_queryset_selecao(),
+                            "empresas_grupo_clientes": mapa_clientes_empresa_grupo(),
                             "tecnicos_importacao": Tecnico.objects.filter(
                                 ativo=True
                             ).order_by("nome"),
@@ -4099,6 +4101,7 @@ def relatorio_form_view(request, pk=None):
                                 "fs_km": fs_km,
                                 "instance": instance,
                                 "clientes_importacao": _clientes_queryset_selecao(),
+                                "empresas_grupo_clientes": mapa_clientes_empresa_grupo(),
                                 "tecnicos_importacao": Tecnico.objects.filter(
                                     ativo=True
                                 ).order_by("nome"),
@@ -4141,6 +4144,7 @@ def relatorio_form_view(request, pk=None):
                             "fs_km": fs_km,
                             "instance": instance,
                             "clientes_importacao": _clientes_queryset_selecao(),
+                            "empresas_grupo_clientes": mapa_clientes_empresa_grupo(),
                             "tecnicos_importacao": Tecnico.objects.filter(
                                 ativo=True
                             ).order_by("nome"),
@@ -4224,6 +4228,7 @@ def relatorio_form_view(request, pk=None):
             "fs_km": fs_km,
             "instance": instance,
             "clientes_importacao": _clientes_queryset_selecao(),
+            "empresas_grupo_clientes": mapa_clientes_empresa_grupo(),
             "tecnicos_importacao": Tecnico.objects.filter(ativo=True).order_by("nome"),
             "titulo_pagina": (
                 f"Editar Relatório {instance.identificador}" if instance else "Novo Relatório"

@@ -1436,6 +1436,7 @@
         {% endblock %}
         {% block extra_js %}
           {{ motivos_clientes_relatorio|json_script:"motivos-clientes-relatorio-data" }}
+          {{ empresas_grupo_clientes|json_script:"empresas-grupo-clientes-data" }}
           <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
           <script src="https://cdn.jsdelivr.net/npm/driver.js@latest/dist/driver.js.iife.js"></script>
           <script defer src="{% static 'js/relatorio_autosave.js' %}?v={{ static_version|default:'20260807' }}"></script>
@@ -1601,6 +1602,16 @@
     fiscalmax: ["FISCALMAX", "FISCAL MAX"],
     casa_chico_de_pneus: ["CASA CHICO DE PNEUS"],
   };
+  const empresasGrupoClientes = (() => {
+    const el = document.getElementById("empresas-grupo-clientes-data");
+    if (!el) return {};
+    try {
+      return JSON.parse(el.textContent || "{}") || {};
+    } catch (err) {
+      console.warn("Falha ao ler vínculos das empresas do grupo.", err);
+      return {};
+    }
+  })();
 
   function selecionarClienteEmpresaGrupo() {
     const empresa = document.querySelector('[name="empresa_grupo"]')?.value || "";
@@ -1610,6 +1621,14 @@
       setClientesInput(document.getElementById("id_clientes_relatorio"), []);
       atualizarBadgesClientesRelatorio();
       atualizarBadgesClientesItens();
+      return;
+    }
+    const clienteCanonico = empresasGrupoClientes[empresa];
+    if (clienteCanonico?.id) {
+      setClientesInput(document.getElementById("id_clientes_relatorio"), [clienteCanonico.id]);
+      atualizarBadgesClientesRelatorio();
+      atualizarBadgesClientesItens();
+      if (feedback) feedback.textContent = "Empresa vinculada automaticamente para os controles internos.";
       return;
     }
     const termos = (EMPRESAS_GRUPO_TERMOS[empresa] || [empresa]).map(normalizarBuscaTexto);

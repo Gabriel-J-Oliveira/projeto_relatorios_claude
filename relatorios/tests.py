@@ -1,10 +1,12 @@
 import json
+import importlib
 from decimal import Decimal
 from datetime import date
 import sys
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.conf import settings
@@ -22,6 +24,7 @@ from .models import (
     Cliente,
     EmailLog,
     EmpresaGrupo,
+    EmpresaGrupoCliente,
     EscopoPoliticaValor,
     DespesaCliente,
     DespesaRateio,
@@ -3997,6 +4000,101 @@ class ClienteListViewTests(TestCase):
 
 
 class ClienteEmpresaGrupoTests(TestCase):
+    def _rodar_data_migration_0062(self):
+        migration = importlib.import_module(
+            "relatorios.migrations.0062_empresa_grupo_cliente"
+        )
+        migration.criar_associacoes_seguras(django_apps, None)
+
+    def test_migration_associa_blazius_existente_ativa_por_cnpj(self):
+        blazius = Cliente.objects.create(
+            nome="BLAZIUS & LORENZETTI ADVOGADOS ASSOCIADOS",
+            razao_social="BLAZIUS & LORENZETTI ADVOGADOS ASSOCIADOS",
+            cnpj_cpf="24649215000104",
+            ativo=True,
+        )
+
+        self._rodar_data_migration_0062()
+
+        associacao = EmpresaGrupoCliente.objects.get(
+            empresa_grupo=EmpresaGrupo.BLAZIUS_E_LORENZETTI
+        )
+        self.assertEqual(associacao.cliente, blazius)
+        self.assertEqual(
+            resolver_cliente_empresa_grupo(EmpresaGrupo.BLAZIUS_E_LORENZETTI),
+            blazius,
+        )
+
+    def test_migration_cria_blazius_local_quando_cnpj_nao_existe(self):
+        self._rodar_data_migration_0062()
+
+        blazius = Cliente.objects.get(cnpj_cpf="24649215000104")
+        self.assertEqual(blazius.nome, "BLAZIUS & LORENZETTI ADVOGADOS ASSOCIADOS")
+        self.assertEqual(
+            blazius.razao_social, "BLAZIUS & LORENZETTI ADVOGADOS ASSOCIADOS"
+        )
+        self.assertTrue(blazius.ativo)
+        self.assertFalse(blazius.origem_api)
+        self.assertEqual(
+            EmpresaGrupoCliente.objects.get(
+                empresa_grupo=EmpresaGrupo.BLAZIUS_E_LORENZETTI
+            ).cliente,
+            blazius,
+        )
+
+    def test_migration_nao_escolhe_blazius_inativa_nem_cria_duplicada(self):
+        Cliente.objects.create(
+            nome="BLAZIUS & LORENZETTI ADVOGADOS ASSOCIADOS",
+            cnpj_cpf="24649215000104",
+            ativo=False,
+        )
+
+        self._rodar_data_migration_0062()
+
+        self.assertFalse(
+            EmpresaGrupoCliente.objects.filter(
+                empresa_grupo=EmpresaGrupo.BLAZIUS_E_LORENZETTI
+            ).exists()
+        )
+        self.assertEqual(Cliente.objects.filter(cnpj_cpf="24649215000104").count(), 1)
+
+    def test_associacao_explicita_tem_prioridade_sobre_texto_ambiguo(self):
+        canonico = Cliente.objects.create(
+            nome="Casa Chico de Pneus Ltda",
+            razao_social="CASA CHICO DE PNEUS LTDA",
+            cnpj_cpf="77816478000119",
+            origem_api=True,
+            ativo=True,
+        )
+        Cliente.objects.create(nome="CASA CHICO DE PNEUS LTDA", ativo=True)
+        EmpresaGrupoCliente.objects.create(
+            empresa_grupo=EmpresaGrupo.CASA_CHICO_DE_PNEUS,
+            cliente=canonico,
+        )
+
+        encontrado = resolver_cliente_empresa_grupo(EmpresaGrupo.CASA_CHICO_DE_PNEUS)
+
+        self.assertEqual(encontrado, canonico)
+
+    def test_associacao_explicita_inativa_falha_sem_fallback(self):
+        canonico = Cliente.objects.create(nome="CONTROLSUL", ativo=False)
+        Cliente.objects.create(nome="CONTROLSUL", ativo=True)
+        EmpresaGrupoCliente.objects.create(
+            empresa_grupo=EmpresaGrupo.CONTROLSUL,
+            cliente=canonico,
+        )
+
+        encontrado = resolver_cliente_empresa_grupo(EmpresaGrupo.CONTROLSUL)
+
+        self.assertIsNone(encontrado)
+
+    def test_empresa_sem_associacao_e_sem_fallback_nao_resolve(self):
+        Cliente.objects.create(nome="LEONARDO LORA BLAZIUS", ativo=True)
+
+        encontrado = resolver_cliente_empresa_grupo(EmpresaGrupo.BLAZIUS_E_LORENZETTI)
+
+        self.assertIsNone(encontrado)
+
     def test_resolve_blazius_por_alias_com_e_comercial(self):
         empresa = Cliente.objects.create(
             nome="BLAZIUS & LORENZETTI",
@@ -4031,6 +4129,25 @@ class ClienteEmpresaGrupoTests(TestCase):
         encontrado = resolver_cliente_empresa_grupo(EmpresaGrupo.CONTROLSUL)
 
         self.assertIsNone(encontrado)
+
+    def test_mapa_clientes_empresa_grupo_lista_somente_associacoes_ativas(self):
+        ativo = Cliente.objects.create(nome="CONTROLSUL", ativo=True)
+        inativo = Cliente.objects.create(nome="FISCALMAX", ativo=False)
+        EmpresaGrupoCliente.objects.create(
+            empresa_grupo=EmpresaGrupo.CONTROLSUL,
+            cliente=ativo,
+        )
+        EmpresaGrupoCliente.objects.create(
+            empresa_grupo=EmpresaGrupo.FISCALMAX,
+            cliente=inativo,
+        )
+
+        from .services.clientes_relatorio_service import mapa_clientes_empresa_grupo
+
+        mapa = mapa_clientes_empresa_grupo()
+
+        self.assertEqual(mapa[EmpresaGrupo.CONTROLSUL]["id"], ativo.pk)
+        self.assertNotIn(EmpresaGrupo.FISCALMAX, mapa)
 
 
 class RelatorioTecnicoFlowTests(TestCase):
@@ -4149,7 +4266,7 @@ class RelatorioTecnicoFlowTests(TestCase):
         self.assertNotIn("fechado", choices)
         self.assertNotIn("enviado", choices)
 
-    def test_nao_reembolsavel_ignora_cliente_postado_e_vincula_empresa_grupo(self):
+    def test_nao_reembolsavel_ignora_cliente_postado_e_vincula_empresa_grupo_canonica(self):
         self.usuario_financeiro.first_name = "Usuario"
         self.usuario_financeiro.last_name = "Financeiro"
         self.usuario_financeiro.email = "financeiro@example.com"
@@ -4158,18 +4275,25 @@ class RelatorioTecnicoFlowTests(TestCase):
             usuario=self.usuario_financeiro,
             defaults={"cadastro_confirmado_em": timezone.now()},
         )
-        controlsul = Cliente.objects.create(
-            nome="CONTROLSUL",
-            razao_social="CONTROLSUL GESTAO EMPRESARIAL LTDA",
+        casa_chico = Cliente.objects.create(
+            nome="Casa Chico de Pneus Ltda",
+            razao_social="CASA CHICO DE PNEUS LTDA",
+            cnpj_cpf="77816478000119",
+            origem_api=True,
             cidade="Curitiba",
             uf="PR",
             valor_km=Decimal("1.35"),
+        )
+        Cliente.objects.create(nome="CASA CHICO DE PNEUS LTDA")
+        EmpresaGrupoCliente.objects.create(
+            empresa_grupo=EmpresaGrupo.CASA_CHICO_DE_PNEUS,
+            cliente=casa_chico,
         )
         dados = self.dados_relatorio(
             acao="rascunho",
             tipo_relatorio="operacional",
             tipo_reembolso="nao_reembolsavel",
-            empresa_grupo=EmpresaGrupo.CONTROLSUL,
+            empresa_grupo=EmpresaGrupo.CASA_CHICO_DE_PNEUS,
             clientes_relatorio=str(self.cliente.pk),
             tecnico_reembolso=str(self.tecnico.pk),
             tecnicos_equipe=[],
@@ -4204,10 +4328,77 @@ class RelatorioTecnicoFlowTests(TestCase):
             response,
             reverse("relatorios:relatorio_detail", kwargs={"pk": relatorio.pk}),
         )
-        self.assertEqual(relatorio.cliente_id, controlsul.pk)
+        self.assertEqual(relatorio.cliente_id, casa_chico.pk)
         self.assertEqual(
             list(relatorio.clientes_vinculados.values_list("cliente_id", flat=True)),
-            [controlsul.pk],
+            [casa_chico.pk],
+        )
+
+    def test_nao_reembolsavel_blazius_usa_cliente_canonico_por_cnpj(self):
+        self.usuario_financeiro.first_name = "Usuario"
+        self.usuario_financeiro.last_name = "Financeiro"
+        self.usuario_financeiro.email = "financeiro@example.com"
+        self.usuario_financeiro.save(update_fields=["first_name", "last_name", "email"])
+        PerfilUsuario.objects.update_or_create(
+            usuario=self.usuario_financeiro,
+            defaults={"cadastro_confirmado_em": timezone.now()},
+        )
+        blazius = Cliente.objects.create(
+            nome="BLAZIUS & LORENZETTI ADVOGADOS ASSOCIADOS",
+            razao_social="BLAZIUS & LORENZETTI ADVOGADOS ASSOCIADOS",
+            cnpj_cpf="24649215000104",
+            cidade="Cascavel",
+            uf="PR",
+            ativo=True,
+        )
+        Cliente.objects.create(nome="LEONARDO LORA BLAZIUS", ativo=True)
+        EmpresaGrupoCliente.objects.create(
+            empresa_grupo=EmpresaGrupo.BLAZIUS_E_LORENZETTI,
+            cliente=blazius,
+        )
+        dados = self.dados_relatorio(
+            acao="rascunho",
+            tipo_relatorio="operacional",
+            tipo_reembolso="nao_reembolsavel",
+            empresa_grupo=EmpresaGrupo.BLAZIUS_E_LORENZETTI,
+            clientes_relatorio=str(self.cliente.pk),
+            tecnico_reembolso=str(self.tecnico.pk),
+            tecnicos_equipe=[],
+        )
+        dados.update(self.dados_formsets_vazios())
+        dados.update(
+            {
+                "despesas-TOTAL_FORMS": "1",
+                "despesas-0-id": "",
+                "despesas-0-ordem": "0",
+                "despesas-0-data": "2026-05-02",
+                "despesas-0-tipo": "alimentacao",
+                "despesas-0-descricao": "Almoco",
+                "despesas-0-valor": "50.00",
+                "despesas-0-quem_pagou": "tecnico",
+                "despesas-0-clientes": "",
+            }
+        )
+
+        response = self.client.post(reverse("relatorios:relatorio_create"), dados)
+
+        relatorio = RelatorioTecnico.objects.order_by("-pk").first()
+        self.assertIsNotNone(
+            relatorio,
+            msg=(
+                f"status={response.status_code}; location={response.get('Location')}; "
+                f"form={response.context['form'].errors if response.context else None}; "
+                f"resumo={response.context.get('resumo_erros') if response.context else None}"
+            ),
+        )
+        self.assertRedirects(
+            response,
+            reverse("relatorios:relatorio_detail", kwargs={"pk": relatorio.pk}),
+        )
+        self.assertEqual(relatorio.cliente_id, blazius.pk)
+        self.assertEqual(
+            list(relatorio.clientes_vinculados.values_list("cliente_id", flat=True)),
+            [blazius.pk],
         )
 
     def test_autosave_rascunho_substitui_versao_anterior(self):
