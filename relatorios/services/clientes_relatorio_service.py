@@ -16,10 +16,13 @@ from relatorios.models import (
 
 ESTADOS_FINAIS = {StatusRelatorio.APROVADO, StatusRelatorio.REJEITADO}
 EMPRESAS_GRUPO_TERMOS = {
-    EmpresaGrupo.BLAZIUS_E_LORENZETTI: "BLAZIUS E LORENZETTI",
-    EmpresaGrupo.CONTROLSUL: "CONTROLSUL",
-    EmpresaGrupo.FISCALMAX: "FISCALMAX",
-    EmpresaGrupo.CASA_CHICO_DE_PNEUS: "CASA CHICO DE PNEUS",
+    EmpresaGrupo.BLAZIUS_E_LORENZETTI: (
+        "BLAZIUS E LORENZETTI",
+        "BLAZIUS & LORENZETTI",
+    ),
+    EmpresaGrupo.CONTROLSUL: ("CONTROLSUL",),
+    EmpresaGrupo.FISCALMAX: ("FISCALMAX", "FISCAL MAX"),
+    EmpresaGrupo.CASA_CHICO_DE_PNEUS: ("CASA CHICO DE PNEUS",),
 }
 
 
@@ -51,26 +54,30 @@ def normalizar_ids_clientes(valor):
 
 
 def resolver_cliente_empresa_grupo(empresa_grupo):
-    termo = EMPRESAS_GRUPO_TERMOS.get(empresa_grupo)
-    if not termo:
+    termos = EMPRESAS_GRUPO_TERMOS.get(empresa_grupo)
+    if not termos:
         return None
 
-    candidatos = list(
-        Cliente.objects.filter(ativo=True)
-        .filter(
+    filtro = Q()
+    for termo in termos:
+        filtro |= (
             Q(nome__icontains=termo)
             | Q(razao_social__icontains=termo)
             | Q(nome_fantasia__icontains=termo)
         )
+
+    candidatos = list(
+        Cliente.objects.filter(ativo=True)
+        .filter(filtro)
         .distinct()
         .order_by("pk")
     )
-    termo_normalizado = normalizar_texto_busca(termo)
+    termos_normalizados = {normalizar_texto_busca(termo) for termo in termos}
     exatos = [
         cliente
         for cliente in candidatos
-        if termo_normalizado
-        in {
+        if termos_normalizados
+        & {
             normalizar_texto_busca(cliente.nome),
             normalizar_texto_busca(cliente.razao_social),
             normalizar_texto_busca(cliente.nome_fantasia),

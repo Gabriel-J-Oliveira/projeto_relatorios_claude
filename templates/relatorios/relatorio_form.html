@@ -1595,10 +1595,11 @@
     return btn?.dataset.clienteNome || `Cliente ${id}`;
   }
 
-  const EMPRESAS_GRUPO_TERMO = {
-    blazius_e_lorenzetti: "BLAZIUS E LORENZETTI",
-    controlsul: "CONTROLSUL",
-    fiscalmax: "FISCALMAX",
+  const EMPRESAS_GRUPO_TERMOS = {
+    blazius_e_lorenzetti: ["BLAZIUS E LORENZETTI", "BLAZIUS & LORENZETTI"],
+    controlsul: ["CONTROLSUL"],
+    fiscalmax: ["FISCALMAX", "FISCAL MAX"],
+    casa_chico_de_pneus: ["CASA CHICO DE PNEUS"],
   };
 
   function selecionarClienteEmpresaGrupo() {
@@ -1611,13 +1612,13 @@
       atualizarBadgesClientesItens();
       return;
     }
-    const termo = normalizarBuscaTexto(EMPRESAS_GRUPO_TERMO[empresa] || empresa);
+    const termos = (EMPRESAS_GRUPO_TERMOS[empresa] || [empresa]).map(normalizarBuscaTexto);
     const candidatos = Array.from(document.querySelectorAll(".cliente-opcao")).filter(btn => {
       const row = btn.closest(".cliente-opcao-linha");
       const texto = normalizarBuscaTexto(
         `${btn.dataset.clienteNome || ""} ${row?.dataset.clienteSearch || ""}`
       );
-      return texto.includes(termo);
+      return termos.some(termo => texto.includes(termo));
     });
     const candidatosExatos = candidatos.filter(btn => {
       const row = btn.closest(".cliente-opcao-linha");
@@ -1626,7 +1627,7 @@
         row?.dataset.clienteNome,
         row?.dataset.clienteRazaoSocial,
         row?.dataset.clienteNomeFantasia,
-      ].some(valor => normalizarBuscaTexto(valor || "") === termo);
+      ].some(valor => termos.includes(normalizarBuscaTexto(valor || "")));
     });
     const candidato = candidatosExatos.length === 1
       ? candidatosExatos[0]

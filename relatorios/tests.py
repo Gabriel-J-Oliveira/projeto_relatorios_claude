@@ -3997,6 +3997,17 @@ class ClienteListViewTests(TestCase):
 
 
 class ClienteEmpresaGrupoTests(TestCase):
+    def test_resolve_blazius_por_alias_com_e_comercial(self):
+        empresa = Cliente.objects.create(
+            nome="BLAZIUS & LORENZETTI",
+            razao_social="BLAZIUS & LORENZETTI LTDA",
+            ativo=True,
+        )
+
+        encontrado = resolver_cliente_empresa_grupo(EmpresaGrupo.BLAZIUS_E_LORENZETTI)
+
+        self.assertEqual(encontrado, empresa)
+
     def test_resolve_empresa_por_correspondencia_exata_sem_confundir_com_outro_cliente(self):
         empresa = Cliente.objects.create(
             nome="CONTROLSUL",
