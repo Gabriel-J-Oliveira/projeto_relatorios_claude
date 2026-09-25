@@ -7,11 +7,13 @@ Mudanças:
 """
 
 import mimetypes
+import hashlib
 import unicodedata
 import uuid
 from pathlib import Path
 
-from django.db import models
+from django.db import IntegrityError, models
+from django.db.models import Q
 from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
@@ -30,6 +32,27 @@ def _valor_monetario(valor):
 def _tipo_mime_por_nome(nome_arquivo):
     tipo_mime, _encoding = mimetypes.guess_type(nome_arquivo or "")
     return tipo_mime or "application/octet-stream"
+
+
+def calcular_sha256_arquivo(arquivo):
+    if not arquivo:
+        return ""
+    try:
+        if hasattr(arquivo, "seek"):
+            arquivo.seek(0)
+        digest = hashlib.sha256()
+        chunks = arquivo.chunks() if hasattr(arquivo, "chunks") else iter(lambda: arquivo.read(1024 * 1024), b"")
+        for chunk in chunks:
+            if not chunk:
+                continue
+            digest.update(chunk)
+        return digest.hexdigest()
+    finally:
+        if hasattr(arquivo, "seek"):
+            try:
+                arquivo.seek(0)
+            except Exception:
+                pass
 
 
 def valor_km_control_sul():
@@ -2827,6 +2850,7 @@ class AnexoRelatorio(models.Model):
     nome_original = models.CharField("Nome original", max_length=255)
     tipo_mime = models.CharField("Tipo MIME", max_length=120, blank=True)
     tamanho_bytes = models.PositiveBigIntegerField("Tamanho em bytes", default=0)
+    sha256 = models.CharField("SHA-256", max_length=64, blank=True, db_index=True)
     enviado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -2852,6 +2876,20 @@ class AnexoRelatorio(models.Model):
             models.Index(fields=["relatorio", "criado_em"]),
             models.Index(fields=["despesa"]),
             models.Index(fields=["trecho"]),
+            models.Index(fields=["despesa", "sha256"]),
+            models.Index(fields=["trecho", "sha256"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["despesa", "sha256"],
+                condition=Q(despesa__isnull=False, trecho__isnull=True, sha256__gt=""),
+                name="anexo_desp_sha_uniq",
+            ),
+            models.UniqueConstraint(
+                fields=["trecho", "sha256"],
+                condition=Q(trecho__isnull=False, despesa__isnull=True, sha256__gt=""),
+                name="anexo_trecho_sha_uniq",
+            ),
         ]
 
     def __str__(self):
@@ -2884,6 +2922,7 @@ class AnexoRelatorio(models.Model):
         if not relatorio or not arquivo:
             return None
         origem = arquivo_original or arquivo
+        sha256 = calcular_sha256_arquivo(origem) or calcular_sha256_arquivo(arquivo)
         defaults = {
             "arquivo": arquivo.name,
             "nome_original": getattr(origem, "name", "") or arquivo.name.rsplit("/", 1)[-1],
@@ -2892,17 +2931,37 @@ class AnexoRelatorio(models.Model):
             "enviado_por": usuario if getattr(usuario, "is_authenticated", False) else None,
             "tipo_documento": getattr(despesa or trecho, "tipo_documento_comprovante", "") or "",
             "numero_documento": getattr(despesa or trecho, "numero_documento_comprovante", "") or "",
+            "sha256": sha256,
         }
         filtros = {"relatorio": relatorio}
+        campos_criacao = {"relatorio": relatorio}
         if despesa:
             filtros["despesa"] = despesa
             filtros["trecho__isnull"] = True
+            campos_criacao["despesa"] = despesa
         elif trecho:
             filtros["trecho"] = trecho
             filtros["despesa__isnull"] = True
+            campos_criacao["trecho"] = trecho
         else:
             return None
-        anexo, _created = cls.objects.update_or_create(defaults=defaults, **filtros)
+        lookup = dict(filtros)
+        if sha256:
+            lookup["sha256"] = sha256
+        else:
+            lookup["arquivo"] = arquivo.name
+        anexo = cls.objects.filter(**lookup).order_by("pk").first()
+        if anexo:
+            for campo, valor in defaults.items():
+                setattr(anexo, campo, valor)
+            anexo.save(update_fields=[*defaults.keys()])
+        else:
+            try:
+                anexo = cls.objects.create(**campos_criacao, **defaults)
+            except IntegrityError:
+                anexo = cls.objects.filter(**lookup).order_by("pk").first()
+                if not anexo:
+                    raise
         return anexo
 
 

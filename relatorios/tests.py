@@ -1,5 +1,8 @@
 import json
 import importlib
+import os
+import shutil
+import tempfile
 from decimal import Decimal
 from datetime import date
 import sys
@@ -21,6 +24,7 @@ from django.utils import timezone
 from .models import (
     Adiantamento,
     AnexoRelatorio,
+    calcular_sha256_arquivo,
     Cliente,
     EmailLog,
     EmpresaGrupo,
@@ -139,6 +143,7 @@ from .services.identidade.sincronizacao_service import (
     UsuarioExternoSnapshot,
     sincronizar_usuario_externo,
 )
+from . import views as relatorio_views
 
 
 class _GrupoFake:
@@ -4152,6 +4157,25 @@ class ClienteEmpresaGrupoTests(TestCase):
 
 class RelatorioTecnicoFlowTests(TestCase):
     def setUp(self):
+        self.anexos_tempdir = tempfile.mkdtemp(prefix="relatorios-anexos-test-")
+        self._storages_originais = []
+        for modelo, campo_nome in (
+            (AnexoRelatorio, "arquivo"),
+            (ItemDespesa, "comprovante"),
+            (TrechoKm, "comprovante"),
+        ):
+            storage = modelo._meta.get_field(campo_nome).storage
+            self._storages_originais.append(
+                (
+                    storage,
+                    getattr(storage, "_location", None),
+                    storage.__dict__.get("location"),
+                    storage.__dict__.get("base_location"),
+                )
+            )
+            storage._location = self.anexos_tempdir
+            storage.__dict__.pop("location", None)
+            storage.__dict__.pop("base_location", None)
         self.cliente = Cliente.objects.create(
             nome="Cliente Teste",
             cidade="Curitiba",
@@ -4175,6 +4199,18 @@ class RelatorioTecnicoFlowTests(TestCase):
             last_name="Financeiro",
         )
         self.client.force_login(self.usuario_financeiro)
+
+    def tearDown(self):
+        for storage, location, cached_location, cached_base_location in getattr(self, "_storages_originais", []):
+            storage._location = location
+            storage.__dict__.pop("location", None)
+            storage.__dict__.pop("base_location", None)
+            if cached_location is not None:
+                storage.__dict__["location"] = cached_location
+            if cached_base_location is not None:
+                storage.__dict__["base_location"] = cached_base_location
+        shutil.rmtree(getattr(self, "anexos_tempdir", ""), ignore_errors=True)
+        super().tearDown()
 
     def dados_relatorio(self, **extra):
         dados = {
@@ -4253,6 +4289,262 @@ class RelatorioTecnicoFlowTests(TestCase):
             centro_custo="Manutencao",
             valor_adiantamento=Decimal("100.00"),
         )
+
+    def criar_despesa(self, relatorio=None, **extra):
+        dados = {
+            "relatorio": relatorio or self.criar_relatorio("RT-2026-DESP"),
+            "ordem": 0,
+            "data": date(2026, 5, 2),
+            "tipo": TipoDespesa.ALIMENTACAO,
+            "descricao": "Almoco",
+            "valor": Decimal("50.00"),
+            "quem_pagou": QuemPagou.TECNICO,
+            "tipo_documento_comprovante": "recibo",
+            "numero_documento_comprovante": "R-001",
+        }
+        dados.update(extra)
+        return ItemDespesa.objects.create(**dados)
+
+    def pdf_upload(self, nome, conteudo=b"conteudo"):
+        return SimpleUploadedFile(
+            nome,
+            b"%PDF-1.4\n" + conteudo + b"\n%%EOF",
+            content_type="application/pdf",
+        )
+
+    def test_anexos_existentes_na_mesma_despesa_recebem_terceiro_sem_sobrescrever(self):
+        relatorio = self.criar_relatorio("RT-2026-ANEXOS-EXISTENTES")
+        despesa = self.criar_despesa(relatorio)
+        anexo_a = relatorio_views._criar_anexo_comprovante_adicional(
+            relatorio,
+            self.usuario_financeiro,
+            despesa,
+            self.pdf_upload("a.pdf", b"conteudo-a"),
+        )
+        anexo_b = relatorio_views._criar_anexo_comprovante_adicional(
+            relatorio,
+            self.usuario_financeiro,
+            despesa,
+            self.pdf_upload("b.pdf", b"conteudo-b"),
+        )
+
+        anexo_c = relatorio_views._criar_anexo_comprovante_adicional(
+            relatorio,
+            self.usuario_financeiro,
+            despesa,
+            self.pdf_upload("c.pdf", b"conteudo-c"),
+        )
+
+        self.assertEqual(AnexoRelatorio.objects.filter(despesa=despesa).count(), 3)
+        self.assertTrue(AnexoRelatorio.objects.filter(pk=anexo_a.pk).exists())
+        self.assertTrue(AnexoRelatorio.objects.filter(pk=anexo_b.pk).exists())
+        self.assertTrue(AnexoRelatorio.objects.filter(pk=anexo_c.pk).exists())
+
+    def test_registrar_comprovante_legado_com_dois_anexos_existentes_nao_falha(self):
+        relatorio = self.criar_relatorio("RT-2026-LEGADO-MULTIPLOS")
+        despesa = self.criar_despesa(relatorio)
+        relatorio_views._criar_anexo_comprovante_adicional(
+            relatorio,
+            self.usuario_financeiro,
+            despesa,
+            self.pdf_upload("a.pdf", b"conteudo-a"),
+        )
+        relatorio_views._criar_anexo_comprovante_adicional(
+            relatorio,
+            self.usuario_financeiro,
+            despesa,
+            self.pdf_upload("b.pdf", b"conteudo-b"),
+        )
+        legado = self.pdf_upload("legado.pdf", b"conteudo-legado")
+        despesa.comprovante = legado
+        despesa.save(update_fields=["comprovante"])
+
+        anexo_legado = AnexoRelatorio.registrar_comprovante(
+            relatorio=relatorio,
+            usuario=self.usuario_financeiro,
+            despesa=despesa,
+            arquivo=despesa.comprovante,
+            arquivo_original=legado,
+        )
+
+        self.assertIsNotNone(anexo_legado)
+        self.assertEqual(AnexoRelatorio.objects.filter(despesa=despesa).count(), 3)
+
+    def test_varios_arquivos_novos_no_mesmo_campo_criam_anexos_distintos(self):
+        dados = self.dados_relatorio_com_despesa(
+            motivo="Relatorio com varios comprovantes",
+            **{
+                "despesas-0-comprovante": [
+                    self.pdf_upload("nota_a.pdf", b"arquivo-a"),
+                    self.pdf_upload("nota_b.pdf", b"arquivo-b"),
+                ],
+            },
+        )
+
+        response = self.client.post(reverse("relatorios:relatorio_create"), dados)
+
+        self.assertEqual(response.status_code, 302)
+        relatorio = RelatorioTecnico.objects.get(motivo="Relatorio com varios comprovantes")
+        despesa = relatorio.despesas.get()
+        self.assertTrue(despesa.comprovante)
+        self.assertEqual(AnexoRelatorio.objects.filter(despesa=despesa).count(), 2)
+
+    def test_reenvio_dos_mesmos_bytes_nao_duplica_anexo(self):
+        relatorio = self.criar_relatorio("RT-2026-IDEMPOTENTE")
+        despesa = self.criar_despesa(relatorio)
+        primeiro = relatorio_views._criar_anexo_comprovante_adicional(
+            relatorio,
+            self.usuario_financeiro,
+            despesa,
+            self.pdf_upload("nota.pdf", b"mesmo-conteudo"),
+        )
+
+        segundo = relatorio_views._criar_anexo_comprovante_adicional(
+            relatorio,
+            self.usuario_financeiro,
+            despesa,
+            self.pdf_upload("nota.pdf", b"mesmo-conteudo"),
+        )
+
+        self.assertEqual(primeiro.pk, segundo.pk)
+        self.assertEqual(AnexoRelatorio.objects.filter(despesa=despesa).count(), 1)
+
+    def test_hash_nao_consume_upload_e_conteudo_salvo_permanece_integro(self):
+        relatorio = self.criar_relatorio("RT-2026-HASH-INTEGRO")
+        despesa = self.criar_despesa(relatorio)
+        conteudo = b"%PDF-1.4\nconteudo-preservado\n%%EOF"
+        upload = SimpleUploadedFile(
+            "integro.pdf",
+            conteudo,
+            content_type="application/pdf",
+        )
+        sha256 = calcular_sha256_arquivo(upload)
+
+        self.assertEqual(len(sha256), 64)
+        self.assertEqual(upload.tell(), 0)
+        anexo = relatorio_views._criar_anexo_comprovante_adicional(
+            relatorio,
+            self.usuario_financeiro,
+            despesa,
+            upload,
+        )
+
+        self.assertEqual(len(anexo.sha256), 64)
+        self.assertEqual(anexo.sha256, sha256)
+        with anexo.arquivo.open("rb") as arquivo_salvo:
+            self.assertEqual(arquivo_salvo.read(), conteudo)
+
+    def test_mesmo_nome_com_bytes_diferentes_cria_dois_anexos(self):
+        relatorio = self.criar_relatorio("RT-2026-MESMO-NOME")
+        despesa = self.criar_despesa(relatorio)
+
+        relatorio_views._criar_anexo_comprovante_adicional(
+            relatorio,
+            self.usuario_financeiro,
+            despesa,
+            self.pdf_upload("nota.pdf", b"conteudo-1"),
+        )
+        relatorio_views._criar_anexo_comprovante_adicional(
+            relatorio,
+            self.usuario_financeiro,
+            despesa,
+            self.pdf_upload("nota.pdf", b"conteudo-2"),
+        )
+
+        anexos = AnexoRelatorio.objects.filter(despesa=despesa)
+        self.assertEqual(anexos.count(), 2)
+        self.assertEqual(anexos.values("sha256").distinct().count(), 2)
+
+    def test_mesmo_conteudo_em_despesas_diferentes_eh_permitido(self):
+        relatorio = self.criar_relatorio("RT-2026-MESMO-CONTEUDO")
+        despesa_a = self.criar_despesa(relatorio, descricao="Almoco A")
+        despesa_b = self.criar_despesa(relatorio, descricao="Almoco B", ordem=1)
+
+        anexo_a = relatorio_views._criar_anexo_comprovante_adicional(
+            relatorio,
+            self.usuario_financeiro,
+            despesa_a,
+            self.pdf_upload("nota.pdf", b"conteudo-compartilhado"),
+        )
+        anexo_b = relatorio_views._criar_anexo_comprovante_adicional(
+            relatorio,
+            self.usuario_financeiro,
+            despesa_b,
+            self.pdf_upload("nota.pdf", b"conteudo-compartilhado"),
+        )
+
+        self.assertNotEqual(anexo_a.pk, anexo_b.pk)
+        self.assertEqual(anexo_a.sha256, anexo_b.sha256)
+
+    def test_falha_intermediaria_reverte_banco_limpa_arquivos_novos_e_preserva_antigos(self):
+        relatorio = self.criar_relatorio("RT-2026-ROLLBACK")
+        despesa = self.criar_despesa(relatorio)
+        anexo_antigo = relatorio_views._criar_anexo_comprovante_adicional(
+            relatorio,
+            self.usuario_financeiro,
+            despesa,
+            self.pdf_upload("antigo.pdf", b"antigo"),
+        )
+        storage_antigo = anexo_antigo.arquivo.storage
+        nome_antigo = anexo_antigo.arquivo.name
+        dados = self.dados_relatorio_com_despesa(
+            motivo=relatorio.motivo,
+            **{
+                "numero": relatorio.numero,
+                "despesas-0-id": str(despesa.pk),
+                "despesas-0-comprovante": self.pdf_upload("novo.pdf", b"novo-arquivo"),
+            },
+        )
+
+        with patch(
+            "relatorios.views.sync_clientes_despesa",
+            side_effect=relatorio_views.WorkflowError("Falha controlada"),
+        ):
+            response = self.client.post(reverse("relatorios:relatorio_update", args=[relatorio.pk]), dados)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(AnexoRelatorio.objects.filter(despesa=despesa).count(), 1)
+        self.assertTrue(AnexoRelatorio.objects.filter(pk=anexo_antigo.pk).exists())
+        self.assertTrue(storage_antigo.exists(nome_antigo))
+        nomes_storage = [
+            caminho
+            for raiz, _dirs, arquivos in os.walk(self.anexos_tempdir)
+            for caminho in [os.path.join(raiz, nome) for nome in arquivos]
+        ]
+        self.assertEqual(len(nomes_storage), 1)
+        self.assertTrue(nomes_storage[0].endswith(os.path.basename(nome_antigo)))
+
+    def test_resposta_ajax_erro_generico_nao_gera_nameerror_e_registra_original(self):
+        dados = self.dados_relatorio_com_despesa(
+            motivo="Relatorio erro ajax",
+            **{
+                "despesas-0-comprovante": SimpleUploadedFile(
+                    "nota.pdf",
+                    b"%PDF-1.4\narquivo\n%%EOF",
+                    content_type="application/pdf",
+                ),
+            },
+        )
+
+        with self.assertLogs("relatorios.views", level="ERROR") as logs:
+            with patch(
+                "relatorios.views.sync_clientes_despesa",
+                side_effect=RuntimeError("Falha original controlada"),
+            ):
+                response = self.client.post(
+                    reverse("relatorios:relatorio_create"),
+                    dados,
+                    HTTP_X_RELATORIO_ASYNC_SUBMIT="1",
+                    HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+                )
+
+        self.assertEqual(response.status_code, 500)
+        payload = response.json()
+        self.assertFalse(payload["ok"])
+        self.assertIn("problema durante o envio dos anexos", payload["message"])
+        self.assertNotIn("NameError", "\n".join(logs.output))
+        self.assertIn("Falha original controlada", "\n".join(logs.output))
+        self.assertFalse(RelatorioTecnico.objects.filter(motivo="Relatorio erro ajax").exists())
 
     def test_status_choices_atuais_incluem_fluxo_operacional(self):
         choices = dict(RelatorioTecnico._meta.get_field("status").choices)

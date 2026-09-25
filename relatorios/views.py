@@ -14,7 +14,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
 from django.core.exceptions import PermissionDenied, RequestDataTooBig, SuspiciousOperation, ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.utils import OperationalError, ProgrammingError
 from django.db.models import Q, Sum
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
@@ -54,6 +54,7 @@ from .models import (
     TrechoKm,
     valor_km_control_sul,
     normalizar_nome_pessoa,
+    calcular_sha256_arquivo,
 )
 from .services.historico_service import registrar_evento
 from .services.email_service import EmailNotificacaoError, enviar_report_suporte
@@ -1389,6 +1390,7 @@ def _upload_contexto_inicial(request, instance=None):
         "despesas_total": request.POST.get("despesas-TOTAL_FORMS", "0"),
         "trechos_total": request.POST.get("trechos-TOTAL_FORMS", "0"),
         "persistidos": [],
+        "arquivos_criados": [],
         "validado_em": None,
         "salvando_em": None,
     }
@@ -1638,6 +1640,30 @@ def _upload_log_exception(contexto, request, relatorio, exc):
         len(contexto.get("persistidos", [])) if contexto else 0,
         exc,
     )
+
+
+def _upload_registrar_arquivo_criado(contexto, arquivo):
+    if not contexto or not arquivo:
+        return
+    nome = getattr(arquivo, "name", "") or ""
+    storage = getattr(arquivo, "storage", None)
+    if not nome or not storage:
+        return
+    contexto.setdefault("arquivos_criados", []).append((storage, nome))
+
+
+def _upload_limpar_arquivos_criados(contexto):
+    if not contexto:
+        return
+    criados = list(contexto.get("arquivos_criados", []))
+    contexto["arquivos_criados"] = []
+    for storage, nome in reversed(criados):
+        try:
+            if nome and storage.exists(nome):
+                storage.delete(nome)
+                logger.info("UPLOAD_STORAGE_ROLLBACK arquivo=%s", nome)
+        except Exception:
+            logger.exception("UPLOAD_STORAGE_ROLLBACK_ERRO arquivo=%s", nome)
 
 
 def _erro_resumo(mensagem, *, contexto="", campo="", href="", tab=""):
@@ -2216,21 +2242,68 @@ def _registrar_metadados_comprovante(relatorio, usuario, item, arquivo_original=
         )
 
 
-def _criar_anexo_comprovante_adicional(relatorio, usuario, despesa, arquivo_original):
+def _buscar_anexo_por_hash(*, relatorio, despesa=None, trecho=None, sha256=""):
+    if not relatorio or not sha256:
+        return None
+    filtros = {"relatorio": relatorio, "sha256": sha256}
+    if despesa:
+        filtros["despesa"] = despesa
+        filtros["trecho__isnull"] = True
+    elif trecho:
+        filtros["trecho"] = trecho
+        filtros["despesa__isnull"] = True
+    else:
+        return None
+    return AnexoRelatorio.objects.filter(**filtros).order_by("pk").first()
+
+
+def _criar_anexo_comprovante_adicional(
+    relatorio,
+    usuario,
+    despesa,
+    arquivo_original,
+    *,
+    upload_contexto=None,
+):
     if not relatorio or not despesa or not arquivo_original:
         return None
-    anexo = AnexoRelatorio.objects.create(
+    sha256 = calcular_sha256_arquivo(arquivo_original)
+    anexo_existente = _buscar_anexo_por_hash(
         relatorio=relatorio,
         despesa=despesa,
-        arquivo=arquivo_original,
-        nome_original=getattr(arquivo_original, "name", "") or "comprovante",
-        tipo_mime=getattr(arquivo_original, "content_type", "") or "",
-        tamanho_bytes=getattr(arquivo_original, "size", 0) or 0,
-        enviado_por=usuario if getattr(usuario, "is_authenticated", False) else None,
-        tipo_documento=getattr(despesa, "tipo_documento_comprovante", "") or "",
-        numero_documento=getattr(despesa, "numero_documento_comprovante", "") or "",
-        observacao="Comprovante adicional da despesa.",
+        sha256=sha256,
     )
+    if anexo_existente:
+        return anexo_existente
+    dados = {
+        "relatorio": relatorio,
+        "despesa": despesa,
+        "arquivo": arquivo_original,
+        "nome_original": getattr(arquivo_original, "name", "") or "comprovante",
+        "tipo_mime": getattr(arquivo_original, "content_type", "") or "",
+        "tamanho_bytes": getattr(arquivo_original, "size", 0) or 0,
+        "sha256": sha256,
+        "enviado_por": usuario if getattr(usuario, "is_authenticated", False) else None,
+        "tipo_documento": getattr(despesa, "tipo_documento_comprovante", "") or "",
+        "numero_documento": getattr(despesa, "numero_documento_comprovante", "") or "",
+        "observacao": "Comprovante adicional da despesa.",
+    }
+    anexo = AnexoRelatorio(**dados)
+    try:
+        anexo.save()
+    except IntegrityError:
+        _upload_limpar_arquivos_criados(
+            {"arquivos_criados": [(anexo.arquivo.storage, anexo.arquivo.name)]}
+        )
+        anexo = _buscar_anexo_por_hash(
+            relatorio=relatorio,
+            despesa=despesa,
+            sha256=sha256,
+        )
+        if anexo:
+            return anexo
+        raise
+    _upload_registrar_arquivo_criado(upload_contexto, anexo.arquivo)
     logger.info(
         "UPLOAD_COMPROVANTE relatorio=%s despesa=%s usuario=%s anexo=%s nome=%s tamanho=%s",
         relatorio.pk,
@@ -3834,6 +3907,7 @@ def relatorio_form_view(request, pk=None):
                                             usuario_historico,
                                             item,
                                             arquivo_upload,
+                                            upload_contexto=upload_contexto,
                                         )
                                     if anexo:
                                         with perf.phase("attachments"):
@@ -3843,6 +3917,11 @@ def relatorio_form_view(request, pk=None):
                                                 arquivo_upload,
                                             )
                             else:
+                                if comprovante_upload:
+                                    _upload_registrar_arquivo_criado(
+                                        upload_contexto,
+                                        item.comprovante,
+                                    )
                                 with perf.phase("attachments"):
                                     _upload_registrar_persistido(
                                         upload_contexto,
@@ -3862,6 +3941,7 @@ def relatorio_form_view(request, pk=None):
                                             usuario_historico,
                                             item,
                                             arquivo_upload,
+                                            upload_contexto=upload_contexto,
                                         )
                                     if anexo:
                                         with perf.phase("attachments"):
@@ -3940,11 +4020,19 @@ def relatorio_form_view(request, pk=None):
                                 trecho.valor_km = Decimal("0.00")
                             with perf.phase("km"):
                                 trecho.save()
+                            comprovante_trecho_upload = request.FILES.get(
+                                f"{f.prefix}-comprovante"
+                            )
+                            if comprovante_trecho_upload:
+                                _upload_registrar_arquivo_criado(
+                                    upload_contexto,
+                                    trecho.comprovante,
+                                )
                             with perf.phase("attachments"):
                                 _upload_registrar_persistido(
                                     upload_contexto,
                                     trecho,
-                                    request.FILES.get(f"{f.prefix}-comprovante"),
+                                    comprovante_trecho_upload,
                                 )
                             with perf.phase("km"):
                                 _registrar_auditoria_geografica_trecho(
@@ -4011,6 +4099,13 @@ def relatorio_form_view(request, pk=None):
                             relatorio.status,
                             acao,
                         )
+                        transaction.on_commit(
+                            lambda contexto=upload_contexto: contexto.update(
+                                {"arquivos_criados": []}
+                            )
+                            if contexto
+                            else None
+                        )
 
                     messages.success(
                         request,
@@ -4021,6 +4116,7 @@ def relatorio_form_view(request, pk=None):
                     return perf.apply_server_timing(response)
 
                 except WorkflowError as exc:
+                    _upload_limpar_arquivos_criados(upload_contexto)
                     erros = _lista_erros_operacionais(exc)
                     _adicionar_erros_operacionais(request, erros)
                     _adicionar_erros_resumo(
@@ -4082,6 +4178,7 @@ def relatorio_form_view(request, pk=None):
                             "Nenhum dado foi perdido. Verifique sua conexão e tente novamente."
                         )
                         _upload_log_exception(upload_contexto, request, instance, exc)
+                        _upload_limpar_arquivos_criados(upload_contexto)
                         if _relatorio_async_submit(request):
                             response = _relatorio_async_error_response(
                                 mensagem_upload,
@@ -4123,6 +4220,11 @@ def relatorio_form_view(request, pk=None):
                                 **upload_config,
                             },
                         )
+                    diagnostico_backend = {
+                        "mensagem": "Erro interno ao salvar. Tente novamente.",
+                        "tipo": exc.__class__.__name__,
+                    }
+                    _upload_limpar_arquivos_criados(upload_contexto)
                     logger.exception("Erro ao salvar relatório: %s", exc)
                     messages.error(request, "Erro interno ao salvar. Tente novamente.")
                     if _relatorio_async_submit(request):
