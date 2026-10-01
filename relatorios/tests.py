@@ -364,6 +364,34 @@ class RelatorioFormHospedagemFrontendTests(SimpleTestCase):
         self.assertIn('marcarCampoInvalido(input, "Data não pode ser futura.");', trecho)
 
 
+class RelatorioMapTilesFrontendTests(SimpleTestCase):
+    templates_mapa = (
+        "relatorio_form.html",
+        "relatorio_detail.html",
+        "relatorio_consulta.html",
+    )
+
+    def _template_source(self, nome_template):
+        path = settings.BASE_DIR / "templates" / "relatorios" / nome_template
+        return path.read_text(encoding="utf-8")
+
+    def test_mapas_nao_usam_servidor_publico_de_tiles_do_openstreetmap(self):
+        for nome_template in self.templates_mapa:
+            with self.subTest(template=nome_template):
+                source = self._template_source(nome_template)
+
+                self.assertNotIn("tile.openstreetmap.org", source)
+                self.assertIn("basemaps.cartocdn.com/rastertiles/voyager", source)
+
+    def test_mapas_mantem_atribuicao_dos_tiles(self):
+        for nome_template in self.templates_mapa:
+            with self.subTest(template=nome_template):
+                source = self._template_source(nome_template)
+
+                self.assertIn("openstreetmap.org/copyright", source)
+                self.assertIn("carto.com/attributions", source)
+
+
 class ExtraAdminUsersTests(SimpleTestCase):
     @override_settings(EXTRA_ADMIN_USERS=["joao.martins"])
     def test_usuario_extra_admin_tem_acesso_administrativo(self):
