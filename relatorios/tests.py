@@ -375,21 +375,22 @@ class RelatorioMapTilesFrontendTests(SimpleTestCase):
         path = settings.BASE_DIR / "templates" / "relatorios" / nome_template
         return path.read_text(encoding="utf-8")
 
-    def test_mapas_nao_usam_servidor_publico_de_tiles_do_openstreetmap(self):
+    def test_mapas_usam_tiles_sem_chave_de_api(self):
         for nome_template in self.templates_mapa:
             with self.subTest(template=nome_template):
                 source = self._template_source(nome_template)
 
                 self.assertNotIn("tile.openstreetmap.org", source)
-                self.assertIn("basemaps.cartocdn.com/rastertiles/voyager", source)
+                self.assertNotIn("basemaps.cartocdn.com", source)
+                self.assertIn("server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map", source)
 
     def test_mapas_mantem_atribuicao_dos_tiles(self):
         for nome_template in self.templates_mapa:
             with self.subTest(template=nome_template):
                 source = self._template_source(nome_template)
 
-                self.assertIn("openstreetmap.org/copyright", source)
-                self.assertIn("carto.com/attributions", source)
+                self.assertIn("Tiles &copy; Esri", source)
+                self.assertIn("OpenStreetMap contributors", source)
 
 
 class ExtraAdminUsersTests(SimpleTestCase):
