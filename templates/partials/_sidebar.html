@@ -26,6 +26,12 @@
       </a>
     </li>
 
+    <li class="nav-item">
+      <a href="{% url 'relatorios:analiticos' %}" class="nav-link d-flex align-items-center gap-2 {% if request.resolver_match.url_name == 'analiticos' %}active{% endif %}">
+        <i class="bi bi-bar-chart-line fs-5"></i><span>Analíticos</span>
+      </a>
+    </li>
+
     <!-- Separador Operacoes -->
     <li class="mt-2 mb-1 px-2">
       <small class="text-uppercase text-muted fw-semibold" style="font-size:.7rem;letter-spacing:.05em;">

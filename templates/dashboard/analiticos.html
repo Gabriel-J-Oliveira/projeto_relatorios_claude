@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load l10n %}
+{% block titulo %}Analíticos{% endblock %}
+{% block page_title %}Analíticos de despesas{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{% url 'relatorios:dashboard' %}">Início</a></li><li class="breadcrumb-item active">Analíticos</li>{% endblock %}
+{% block extra_css %}
+<style>
+ .analytics {max-width:1200px;margin:auto}.analytics .bar-link {display:block;color:inherit;text-decoration:none;padding:.65rem 0;border-bottom:1px solid var(--bs-border-color)}
+ .analytics .bar-link:hover,.analytics .bar-link:focus-visible {background:var(--bs-tertiary-bg);outline:2px solid var(--bs-primary)}
+ .analytics .bar-track {height:12px;background:var(--bs-secondary-bg);margin-top:.4rem;border-radius:3px;overflow:hidden}
+ .analytics .bar-fill {height:100%;background:var(--bs-primary)}.analytics td {vertical-align:middle}.analytics .break {overflow-wrap:anywhere}
+ @media(max-width:575px){.analytics .metric {font-size:1.2rem}.analytics .bar-label {max-width:65%}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="analytics">
+  <form method="get" class="row g-2 mb-3 align-items-end" aria-label="Filtros de despesas">
+    <div class="col-6 col-md-2"><label for="inicio" class="form-label small">Início da viagem, de</label><input class="form-control" type="date" id="inicio" name="inicio" value="{{ filtros.inicio }}"></div>
+    <div class="col-6 col-md-2"><label for="fim" class="form-label small">Até</label><input class="form-control" type="date" id="fim" name="fim" value="{{ filtros.fim }}"></div>
+    <div class="col-12 col-md-2"><label for="origem" class="form-label small">Origem</label><select id="origem" name="origem" class="form-select"><option value="">Atuais e legados</option><option value="atual" {% if filtros.origem == 'atual' %}selected{% endif %}>Atuais</option><option value="legado" {% if filtros.origem == 'legado' %}selected{% endif %}>Legados</option></select></div>
+    <div class="col-12 col-md-4"><label for="q" class="form-label small">Relatório, cliente principal, técnico, descrição ou documento</label><input id="q" name="q" class="form-control" type="search" value="{{ filtros.q }}"></div>
+    <div class="col-12 col-md-2 d-flex gap-2"><button class="btn btn-primary" type="submit"><i class="bi bi-funnel" aria-hidden="true"></i> Filtrar</button><a class="btn btn-outline-secondary" href="{% url 'relatorios:analiticos' %}" aria-label="Limpar filtros" title="Limpar filtros"><i class="bi bi-x-lg" aria-hidden="true"></i></a></div>
+  </form>
+  {% if erro_filtros %}<div role="alert" class="alert alert-warning">{{ erro_filtros }}</div>{% else %}
+  <p class="small text-body-secondary">Valores lançados nos itens de despesa, incluindo relatórios em andamento. Não representam reembolso, total aprovado ou custo de KM. O histórico mantém suas categorias originais.</p>
+  <div class="row g-3 border-top border-bottom py-3 mb-4">
+    <div class="col-6 col-md-3"><div class="small text-body-secondary">Despesas no recorte</div><strong class="fs-4 metric">R$ {{ total|floatformat:2 }}</strong></div>
+    <div class="col-6 col-md-3"><div class="small text-body-secondary">Relatórios com despesas</div><strong class="fs-4 metric">{{ relatorios_count }}</strong></div>
+    <div class="col-6 col-md-3"><div class="small text-body-secondary">Itens de despesa</div><strong class="fs-4 metric">{{ quantidade }}</strong></div>
+    <div class="col-6 col-md-3"><div class="small text-body-secondary">Parcela do legado</div><strong class="fs-4 metric">R$ {{ somente_legado|floatformat:2 }}</strong></div>
+  </div>
+  {% if sem_data %}<p class="small text-warning-emphasis">{{ sem_data }} item(ns) sem data de início da viagem; não entram em filtros por período.</p>{% endif %}
+  <section aria-labelledby="categorias-titulo" class="mb-4">
+    <h2 class="h6" id="categorias-titulo">Despesas por categoria</h2>
+    {% for g in categorias %}
+    <a class="bar-link" href="{{ g.url }}" aria-label="Explorar {{ g.nome }}: R$ {{ g.valor|floatformat:2 }}, {{ g.quantidade }} itens">
+      <div class="d-flex justify-content-between gap-2"><span class="bar-label break">{{ g.nome }}</span><span class="text-end">R$ {{ g.valor|floatformat:2 }} <small class="text-body-secondary">· {{ g.quantidade }} itens <i class="bi bi-chevron-right" aria-hidden="true"></i></small></span></div>
+      <div class="bar-track" aria-hidden="true"><div class="bar-fill" style="width:{{ g.largura|unlocalize }}%"></div></div>
+    </a>
+    {% empty %}<p class="text-body-secondary py-4">Nenhuma despesa encontrada nos relatórios que você pode consultar.</p>{% endfor %}
+  </section>
+  <nav aria-label="Trilha de investigação" class="d-flex flex-wrap gap-2 small mb-3">
+    <a href="{{ inicio_url }}">Todas as categorias</a>{% if categoria %}<span aria-hidden="true">›</span><a href="{{ categoria_url }}">{{ categoria|capfirst }}</a>{% endif %}{% if relatorio_selecionado %}<span aria-hidden="true">›</span><span>Relatório {{ relatorio_numero }}</span>{% endif %}{% if detalhe %}<span aria-hidden="true">›</span><span>Item #{{ detalhe.item }}</span>{% endif %}
+  </nav>
+  {% if detalhe %}
+  <section class="border-top border-bottom py-3 mb-4" aria-labelledby="item-titulo">
+    <h2 class="h6" id="item-titulo">Item #{{ detalhe.item }} · {{ detalhe.origem|capfirst }} · Relatório {{ detalhe.numero }}</h2>
+    <p class="break mb-2">{{ detalhe.descricao|default:"Sem descrição" }}</p>
+    <dl class="row small mb-2"><dt class="col-sm-3">Valor lançado</dt><dd class="col-sm-9">R$ {{ detalhe.valor|floatformat:2 }}</dd><dt class="col-sm-3">Data da despesa</dt><dd class="col-sm-9">{{ detalhe.data|date:"d/m/Y"|default:"Não informada" }}</dd><dt class="col-sm-3">Cliente principal / histórico</dt><dd class="col-sm-9">{{ detalhe.cliente|default:"Não informado" }}</dd><dt class="col-sm-3">Técnico responsável / histórico</dt><dd class="col-sm-9">{{ detalhe.tecnico|default:"Não informado" }}</dd><dt class="col-sm-3">Quem pagou</dt><dd class="col-sm-9">{{ detalhe.pagador|default:"Não informado no legado"|capfirst }}</dd><dt class="col-sm-3">Documento</dt><dd class="col-sm-9">{{ detalhe.documento|default:"Não informado" }}</dd></dl>
+    <a href="{{ detalhe.url }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i> Abrir relatório de origem</a>
+  </section>
+  {% endif %}
+  <h2 class="h6">{% if relatorio_selecionado %}Itens que compõem o valor{% else %}Relatórios que compõem o valor{% endif %}</h2>
+  <div class="table-responsive"><table class="table table-hover small"><thead><tr><th>{% if relatorio_selecionado %}Item / descrição{% else %}Relatório{% endif %}</th><th>Origem</th><th>{% if relatorio_selecionado %}Data{% else %}Técnico{% endif %}</th><th class="text-end">Valor lançado</th><th><span class="visually-hidden">Explorar</span></th></tr></thead><tbody>
+  {% for r in pagina %}<tr><td class="break">{% if relatorio_selecionado %}<a href="{{ r.item_url }}">#{{ r.item }} · {{ r.descricao|default:"Sem descrição" }}</a>{% else %}<a href="{{ r.url }}">{{ r.numero }}</a><small class="text-body-secondary d-block">{{ r.quantidade }} item(ns)</small>{% endif %}</td><td>{{ r.origem|capfirst }}</td><td>{% if relatorio_selecionado %}{{ r.data|date:"d/m/Y"|default:"Não informada" }}{% else %}{{ r.tecnico|default:"Não informado" }}{% endif %}</td><td class="text-end text-nowrap">R$ {{ r.valor|floatformat:2 }}</td><td><a href="{% if relatorio_selecionado %}{{ r.item_url }}{% else %}{{ r.url }}{% endif %}" aria-label="Explorar {% if relatorio_selecionado %}item {{ r.item }}{% else %}relatório {{ r.numero }}{% endif %}"><i class="bi bi-chevron-right" aria-hidden="true"></i></a></td></tr>{% empty %}<tr><td colspan="5" class="text-body-secondary">Nenhum registro neste recorte.</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% if pagina.paginator.num_pages > 1 %}<nav aria-label="Paginação" class="d-flex justify-content-between align-items-center">{% if pagina.has_previous %}<a href="{{ anterior_url }}">Anterior</a>{% endif %}<span class="small">{{ pagina.number }} / {{ pagina.paginator.num_pages }}</span>{% if pagina.has_next %}<a href="{{ proxima_url }}">Próxima</a>{% endif %}</nav>{% endif %}
+  {% endif %}
+</div>
+{% endblock %}

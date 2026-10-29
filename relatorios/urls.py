@@ -38,6 +38,7 @@ urlpatterns = [
     ),
     path("tours/marcar-visto/", views.marcar_tour_guiado_visto, name="marcar_tour_guiado_visto"),
     path("dashboard/", views.DashboardView.as_view(), name="dashboard"),
+    path("analiticos", views.analiticos_view, name="analiticos"),
     path("dashboard/dados/", views.dashboard_dados_json, name="dashboard_dados"),
     path("politica-despesa/", views.politica_despesa_json, name="politica_despesa"),
     path("municipios/buscar/", views.municipios_buscar_json, name="municipios_buscar"),

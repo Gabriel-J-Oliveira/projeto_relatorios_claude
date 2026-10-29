@@ -3358,6 +3358,25 @@ def dashboard_dados_json(request):
     return JsonResponse(dados)
 
 
+@require_GET
+@login_required
+@exigir_acesso_erp
+def analiticos_view(request):
+    from django.core.exceptions import ValidationError
+    from .services.analiticos_service import consultar_despesas
+
+    contexto = {"titulo_pagina": "Analiticos", "filtros": request.GET}
+    try:
+        contexto.update(consultar_despesas(
+            queryset_relatorios_visiveis(request.user, RelatorioTecnico.objects.all()),
+            _relatorios_legados_visiveis(request.user), request.GET,
+        ))
+    except ValidationError as exc:
+        contexto["erro_filtros"] = " ".join(exc.messages)
+        return render(request, "dashboard/analiticos.html", contexto, status=400)
+    return render(request, "dashboard/analiticos.html", contexto)
+
+
 def _relatorios_legados_visiveis(user):
     qs = RelatorioLegado.objects.select_related("cliente_vinculado", "tecnico_vinculado", "importado_por")
     if usuario_pode_atuar_como_financeiro(user) or usuario_eh_administrativo(user):
