@@ -32,7 +32,7 @@ class AnaliticosTests(TestCase):
         self.item_legado = DespesaLegada.objects.create(relatorio=self.legado,
             tipo_descricao='Alimentação', valor=Decimal('10.20'), descricao='Jantar antigo')
         self.client.force_login(self.user)
-        self.url = reverse('relatorios:analiticos')
+        self.url = reverse('relatorios:analiticos_explorar')
 
     def test_soma_sem_duplicar_e_mantem_identidades_de_origem(self):
         with self.assertNumQueries(2):

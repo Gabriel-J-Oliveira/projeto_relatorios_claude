@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import analiticos_views
 
 app_name = "relatorios"
 
@@ -38,7 +39,14 @@ urlpatterns = [
     ),
     path("tours/marcar-visto/", views.marcar_tour_guiado_visto, name="marcar_tour_guiado_visto"),
     path("dashboard/", views.DashboardView.as_view(), name="dashboard"),
-    path("analiticos", views.analiticos_view, name="analiticos"),
+    path("analiticos", analiticos_views.financeiro, name="analiticos"),
+    path("analiticos/explorar/", views.analiticos_view, name="analiticos_explorar"),
+    path("analiticos/despesas/", analiticos_views.financeiro, {"nivel":"despesas"}, name="financeiro_despesas"),
+    path("analiticos/clientes/<int:cliente_id>/", analiticos_views.financeiro, {"nivel":"cliente"}, name="financeiro_cliente"),
+    path("analiticos/relatorios/", analiticos_views.financeiro, {"nivel":"relatorios"}, name="financeiro_relatorios"),
+    path("analiticos/adiantamentos/", analiticos_views.financeiro, {"nivel":"adiantamentos"}, name="financeiro_adiantamentos"),
+    path("analiticos/relatorios/<str:origem>/<int:pk>/", analiticos_views.financeiro, {"nivel":"relatorio"}, name="financeiro_relatorio"),
+    path("analiticos/despesas/<str:origem>/<int:pk>/", analiticos_views.financeiro, {"nivel":"item"}, name="financeiro_item"),
     path("dashboard/dados/", views.dashboard_dados_json, name="dashboard_dados"),
     path("politica-despesa/", views.politica_despesa_json, name="politica_despesa"),
     path("municipios/buscar/", views.municipios_buscar_json, name="municipios_buscar"),
