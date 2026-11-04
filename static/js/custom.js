@@ -653,7 +653,7 @@ const FieldRules = [
 
   {
     // Origem / Destino obrigatórios
-    test: c => c.name?.includes("-origem") || c.name?.includes("-destino"),
+    test: c => c.type !== "hidden" && (c.name?.endsWith("-origem") || c.name?.endsWith("-destino")),
     run(campo) {
       const r = Validators.origemDestinoObrigatorio(campo);
       r.ok ? UI.clearError(campo) : UI.setError(campo, r.msg);

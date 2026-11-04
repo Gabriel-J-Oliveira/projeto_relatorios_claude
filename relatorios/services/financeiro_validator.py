@@ -76,8 +76,13 @@ def validar_cobertura_clientes_relatorio(relatorio, clientes_relatorio_ids=None)
     if relatorio.tipo_reembolso == TipoReembolso.NAO_REEMBOLSAVEL:
         clientes_internos_ids = set(
             cliente.pk
-            for cliente in Cliente.objects.filter(pk__in=clientes_relatorio_ids)
-            if cliente_e_empresa_interna_grupo(cliente)
+            for cliente in Cliente.objects.filter(pk__in=clientes_relatorio_ids).select_related(
+                "empresa_grupo_canonica"
+            )
+            if (
+                cliente.ativo
+                and getattr(cliente, "empresa_grupo_canonica", None) is not None
+            ) or cliente_e_empresa_interna_grupo(cliente)
         )
         clientes_relatorio_ids = clientes_relatorio_ids - clientes_internos_ids
         if not clientes_relatorio_ids:
