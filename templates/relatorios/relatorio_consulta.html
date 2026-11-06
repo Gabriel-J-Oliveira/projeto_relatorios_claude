@@ -166,13 +166,21 @@
     </div>
     <div class="consulta-status-panel">
       <span class="text-muted small">Resultado financeiro</span>
-      <strong>R$ {{ consulta.totais.total_aprovado|floatformat:2 }}</strong>
-      <small class="text-muted">Total aprovado para reembolso/prestação</small>
+      <strong data-testid="reembolso-final">R$ {{ consulta.totais.total_a_reembolsar|floatformat:2 }}</strong>
+      <small class="text-muted">Valor final a reembolsar ao técnico</small>
+      <dl class="small mt-3 mb-0 consulta-composicao">
+        <div><dt>Despesas reembolsáveis aprovadas</dt><dd>R$ {{ consulta.totais.total_despesas_reembolsaveis|floatformat:2 }}</dd></div>
+        <div><dt>KM a ressarcir</dt><dd>R$ {{ consulta.totais.valor_km_ressarcir|floatformat:2 }}</dd></div>
+        <div class="border-top pt-2"><dt>Adiantamento</dt><dd>− R$ {{ consulta.totais.valor_adiantamento|floatformat:2 }}</dd></div>
+      </dl>
+      {% if consulta.totais.total_a_reembolsar < 0 %}
+      <small class="text-warning d-block mt-2">Saldo negativo: o adiantamento supera o valor a ressarcir.</small>
+      {% endif %}
     </div>
   </div>
 </section>
 
-<section class="row g-3 mb-4">
+<section class="consulta-kpis mb-4">
   <div class="col-12 col-sm-6 col-xl-2">
     <div class="consulta-kpi">
       <span>Despesas reembolsaveis</span>
@@ -201,6 +209,12 @@
     <div class="consulta-kpi success">
       <span>Total a reembolsar</span>
       <strong>R$ {{ consulta.totais.total_a_reembolsar|floatformat:2 }}</strong>
+    </div>
+  </div>
+  <div class="col-12 col-sm-6 col-xl-2">
+    <div class="consulta-kpi">
+      <span>Adiantamento informado</span>
+      <strong data-testid="adiantamento">R$ {{ consulta.totais.valor_adiantamento|floatformat:2 }}</strong>
     </div>
   </div>
   <div class="col-12 col-sm-6 col-xl-2">
@@ -633,7 +647,17 @@
   .consulta-status-panel {
     min-width: min(100%, 320px);
     padding: 1.25rem;
+    border-color: rgba(var(--bs-primary-rgb), .5);
   }
+
+  .consulta-composicao > div { display: flex; justify-content: space-between; gap: 1rem; margin-top: .65rem; }
+  .consulta-composicao dt { font-weight: normal; }
+  .consulta-composicao dd { margin: 0; white-space: nowrap; }
+  .consulta-kpis { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1rem; }
+  .consulta-kpis > div { width: auto; min-width: 0; }
+  @media (max-width: 1399.98px) { .consulta-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  @media (max-width: 767.98px) { .consulta-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 419.98px) { .consulta-kpis { grid-template-columns: 1fr; } }
 
   .consulta-status-panel strong {
     display: block;
