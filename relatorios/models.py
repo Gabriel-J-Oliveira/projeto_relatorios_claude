@@ -2876,8 +2876,8 @@ class AnexoRelatorio(models.Model):
             models.Index(fields=["relatorio", "criado_em"]),
             models.Index(fields=["despesa"]),
             models.Index(fields=["trecho"]),
-            models.Index(fields=["despesa", "sha256"]),
-            models.Index(fields=["trecho", "sha256"]),
+            models.Index(fields=["despesa", "sha256"], name="relatorios__despesa_6566ad_idx"),
+            models.Index(fields=["trecho", "sha256"], name="relatorios__trecho__bc1f24_idx"),
         ]
         constraints = [
             models.UniqueConstraint(
