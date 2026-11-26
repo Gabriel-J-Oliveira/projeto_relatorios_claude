@@ -378,7 +378,6 @@ Antes de implementar:
 - Municipios IBGE: comando `importar_municipios_ibge`.
 - Mapas: Leaflet; ativos remotos e provedores de tiles dependem de conectividade e configuracao.
 - Correio: SMTP configuravel por ambiente. Identidade: Django auth e LDAP/Active Directory opcional.
-- Analiticos: `/analiticos` e rotas de detalhamento em `relatorios/analiticos_views.py`.
 - Dependencias e versoes oficiais: `requirements.txt`; PostgreSQL, psycopg, Gunicorn, WhiteNoise e WeasyPrint. SQLite de teste e exclusivamente local.
 
 Detalhes de autorizacao e cutover: [Central de Permissoes](docs/central_permissoes.md). Nunca publique credenciais ou arquivos .env.
