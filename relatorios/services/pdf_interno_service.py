@@ -117,7 +117,7 @@ def _relatorio_snapshot(payload):
         status=relatorio.get("status") or "",
         status_label=relatorio.get("status_label") or "",
         tipo_relatorio=relatorio.get("tipo_relatorio") or "",
-        tipo_relatorio_label=relatorio.get("tipo_relatorio_label") or "Nao informado",
+        tipo_relatorio_label=relatorio.get("tipo_relatorio_label") or "Não informado",
         tipo_reembolso=relatorio.get("tipo_reembolso") or "reembolsavel",
         tipo_reembolso_label=relatorio.get("tipo_reembolso_label") or "Reembolsável",
         empresa_grupo=relatorio.get("empresa_grupo") or "",
@@ -131,7 +131,7 @@ def _relatorio_snapshot(payload):
         cidade_atendimento=relatorio.get("cidade_atendimento") or "",
         uf_atendimento=relatorio.get("uf_atendimento") or "",
         cidades=cidades,
-        cidade_principal=cidades[0].nome if cidades else "NÃ£o informado",
+        cidade_principal=cidades[0].nome if cidades else "Não informado",
         cidade_extra_count=max(len(cidades) - 1, 0),
         clientes=clientes,
         tecnicos=tecnicos,
@@ -395,10 +395,11 @@ def _relatorio_vivo(relatorio):
         empresa_grupo=relatorio.empresa_grupo,
         empresa_grupo_label=relatorio.get_empresa_grupo_display() if relatorio.empresa_grupo else "",
         tecnico_reembolso_nome=(
-            relatorio.tecnico_reembolso_exibicao().nome
-            if relatorio.tecnico_reembolso_exibicao()
-            else "Não informado"
+            relatorio.tecnico_reembolso.nome
+            if relatorio.tecnico_reembolso_id
+            else tecnicos[0].nome if len(tecnicos) == 1 else "Não informado"
         ),
+        tecnico_reembolso_fallback_historico=not relatorio.tecnico_reembolso_id and len(tecnicos) == 1,
         data_inicio=relatorio.data_inicio,
         data_fim=relatorio.data_fim,
         aprovado_em=relatorio.aprovado_em,
@@ -406,7 +407,7 @@ def _relatorio_vivo(relatorio):
         cidade_atendimento=relatorio.cidade_atendimento,
         uf_atendimento=relatorio.uf_atendimento,
         cidades=cidades,
-        cidade_principal=cidades[0].nome if cidades else "NÃ£o informado",
+        cidade_principal=cidades[0].nome if cidades else "Não informado",
         cidade_extra_count=max(len(cidades) - 1, 0),
         clientes=clientes,
         tecnicos=tecnicos,
@@ -562,7 +563,7 @@ def _justificativas_vivas(relatorio):
 
 def _categoria_contabil(tipo):
     mapa = {
-        "alimentacao": "Alimentacao",
+        "alimentacao": "Alimentação",
         "hospedagem": "Hotel",
         "transporte": "Taxi/Uber/Passagem",
         "pedagio": "Pedagio",

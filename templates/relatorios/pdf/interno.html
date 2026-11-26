@@ -15,7 +15,7 @@
       </div>
     </div>
     <div class="header-meta">
-      <div class="label">Relatorio</div>
+      <div class="label">Relatório</div>
       <div class="number">{{ pdf.relatorio.identificador }}</div>
       <span class="status status-{{ pdf.relatorio.status }}">{{ pdf.relatorio.status_label }}</span>
     </div>
@@ -37,11 +37,8 @@
         {% endif %}
       </div>
       <div>
-        <span class="label">Tecnico(s)</span>
-        <strong>{{ pdf.relatorio.tecnico_principal }}{% if pdf.relatorio.tecnico_extra_count %} +{{ pdf.relatorio.tecnico_extra_count }}{% endif %}</strong>
-        {% if pdf.relatorio.tecnicos|length > 1 %}
-        <small>{% for tecnico in pdf.relatorio.tecnicos %}{{ tecnico.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}</small>
-        {% endif %}
+        <span class="label">Técnicos participantes</span>
+        {% for tecnico in pdf.relatorio.tecnicos %}<strong class="tecnico-participante">{{ tecnico.nome }}</strong>{% empty %}<strong>Não informado</strong>{% endfor %}
       </div>
       <div>
         <span class="label">Cidade(s)</span>
@@ -55,12 +52,8 @@
         <strong>{{ pdf.relatorio.tipo_reembolso_label|default:"Reembolsável" }}</strong>
       </div>
       <div>
-        <span class="label">Técnico reembolsado</span>
-        <strong>{{ pdf.relatorio.tecnico_reembolso_nome|default:"Não informado" }}</strong>
-      </div>
-      <div>
-        <span class="label">Area de gasto</span>
-        <strong>{{ pdf.relatorio.tipo_relatorio_label|default:"Nao informado" }}</strong>
+        <span class="label">Área de gasto</span>
+        <strong>{{ pdf.relatorio.tipo_relatorio_label|default:"Não informado" }}</strong>
       </div>
       <div>
         <span class="label">Período</span>
@@ -75,6 +68,13 @@
         <strong>{{ pdf.relatorio.aprovado_em|date:"d/m/Y H:i"|default:"-" }}</strong>
       </div>
     </div>
+  </section>
+
+  <section class="beneficiario">
+    <span class="label">Beneficiário do reembolso</span>
+    <strong>{{ pdf.relatorio.tecnico_reembolso_nome|default:"Não informado" }}</strong>
+    {% if pdf.relatorio.tecnico_reembolso_fallback_historico %}<small>Indicação histórica: único técnico participante.</small>{% endif %}
+    <small>{% if pdf.total_reembolso_tecnico < 0 %}Saldo a devolver à empresa{% elif pdf.total_reembolso_tecnico == 0 %}Saldo zerado{% else %}Valor sujeito à conferência financeira{% endif %}</small>
   </section>
 
   <section class="section">
@@ -126,8 +126,8 @@
   </section>
 
   <section class="section">
-    <h2>Despesas pagas pelo tecnico</h2>
-    {% include "relatorios/pdf/partials/_interno_despesas_table.html" with despesas=pdf.despesas_tecnico empty_text="Nenhuma despesa paga pelo tecnico." %}
+    <h2>Despesas pagas pelo técnico</h2>
+    {% include "relatorios/pdf/partials/_interno_despesas_table.html" with despesas=pdf.despesas_tecnico empty_text="Nenhuma despesa paga pelo técnico." %}
   </section>
 
   <section class="section">
@@ -145,7 +145,7 @@
           <th class="amount">KM</th>
           <th class="amount">Pagar técnico</th>
           <th class="amount">Cobrar cliente</th>
-          <th class="amount">Excesso/reducao</th>
+          <th class="amount">Excesso/redução</th>
           <th>Status</th>
         </tr>
       </thead>
@@ -168,12 +168,12 @@
   </section>
 
   <section class="section page-break-avoid">
-    <h2>Lancamento contabil por categoria</h2>
+    <h2>Lançamento contábil por categoria</h2>
     <table class="data-table compact">
       <thead>
         <tr>
           <th>Categoria</th>
-          <th class="amount">Pago tecnico</th>
+          <th class="amount">Pago técnico</th>
           <th class="amount">Pago empresa</th>
           <th class="amount">Total</th>
         </tr>
@@ -187,7 +187,7 @@
           <td class="amount">R$ {{ linha.total|floatformat:2 }}</td>
         </tr>
         {% empty %}
-        <tr><td colspan="4" class="empty">Nenhum lancamento contabil.</td></tr>
+        <tr><td colspan="4" class="empty">Nenhum lançamento contábil.</td></tr>
         {% endfor %}
       </tbody>
     </table>

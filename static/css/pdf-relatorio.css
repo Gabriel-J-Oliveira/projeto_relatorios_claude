@@ -74,10 +74,18 @@ body {
 
 h1 {
   color: #111827;
-  font-size: 20px;
+  font-size: 17px;
   line-height: 1.1;
   margin: 3px 0 0;
 }
+
+.brand { flex: 1; min-width: 0; }
+.brand-mark { flex-shrink: 0; }
+.header-meta { flex-shrink: 0; margin-left: 12px; }
+.tecnico-participante { display: block; overflow-wrap: anywhere; }
+.beneficiario { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 12px; padding: 10px 12px; break-inside: avoid; }
+.beneficiario strong { color: #111827; display: block; font-size: 15px; overflow-wrap: anywhere; }
+.beneficiario small { color: #475569; display: block; margin-top: 3px; }
 
 h2 {
   color: #111827;

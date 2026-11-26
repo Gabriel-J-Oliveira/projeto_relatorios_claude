@@ -4979,7 +4979,7 @@ def relatorio_pdf_interno_view(request, pk):
         "relatorios/pdf/interno.html",
         {
             "pdf": pdf_contexto,
-            "empresa": "CONTROLSUL GESTÃƒO EMPRESARIAL",
+            "empresa": "CONTROLSUL GESTÃO EMPRESARIAL",
             "emitido_em": emitido_em,
             "usuario_gerador": usuario_gerador,
         },

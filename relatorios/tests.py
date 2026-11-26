@@ -6628,7 +6628,7 @@ class RelatorioTecnicoFlowTests(TestCase):
         class FakeHTML:
             rendered_html = ""
 
-            def __init__(self, string, base_url):
+            def __init__(self, string, base_url, encoding=None):
                 FakeHTML.rendered_html = string
                 self.base_url = base_url
 
@@ -6712,7 +6712,7 @@ class RelatorioTecnicoFlowTests(TestCase):
         class FakeHTML:
             rendered_html = ""
 
-            def __init__(self, string, base_url):
+            def __init__(self, string, base_url, encoding=None):
                 FakeHTML.rendered_html = string
                 self.base_url = base_url
 
@@ -6722,7 +6722,7 @@ class RelatorioTecnicoFlowTests(TestCase):
 
         self.client.force_login(self.usuario_financeiro)
         relatorio = self.criar_relatorio("RT-2026-016")
-        relatorio.status = StatusRelatorio.CONFERENCIA
+        relatorio.status = StatusRelatorio.APROVADO
         relatorio.motivo_rejeicao = "Ajuste solicitado para conferência interna."
         relatorio.save(update_fields=["status", "motivo_rejeicao"])
         ItemDespesa.objects.create(
@@ -6773,19 +6773,23 @@ class RelatorioTecnicoFlowTests(TestCase):
         self.assertEqual(response["Content-Type"], "application/pdf")
         self.assertIn("inline", response["Content-Disposition"])
         self.assertEqual(response.content, b"%PDF-INTERNO-FAKE")
-        self.assertIn("Relatório Financeiro Interno", FakeHTML.rendered_html)
-        self.assertIn("Total solicitado", FakeHTML.rendered_html)
-        self.assertIn("Total aprovado", FakeHTML.rendered_html)
-        self.assertIn("Diferença removida", FakeHTML.rendered_html)
+        self.assertIn("Relatório de Despesa de Viagem", FakeHTML.rendered_html)
+        self.assertIn("Resumo contábil", FakeHTML.rendered_html)
+        self.assertIn("Beneficiário do reembolso", FakeHTML.rendered_html)
+        self.assertIn("Técnicos participantes", FakeHTML.rendered_html)
         self.assertIn("Almoço com valor ajustado", FakeHTML.rendered_html)
         self.assertIn("Pedágio sem comprovante", FakeHTML.rendered_html)
         self.assertIn("REJEITADO", FakeHTML.rendered_html)
         self.assertIn("AJUSTADO", FakeHTML.rendered_html)
         self.assertIn("Comprovante ausente.", FakeHTML.rendered_html)
-        self.assertIn("Atenções identificadas", FakeHTML.rendered_html)
-        self.assertIn("Histórico resumido", FakeHTML.rendered_html)
-        self.assertIn("Relatório enviado para conferência", FakeHTML.rendered_html)
-        self.assertIn("Gerado por financeiro", FakeHTML.rendered_html)
+        self.assertIn("CONTROLSUL GESTÃO EMPRESARIAL", FakeHTML.rendered_html)
+
+    def test_pdf_interno_nao_disponivel_em_conferencia(self):
+        relatorio = self.criar_relatorio("RT-2026-PDF-CONFERENCIA")
+        relatorio.status = StatusRelatorio.CONFERENCIA
+        relatorio.save(update_fields=["status"])
+        resposta = self.client.get(reverse("relatorios:relatorio_pdf_interno", kwargs={"pk": relatorio.pk}))
+        self.assertRedirects(resposta, reverse("relatorios:relatorio_detail", kwargs={"pk": relatorio.pk}))
 
 
 class EmailServiceTests(TestCase):
