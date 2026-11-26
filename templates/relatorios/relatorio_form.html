@@ -272,14 +272,16 @@
                     <div class="form-text small" id="empresa-grupo-feedback"></div>
                   </div>
 
-                  <div class="col-md-6" data-tour="relatorio-clientes" id="clientes-relatorio-wrapper">
+                  <div class="col-12">
+                  <div class="row g-3" id="relatorio-participantes">
+                  <div class="col-md-4" data-tour="relatorio-clientes" id="clientes-relatorio-wrapper">
                     <label class="form-label fw-medium small text-muted"
                            id="clientes-relatorio-label">Clientes *</label>
                     <input type="hidden"
                            name="clientes_relatorio"
                            id="id_clientes_relatorio"
                            value="{{ clientes_selecionados_ids|join:',' }}">
-                    <div class="border rounded-2 bg-body-tertiary px-3 py-2 d-flex align-items-center justify-content-between gap-2"
+                    <div class="border rounded-2 bg-body-tertiary px-3 py-2 d-flex flex-wrap align-items-center justify-content-between gap-2"
                          id="clientes-relatorio-control">
                       <div class="min-w-0" id="clientes-relatorio-resumo">
                         <div class="small text-muted mb-1">
@@ -300,7 +302,7 @@
                         <span>Não aplicável. A empresa responsável pelo custo é definida no campo acima.</span>
                       </div>
                       <button type="button"
-                              class="btn btn-outline-secondary btn-sm text-nowrap"
+                              class="btn btn-outline-secondary btn-sm mw-100"
                               id="btn-selecionar-clientes-relatorio"
                               data-bs-toggle="modal"
                               data-bs-target="#modalSelecionarClientes"
@@ -311,14 +313,13 @@
                     <div class="invalid-feedback d-block small erro-clientes-relatorio"></div>
                   </div>
 
-                  <div class="col-md-6" data-tour="relatorio-tecnicos">
+                  <div class="col-md-4" data-tour="relatorio-tecnicos">
                     <label class="form-label fw-medium small text-muted">Técnicos *</label>
                     <div class="d-none">
                       {{ form.tecnico_responsavel }}
                       {{ form.tecnicos_equipe }}
-                      {{ form.tecnico_reembolso }}
                     </div>
-                    <div class="border rounded-2 bg-body-tertiary px-3 py-2 d-flex align-items-center justify-content-between gap-2">
+                    <div class="border rounded-2 bg-body-tertiary px-3 py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
                       <div class="min-w-0">
                         <div class="small text-muted mb-1">
                           <span id="tecnicos-equipe-contador">{{ tecnicos_selecionados_ids|length }}</span>
@@ -333,7 +334,7 @@
                         </div>
                       </div>
                       <button type="button"
-                              class="btn btn-outline-secondary btn-sm text-nowrap"
+                              class="btn btn-outline-secondary btn-sm mw-100"
                               data-bs-toggle="modal"
                               data-bs-target="#modalSelecionarTecnicos">
                         <i class="bi bi-person-plus me-1"></i>Selecionar técnicos
@@ -345,10 +346,24 @@
                     {% if form.tecnicos_equipe.errors %}
                       <div class="text-danger small mt-1">{{ form.tecnicos_equipe.errors.0 }}</div>
                     {% endif %}
-                    {% if form.tecnico_reembolso.errors %}
-                      <div class="text-danger small mt-1">{{ form.tecnico_reembolso.errors.0 }}</div>
-                    {% endif %}
                     <div class="invalid-feedback d-block small erro-tecnicos-relatorio"></div>
+                  </div>
+                  <div class="col-md-4">
+                    <label for="tecnico-reembolso-seletor" class="form-label fw-medium small text-muted">Quem receberá o reembolso?</label>
+                    {{ form.tecnico_reembolso }}
+                    <select id="tecnico-reembolso-seletor" class="form-select form-select-sm" disabled
+                            {% if form.tecnico_reembolso.errors %}aria-invalid="true"{% endif %}
+                            aria-describedby="tecnico-reembolso-sugestao tecnico-reembolso-erro">
+                      <option value=""></option>
+                    </select>
+                    <div id="tecnico-reembolso-sugestao" class="form-text small" role="status"></div>
+                    <div id="tecnico-reembolso-erro" class="text-danger small mt-1" aria-live="polite">
+                    {% if form.tecnico_reembolso.errors %}
+                      {{ form.tecnico_reembolso.errors.0 }}
+                    {% endif %}
+                    </div>
+                  </div>
+                  </div>
                   </div>
 
                   <div class="col-12" data-tour="relatorio-motivo-clientes">
@@ -1267,23 +1282,6 @@
     .cliente-selecao-bloqueada .btn:disabled {
       opacity: .55;
     }
-    .badge-definir-reembolso {
-      border: 0;
-      border-radius: 999px;
-      box-shadow: none;
-      font-size: .62rem;
-      font-weight: 600;
-      line-height: 1;
-      min-height: auto;
-      padding: .16rem .38rem !important;
-    }
-    .tecnico-reembolso-pill {
-      border-radius: 999px;
-      font-size: .62rem;
-      font-weight: 600;
-      line-height: 1;
-      padding: .18rem .42rem;
-    }
     #autosave-status {
       border: 1px solid var(--bs-border-color);
       font-size: .72rem;
@@ -1439,7 +1437,7 @@
           {{ empresas_grupo_clientes|json_script:"empresas-grupo-clientes-data" }}
           <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
           <script src="https://cdn.jsdelivr.net/npm/driver.js@latest/dist/driver.js.iife.js"></script>
-          <script defer src="{% static 'js/relatorio_autosave.js' %}?v={{ static_version|default:'20260807' }}"></script>
+          <script defer src="{% static 'js/relatorio_autosave.js' %}?v={{ static_version|default:'20260807' }}-beneficiario-1"></script>
           <script defer src="{% static 'js/relatorio_upload_monitor.js' %}?v={{ static_version|default:'20260812-async-upload' }}"></script>
           <script defer src="{% static 'js/relatorio_form_tour.js' %}?v={{ static_version|default:'20260807' }}"></script>
           <script defer src="{% static 'js/relatorio_novidades_tour.js' %}?v={{ static_version|default:'20260811' }}"></script>
@@ -1478,6 +1476,7 @@
     _idxDesp = Number(document.getElementById("id_despesas-TOTAL_FORMS")?.value || _idxDesp) || _idxDesp;
     _idxKm = Number(document.getElementById("id_trechos-TOTAL_FORMS")?.value || _idxKm) || _idxKm;
     atualizarBadgesAbasSeguro();
+    atualizarBadgesTecnicosEquipe();
     atualizarBadgesTecnicosDespesas();
   });
 
@@ -1793,7 +1792,9 @@
   function setTecnicoReembolso(id) {
     const input = getTecnicoReembolsoInput();
     if (!input) return;
-    input.value = id || "";
+    const valor = String(id || "");
+    if (input.value === valor) return;
+    input.value = valor;
     input.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
@@ -1809,13 +1810,11 @@
     return Array.from(new Set(ids.map(String).filter(Boolean)));
   }
 
-  function setTecnicosEquipe(ids) {
+  function setTecnicosEquipe(ids, { novaSelecao = false } = {}) {
+    const anteriores = getTecnicosEquipeIds();
     const valores = Array.from(new Set((ids || []).map(String).filter(Boolean)));
     const responsavel = getTecnicoResponsavelSelect();
-    if (responsavel) {
-      responsavel.value = valores[0] || "";
-      responsavel.dispatchEvent(new Event("change", { bubbles: true }));
-    }
+    if (responsavel) responsavel.value = valores[0] || "";
 
     const selecionados = new Set(valores.slice(1));
     const select = getTecnicosEquipeSelect();
@@ -1823,40 +1822,58 @@
     Array.from(select.options).forEach(option => {
       option.selected = selecionados.has(option.value);
     });
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-    const reembolsoAtual = getTecnicoReembolsoId();
-    if (!valores.includes(reembolsoAtual)) {
-      setTecnicoReembolso(valores.length === 1 ? valores[0] : "");
-    } else if (!reembolsoAtual && valores.length === 1) {
-      setTecnicoReembolso(valores[0]);
+    const atuais = getTecnicosEquipeIds();
+    const mudouEquipe = atuais.length !== anteriores.length || atuais.some(id => !anteriores.includes(id));
+    if (novaSelecao || mudouEquipe) {
+      setTecnicoReembolso(atuais.length === 1 ? atuais[0] : "");
+      limparErroTecnicoReembolso();
     }
+    responsavel?.dispatchEvent(new Event("change", { bubbles: true }));
+    select.dispatchEvent(new Event("change", { bubbles: true }));
   }
+
+  function limparErroTecnicoReembolso() {
+    const erro = document.getElementById("tecnico-reembolso-erro");
+    if (erro) erro.textContent = "";
+    document.getElementById("tecnico-reembolso-seletor")?.removeAttribute("aria-invalid");
+  }
+
+  function atualizarSeletorTecnicoReembolso(ids) {
+    const seletor = document.getElementById("tecnico-reembolso-seletor");
+    const sugestao = document.getElementById("tecnico-reembolso-sugestao");
+    if (!seletor || !sugestao) return;
+    const beneficiario = getTecnicoReembolsoId();
+    const idSugerido = getTecnicoReembolsoInput()?.dataset.tecnicoSugerido;
+    const valido = ids.length === 1 ? ids[0] : ids.includes(beneficiario) ? beneficiario : "";
+
+    seletor.replaceChildren(new Option(ids.length > 1 ? "Selecione um técnico" : "", ""));
+    ids.forEach(id => seletor.add(new Option(getNomeTecnico(id), id)));
+    seletor.disabled = ids.length === 0;
+    seletor.value = valido;
+    setTecnicoReembolso(valido);
+    sugestao.textContent = ids.length > 1 && !valido && ids.includes(idSugerido)
+      ? "Sugestão: " + getNomeTecnico(idSugerido)
+      : "";
+  }
+
+  document.getElementById("tecnico-reembolso-seletor")?.addEventListener("change", event => {
+    const ids = getTecnicosEquipeIds();
+    setTecnicoReembolso(ids.includes(event.target.value) ? event.target.value : "");
+    limparErroTecnicoReembolso();
+    atualizarSeletorTecnicoReembolso(ids);
+  });
 
   function atualizarBadgesTecnicosEquipe() {
     const ids = getTecnicosEquipeIds();
     const contador = document.getElementById("tecnicos-equipe-contador");
     const badges = document.getElementById("tecnicos-equipe-badges");
-    let reembolsoId = getTecnicoReembolsoId();
-    if (!reembolsoId && ids.length === 1) {
-      setTecnicoReembolso(ids[0]);
-      reembolsoId = ids[0];
-    } else if (reembolsoId && !ids.includes(reembolsoId)) {
-      const novoReembolso = ids.length === 1 ? ids[0] : "";
-      setTecnicoReembolso(novoReembolso);
-      reembolsoId = novoReembolso;
-    }
+    atualizarSeletorTecnicoReembolso(ids);
     if (contador) contador.textContent = ids.length;
     if (badges) {
       badges.innerHTML = ids.length
         ? ids.map(id => `
-            <span class="badge rounded-pill ${id === reembolsoId ? "text-bg-primary" : "text-bg-secondary"} d-inline-flex align-items-center gap-1">
+            <span class="badge rounded-pill text-bg-secondary d-inline-flex align-items-center gap-1">
               <span>${escapeHtmlMapa(getNomeTecnico(id))}</span>
-              ${id === reembolsoId
-                ? '<span class="badge text-bg-light text-primary tecnico-reembolso-pill">Reembolso</span>'
-                : `<button type="button"
-                          class="btn btn-light badge-definir-reembolso"
-                          data-tecnico-id="${escapeHtmlMapa(id)}"
-                          title="Definir como técnico reembolsado">Reembolso</button>`}
               <button type="button"
                       class="btn-close btn-close-white badge-remove-tecnico"
                       data-tecnico-id="${escapeHtmlMapa(id)}"
@@ -3050,7 +3067,7 @@
       tecnicosImportados.push(...(dados.apoio_ids || []));
     }
     if (tecnicosImportados.length) {
-      setTecnicosEquipe(tecnicosImportados);
+      setTecnicosEquipe(tecnicosImportados, { novaSelecao: true });
       atualizarBadgesTecnicosEquipe();
     }
     const campoAdiantamento = campoPorNome("valor_adiantamento");
@@ -3116,14 +3133,6 @@
       });
     }
 
-    const definirReembolso = event.target.closest(".badge-definir-reembolso");
-    if (definirReembolso) {
-      const tecnicoId = String(definirReembolso.dataset.tecnicoId || "");
-      if (getTecnicosEquipeIds().includes(tecnicoId)) {
-        setTecnicoReembolso(tecnicoId);
-        atualizarBadgesTecnicosEquipe();
-      }
-    }
   });
 
   document.getElementById("btn-confirmar-clientes")
@@ -3959,6 +3968,7 @@ function validarKmGlobal() {
       if (erroRelatorio) erroRelatorio.textContent = "";
       if (erroMotivos) erroMotivos.textContent = "";
       if (erroTecnicos) erroTecnicos.textContent = "";
+      limparErroTecnicoReembolso();
       if (!validarDatasFuturasFrontend(form)) {
         invalido = true;
         adicionarErroSubmit("Revise as datas informadas.");
@@ -4007,7 +4017,9 @@ function validarKmGlobal() {
         const empresaGrupo = document.querySelector('[name="empresa_grupo"]')?.value || "";
         if (tipoReembolso === "reembolsavel" && !tecnicoReembolso) {
           invalido = true;
-          if (erroTecnicos) erroTecnicos.textContent = "Selecione o técnico que receberá o reembolso.";
+          const erroReembolso = document.getElementById("tecnico-reembolso-erro");
+          if (erroReembolso) erroReembolso.textContent = "Selecione o técnico que receberá o reembolso.";
+          document.getElementById("tecnico-reembolso-seletor")?.setAttribute("aria-invalid", "true");
           adicionarErroSubmit("Selecione o técnico que receberá o reembolso.");
         }
         if (tipoReembolso === "nao_reembolsavel" && !empresaGrupo) {

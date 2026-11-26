@@ -3652,6 +3652,7 @@ def relatorio_form_view(request, pk=None):
                 request.POST,
                 request.FILES,
                 instance=instance,
+                usuario=request.user,
             )
 
             fs_desp = ItemDespesaFormSet(
@@ -4054,7 +4055,7 @@ def relatorio_form_view(request, pk=None):
 
                         with perf.phase("integrity"):
                             erros_integridade = validar_integridade_financeira_relatorio(
-                                relatorio
+                                relatorio, permitir_beneficiario_pendente=acao == "rascunho"
                             )
                         if erros_integridade:
                             raise WorkflowError(erros_integridade)
@@ -4297,7 +4298,7 @@ def relatorio_form_view(request, pk=None):
 
     # ── GET ───────────────────────────────────────────────────────────────────
     else:
-        form = RelatorioTecnicoForm(instance=instance)
+        form = RelatorioTecnicoForm(instance=instance, usuario=request.user)
 
         fs_cidades = CidadeAtendimentoFormSet(
             instance=instance,

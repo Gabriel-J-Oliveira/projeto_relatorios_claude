@@ -4733,6 +4733,7 @@ class RelatorioTecnicoFlowTests(TestCase):
             "autosave_key": "autosave-teste",
             "relatorio_id": str(relatorio.pk),
             "motivo": "Primeira versao",
+            "tecnico_reembolso": str(self.tecnico.pk),
             "despesas-TOTAL_FORMS": "1",
             "trechos-TOTAL_FORMS": "0",
         }
@@ -4753,7 +4754,70 @@ class RelatorioTecnicoFlowTests(TestCase):
         autosave = autosaves.get()
         self.assertEqual(autosave.relatorio, relatorio)
         self.assertEqual(autosave.payload["motivo"], "Segunda versao")
+        self.assertEqual(autosave.payload["tecnico_reembolso"], str(self.tecnico.pk))
         self.assertEqual(autosave.despesas_count, 2)
+
+    def test_beneficiario_multiplos_rascunho_edicao_e_post_invalido(self):
+        apoio = Tecnico.objects.create(nome="Apoio", email="apoio@example.com")
+        externo = Tecnico.objects.create(nome="Externo", email="externo@example.com")
+        url = reverse("relatorios:relatorio_create")
+        dados = self.dados_relatorio_com_despesa(tecnicos_equipe=[str(apoio.pk)], tecnico_reembolso="",
+            **{"despesas-0-tecnicos": str(self.tecnico.pk)})
+        resposta = self.client.post(url, {**dados, "acao": "enviar"})
+        self.assertContains(resposta, "Selecione o técnico que receberá o reembolso.")
+        self.assertFalse(RelatorioTecnico.objects.exists())
+        resposta = self.client.post(url, {**dados, "tecnico_reembolso": str(externo.pk)})
+        self.assertIn("tecnico_reembolso", resposta.context["form"].errors)
+        self.assertFalse(RelatorioTecnico.objects.exists())
+
+        resposta = self.client.post(url, dados)
+        self.assertEqual(resposta.status_code, 302, resposta.context and
+            [resposta.context["form"].errors, resposta.context["resumo_erros"]])
+        relatorio = RelatorioTecnico.objects.get()
+        self.assertIsNone(relatorio.tecnico_reembolso_id)
+        editar = reverse("relatorios:relatorio_update", args=[relatorio.pk])
+        self.assertIsNone(self.client.get(editar).context["form"]["tecnico_reembolso"].value())
+
+        resposta = self.client.post(url, {**dados, "tecnico_reembolso": str(apoio.pk), "data_inicio": "invalida"})
+        self.assertIn("data_inicio", resposta.context["form"].errors)
+        self.assertEqual(str(resposta.context["form"]["tecnico_reembolso"].value()), str(apoio.pk))
+
+        relatorio.tecnico_reembolso = apoio
+        relatorio.save(update_fields=["tecnico_reembolso"])
+        self.assertEqual(self.client.get(editar).context["form"]["tecnico_reembolso"].value(), apoio.pk)
+
+    def test_sugestao_exata_nao_confirma_beneficiario_e_rejeita_conflitos(self):
+        from .forms import sugerir_tecnico_reembolso
+
+        usuario = self.usuario_financeiro
+        self.tecnico.nome = usuario.get_full_name()
+        self.tecnico.save(update_fields=["nome"])
+        self.assertIsNone(sugerir_tecnico_reembolso(usuario))
+        self.tecnico.ad_username = usuario.username.upper()
+        self.tecnico.email = usuario.email
+        self.tecnico.save(update_fields=["ad_username", "email"])
+        self.assertEqual(sugerir_tecnico_reembolso(usuario), self.tecnico.pk)
+        campo = self.client.get(reverse("relatorios:relatorio_create")).context["form"]["tecnico_reembolso"]
+        self.assertEqual(campo.field.widget.attrs["data-tecnico-sugerido"], self.tecnico.pk)
+        self.assertIsNone(campo.value())
+        conflito = Tecnico.objects.create(nome="Outro", email="duplicado@example.com")
+        usuario.email = conflito.email
+        self.assertIsNone(sugerir_tecnico_reembolso(usuario))
+
+    def test_beneficiario_nao_e_copiado_na_duplicacao_ou_importacao(self):
+        apoio = Tecnico.objects.create(nome="Apoio", email="apoio@example.com")
+        original = self.criar_relatorio("RT-2026-BENEFICIARIO")
+        RelatorioTecnicoEquipe.objects.create(relatorio=original, tecnico=apoio)
+        original.tecnico_reembolso = apoio
+        original.save(update_fields=["tecnico_reembolso"])
+        dados = self.client.get(reverse("relatorios:relatorio_import_detail", args=[original.pk])).json()
+        self.assertEqual(dados["apoio_ids"], [apoio.pk])
+        self.assertNotIn("tecnico_reembolso", dados)
+        resposta = self.client.post(reverse("relatorios:relatorio_duplicate", args=[original.pk]))
+        self.assertEqual(resposta.status_code, 302)
+        copia = RelatorioTecnico.objects.exclude(pk=original.pk).get()
+        self.assertIsNone(copia.tecnico_reembolso_id)
+        self.assertTrue(copia.equipe.filter(tecnico=apoio).exists())
 
     def test_autosave_bloqueia_relatorio_fora_de_rascunho(self):
         relatorio = self.criar_relatorio("RT-2026-AUTOSAVE-BLOQUEADO")

@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django import forms
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.forms import inlineformset_factory, BaseInlineFormSet
 from django.utils import timezone
 from django.utils.text import slugify
@@ -33,6 +34,22 @@ from .validators import validar_anexo_upload
 
 
 logger = logging.getLogger(__name__)
+
+
+def sugerir_tecnico_reembolso(usuario):
+    if not getattr(usuario, "is_authenticated", False) or not usuario.is_active:
+        return None
+    username = (usuario.get_username() or "").strip()
+    email = (usuario.email or "").strip()
+    if not username and not email:
+        return None
+    identidade = Q()
+    if username:
+        identidade |= Q(ad_username__iexact=username) | Q(ad_user_principal_name__iexact=username)
+    if email:
+        identidade |= Q(email__iexact=email)
+    ids = list(Tecnico.objects.filter(identidade).values_list("pk", "ativo")[:2])
+    return ids[0][0] if len(ids) == 1 and ids[0][1] else None
 
 
 def _normalizar_numero_documento(valor):
@@ -472,7 +489,11 @@ class RelatorioTecnicoForm(BootstrapMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         kwargs.pop("numero_sugerido", None)
+        usuario = kwargs.pop("usuario", None)
         super().__init__(*args, **kwargs)
+        tecnico_sugerido = sugerir_tecnico_reembolso(usuario)
+        if tecnico_sugerido is not None:
+            self.fields["tecnico_reembolso"].widget.attrs["data-tecnico-sugerido"] = tecnico_sugerido
 
         self.fields["tecnico_responsavel"].queryset = Tecnico.objects.filter(
             ativo=True

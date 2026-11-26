@@ -338,7 +338,7 @@ def validar_documentos_unicos_relatorio(relatorio):
     return erros
 
 
-def validar_integridade_financeira_relatorio(relatorio):
+def validar_integridade_financeira_relatorio(relatorio, *, permitir_beneficiario_pendente=False):
     erros = []
     clientes_relatorio_ids = _clientes_relatorio_ids(relatorio)
     if not clientes_relatorio_ids:
@@ -352,7 +352,7 @@ def validar_integridade_financeira_relatorio(relatorio):
         or relatorio.trechos.exists()
         or (relatorio.km_excedente_interno or Decimal("0.00")) > 0
     )
-    if tem_pagamento_tecnico and not tecnico_reembolso_id:
+    if tem_pagamento_tecnico and not tecnico_reembolso_id and not permitir_beneficiario_pendente:
         erros.append("Selecione o técnico que receberá o reembolso.")
     if tecnico_reembolso_id and tecnico_reembolso_id not in envolvidos:
         erros.append("O técnico definido para reembolso deve estar entre os técnicos envolvidos no relatório.")

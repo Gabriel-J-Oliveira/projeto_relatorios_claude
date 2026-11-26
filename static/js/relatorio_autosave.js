@@ -79,6 +79,8 @@
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key).push(value && typeof value === "object" ? "" : String(value ?? ""));
     });
+    // FormData omits a multiple select when it has no selected options.
+    if (!grouped.has("tecnicos_equipe")) grouped.set("tecnicos_equipe", []);
 
     grouped.forEach((values, key) => {
       const fields = Array.from(form.querySelectorAll(`[name="${CSS.escape(key)}"]`));
