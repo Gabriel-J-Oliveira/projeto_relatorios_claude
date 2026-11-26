@@ -155,10 +155,6 @@
           <strong>{{ consulta.relatorio.tipo_reembolso_label }}</strong>
         </div>
         <div>
-          <span>Técnico reembolsado</span>
-          <strong>{{ consulta.relatorio.tecnico_reembolso_nome|default:"Não informado" }}</strong>
-        </div>
-        <div>
           <span>Area de gasto</span>
           <strong>{{ consulta.relatorio.tipo_relatorio_label|default:"Nao informado" }}</strong>
         </div>
@@ -166,8 +162,13 @@
     </div>
     <div class="consulta-status-panel">
       <span class="text-muted small">Resultado financeiro</span>
+      <div class="mt-3">
+        <span class="text-muted small">Beneficiário do reembolso</span>
+        <div class="consulta-beneficiario text-primary-emphasis fw-semibold"><i class="bi bi-person-badge me-2" aria-hidden="true"></i>{{ consulta.relatorio.tecnico_reembolso_nome|default:"Não informado" }}</div>
+      </div>
+      <hr>
+      <span class="text-muted small">{% if consulta.totais.total_a_reembolsar < 0 %}Valor a devolver à empresa{% elif consulta.totais.total_a_reembolsar == 0 %}Saldo final{% else %}Valor final a reembolsar{% endif %}</span>
       <strong data-testid="reembolso-final">R$ {{ consulta.totais.total_a_reembolsar|floatformat:2 }}</strong>
-      <small class="text-muted">Valor final a reembolsar ao técnico</small>
       <dl class="small mt-3 mb-0 consulta-composicao">
         <div><dt>Despesas reembolsáveis aprovadas</dt><dd>R$ {{ consulta.totais.total_despesas_reembolsaveis|floatformat:2 }}</dd></div>
         <div><dt>KM a ressarcir</dt><dd>R$ {{ consulta.totais.valor_km_ressarcir|floatformat:2 }}</dd></div>
@@ -645,10 +646,14 @@
   }
 
   .consulta-status-panel {
-    min-width: min(100%, 320px);
+    flex: 0 1 390px;
+    min-width: min(100%, 360px);
+    max-width: 100%;
     padding: 1.25rem;
     border-color: rgba(var(--bs-primary-rgb), .5);
   }
+
+  .consulta-beneficiario { font-size: 1.15rem; overflow-wrap: anywhere; }
 
   .consulta-composicao > div { display: flex; justify-content: space-between; gap: 1rem; margin-top: .65rem; }
   .consulta-composicao dt { font-weight: normal; }

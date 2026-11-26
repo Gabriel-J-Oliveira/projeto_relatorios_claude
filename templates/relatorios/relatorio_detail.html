@@ -911,6 +911,14 @@
       </div>
       <div class="card-body">
 
+        <div class="mb-3 pb-3 border-bottom">
+          <div class="text-muted small">Beneficiário do reembolso</div>
+          {% with tecnico_reembolso=relatorio.tecnico_reembolso_exibicao %}
+          <div class="fw-semibold fs-5 text-primary-emphasis" style="overflow-wrap: anywhere;"><i class="bi bi-person-badge me-2" aria-hidden="true"></i>{{ tecnico_reembolso.nome|default:"Não informado" }}</div>
+          {% endwith %}
+          <div class="text-muted small mt-2" id="resultado-financeiro-label">{% if relatorio.total_a_reembolsar < 0 %}Valor a devolver à empresa{% elif relatorio.total_a_reembolsar == 0 %}Saldo final{% else %}Valor final a reembolsar{% endif %}</div>
+        </div>
+
         <div class="d-flex flex-column gap-3 small">
           <div>
             <div class="fw-bold text-uppercase text-muted mb-2" style="font-size: .7rem;">Reembolso ao tecnico</div>
@@ -927,7 +935,7 @@
               <span class="fw-semibold text-danger" id="adiantamento-financeiro">R$ {{ relatorio.valor_adiantamento|floatformat:2 }}</span>
             </div>
             <div class="d-flex justify-content-between pt-2">
-              <span class="fw-bold">Total a reembolsar</span>
+              <span class="fw-bold">Saldo final</span>
               <span class="fw-bold text-success" id="saldo-aprovado-financeiro">R$ {{ relatorio.total_a_reembolsar|floatformat:2 }}</span>
             </div>
           </div>
@@ -970,17 +978,17 @@
         </div>
         {% endif %}
 
-        <div class="mt-3 p-3 rounded-3
+        <div id="resultado-financeiro-destaque" class="mt-3 p-3 rounded-3
              {% if relatorio.total_a_reembolsar >= 0 %}bg-success-subtle{% else %}bg-danger-subtle{% endif %}">
           <div class="d-flex justify-content-between align-items-center">
-            <span class="fw-bold">Total a reembolsar</span>
+            <span class="fw-bold">Saldo final</span>
             <span id="total-a-reembolsar-destaque"
                   class="fw-bold fs-5
                   {% if relatorio.total_a_reembolsar >= 0 %}text-success{% else %}text-danger{% endif %}">
               R$ {{ relatorio.total_a_reembolsar|floatformat:2 }}
             </span>
           </div>
-          <div class="small mt-1
+          <div id="resultado-financeiro-mensagem" data-nao-reembolsavel="{% if relatorio.tipo_reembolso == 'nao_reembolsavel' %}1{% else %}0{% endif %}" class="small mt-1
                {% if relatorio.total_a_reembolsar >= 0 %}text-success{% else %}text-danger{% endif %}">
             {% if relatorio.tipo_reembolso == 'nao_reembolsavel' %}
             <i class="bi bi-info-circle me-1"></i>
@@ -1915,12 +1923,29 @@
       if (despesasReembolsaveisEl) despesasReembolsaveisEl.textContent = formatMoney(totalDespesasReembolsaveis);
       if (kmRessarcirEl) kmRessarcirEl.textContent = formatMoney(totalKm);
       if (removidoEl) removidoEl.textContent = formatMoney(valorRemovidoReembolso);
+      atualizarRotuloSaldo(saldo);
       [saldoEl, saldoDestaqueEl].forEach(el => {
         if (!el) return;
         el.textContent = formatMoney(saldo);
         el.classList.toggle("text-success", saldo >= 0);
         el.classList.toggle("text-danger", saldo < 0);
       });
+    }
+
+    function atualizarRotuloSaldo(saldo) {
+      const label = document.getElementById("resultado-financeiro-label");
+      if (label) label.textContent = saldo < 0 ? "Valor a devolver à empresa" : saldo === 0 ? "Saldo final" : "Valor final a reembolsar";
+      const destaque = document.getElementById("resultado-financeiro-destaque");
+      destaque?.classList.toggle("bg-success-subtle", saldo >= 0);
+      destaque?.classList.toggle("bg-danger-subtle", saldo < 0);
+      const mensagem = document.getElementById("resultado-financeiro-mensagem");
+      if (mensagem) {
+        mensagem.classList.toggle("text-success", saldo >= 0);
+        mensagem.classList.toggle("text-danger", saldo < 0);
+        mensagem.textContent = mensagem.dataset.naoReembolsavel === "1"
+          ? "Custo assumido pela empresa do grupo; reembolso ao técnico mantido quando houver valores aprovados."
+          : saldo < 0 ? "Técnico deve devolver à empresa." : saldo === 0 ? "Contas zeradas." : "Empresa deve reembolsar o técnico.";
+      }
     }
 
     function aplicarResumoGlobal(resumo) {
@@ -1934,6 +1959,7 @@
       const saldoEl = document.getElementById("saldo-aprovado-financeiro");
       const saldoDestaqueEl = document.getElementById("total-a-reembolsar-destaque");
       const saldo = parseMoney(resumo.total_a_reembolsar || resumo.saldo_aprovado);
+      atualizarRotuloSaldo(saldo);
       [saldoEl, saldoDestaqueEl].forEach(el => {
         if (!el) return;
         el.textContent = formatMoney(saldo);
