@@ -5,7 +5,10 @@ const { chromium } = require('playwright');
 
 (async () => {
   const url = process.env.RELATORIO_URL;
-  const browser = await chromium.launch({ executablePath: process.env.RELATORIO_BROWSER });
+  const browser = await chromium.launch({
+    executablePath: process.env.RELATORIO_BROWSER,
+    ignoreDefaultArgs: ['--hide-scrollbars'],
+  });
   try {
     const context = await browser.newContext({ viewport: {width: 1440, height: 900} });
     await context.addCookies([{name: 'sessionid', value: process.env.RELATORIO_SESSION, url}]);
@@ -25,11 +28,18 @@ const { chromium } = require('playwright');
       if (query === 'Rua antiga') {
         await new Promise(resolve => { responderAntiga = resolve; receberAntiga(); });
       }
-      await route.fulfill({json: {success: true, data: [{
+      const resultado = {
         display_name: query + ', Cascavel - PR', nome: query, numero: '205',
         bairro: 'Santo Inácio', municipio: 'Cascavel', uf: 'PR',
         lat: -24.9, lon: -53.4, aproximado: true,
-      }]}});
+      };
+      const data = query === 'Rua com muitas opções'
+        ? Array.from({length: 5}, (_, i) => ({
+          ...resultado, nome: `Opção ${i + 1}: endereço com várias linhas na lista`,
+          divergente: true,
+        }))
+        : [resultado];
+      await route.fulfill({json: {success: true, data}});
     });
     await page.route('**/mapas/calcular-rota/**', async route => {
       rotas++;
@@ -105,6 +115,30 @@ const { chromium } = require('playwright');
     await (await respostaRota).finished();
     assert.equal(await linha.locator('.mapa-km-calculado').inputValue(), '');
     assert.match(await km.inputValue(), /^42/);
+
+    await origem.fill('Rua com muitas opções');
+    const lista = origem.locator('..').locator('.endereco-sugestoes');
+    await lista.getByRole('button', {name: /Opção 5/}).waitFor();
+    const cores = [];
+    for (const tema of ['light', 'dark']) {
+      await page.evaluate(tema => document.documentElement.setAttribute('data-bs-theme', tema), tema);
+      const estado = await lista.evaluate(el => ({
+        overflow: el.scrollHeight > el.clientHeight,
+        largura: getComputedStyle(el).scrollbarWidth,
+        cor: getComputedStyle(el).scrollbarColor,
+        contencao: getComputedStyle(el).overscrollBehaviorY,
+      }));
+      assert.equal(estado.overflow, true);
+      assert.equal(estado.largura, 'thin');
+      assert.equal(estado.contencao, 'contain');
+      assert.notEqual(estado.cor, 'auto');
+      cores.push(estado.cor);
+      if (out) await lista.screenshot({path: path.join(out, `scroll-${tema}.png`)});
+    }
+    assert.notEqual(cores[0], cores[1], 'A barra deve acompanhar o tema');
+    await lista.hover();
+    await page.mouse.wheel(0, 300);
+    await page.waitForFunction(el => el.scrollTop > 0, await lista.elementHandle());
   } finally {
     await browser.close();
   }

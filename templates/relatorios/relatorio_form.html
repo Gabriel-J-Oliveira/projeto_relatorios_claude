@@ -1240,11 +1240,25 @@
       left: 0;
       max-height: 220px;
       overflow-y: auto;
+      overscroll-behavior-y: contain;
+      scrollbar-width: thin;
+      scrollbar-color: var(--bs-secondary-color) var(--bs-tertiary-bg);
       position: absolute;
       width: min(19rem, calc(100vw - 2rem));
       top: calc(100% - 0.5rem);
       z-index: 3000;
       box-shadow: 0 .75rem 1.5rem rgba(15, 23, 42, .16);
+    }
+    .endereco-sugestoes::-webkit-scrollbar {
+      width: 8px;
+    }
+    .endereco-sugestoes::-webkit-scrollbar-track {
+      background: var(--bs-tertiary-bg);
+    }
+    .endereco-sugestoes::-webkit-scrollbar-thumb {
+      background: var(--bs-secondary-color);
+      border: 2px solid var(--bs-tertiary-bg);
+      border-radius: 8px;
     }
     .linha-trecho td {
       position: relative;
