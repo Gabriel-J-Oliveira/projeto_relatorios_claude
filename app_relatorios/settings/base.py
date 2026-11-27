@@ -232,6 +232,16 @@ CACHES = {
     }
 }
 DASHBOARD_CACHE_TTL = config("DASHBOARD_CACHE_TTL", default=180, cast=int)
+MAPS_GEOCODE_PROVIDER = config("MAPS_GEOCODE_PROVIDER", default="geoapify")
+GEOAPIFY_API_KEY = config("GEOAPIFY_API_KEY", default="")
+GEOAPIFY_DAILY_LIMIT = config("GEOAPIFY_DAILY_LIMIT", default=2700, cast=int)
+MAPS_REDIS_URL = config("MAPS_REDIS_URL", default="")
+if MAPS_REDIS_URL:
+    CACHES["geocoding"] = {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": MAPS_REDIS_URL,
+        "TIMEOUT": 86400,
+    }
 
 
 # ─── Chave primária padrão ────────────────────────────────────────────────────

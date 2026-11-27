@@ -5184,6 +5184,24 @@ class RelatorioTecnicoFlowTests(TestCase):
         )
         self.assertContains(detalhe, "A preencher")
 
+    def test_duplicacao_preserva_coordenadas_do_trecho_sem_alterar_original(self):
+        original = self.criar_relatorio("RT-2026-GEOCODE")
+        original.status = StatusRelatorio.APROVADO
+        original.save(update_fields=["status"])
+        trecho = TrechoKm.objects.create(
+            relatorio=original, ordem=0, data="2026-05-02",
+            origem="Cascavel", destino="Toledo", km=Decimal("42"),
+            origem_lat=Decimal("-24.955"), origem_lon=Decimal("-53.455"),
+            destino_lat=Decimal("-24.724"), destino_lon=Decimal("-53.743"),
+            km_calculado_api=Decimal("40"), fonte_calculo_rota="manual",
+        )
+        resposta = self.client.post(reverse("relatorios:relatorio_duplicate", args=[original.pk]))
+        self.assertEqual(resposta.status_code, 302)
+        copia = RelatorioTecnico.objects.exclude(pk=original.pk).get().trechos.get()
+        trecho.refresh_from_db()
+        for campo in ("origem_lat", "origem_lon", "destino_lat", "destino_lon", "km", "km_calculado_api", "fonte_calculo_rota"):
+            self.assertEqual(getattr(copia, campo), getattr(trecho, campo), campo)
+
     def test_endpoints_importacao_expoem_apenas_dados_operacionais(self):
         relatorio = self.criar_relatorio("RT-2026-013")
         relatorio.status = StatusRelatorio.APROVADO

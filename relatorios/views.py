@@ -5161,7 +5161,10 @@ def mapa_buscar_endereco_json(request):
 
     inicio = time.perf_counter()
     try:
-        resultados = buscar_endereco(query)
+        resultados = buscar_endereco(
+            query, modo=request.GET.get("modo", "autocomplete"),
+            contexto=request.GET.get("contexto") or None, localidade=request.GET.get("localidade", ""),
+        )
     except MapsServiceError as exc:
         return JsonResponse({"success": False, "error": str(exc)}, status=400)
     except Exception as exc:

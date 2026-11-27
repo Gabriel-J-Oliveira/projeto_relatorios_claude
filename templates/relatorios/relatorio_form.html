@@ -669,6 +669,7 @@
                     </button>
                   </div>
                   <div id="mapa-km-formulario" class="mapa-formulario-km"></div>
+                  <div class="small text-muted mt-1">Geocodificação por <a href="https://www.geoapify.com/" target="_blank" rel="noopener noreferrer">Geoapify</a> | Dados © OpenStreetMap contributors</div>
                   <div id="mapa-km-formulario-vazio"
                        class="text-muted small mt-2 d-none">
                     Preencha origem e destino para visualizar a rota.
@@ -1240,7 +1241,7 @@
       max-height: 220px;
       overflow-y: auto;
       position: absolute;
-      right: 0;
+      width: min(19rem, calc(100vw - 2rem));
       top: calc(100% - 0.5rem);
       z-index: 3000;
       box-shadow: 0 .75rem 1.5rem rgba(15, 23, 42, .16);
@@ -1248,6 +1249,9 @@
     .linha-trecho td {
       position: relative;
       overflow: visible;
+    }
+    .linha-trecho td:has(> .campo-endereco-mapa) {
+      min-width: 10rem;
     }
     .endereco-sugestao {
       cursor: pointer;
@@ -1437,7 +1441,7 @@
           {{ empresas_grupo_clientes|json_script:"empresas-grupo-clientes-data" }}
           <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
           <script src="https://cdn.jsdelivr.net/npm/driver.js@latest/dist/driver.js.iife.js"></script>
-          <script defer src="{% static 'js/relatorio_autosave.js' %}?v={{ static_version|default:'20260807' }}-beneficiario-1"></script>
+          <script defer src="{% static 'js/relatorio_autosave.js' %}?v={{ static_version|default:'20260807' }}-geocoding-1"></script>
           <script defer src="{% static 'js/relatorio_upload_monitor.js' %}?v={{ static_version|default:'20260812-async-upload' }}"></script>
           <script defer src="{% static 'js/relatorio_form_tour.js' %}?v={{ static_version|default:'20260807' }}"></script>
           <script defer src="{% static 'js/relatorio_novidades_tour.js' %}?v={{ static_version|default:'20260811' }}"></script>
@@ -1460,6 +1464,10 @@
   let _idxKm = {{ fs_km.total_form_count }};
   const enderecoTimers = new WeakMap();
   const enderecoSugestoesCache = new WeakMap();
+  const enderecoVersoes = new WeakMap();
+  const rotaVersoes = new WeakMap();
+  const pontosConfirmados = new WeakMap();
+  let enderecoEscolhaMapa = null;
   let mapaFormularioKm = null;
   let mapaFormularioKmLayers = null;
   let linhaTrechoSelecionadaMapa = null;
@@ -1478,6 +1486,8 @@
     atualizarBadgesAbasSeguro();
     atualizarBadgesTecnicosEquipe();
     atualizarBadgesTecnicosDespesas();
+    linhasAtivasFormulario(".linha-trecho").forEach(prepararLinhaMapaKm);
+    atualizarMapaFormulario();
   });
 
   document.addEventListener("click", (event) => {
@@ -2485,7 +2495,22 @@
     if (!container || typeof L === "undefined") return null;
     if (mapaFormularioKm) return mapaFormularioKm;
 
-    mapaFormularioKm = L.map(container, { scrollWheelZoom: true });
+    mapaFormularioKm = L.map(container, { scrollWheelZoom: true }).setView([-14.2, -51.9], 4);
+    mapaFormularioKm.on("click", event => {
+      const input = enderecoEscolhaMapa;
+      if (!input || !input.isConnected) return;
+      enderecoEscolhaMapa = null;
+      clearTimeout(enderecoTimers.get(input));
+      enderecoSugestoesCache.delete(input);
+      enderecoVersoes.set(input, (enderecoVersoes.get(input) || 0) + 1);
+      esconderSugestoesEndereco(input);
+      limparCoordenadasEndereco(input);
+      setCoordenadasEndereco(input, {lat: event.latlng.lat.toFixed(6), lon: event.latlng.lng.toFixed(6), display_name: input.value});
+      setAvisoEndereco(input, "Ponto confirmado manualmente no mapa.", "success");
+      input.form?.dispatchEvent(new Event("autosave:dirty"));
+      atualizarMapaFormulario();
+      tentarCalcularRotaLinha(input.closest(".linha-trecho"));
+    });
     L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
       maxZoom: 19,
       attribution: "Tiles &copy; Esri &mdash; Source: Esri, OpenStreetMap contributors and the GIS User Community",
@@ -2708,14 +2733,32 @@
     const lat = campoCoordenada(linha, papel, "lat");
     const lon = campoCoordenada(linha, papel, "lon");
     const completo = campoEnderecoCompleto(linha, papel);
-    if (lat) lat.value = resultado?.lat || "";
-    if (lon) lon.value = resultado?.lon || "";
+    if (lat) lat.value = resultado?.lat ?? "";
+    if (lon) lon.value = resultado?.lon ?? "";
     if (completo) completo.value = resultado?.display_name || input?.value || "";
+    if (resultado) pontosConfirmados.set(input, input.value);
+    else if (input) pontosConfirmados.delete(input);
   }
 
   function limparCoordenadasEndereco(input) {
     setCoordenadasEndereco(input, null);
-    const rotaGeojson = input?.closest(".linha-trecho")?.querySelector(".mapa-rota-geojson");
+    const linha = input?.closest(".linha-trecho");
+    if (linha) {
+      rotaVersoes.set(linha, (rotaVersoes.get(linha) || 0) + 1);
+      const kmInput = linha.querySelector(".campo-km");
+      const valorCalculado = normalizarNumero(linha.dataset.kmCalculado);
+      if (kmInput && valorCalculado && normalizarNumero(kmInput.value) === valorCalculado && linha.querySelector(".mapa-fonte-rota")?.value === "OSRM") {
+        kmInput.value = "";
+        kmInput.dispatchEvent(new Event("input", {bubbles: true}));
+      }
+      delete linha.dataset.kmCalculado;
+      for (const selector of [".mapa-km-calculado", ".mapa-km-diferenca", ".mapa-fonte-rota"]) {
+        const campo = linha.querySelector(selector);
+        if (campo) campo.value = "";
+      }
+      linha.classList.remove("km-divergente");
+    }
+    const rotaGeojson = linha?.querySelector(".mapa-rota-geojson");
     if (rotaGeojson) rotaGeojson.value = "{}";
     atualizarMapaFormulario();
   }
@@ -2759,18 +2802,39 @@
     box.classList.add("d-none");
   }
 
-  async function buscarSugestoesEndereco(input) {
+  async function buscarSugestoesEndereco(input, modo = "autocomplete") {
     const query = String(input?.value || "").trim();
+    const versao = (enderecoVersoes.get(input) || 0) + 1;
+    enderecoVersoes.set(input, versao);
     if (query.length < 4) {
       esconderSugestoesEndereco(input);
       return [];
     }
-    const params = new URLSearchParams({ q: query });
-    const response = await fetch(`${URL_MAPAS_BUSCAR_ENDERECO}?${params.toString()}`, {
+    const params = new URLSearchParams({ q: query, modo });
+    const cidade = document.getElementById("id_cidade_atendimento")?.value;
+    const uf = document.getElementById("id_uf_atendimento")?.value;
+    if (cidade) params.set("localidade", [cidade, uf].filter(Boolean).join(" - "));
+    const linha = input.closest(".linha-trecho");
+    const outro = input.dataset.mapRole === "origem" ? "destino" : "origem";
+    const lat = campoCoordenada(linha, outro, "lat")?.value;
+    const lon = campoCoordenada(linha, outro, "lon")?.value;
+    const outroInput = campoEndereco(linha, outro);
+    if (lat && lon && outroInput && pontosConfirmados.get(outroInput) === outroInput.value) {
+      params.set("contexto", `${lat},${lon}`);
+    }
+    const atual = () => input.isConnected && versao === enderecoVersoes.get(input) && query === String(input.value || "").trim();
+    let response, payload;
+    try {
+      response = await fetch(`${URL_MAPAS_BUSCAR_ENDERECO}?${params.toString()}`, {
       headers: { "X-Requested-With": "XMLHttpRequest" },
       credentials: "same-origin",
-    });
-    const payload = await response.json();
+      });
+      payload = await response.json();
+    } catch (error) {
+      if (!atual()) return null;
+      throw error;
+    }
+    if (!atual()) return null;
     if (!response.ok || !payload.success) {
       throw new Error(payload.error || "Erro ao buscar endereço.");
     }
@@ -2781,7 +2845,7 @@
   function renderizarSugestoesEndereco(input, resultados) {
     const box = input?.closest("td")?.querySelector(".endereco-sugestoes");
     if (!box) return;
-    if (!resultados.length) {
+    if (!resultados || !resultados.length) {
       esconderSugestoesEndereco(input);
       return;
     }
@@ -2789,7 +2853,10 @@
       <button type="button"
               class="dropdown-item endereco-sugestao small text-wrap"
               data-endereco-index="${index}">
-        ${item.display_name}
+        <span class="d-block fw-semibold">${escapeHtmlMapa([item.nome, item.numero].filter(Boolean).join(", ") || item.display_name)}</span>
+        <span class="d-block text-body-secondary">${escapeHtmlMapa([item.bairro, item.municipio, item.uf].filter(Boolean).join(" · ") || (item.nome ? item.display_name : ""))}</span>
+        ${item.aproximado ? '<span class="text-body-secondary">Localização aproximada</span>' : ''}
+        ${item.divergente ? '<span class="d-block text-body-secondary">Fora do município de referência</span>' : ''}
       </button>
     `).join("");
     box.classList.remove("d-none");
@@ -2802,33 +2869,27 @@
       setAvisoEndereco(input, "");
       return null;
     }
-    try {
-      const resultados = await buscarSugestoesEndereco(input);
-      const escolhido = resultados[0] || null;
-      if (!escolhido) {
-        limparCoordenadasEndereco(input);
-        setAvisoEndereco(input, "Não foi possível localizar este endereço. Informe o KM manualmente.");
-        return null;
-      }
-      setCoordenadasEndereco(input, escolhido);
-      setAvisoEndereco(input, silencioso ? "" : "Endereço localizado automaticamente.", "success");
-      return escolhido;
-    } catch (error) {
-      limparCoordenadasEndereco(input);
-      setAvisoEndereco(input, "Não foi possível localizar este endereço. Informe o KM manualmente.");
-      logFormError("geocodificar_endereco_erro", error, { query });
-      return null;
-    }
+    const linha = input.closest(".linha-trecho");
+    const papel = input.dataset.mapRole;
+    if (campoCoordenada(linha, papel, "lat")?.value && campoCoordenada(linha, papel, "lon")?.value) return true;
+    if (!silencioso) setAvisoEndereco(input, "Selecione uma sugestão ou informe o KM manualmente.");
+    return null;
   }
 
   function selecionarSugestaoEndereco(input, index) {
     const sugestoes = enderecoSugestoesCache.get(input) || [];
     const selecionado = sugestoes[Number(index)];
     if (!selecionado) return;
+    clearTimeout(enderecoTimers.get(input));
+    enderecoEscolhaMapa = null;
+    limparCoordenadasEndereco(input);
     input.value = selecionado.display_name;
+    enderecoVersoes.set(input, (enderecoVersoes.get(input) || 0) + 1);
     setCoordenadasEndereco(input, selecionado);
-    setAvisoEndereco(input, "");
+    setAvisoEndereco(input, selecionado.aproximado ? "Ponto aproximado confirmado. Confira a posição no mapa." : "", "warning");
     esconderSugestoesEndereco(input);
+    input.form?.dispatchEvent(new Event("autosave:dirty"));
+    atualizarMapaFormulario();
     tentarCalcularRotaLinha(input.closest(".linha-trecho"));
   }
 
@@ -2837,12 +2898,9 @@
     const origem = campoEndereco(linha, "origem");
     const destino = campoEndereco(linha, "destino");
     if (!origem?.value || !destino?.value) return;
-
-    if (!campoCoordenada(linha, "origem", "lat")?.value) {
-      await geocodificarTextoLivre(origem, { silencioso: true });
-    }
-    if (!campoCoordenada(linha, "destino", "lat")?.value) {
-      await geocodificarTextoLivre(destino, { silencioso: true });
+    if (pontosConfirmados.get(origem) !== origem.value || pontosConfirmados.get(destino) !== destino.value) {
+      setFeedbackRota(linha, "Confirme a origem e o destino para calcular uma nova rota.", "muted");
+      return;
     }
 
     const params = new URLSearchParams({
@@ -2852,6 +2910,8 @@
       destino_lon: campoCoordenada(linha, "destino", "lon")?.value || "",
     });
     if (Array.from(params.values()).some(valor => !valor)) return;
+    const versao = (rotaVersoes.get(linha) || 0) + 1;
+    rotaVersoes.set(linha, versao);
 
     setFeedbackRota(linha, "Calculando rota...", "muted");
     try {
@@ -2860,11 +2920,13 @@
         credentials: "same-origin",
       });
       const payload = await response.json();
+      if (!linha.isConnected || linhaEstaRemovida(linha) || rotaVersoes.get(linha) !== versao) return;
       if (!response.ok || !payload.success) {
         throw new Error(payload.error || "Erro ao calcular rota.");
       }
       aplicarResultadoRota(linha, payload.data);
     } catch (error) {
+      if (rotaVersoes.get(linha) !== versao) return;
       setFeedbackRota(linha, "Não foi possível calcular a rota. Informe o KM manualmente.", "warning");
       const fonteHidden = linha?.querySelector(".mapa-fonte-rota");
       if (fonteHidden) fonteHidden.value = "manual";
@@ -2884,10 +2946,12 @@
     const fonteHidden = linha.querySelector(".mapa-fonte-rota");
     const geojsonHidden = linha.querySelector(".mapa-rota-geojson");
     if (calculadoHidden) calculadoHidden.value = km.toFixed(2);
-    if (fonteHidden) fonteHidden.value = "OSRM";
+    if (fonteHidden) fonteHidden.value = String(campoKm.value || "").trim() ? "manual" : "OSRM";
     if (geojsonHidden) geojsonHidden.value = JSON.stringify(resultado?.rota_geojson || resultado?.geometria || {});
-    campoKm.value = km.toFixed(2).replace(".", ",");
-    campoKm.dispatchEvent(new Event("input", { bubbles: true }));
+    if (!String(campoKm.value || "").trim()) {
+      campoKm.value = km.toFixed(2).replace(".", ",");
+      campoKm.dispatchEvent(new Event("input", { bubbles: true }));
+    }
     calcularTrechoKm(campoKm);
     recalcular();
     validarDivergenciaKm(linha);
@@ -2897,6 +2961,7 @@
       mapa.innerHTML = `<i class="bi bi-map me-1"></i>Última rota calculada: ${km.toFixed(2).replace(".", ",")} km. O desenho no mapa será adicionado na próxima fase.`;
     }
     atualizarMapaFormulario();
+    campoKm.form?.dispatchEvent(new Event("autosave:dirty"));
   }
 
   function validarDivergenciaKm(linha) {
@@ -3338,10 +3403,7 @@ async function adicionarLinhaKm() {
     copiar("origem_lat", "destino_lat");
     copiar("origem_lon", "destino_lon");
     copiar("km", "km");
-    copiar("km_calculado_api", "km_calculado_api");
     copiar("km_informado", "km_informado");
-    copiar("diferenca_km_percentual", "diferenca_km_percentual");
-    copiar("fonte_calculo_rota", "fonte_calculo_rota");
     copiar("valor_km", "valor_km");
     copiar("clientes", "clientes");
 
@@ -3709,9 +3771,35 @@ function validarKmGlobal() {
 }
 
   // Inicialização imediata (sem Alpine em modo não-defer)
+  document.addEventListener("focusin", function (event) {
+    const input = event.target.closest(".campo-endereco-mapa");
+    const celula = input?.closest("td");
+    if (celula && !celula.querySelector(".escolher-ponto-mapa")) {
+      const botao = document.createElement("button");
+      botao.type = "button";
+      botao.className = "btn btn-link btn-sm p-0 escolher-ponto-mapa";
+      botao.title = "Selecionar ponto no mapa";
+      botao.setAttribute("aria-label", botao.title);
+      botao.innerHTML = '<i class="bi bi-geo-alt" aria-hidden="true"></i>';
+      celula.appendChild(botao);
+      const buscar = document.createElement("button");
+      buscar.type = "button";
+      buscar.className = "btn btn-link btn-sm p-0 me-2 buscar-endereco-completo";
+      buscar.title = "Buscar endereço";
+      buscar.setAttribute("aria-label", buscar.title);
+      buscar.innerHTML = '<i class="bi bi-search" aria-hidden="true"></i>';
+      celula.insertBefore(buscar, botao);
+    }
+  });
+
   document.addEventListener("input", function (event) {
     const endereco = event.target.closest(".campo-endereco-mapa");
-    if (endereco) {
+    if (endereco && !event.target.form?.dataset.restaurandoAutosave) {
+      if (enderecoEscolhaMapa === endereco) enderecoEscolhaMapa = null;
+      enderecoVersoes.set(endereco, (enderecoVersoes.get(endereco) || 0) + 1);
+      const versaoInput = enderecoVersoes.get(endereco);
+      enderecoSugestoesCache.delete(endereco);
+      esconderSugestoesEndereco(endereco);
       limparCoordenadasEndereco(endereco);
       setAvisoEndereco(endereco, "");
       setFeedbackRota(endereco.closest(".linha-trecho"), "");
@@ -3719,21 +3807,52 @@ function validarKmGlobal() {
       enderecoTimers.set(endereco, setTimeout(async () => {
         try {
           const resultados = await buscarSugestoesEndereco(endereco);
-          renderizarSugestoesEndereco(endereco, resultados);
+          if (resultados !== null) renderizarSugestoesEndereco(endereco, resultados);
         } catch (error) {
+          if (enderecoVersoes.get(endereco) !== versaoInput + 1) return;
           esconderSugestoesEndereco(endereco);
-          logFormError("buscar_sugestoes_endereco_erro", error, { query: endereco.value });
+          setAvisoEndereco(endereco, "Busca indisponível. Você pode preencher o KM manualmente.");
         }
-      }, 450));
+      }, 700));
     }
 
     const km = event.target.closest(".campo-km");
     if (km) {
+      if (event.isTrusted) {
+        const fonte = km.closest(".linha-trecho")?.querySelector(".mapa-fonte-rota");
+        if (fonte) fonte.value = "manual";
+      }
       validarDivergenciaKm(km.closest(".linha-trecho"));
     }
   });
 
   document.addEventListener("click", function (event) {
+    const buscar = event.target.closest(".buscar-endereco-completo");
+    if (buscar) {
+      const input = buscar.closest("td")?.querySelector(".campo-endereco-mapa");
+      if (!input) return;
+      clearTimeout(enderecoTimers.get(input));
+      buscarSugestoesEndereco(input, "search").then(resultados => {
+        if (resultados === null) return;
+        renderizarSugestoesEndereco(input, resultados);
+        setAvisoEndereco(input, resultados.length ? "" : "Nenhum endereço encontrado. Escolha um ponto no mapa ou informe o KM.");
+      }).catch(() => setAvisoEndereco(input, "Busca indisponível. Você pode preencher o KM manualmente."));
+      return;
+    }
+    const botaoMapa = event.target.closest(".escolher-ponto-mapa");
+    if (botaoMapa) {
+      const input = botaoMapa.closest("td")?.querySelector(".campo-endereco-mapa");
+      if (!input?.value.trim()) { setAvisoEndereco(input, "Informe o endereço antes de selecionar o ponto."); return; }
+      enderecoEscolhaMapa = input;
+      if (!inicializarMapaFormulario()) {
+        enderecoEscolhaMapa = null;
+        setAvisoEndereco(input, "Mapa indisponível. Informe o KM manualmente.");
+        return;
+      }
+      document.getElementById("mapa-km-formulario")?.scrollIntoView({behavior: "smooth", block: "center"});
+      setAvisoEndereco(input, "Clique no mapa para confirmar este ponto.");
+      return;
+    }
     const sugestao = event.target.closest(".endereco-sugestao");
     if (sugestao) {
       const input = sugestao.closest("td")?.querySelector(".campo-endereco-mapa");
@@ -3752,11 +3871,9 @@ function validarKmGlobal() {
   document.addEventListener("blur", function (event) {
     const endereco = event.target.closest(".campo-endereco-mapa");
     if (!endereco) return;
-    setTimeout(async () => {
-      esconderSugestoesEndereco(endereco);
-      await geocodificarTextoLivre(endereco, { silencioso: true });
-      await tentarCalcularRotaLinha(endereco.closest(".linha-trecho"));
-    }, 200);
+    if (!event.relatedTarget?.closest(".endereco-sugestoes, .escolher-ponto-mapa, .buscar-endereco-completo")) {
+      geocodificarTextoLivre(endereco);
+    }
   }, true);
 
   Object.assign(window, {

@@ -188,7 +188,12 @@
         const corpoKm = document.getElementById("corpo-trechos");
         if (corpoKm) corpoKm.innerHTML = data.trechosHtml;
       }
-      applyEntries(form, data.entries);
+      form.dataset.restaurandoAutosave = "1";
+      try {
+        applyEntries(form, data.entries);
+      } finally {
+        delete form.dataset.restaurandoAutosave;
+      }
       restoring = false;
       window.dispatchEvent(new CustomEvent("relatorio:autosave-restored"));
       dirty = true;
